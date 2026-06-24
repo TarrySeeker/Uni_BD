@@ -120,8 +120,8 @@ describe('config/settings — home merge', () => {
   it('пустая БД → home = HOME_DEFAULTS (фолбэк витрины)', () => {
     const eff = mergeSettings(envWith(), []);
     expect(eff.home).toEqual(HOME_DEFAULTS);
-    // дефолты непустые — совпадают с текущей витриной.
-    expect(eff.home.about.title).toBe('О бренде');
+    // дефолты непустые — нейтральный коробочный фолбэк платформы.
+    expect(eff.home.about.title).toBe('О магазине');
     expect(eff.home.quality.items.length).toBeGreaterThan(0);
     expect(eff.home.delivery.items.length).toBe(3);
   });
