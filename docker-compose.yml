@@ -1,0 +1,381 @@
+# =============================================================================
+# Admik — docker compose: весь стек одного магазина
+# =============================================================================
+# Запуск:  docker compose up -d
+# Поднимает: app (Next.js) + postgres + redis + minio + caddy.
+# ВСЕ секреты и параметры берутся из .env (env_file / ${...}).
+# В этом файле НЕТ ни одного хардкод-пароля.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Приложение (Next.js standalone, собирается из Dockerfile)
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Детерминированное имя собранного образа. Нужно для ЧЕСТНОГО отката
+    # scripts/update.sh (бэклог Этапа 6, пункт a): перед сборкой нового образа
+    # текущий тегируется как образ-снимок, и при провале откат ВОЗВРАЩАЕТ его
+    # без пересборки. Переопределяется через .env (APP_IMAGE), дефолт ниже.
+    image: ${APP_IMAGE:-admik-app:current}
+    # Все секреты/параметры берутся из .env. ВАЖНО (least-privilege, ADR-002/ADR-006):
+    # рантайм подключается к БД по DATABASE_URL под ролью admik_app (минимальный DML),
+    # НЕ под суперпользователем POSTGRES_USER. Суперпользователь — только init/бэкап;
+    # миграции (DDL) — под admik_migrator (см. scripts/init-shop.sh, .env.example).
+    env_file:
+      - .env
+    restart: unless-stopped
+    # Ротация структурных JSON-логов приложения (Этап 6, 6.3; ADR-015 §6.3): защита
+    # диска от переполнения логами. Драйвер json-file (дефолтный) + ограничение
+    # размера/числа файлов. Кто хочет агрегатор (Loki/ELK) — меняет driver здесь
+    # (точка расширения, §6.3.4). Логи приложения = stdout (lib/logger.ts).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # Стартуем только когда зависимости реально готовы (healthcheck'и ниже)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      # Проверяем endpoint готовности приложения
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - admik
+
+  # ---------------------------------------------------------------------------
+  # Storefront — публичная витрина магазина (Next.js standalone, порт 3000)
+  # ---------------------------------------------------------------------------
+  # КАК ЭТО РАБОТАЕТ (docs/13, docs/09 «один VPS, два домена»):
+  #   Витрина — ОТДЕЛЬНЫЙ контейнер на том же VPS. Это headless-потребитель
+  #   публичного Storefront API Admik (/api/storefront/v1/*): своей БД/заказов/
+  #   СДЭК у неё нет. Топология поддоменов:
+  #     • витрина  → ${SHOP_DOMAIN} (+ www)        — этот сервис (storefront:3000);
+  #     • Admik    → ${ADMIN_DOMAIN} (admin.<домен>) — сервис app (админка/API/медиа).
+  #   Маршрутизацию обоих доменов делает Caddy (см. Caddyfile), наружу порт
+  #   витрины НЕ публикуется — только через Caddy по HTTPS.
+  #
+  # ДВА АДРЕСА API (намеренно):
+  #   • ADMIK_API_URL=http://app:3000 — СЕРВЕРНЫЕ запросы витрины (server
+  #     components / route handlers) идут ВНУТРИ docker-сети, не выходя в интернет;
+  #   • NEXT_PUBLIC_ADMIK_API_URL — ПУБЛИЧНЫЙ адрес API (https://${ADMIN_DOMAIN}),
+  #     попадает в клиентский бандл (checkout, автокомплит городов СДЭК). Это
+  #     build-arg: значение «впекается» в сборку Next.js, поэтому пробрасывается
+  #     и в build.args, и в окружение.
+  #
+  # ОБРАЗ/СБОРКА:
+  #   Контекст сборки — каталог витрины ./storefront (отдельный репозиторий рядом).
+  #   Его Dockerfile (output: standalone, порт 3000) принимает build-arg
+  #   NEXT_PUBLIC_ADMIK_API_URL. Имя образа переопределяется через .env
+  #   (STOREFRONT_IMAGE) — для честного отката, как у сервиса app.
+  storefront:
+    build:
+      context: ./storefront
+      args:
+        NEXT_PUBLIC_ADMIK_API_URL: "${NEXT_PUBLIC_ADMIK_API_URL}"
+    image: ${STOREFRONT_IMAGE:-admik-storefront:current}
+    restart: unless-stopped
+    # Ротация структурных логов витрины (как у app; Этап 6, 6.3).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # Витрина бесполезна без живого API Admik — ждём health сервиса app.
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # Серверные запросы витрины — внутрь docker-сети (наружу не выходят).
+      ADMIK_API_URL: http://app:3000
+      # Публичный адрес сайта витрины (для абсолютных ссылок/SEO/sitemap).
+      NEXT_PUBLIC_SITE_URL: https://${SHOP_DOMAIN}
+      # Публичный адрес API для клиентского бандла (дублирует build-arg —
+      # на случай рантайм-чтения; основное значение «впекается» при сборке).
+      NEXT_PUBLIC_ADMIK_API_URL: ${NEXT_PUBLIC_ADMIK_API_URL}
+      # Ключ витрины (если Admik настроен на STOREFRONT_API_KEYS). Пусто —
+      # доступ по Origin-allowlist / mock. Дефолт пустой, чтобы .env без ключа
+      # не валил подстановку.
+      STOREFRONT_API_KEY: ${STOREFRONT_API_KEY:-}
+      # Закрыть витрину от поисковой индексации (noindex/nofollow + robots
+      # Disallow: /). 1/true — для тестового/staging стенда; пусто — боевой
+      # магазин (индексация открыта). Читается в рантайме (robots/sitemap/мета).
+      STOREFRONT_NOINDEX: ${STOREFRONT_NOINDEX:-}
+    healthcheck:
+      # Витрина «жива», если корневая страница отвечает (Next.js standalone :3000).
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - admik
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 15 — основная БД магазина
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready подтверждает, что сервер принимает подключения
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - admik
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — кеш и rate-limit
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - admik
+
+  # ---------------------------------------------------------------------------
+  # MinIO — S3-совместимое хранилище медиа
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      # API S3
+      - "9000:9000"
+      # Веб-консоль администрирования
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # Встроенный health endpoint MinIO
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - admik
+
+  # ---------------------------------------------------------------------------
+  # Cron СДЭК — лёгкий планировщик: по расписанию дёргает /api/cron/cdek/*
+  # ---------------------------------------------------------------------------
+  # КАК ЭТО РАБОТАЕТ (для не-разработчика, docs/02):
+  #   Этот контейнер — маленький Alpine с curl. Раз в N минут он «стучится» по
+  #   защищённым внутренним адресам приложения, и приложение выполняет фоновую
+  #   работу СДЭК:
+  #     • create-pending  — каждые 5 минут: создаёт отправления СДЭК по
+  #       оплаченным заказам, по которым отправление ещё не создано;
+  #     • refresh-active  — каждый час: подтягивает статусы активных отправлений
+  #       (страховка, если webhook от СДЭК не пришёл);
+  #     • notify-stuck    — раз в сутки: предупреждает о «зависших» заказах.
+  #   Запросы защищены секретом CDEK_CRON_SECRET (.env) — снаружи их выполнить
+  #   нельзя. Контейнер ходит ВНУТРИ docker-сети на http://app:3000, наружу
+  #   эти адреса не публикуются.
+  #
+  # ВКЛЮЧЕНИЕ:
+  #   1) В .env задайте непустой CDEK_CRON_SECRET (любая длинная случайная строка).
+  #   2) Если CDEK_CRON_SECRET пуст — cron-роуты отвечают 503 (выключены),
+  #      и этот сервис просто ничего не делает (заказы можно обрабатывать вручную).
+  #   3) Поднимется автоматически вместе со всем стеком (docker compose up -d).
+  #
+  # АЛЬТЕРНАТИВА без этого контейнера (если используете внешний планировщик —
+  # системный cron хоста или планировщик Timeweb): уберите этот сервис и
+  # настройте внешний вызов с тем же секретом, например (каждые 5 минут):
+  #   */5 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/cdek/create-pending?key=СЕКРЕТ"
+  #   0   * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/cdek/refresh-active?key=СЕКРЕТ"
+  #   0  10 * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/cdek/notify-stuck?key=СЕКРЕТ"
+  # ---------------------------------------------------------------------------
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Ротация логов (Этап 6, 6.3): задачи cron пишут вывод в stdout контейнера.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      app:
+        condition: service_healthy
+    # Внутренний адрес приложения (в docker-сети) + секрет из .env.
+    # CDEK_CRON_URL можно переопределить в .env (по умолчанию app:3000).
+    environment:
+      CDEK_CRON_URL: ${CDEK_CRON_URL:-http://app:3000}
+      CDEK_CRON_SECRET: ${CDEK_CRON_SECRET}
+    # Устанавливаем curl, пишем crontab и запускаем crond на переднем плане.
+    # Каждая задача «тихо» (-fsS) дёргает свой эндпоинт с секретом в заголовке.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache curl >/dev/null
+        HIT='curl -fsS -m 60 -X POST -H "X-Cron-Secret: $$CDEK_CRON_SECRET"'
+        {
+          echo "*/5 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/cdek/create-pending\" >/proc/1/fd/1 2>&1";
+          echo "0   * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/cdek/refresh-active\"  >/proc/1/fd/1 2>&1";
+          echo "0  10 * * * $$HIT \"$$CDEK_CRON_URL/api/cron/cdek/notify-stuck\"    >/proc/1/fd/1 2>&1";
+        } > /etc/crontabs/root
+        echo "[cdek-cron] расписание установлено; запуск crond"
+        exec crond -f -l 8
+    networks:
+      - admik
+
+  # ---------------------------------------------------------------------------
+  # Backup — планировщик бэкапов БД и медиа (Этап 6, пакет 6.2; ADR-015)
+  # ---------------------------------------------------------------------------
+  # КАК ЭТО РАБОТАЕТ (для не-разработчика, docs/02):
+  #   Том Docker — это НЕ бэкап (он не спасает от удаления/коррупции данных).
+  #   Этот контейнер раз в сутки делает переносимый бэкап магазина:
+  #     • дамп базы данных (pg_dump) в том backups:/backups/db;
+  #     • зеркало медиа (mc mirror из MinIO) в backups/media;
+  #     • чистит файлы старше BACKUP_RETENTION_DAYS (ретенция).
+  #   Раз в неделю он запускает «учебное восстановление» (restore-drill):
+  #   поднимает последний дамп в одноразовую временную БД и читает ключевые
+  #   таблицы — это ранний сигнал «бэкапы нерабочие» («бэкап без проверенного
+  #   restore — не бэкап», ADR-015). Расписания и ретенция — из .env.
+  #
+  # ОБРАЗ: postgres:15-alpine (та же мажорная версия, что и сервис postgres —
+  #   совместимый pg_dump/pg_restore) + ставим minio/mc для зеркала медиа.
+  #   Скрипты монтируются из ./scripts (read-only), бэкапы — в том backups.
+  #
+  # РУЧНОЙ запуск разовых операций (на хосте, через docker compose):
+  #   docker compose exec backup /scripts/backup.sh
+  #   docker compose exec backup /scripts/restore-drill.sh
+  #   docker compose exec -e CONFIRM=yes backup /scripts/restore.sh
+  # ---------------------------------------------------------------------------
+  backup:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Ротация логов (Этап 6, 6.3): backup/restore-drill пишут отчёты в stdout.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # PG*-параметры подключения к сервису postgres из docker-сети.
+    # SHOP_NAME попадает в имя дампа; BACKUP_*-расписания — в crontab ниже.
+    environment:
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+      BACKUP_DRILL_CRON: ${BACKUP_DRILL_CRON:-0 4 * * 0}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      # Скрипты бэкапа/восстановления (read-only) и каталог миграций при нужде.
+      - ./scripts:/scripts:ro
+      # Том с бэкапами (переживает пересоздание контейнеров; в .gitignore).
+      - backups:/backups
+    # Каталог бэкапов внутри контейнера — том backups, а не ./backups хоста.
+    # Ставим minio/mc (для медиа) и crond пишет два расписания: ежесуточный
+    # backup и еженедельный restore-drill. Вывод задач идёт в логи контейнера.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        export BACKUP_DIR=/backups
+        # mc (MinIO Client) для зеркала медиа; pg_dump/pg_restore уже в образе.
+        if ! command -v mc >/dev/null 2>&1; then
+          wget -q -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc \
+            && chmod +x /usr/local/bin/mc \
+            || echo "[backup] предупреждение: mc не установлен — медиа будет пропущено";
+        fi
+        {
+          echo "$$BACKUP_CRON /scripts/backup.sh >/proc/1/fd/1 2>&1";
+          echo "$$BACKUP_DRILL_CRON /scripts/restore-drill.sh >/proc/1/fd/1 2>&1";
+        } > /etc/crontabs/root
+        echo "[backup] расписание установлено: backup='$$BACKUP_CRON' drill='$$BACKUP_DRILL_CRON'"
+        exec crond -f -l 8
+    networks:
+      - admik
+
+  # ---------------------------------------------------------------------------
+  # Caddy — reverse-proxy + авто-SSL (точка входа 80/443)
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+      storefront:
+        condition: service_healthy
+    environment:
+      # Домены и email прокидываются в Caddyfile через {$...}.
+      #   SHOP_DOMAIN  — apex+www витрины (reverse_proxy storefront:3000);
+      #   ADMIN_DOMAIN — поддомен Admik (админка/API/медиа, reverse_proxy app:3000).
+      # Если ADMIN_DOMAIN не задан — дефолт admin.localhost (одиночный-домен
+      # сценарий сохраняется: блок {$SHOP_DOMAIN} и :80-fallback работают как раньше).
+      SHOP_DOMAIN: ${SHOP_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.localhost}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - admik
+
+# -----------------------------------------------------------------------------
+# Именованные тома (данные переживают пересоздание контейнеров)
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
+  # Бэкапы БД и медиа (Этап 6, 6.2). Содержат данные магазина → НЕ в git
+  # (.gitignore). Том переживает пересоздание контейнеров; для надёжности
+  # рекомендуется offsite-выгрузка (BACKUP_OFFSITE_REMOTE, .env).
+  backups:
+
+# -----------------------------------------------------------------------------
+# Внутренняя сеть стека
+# -----------------------------------------------------------------------------
+networks:
+  admik:
+    driver: bridge

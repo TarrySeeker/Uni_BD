@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+playwright-report/
+test-results/
+
+# Docker volumes / data
+data/
+.data/
+postgres-data/
+minio-data/
+
+# Бэкапы БД и медиа (Этап 6, 6.2) — содержат данные магазина, не в git
+backups/
+
+# Макет витрины конкретного магазина кладётся рядом в каталог storefront/
+# (см. START-HERE.md и docs/20). Его внутренние node_modules/.next/.env должны
+# игнорироваться вложенным storefront/.gitignore — в этот репозиторий платформы
+# исходники витрины не коммитятся.

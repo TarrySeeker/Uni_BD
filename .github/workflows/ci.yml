@@ -1,0 +1,181 @@
+# =============================================================================
+# Admik — CI: проверка качества на каждый push и pull request
+# =============================================================================
+# Пайплайн: установка зависимостей -> typecheck -> lint -> test -> build.
+# Используется pnpm с кешированием store для ускорения.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Отменяем устаревшие запуски на той же ветке/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Typecheck · Lint · Test · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm должен быть установлен до setup-node, чтобы сработал кеш pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        # frozen-lockfile если лок есть; иначе обычная установка (fallback)
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            echo "pnpm-lock.yaml не найден — установка без frozen-lockfile"
+            pnpm install
+          fi
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  # ---------------------------------------------------------------------------
+  # Линт shell-скриптов (Этап 6): shellcheck + bash -n по каждому скрипту.
+  # Независим от основного job, гоняется параллельно.
+  # ---------------------------------------------------------------------------
+  scripts-lint:
+    name: Scripts · shellcheck · bash -n
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: shellcheck
+        run: shellcheck scripts/*.sh
+
+      - name: bash -n (синтаксис каждого скрипта)
+        run: |
+          for f in scripts/*.sh; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+  # ---------------------------------------------------------------------------
+  # Линтер аддитивности миграций (Этап 6, 6.4; §6.4, ADR-015).
+  # Гейт обратной совместимости: блокирует деструктивные DDL (DROP COLUMN/TABLE/
+  # CONSTRAINT, RENAME, ALTER TYPE, SET NOT NULL без DEFAULT) в db/migrations.
+  # Для простоты прогоняем по ВСЕМ миграциям (не по diff). Независимый job.
+  # ---------------------------------------------------------------------------
+  check-migrations:
+    name: Migrations · additive-only lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: check-migrations.sh (все db/migrations/*.sql)
+        run: bash scripts/check-migrations.sh db/migrations/*.sql
+
+  # ---------------------------------------------------------------------------
+  # Docker-смок «copy-paste-деплоя» (Этап 6, бэклог-пункт e; docs/00).
+  # Собирает рантайм-образ из Dockerfile, поднимает стек, прогоняет
+  # init-shop ВНУТРИ контейнера app (make init) и smoke по эндпоинтам
+  # (make smoke). Ловит регрессии Dockerfile/standalone-трассировки и
+  # сценария инициализации, которые остальные job'ы (pnpm build) не видят.
+  # Без боевых ключей: СДЭК/Storefront/S3 — в mock/local-режиме (ADR-003/011).
+  # ---------------------------------------------------------------------------
+  docker-smoke:
+    name: Docker · build · init · smoke
+    runs-on: ubuntu-latest
+    # Прод-compose + CI-оверлей подключаются ко ВСЕМ шагам, включая make
+    # init/smoke, которые внутри вызывают docker compose. Так Makefile-цели
+    # видят оба файла (порт app опубликован, depends_on ослаблен).
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Подготовить .env (копия .env.example + эфемерные CI-значения)
+        # Берём именно .env.example — так смок проверяет ЗАДОКУМЕНТИРОВАННЫЙ
+        # шаблон (docs/09: cp .env.example .env). Значения с пробелами в нём
+        # (SHOP_NAME, BACKUP_CRON) теперь корректно читаются load_env_file.
+        # Поверх дописываем одноразовые значения для автоматического прогона
+        # (стенд удаляется в конце job): задаём OWNER_PASSWORD (иначе owner.mjs
+        # генерирует случайный) и параметры смока на опубликованный порт.
+        run: |
+          cp .env.example .env
+          {
+            echo ""
+            echo "# --- CI overrides (docker-smoke) ---"
+            echo "OWNER_PASSWORD=ci-owner-password"
+            echo "SMOKE_BASE_URL=http://localhost:3000"
+            echo "SMOKE_RETRIES=40"
+            echo "SMOKE_RETRY_DELAY=3"
+          } >> .env
+
+      - name: Сборка образа и запуск стека (postgres + redis + minio + app)
+        run: docker compose up -d --build postgres redis minio app
+
+      - name: Дождаться liveness приложения (/api/health)
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/health 2>/dev/null | grep -q '"status":"ok"'; then
+              echo "app live (попытка $i)"; exit 0
+            fi
+            echo "... жду app ($i/60)"; sleep 3
+          done
+          echo "app не поднялся за отведённое время"; exit 1
+
+      - name: Инициализация магазина внутри контейнера app (make init)
+        run: make init
+
+      - name: Регресс-гард нативного sharp/libvips в образе
+        # Ловит ERR_DLOPEN (libvips не дотрассирован в standalone), из-за которого
+        # падали экшены каталога и storefront brands/products/pages. ESM import —
+        # как грузит external Turbopack. См. scripts/sharp-selfcheck.mjs.
+        run: docker compose exec -T app node /app/scripts/sharp-selfcheck.mjs
+
+      - name: Smoke-проверка эндпоинтов (make smoke)
+        run: make smoke
+
+      - name: Диагностика при провале — статус и логи стека
+        if: failure()
+        run: |
+          docker compose ps || true
+          docker compose logs --no-color --tail=300 || true
+
+      - name: Остановить и очистить стенд
+        if: always()
+        run: docker compose down -v || true

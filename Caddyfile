@@ -1,0 +1,101 @@
+# =============================================================================
+# Admik — Caddyfile (reverse-proxy с авто-SSL, два домена)
+# =============================================================================
+# Один VPS обслуживает два сайта под ОДНИМ личным доменом по схеме поддоменов
+# (docs/09, docs/13):
+#   • витрина магазина → {$SHOP_DOMAIN} (+ www)  →  reverse_proxy storefront:3000
+#   • Admik (админка/API/медиа) → {$ADMIN_DOMAIN} →  reverse_proxy app:3000
+# Домены берутся из .env (SHOP_DOMAIN / ADMIN_DOMAIN), прокидываются в контейнер
+# caddy через docker-compose. Для реальных доменов Caddy сам получит бесплатный
+# TLS Let's Encrypt (HTTPS из коробки) для каждого имени.
+#
+# Обратная совместимость: если используется ОДИН домен (ADMIN_DOMAIN не задан →
+# дефолт admin.localhost из compose), блок {$SHOP_DOMAIN} и :80-fallback ниже
+# работают как раньше; для боевого admin.localhost-сертификат не выпускается,
+# что нормально для одиночного-домена/локального сценария.
+# =============================================================================
+
+# Глобальные настройки Caddy
+{
+	# Email для уведомлений Let's Encrypt (необязательно, но рекомендуется).
+	email {$ACME_EMAIL}
+}
+
+# -----------------------------------------------------------------------------
+# Сниппет с security-заголовками (переиспользуется в каждом сайте)
+# -----------------------------------------------------------------------------
+(security_headers) {
+	header {
+		# Принудительный HTTPS на год + поддомены (HSTS)
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		# Запрет угадывания MIME-типов
+		X-Content-Type-Options "nosniff"
+		# Защита от кликджекинга
+		X-Frame-Options "SAMEORIGIN"
+		# Базовая referrer-политика
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Убираем заголовок, раскрывающий сервер
+		-Server
+	}
+}
+
+# -----------------------------------------------------------------------------
+# Сниппет логирования (структурный JSON в stdout — удобно для мониторинга)
+# -----------------------------------------------------------------------------
+(json_log) {
+	log {
+		output stdout
+		format json
+	}
+}
+
+# -----------------------------------------------------------------------------
+# Витрина storefront — apex-домен и www (авто-SSL)
+# -----------------------------------------------------------------------------
+# www → apex редирект (канонизация), затем проксирование на контейнер витрины.
+www.{$SHOP_DOMAIN} {
+	import security_headers
+	redir https://{$SHOP_DOMAIN}{uri} permanent
+}
+
+{$SHOP_DOMAIN} {
+	import security_headers
+	import json_log
+	reverse_proxy storefront:3000
+}
+
+# -----------------------------------------------------------------------------
+# Admik — поддомен admin.<домен>: админка + публичный API + медиа (авто-SSL)
+# -----------------------------------------------------------------------------
+{$ADMIN_DOMAIN} {
+	import security_headers
+	import json_log
+
+	# Медиа товаров (MinIO за Caddy по HTTPS). Согласовано с lib/storage:
+	#   S3_PUBLIC_URL = https://{$ADMIN_DOMAIN}/media/admik-media
+	#   S3Storage.url(key) = S3_PUBLIC_URL + "/" + key
+	#     → https://{$ADMIN_DOMAIN}/media/admik-media/<key>
+	# handle_path СТРИПАЕТ префикс /media, остаётся /admik-media/<key> — это и
+	# есть path-style адрес объекта в MinIO (бакет admik-media, S3_BUCKET):
+	#     http://minio:9000/admik-media/<key>
+	# Поэтому путь после /media ДОЛЖЕН начинаться с имени бакета (admik-media).
+	# Меняете S3_BUCKET — оставьте имя бакета первым сегментом в S3_PUBLIC_URL.
+	handle_path /media/* {
+		reverse_proxy minio:9000
+	}
+
+	# Всё остальное (админка /admin, API /api/*) — в приложение Admik.
+	handle {
+		reverse_proxy app:3000
+	}
+}
+
+# -----------------------------------------------------------------------------
+# Fallback для проверки по IP / без домена (:80, без TLS).
+# Точка входа по умолчанию — витрина (storefront:3000). Работает, даже если
+# SHOP_DOMAIN не задан реальным доменом (локальный запуск / smoke по localhost).
+# -----------------------------------------------------------------------------
+:80 {
+	import security_headers
+	reverse_proxy storefront:3000
+}

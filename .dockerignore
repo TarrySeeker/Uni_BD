@@ -1,0 +1,66 @@
+# =============================================================================
+# Admik — .dockerignore
+# Исключаем из контекста сборки всё, что не нужно образу (ускоряет билд и
+# уменьшает контекст). Зависимости и сборка делаются внутри образа.
+# =============================================================================
+
+# Зависимости и сборка (ставятся/собираются внутри Dockerfile)
+node_modules
+.pnpm-store
+.next
+out
+build
+dist
+
+# Витрина-потребитель — отдельный проект со своим Docker-контекстом (./storefront).
+# В образ Admik её исходники попадать НЕ должны (иначе next build Admik пытается
+# типизировать файлы витрины, где алиас @ резолвится иначе → ошибка сборки).
+storefront
+storefront/
+
+# Git и история
+.git
+.gitignore
+.gitattributes
+
+# Секреты и локальное окружение (НИКОГДА не попадают в образ)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Документация и журнал проекта
+docs
+README.md
+*.md
+
+# Тесты и покрытие
+tests
+coverage
+playwright-report
+test-results
+vitest.config.ts
+
+# CI/CD и инфраструктурные конфиги (не нужны рантайму)
+.github
+docker-compose.yml
+Dockerfile
+.dockerignore
+Caddyfile
+
+# Конфиги редакторов / ОС
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Логи и данные локальных томов
+*.log
+logs
+data
+postgres-data
+minio-data
+
+# Агентские настройки Claude
+.claude
