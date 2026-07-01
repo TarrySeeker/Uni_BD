@@ -10,12 +10,13 @@
 # По умолчанию DRY-RUN (только показывает, что было бы удалено). Для реального
 # удаления: CONFIRM=yes scripts/clean-stand-testdata.sh
 #
-# Доступ: SSH-ключ ~/.ssh/admik_deploy (root@admin.erfgq.website). Контейнер postgres.
+# Доступ: SSH-ключ ~/.ssh/admik_deploy (root@<ваш-стенд>, задаётся через SSH_HOST).
+# Контейнер postgres.
 # ============================================================================
 set -euo pipefail
 
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/admik_deploy}"
-SSH_HOST="${SSH_HOST:-root@admin.erfgq.website}"
+SSH_HOST="${SSH_HOST:-root@admin.example.com}"
 DB_USER="${DB_USER:-admik}"
 DB_NAME="${DB_NAME:-admik}"
 QA_EMAIL="${QA_EMAIL:-zz-qa-buyer@example.com}"
