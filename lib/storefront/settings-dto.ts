@@ -45,6 +45,16 @@ export interface PublicHomeDto {
   about: { title: string; paragraphs: string[]; imageUrls: string[]; values: string[] };
   quality: { title: string; items: string[] };
   delivery: { items: { title: string; text: string }[] };
+  /** B1 — лента ценностей: показ (enabled) + тезисы. По умолчанию скрыта. */
+  valuesStrip: { enabled: boolean; items: { title: string; text: string }[] };
+  /** B3 — философия: надзаголовок/заголовок/абзац + ссылка. */
+  philosophy: {
+    eyebrow: string;
+    title: string;
+    text: string;
+    linkLabel: string;
+    linkHref: string;
+  };
 }
 
 /** Публичный DTO настроек магазина (наружу витрине). */
@@ -183,6 +193,11 @@ export function toPublicSettingsDto(
       },
       quality: { title: eff.home.quality.title, items: [...eff.home.quality.items] },
       delivery: { items: eff.home.delivery.items.map((i) => ({ ...i })) },
+      valuesStrip: {
+        enabled: eff.home.valuesStrip.enabled,
+        items: eff.home.valuesStrip.items.map((i) => ({ ...i })),
+      },
+      philosophy: { ...eff.home.philosophy },
     },
     navigation: {
       header: eff.navigation.header.map((i) => ({ label: i.label, href: i.href })),

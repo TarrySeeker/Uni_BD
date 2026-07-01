@@ -5,7 +5,9 @@ import { useState } from 'react';
 
 import {
   nextStatuses,
+  detectStatusContradictions,
 } from '@/lib/orders/status';
+import type { OrderStatus, DeliveryStatus } from '@/lib/orders/types';
 import {
   orderStatusLabel,
   paymentStatusLabel,
@@ -58,6 +60,14 @@ export function OrderActionsPanel({
   const paymentNext = nextStatuses('payment', paymentStatus);
   const deliveryNext = nextStatuses('delivery', deliveryStatus);
 
+  // Баг #4 (аудит тупиков): три статус-машины независимы. Авто-синхронизации нет
+  // (оси ортогональны), но показываем оператору МЯГКУЮ подсказку об очевидных
+  // противоречиях (например, заказ «Отгружен», а доставка «Ожидает») — не блокируя.
+  const contradictions = detectStatusContradictions({
+    orderStatus: status as OrderStatus,
+    deliveryStatus: deliveryStatus as DeliveryStatus,
+  });
+
   async function run(
     label: string,
     fn: () => Promise<ActionResult<unknown>>,
@@ -84,6 +94,23 @@ export function OrderActionsPanel({
       aria-label="Управление статусами"
     >
       <h2 className="text-sm font-semibold text-gray-800">Управление статусами</h2>
+      <p className="mt-1 text-xs text-gray-500">
+        Статусы заказа, оплаты и доставки управляются независимо.
+      </p>
+
+      {contradictions.length > 0 ? (
+        <div
+          role="status"
+          className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          <p className="font-medium">Возможное рассогласование статусов:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {contradictions.map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {error ? (
         <div

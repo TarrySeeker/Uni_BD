@@ -36,6 +36,8 @@ function makePage(
     publishedAt: now,
     seoTitle: 'SEO О компании',
     seoDescription: 'Описание страницы',
+    ogTitle: null,
+    ogDescription: null,
     ogImageUrl: 'https://cdn.example/about.png',
     canonicalUrl: null,
     noindex: false,
@@ -97,6 +99,25 @@ describe('toPublicPageDto — публичный DTO CMS-страницы', () =
     expect(dto.meta.canonical).toBe('https://shop.example/page/about');
     expect(dto.meta.ogImageUrl).toBe('https://cdn.example/about.png');
     expect(dto.meta.noindex).toBe(false);
+  });
+
+  // C18: OG-текст страницы (og_title/og_description) должен доходить до витрины,
+  // а не подменяться fallback'ом. Заданные значения пробрасываются в meta.
+  it('пробрасывает явные ogTitle/ogDescription страницы в meta (C18)', () => {
+    const page = makePage({
+      ogTitle: 'OG заголовок страницы',
+      ogDescription: 'OG описание страницы',
+    });
+    const dto = toPublicPageDto(page, makeSeoCtx());
+    expect(dto.meta.ogTitle).toBe('OG заголовок страницы');
+    expect(dto.meta.ogDescription).toBe('OG описание страницы');
+  });
+
+  it('без ogTitle/ogDescription meta откатывается на title/description (fallback билдера)', () => {
+    const dto = toPublicPageDto(makePage(), makeSeoCtx());
+    // og_title пуст → fallback на собранный title; og_description пуст → на description.
+    expect(dto.meta.ogTitle).toBe('SEO О компании — Магазин');
+    expect(dto.meta.ogDescription).toBe('Описание страницы');
   });
 
   it('отдаёт ТОЛЬКО enabled-секции, отсортированные по display_order', () => {

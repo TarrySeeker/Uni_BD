@@ -13,7 +13,17 @@ export {
   PaymentService,
   parseNotification,
   sanitizeNotification,
+  type ReconcilePaymentResult,
+  type RefundPaymentResult,
 } from './service';
+export {
+  runReconcilePending,
+  findPendingTbankPayments,
+  RECONCILE_PENDING_LIMIT,
+  type PendingPaymentCandidate,
+  type ReconcileStats,
+  type ReconcileDeps,
+} from './cron';
 export {
   applyPaymentStatus,
   insertPaymentLog,

@@ -1,9 +1,16 @@
+import Link from 'next/link';
+
 import { logout } from '@/lib/auth/actions';
 import { ShopLogo } from './ShopLogo';
 
 /**
- * Верхняя панель: брендинг магазина (из .env, без хардкодов) + текущий
- * пользователь + кнопка «Выйти» (Server Action logout через <form action>).
+ * Верхняя панель: брендинг магазина (из .env, без хардкодов) + ссылка на профиль
+ * текущего пользователя (email → /admin/account, где можно сменить свой пароль) +
+ * кнопка «Выйти» (Server Action logout через <form action>).
+ *
+ * Email сделан ссылкой на профиль (а не отдельным пунктом меню/правом): смена
+ * собственного пароля не требует права и привязана к текущему пользователю —
+ * как и кнопка «Выйти». Так раздел «Профиль» достижим из любого места админки.
  */
 export function Topbar({
   shopName,
@@ -22,7 +29,13 @@ export function Topbar({
       </div>
 
       <div className="flex items-center gap-4">
-        <span className="text-sm text-gray-600">{userEmail}</span>
+        <Link
+          href="/admin/account"
+          className="text-sm text-gray-600 hover:text-gray-900 hover:underline"
+          title="Профиль и смена пароля"
+        >
+          {userEmail}
+        </Link>
         <form action={logout}>
           <button
             type="submit"

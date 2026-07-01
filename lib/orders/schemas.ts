@@ -25,6 +25,7 @@ import {
   PROMO_KINDS,
   PROMO_TARGET_TYPES,
 } from './types';
+import type { PromoApplyScope, PromoTargetType } from './types';
 
 // -----------------------------------------------------------------------------
 // Переиспользуемые примитивы.
@@ -131,7 +132,13 @@ export type CartQuoteInput = z.infer<typeof CartQuoteSchema>;
 // Создание заказа (POST /orders, §4.2). Идемпотентность — Idempotency-Key (header).
 // -----------------------------------------------------------------------------
 
-export const CreateOrderSchema = z.object({
+/**
+ * Общая форма создания заказа (storefront + ручной заказ админки). Вынесена в
+ * объект-shape, чтобы ManualOrderSchema собирался как НОВЫЙ z.object (а не
+ * .extend поверх ZodEffects) — .superRefine ниже превращает схему в effects, у
+ * которой нет .extend.
+ */
+const createOrderShape = {
   items: z
     .array(cartLineSchema)
     .min(1, 'Корзина пуста.')
@@ -143,13 +150,37 @@ export const CreateOrderSchema = z.object({
   comment: z.string().trim().max(2000).optional(),
   /** Ключ идемпотентности (обычно из заголовка Idempotency-Key). */
   idempotencyKey: z.string().trim().min(1).max(200).optional(),
-});
+};
+
+/**
+ * Баг #32 (аудит тупиков): курьерская доставка ТРЕБУЕТ непустой адрес при
+ * СОЗДАНИИ заказа — иначе заказ нельзя отгрузить (СДЭК/курьеру некуда везти).
+ *
+ * Проверка живёт на уровне создания заказа, а НЕ в общей deliverySelectionSchema:
+ * на quote (CartQuoteSchema) адрес ещё не нужен (это лишь оценка стоимости по
+ * городу), и требовать его там сломало бы легитимный расчёт корзины. Для pvz
+ * обязательность pvzCode уже в deliverySelectionSchema.superRefine.
+ */
+function refineCourierAddress(
+  val: { delivery?: { type?: string; address?: string } },
+  ctx: z.RefinementCtx,
+): void {
+  if (val.delivery?.type === 'courier' && !val.delivery.address?.trim()) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['delivery', 'address'],
+      message: 'Для курьерской доставки требуется адрес доставки.',
+    });
+  }
+}
+
+export const CreateOrderSchema = z.object(createOrderShape).superRefine(refineCourierAddress);
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 
 /** Ручное создание заказа в админке (source='admin'): та же форма + признак. */
-export const ManualOrderSchema = CreateOrderSchema.extend({
-  source: z.literal('admin').optional(),
-});
+export const ManualOrderSchema = z
+  .object({ ...createOrderShape, source: z.literal('admin').optional() })
+  .superRefine(refineCourierAddress);
 export type ManualOrderInput = z.infer<typeof ManualOrderSchema>;
 
 // -----------------------------------------------------------------------------
@@ -222,6 +253,35 @@ export const promoTargetSchema = z
     }
   });
 export type PromoTargetInput = z.infer<typeof promoTargetSchema>;
+
+/**
+ * Допустимые типы таргета для области применения (scope), §5.2.3.
+ *
+ * Баг #5 (аудит тупиков): раньше scope (category/brand/set) НЕ ограничивал тип
+ * таргета — подпись «Категория»/«Бренд» обещала поведение, которого не было
+ * (lineInScope матчил по любому таргету). Теперь scope строго задаёт допустимые
+ * типы; единый источник правды для формы (PromoForm) и серверной валидации
+ * (refinePromo), чтобы UI и схема не расходились.
+ *  - category → только category-таргеты;
+ *  - brand    → только brand-таргеты;
+ *  - set      → произвольный набор (категория/бренд/товар/вариант);
+ *  - cart     → таргеты не нужны (скидка на всю корзину).
+ */
+export function allowedTargetTypesForScope(
+  scope: PromoApplyScope,
+): readonly PromoTargetType[] {
+  switch (scope) {
+    case 'category':
+      return ['category'];
+    case 'brand':
+      return ['brand'];
+    case 'set':
+      return PROMO_TARGET_TYPES;
+    case 'cart':
+    default:
+      return [];
+  }
+}
 
 /**
  * Дата окончания промокода. Поле формы — <input type="date">, которое отдаёт
@@ -378,6 +438,22 @@ function refinePromo(
         code: 'custom',
         path: ['targets'],
         message: `Для apply_scope='${val.applyScope}' требуется хотя бы один таргет.`,
+      });
+    } else {
+      // Баг #5: тип таргета ДОЛЖЕН соответствовать области применения (иначе
+      // scope=Категория с brand-таргетом «работал», нарушая обещание подписи).
+      const allowed = allowedTargetTypesForScope(val.applyScope);
+      val.targets.forEach((t, i) => {
+        const targetType = (t as { targetType?: string } | null)?.targetType;
+        if (targetType && !allowed.includes(targetType as PromoTargetType)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['targets', i, 'targetType'],
+            message:
+              `Для apply_scope='${val.applyScope}' тип таргета должен быть одним из: ` +
+              `${allowed.join(', ')}.`,
+          });
+        }
       });
     }
   }

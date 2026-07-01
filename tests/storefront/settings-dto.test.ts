@@ -15,6 +15,7 @@ function makeEffective(): EffectiveSettings {
     modules: { overrides: {} },
     home: HOME_DEFAULTS,
     navigation: { header: [], footer: [] },
+    access: { singleUserMode: false },
     branding: {
       shopName: 'Gang Auto',
       logoUrl: 'https://cdn/logo.png',

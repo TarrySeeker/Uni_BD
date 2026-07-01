@@ -17,6 +17,8 @@ describe('cms/repository — mapCmsPage', () => {
     published_at: '2026-01-02T03:04:05.000Z',
     seo_title: 'SEO заголовок',
     seo_description: 'SEO описание',
+    og_title: 'OG заголовок',
+    og_description: 'OG описание',
     og_image_url: 'https://cdn/og.jpg',
     canonical_url: 'https://shop/about',
     noindex: true,
@@ -36,6 +38,8 @@ describe('cms/repository — mapCmsPage', () => {
     expect(p.status).toBe('published');
     expect(p.seoTitle).toBe('SEO заголовок');
     expect(p.seoDescription).toBe('SEO описание');
+    expect(p.ogTitle).toBe('OG заголовок');
+    expect(p.ogDescription).toBe('OG описание');
     expect(p.ogImageUrl).toBe('https://cdn/og.jpg');
     expect(p.canonicalUrl).toBe('https://shop/about');
     expect(p.noindex).toBe(true);
@@ -57,6 +61,8 @@ describe('cms/repository — mapCmsPage', () => {
       published_at: null,
       seo_title: null,
       seo_description: null,
+      og_title: null,
+      og_description: null,
       og_image_url: null,
       canonical_url: null,
       noindex: false,
@@ -69,6 +75,8 @@ describe('cms/repository — mapCmsPage', () => {
     });
     expect(p.publishedAt).toBeNull();
     expect(p.seoTitle).toBeNull();
+    expect(p.ogTitle).toBeNull();
+    expect(p.ogDescription).toBeNull();
     expect(p.ogImageUrl).toBeNull();
     expect(p.canonicalUrl).toBeNull();
     expect(p.noindex).toBe(false);

@@ -5,6 +5,7 @@ import { can } from '@/lib/auth/rbac';
 import { sql } from '@/lib/db/client';
 import { getDashboardSeries } from '@/lib/analytics/repository';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
+import { countNewLeads } from '@/lib/leads/repository';
 import { MiniBarChart } from './_components/MiniBarChart';
 
 /**
@@ -36,6 +37,33 @@ function MetricCard({ title, value }: { title: string; value: number }) {
   );
 }
 
+/**
+ * Кликабельная карточка «Новые заявки» (находка #7): сигнал о необработанных
+ * сообщениях с витрины. При наличии новых — подсвечивается янтарным и ведёт в
+ * раздел «Заявки», чтобы владелец не пропустил обращения.
+ */
+function LeadsCard({ value }: { value: number }) {
+  const active = value > 0;
+  return (
+    <Link
+      href="/admin/leads"
+      aria-label={`Новые заявки: ${value}. Перейти к заявкам`}
+      className={`block rounded-lg border p-5 transition hover:shadow-sm ${
+        active
+          ? 'border-amber-300 bg-amber-50 hover:bg-amber-100'
+          : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+      }`}
+    >
+      <h2 className={`text-sm font-medium ${active ? 'text-amber-800' : 'text-gray-500'}`}>
+        Новые заявки
+      </h2>
+      <p className={`mt-2 text-3xl font-semibold ${active ? 'text-amber-900' : 'text-gray-900'}`}>
+        {value}
+      </p>
+    </Link>
+  );
+}
+
 export default async function DashboardPage() {
   const user = await requireUser();
 
@@ -45,11 +73,27 @@ export default async function DashboardPage() {
   // расходясь с моделью гейтинга (nav.ts / guardOrders) и собственным комментарием
   // карточек. Гейтим чтения orders флагом модуля; «Посещения» от модуля orders не
   // зависят и показываются всегда.
-  const ordersOn = await isModuleEffectivelyEnabled('orders');
+  // Эффективный набор модулей: дашборд обязан совпадать с боковым меню и
+  // страницами (которые требуют ВКЛЮЧЁННЫЙ модуль, а не только право). Иначе при
+  // выключенном модуле дашборд показывает счётчики/кнопки, ведущие на «модуль
+  // выключен» (тупик) — расхождение «настроил → всё равно видно».
+  const [ordersOn, catalogOn, cdekOn] = await Promise.all([
+    isModuleEffectivelyEnabled('orders'),
+    isModuleEffectivelyEnabled('catalog'),
+    isModuleEffectivelyEnabled('cdek'),
+  ]);
 
-  const [products, categories, ordersTotal, ordersToday, series] = await Promise.all([
-    safeCount(sql<{ n: string }[]>`SELECT count(*)::text AS n FROM products`),
-    safeCount(sql<{ n: string }[]>`SELECT count(*)::text AS n FROM categories`),
+  // «Заявки» — раздел ядра (без модуля), доступ по orders.read (см. nav.ts).
+  // Сигнал о новых заявках показываем только носителю этого права.
+  const canReadLeads = can(user, 'orders.read');
+
+  const [products, categories, ordersTotal, ordersToday, newLeads, series] = await Promise.all([
+    catalogOn
+      ? safeCount(sql<{ n: string }[]>`SELECT count(*)::text AS n FROM products`)
+      : Promise.resolve(null),
+    catalogOn
+      ? safeCount(sql<{ n: string }[]>`SELECT count(*)::text AS n FROM categories`)
+      : Promise.resolve(null),
     ordersOn
       ? safeCount(sql<{ n: string }[]>`SELECT count(*)::text AS n FROM orders`)
       : Promise.resolve(null),
@@ -58,17 +102,19 @@ export default async function DashboardPage() {
           sql<{ n: string }[]>`SELECT count(*)::text AS n FROM orders WHERE created_at >= current_date`,
         )
       : Promise.resolve(null),
+    // Новые (необработанные) заявки — мягко (ошибка/нет таблицы → null, карточка скрыта).
+    canReadLeads ? countNewLeads().catch(() => null) : Promise.resolve(null),
     // Ряды для графиков (заказы/посещения за 14 дней); null при отсутствии БД.
     getDashboardSeries(14).catch(() => null),
   ]);
 
   // Быстрые ссылки — только те, на что есть право (owner видит всё).
   const links: { href: string; label: string; show: boolean }[] = [
-    { href: '/admin/catalog/products/new', label: '+ Создать товар', show: can(user, 'catalog.write') },
-    { href: '/admin/catalog', label: 'Каталог товаров', show: can(user, 'catalog.read') },
-    { href: '/admin/catalog/categories', label: 'Категории', show: can(user, 'catalog.read') },
-    { href: '/admin/orders', label: 'Заказы', show: can(user, 'orders.read') },
-    { href: '/admin/cdek', label: 'Доставка', show: can(user, 'cdek.manage') },
+    { href: '/admin/catalog/products/new', label: '+ Создать товар', show: catalogOn && can(user, 'catalog.write') },
+    { href: '/admin/catalog', label: 'Каталог товаров', show: catalogOn && can(user, 'catalog.read') },
+    { href: '/admin/catalog/categories', label: 'Категории', show: catalogOn && can(user, 'catalog.read') },
+    { href: '/admin/orders', label: 'Заказы', show: ordersOn && can(user, 'orders.read') },
+    { href: '/admin/cdek', label: 'Доставка', show: cdekOn && can(user, 'cdek.manage') },
     { href: '/admin/settings', label: 'Настройки', show: can(user, 'settings.manage') },
   ].filter((l) => l.show);
 
@@ -87,6 +133,7 @@ export default async function DashboardPage() {
         {categories !== null ? <MetricCard title="Категорий" value={categories} /> : null}
         {ordersToday !== null ? <MetricCard title="Заказов сегодня" value={ordersToday} /> : null}
         {ordersTotal !== null ? <MetricCard title="Заказов всего" value={ordersTotal} /> : null}
+        {newLeads !== null ? <LeadsCard value={newLeads} /> : null}
       </section>
 
       {series ? (

@@ -287,3 +287,48 @@ describe('cms/schemas — секция/страница', () => {
     expect(bad.success).toBe(false);
   });
 });
+
+describe('cms/schemas — OG-текст страницы (C18)', () => {
+  const UUID = '11111111-1111-4111-8111-111111111111';
+
+  it('CmsPageCreateSchema: принимает ogTitle/ogDescription и НЕ вырезает их (strip)', () => {
+    const r = CmsPageCreateSchema.safeParse({
+      title: 'О компании',
+      ogTitle: 'OG заголовок',
+      ogDescription: 'OG описание',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.ogTitle).toBe('OG заголовок');
+      expect(r.data.ogDescription).toBe('OG описание');
+    }
+  });
+
+  it('CmsPageUpdateSchema: принимает ogTitle/ogDescription частично', () => {
+    const r = CmsPageUpdateSchema.safeParse({
+      id: UUID,
+      ogTitle: 'Только OG-заголовок',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.ogTitle).toBe('Только OG-заголовок');
+      expect(r.data.ogDescription).toBeUndefined();
+    }
+  });
+
+  it('ogTitle > 255 символов → ошибка (max как у каталога)', () => {
+    const r = CmsPageUpdateSchema.safeParse({
+      id: UUID,
+      ogTitle: 'x'.repeat(256),
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('ogDescription > 1000 символов → ошибка (max как у каталога)', () => {
+    const r = CmsPageUpdateSchema.safeParse({
+      id: UUID,
+      ogDescription: 'y'.repeat(1001),
+    });
+    expect(r.success).toBe(false);
+  });
+});

@@ -10,6 +10,7 @@ import {
   createVariant,
   updateVariant,
   deleteVariant,
+  reorderVariant,
   setProductAttributes,
   attachMedia,
   deleteMedia,
@@ -73,6 +74,11 @@ export async function updateVariantAction(input: unknown): Promise<ActionResult<
 }
 export async function deleteVariantAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   return deleteVariant(input);
+}
+export async function reorderVariantAction(
+  input: unknown,
+): Promise<ActionResult<{ productId: string }>> {
+  return reorderVariant(input);
 }
 
 // --- Характеристики ---------------------------------------------------------

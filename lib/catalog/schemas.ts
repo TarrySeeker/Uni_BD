@@ -50,16 +50,30 @@ export const slugSchema = z
 export const skuSchema = z.string().trim().min(1).max(100);
 
 /**
+ * Нормализация денежного ввода: trim + запятая-разделитель → точка.
+ *
+ * Русскоязычный ввод «1500,50» естественно содержит запятую (на мобильной
+ * RU-раскладке десятичный разделитель — запятая). Приводим к каноничной точке,
+ * чтобы один контракт принимал значение из ЛЮБОГО клиента (форма админки,
+ * импорт каталога, будущие магазины) — а не только из текущей формы. Нестроки
+ * (null/undefined для .nullish()/.optional()) пропускаем без изменений.
+ */
+export const normalizeMoney = (v: string): string => v.trim().replace(',', '.');
+
+/**
  * Денежная сумма NUMERIC(14,2) ≥ 0 как строка.
  * Принимает целое/дробное (до 2 знаков), без минуса. Длина целой части ≤ 12.
+ *
+ * z.preprocess нормализует ввод (trim + запятая→точка) ДО проверки формата —
+ * серверная защита от RU-запятой (находка 2 аудита): «1500,50» → «1500.50».
  */
-export const moneySchema = z
-  .string()
-  .trim()
-  .regex(
+export const moneySchema = z.preprocess(
+  (v) => (typeof v === 'string' ? normalizeMoney(v) : v),
+  z.string().regex(
     /^\d{1,12}(?:\.\d{1,2})?$/,
     'цена: неотрицательное число с не более чем 2 знаками после точки',
-  );
+  ),
+);
 
 /** Код характеристики (attributes.code): стабильный идентификатор. */
 export const attributeCodeSchema = z
@@ -267,6 +281,17 @@ export type VariantUpdateInput = z.infer<typeof VariantUpdateSchema>;
 
 export const VariantIdSchema = z.object({ id: uuidSchema });
 
+/**
+ * Переупорядочивание вариантов товара (зеркало MediaReorderSchema, но без
+ * primaryId — у вариантов нет «главного»). Индекс id в массиве `order` → значение
+ * sort (нормализует существующие sort=0 в 0..n-1). Минимум один id.
+ */
+export const VariantReorderSchema = z.object({
+  productId: uuidSchema,
+  order: z.array(uuidSchema).min(1),
+});
+export type VariantReorderInput = z.infer<typeof VariantReorderSchema>;
+
 // -----------------------------------------------------------------------------
 // Бренды (docs/06 §3.3, §4.3).
 // -----------------------------------------------------------------------------
@@ -343,6 +368,10 @@ export const AttributeValueSchema = z.object({
   sort: z.number().int().min(0).optional().default(0),
 });
 export type AttributeValueInput = z.infer<typeof AttributeValueSchema>;
+
+/** Удаление значения из словаря характеристики (по id). */
+export const AttributeValueDeleteSchema = z.object({ id: uuidSchema });
+export type AttributeValueDeleteInput = z.infer<typeof AttributeValueDeleteSchema>;
 
 /** Одна привязка значения характеристики к товару/варианту. */
 export const ProductAttributeItemSchema = z

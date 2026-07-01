@@ -22,9 +22,11 @@ import {
   VariantCreateSchema,
   VariantUpdateSchema,
   VariantIdSchema,
+  VariantReorderSchema,
   AttributeCreateSchema,
   AttributeUpdateSchema,
   AttributeValueSchema,
+  AttributeValueDeleteSchema,
   SetProductAttributesSchema,
   MediaUploadSchema,
   MediaDeleteSchema,
@@ -812,6 +814,39 @@ export const deleteVariant = defineAction({
   },
 });
 
+/**
+ * Переупорядочивание вариантов товара (зеркало reorderMedia). Индекс id в
+ * массиве order → значение sort. Все UPDATE — в одной транзакции (либо порядок
+ * применяется целиком, либо откатывается). Нормализует существующие sort=0 в
+ * 0..n-1 при первом переносе. Скоупится product_id, чтобы случайный чужой id из
+ * массива не трогал варианты другого товара.
+ */
+export const reorderVariant = defineAction({
+  permission: 'catalog.write',
+  input: VariantReorderSchema,
+  handler: async (data, _ctx) => {
+    await assertCatalogEnabled();
+    await sql.begin(async (tx: TransactionSql) => {
+      for (let i = 0; i < data.order.length; i++) {
+        await tx`
+          UPDATE product_variants SET sort = ${i}
+          WHERE id = ${data.order[i]!} AND product_id = ${data.productId}
+        `;
+      }
+    });
+    return {
+      result: { productId: data.productId },
+      revalidate: [productPath(data.productId)],
+      audit: {
+        action: 'catalog.variant.reorder',
+        entityType: 'product',
+        entityId: data.productId,
+        after: { order: data.order },
+      },
+    };
+  },
+});
+
 // =============================================================================
 // ХАРАКТЕРИСТИКИ (§4.5).
 // =============================================================================
@@ -901,6 +936,45 @@ export const addAttributeValue = defineAction({
         entityType: 'attribute_value',
         entityId: rows[0]!.id,
         after: { attributeId: data.attributeId, value: data.value },
+      },
+    };
+  },
+});
+
+/**
+ * Удаление значения из словаря характеристики (симметрия с category/product/
+ * variant/brand/media delete). Перед DELETE — дружелюбная предпроверка
+ * использования: FK product_attributes.value_id объявлен ON DELETE RESTRICT,
+ * поэтому сырое удаление используемого значения дало бы PG 23503 → 'internal'.
+ * Вместо этого бросаем CatalogError('conflict') с понятным текстом.
+ */
+export const deleteAttributeValue = defineAction({
+  permission: 'catalog.write',
+  input: AttributeValueDeleteSchema,
+  handler: async (data, _ctx) => {
+    await assertCatalogEnabled();
+    const used = await sql<{ one: number }[]>`
+      SELECT 1 AS one FROM product_attributes WHERE value_id = ${data.id} LIMIT 1
+    `;
+    if (used[0]) {
+      throw new CatalogError(
+        'conflict',
+        'Значение используется товарами — сначала уберите его из товаров.',
+      );
+    }
+    const rows = await sql<{ id: string }[]>`
+      DELETE FROM attribute_values WHERE id = ${data.id} RETURNING id
+    `;
+    if (!rows[0]) {
+      throw new CatalogError('not_found', 'Значение характеристики не найдено.');
+    }
+    return {
+      result: { id: rows[0].id },
+      revalidate: [ATTRIBUTES_PATH],
+      audit: {
+        action: 'catalog.attribute_value.delete',
+        entityType: 'attribute_value',
+        entityId: rows[0].id,
       },
     };
   },

@@ -30,7 +30,7 @@ import { isOrderPayable } from '@/lib/orders/status';
 import { verifyNotificationToken } from './token';
 import { buildReceipt } from './receipt';
 import { toKopecks } from './receipt';
-import { recordWebhookEvent, setPaymentRefAndProvider } from './repository';
+import { recordWebhookEvent, setPaymentRefAndProvider, insertPaymentLog } from './repository';
 import type {
   HandleWebhookResult,
   InitPaymentResult,
@@ -38,7 +38,37 @@ import type {
   TbankInitRequest,
   TbankInitResponse,
   TbankNotification,
+  TbankGetStateRequest,
+  TbankGetStateResponse,
+  TbankCancelRequest,
+  TbankCancelResponse,
 } from './types';
+
+/** Результат сверки платежа через GetState (reconcilePayment, Фича #16). */
+export interface ReconcilePaymentResult {
+  /** Шлюз ответил корректно (Success / mock). false → транспортная/бизнес-ошибка GetState. */
+  ok: boolean;
+  /** Сырой Status Т-Банка (или null). */
+  status: string | null;
+  /** Переход payment_status применён в этой сверке (recordWebhookEvent.processed). */
+  applied: boolean;
+  isMock: boolean;
+  /** Причина ok=false (ErrorCode/Message). */
+  reason?: string;
+}
+
+/** Результат шлюзового возврата через Cancel (refundPayment, Фича #15). */
+export interface RefundPaymentResult {
+  /** Возврат принят шлюзом (или корректно пропущен). false → шлюз отказал. */
+  ok: boolean;
+  /** Сырой Status Т-Банка после Cancel (REFUNDED/REVERSED) или null. */
+  status: string | null;
+  isMock: boolean;
+  /** true → шлюзовой возврат не требовался (COD/manual или нечего возвращать). */
+  skipped?: boolean;
+  /** Причина skipped/ok=false (no_gateway/not_captured/ErrorCode). */
+  reason?: string;
+}
 
 // =============================================================================
 // parseNotification — ЧИСТАЯ. Нормализация тела webhook → TbankEvent. docs/15 §4.2.
@@ -277,6 +307,139 @@ export class PaymentService {
       comment: 'mock-pay-demo:CONFIRMED',
     });
     return { ok: true };
+  }
+
+  /**
+   * СВЕРКА статуса платежа через GetState (Фича #16, фоллбэк потерянного webhook).
+   *
+   * Дёргает /v2/GetState (в mock — manager.mock.mockGetState), маппит Status →
+   * payment_status и АТОМАРНО+ИДЕМПОТЕНТНО доводит статус заказа через
+   * recordWebhookEvent (UNIQUE (payment_id, status) → дубликат не задваивает; гард
+   * C4-1 не даст пометить paid отменённый/возвращённый заказ). Возвращает
+   * applied=true, только если переход реально применён в этой сверке.
+   *
+   * Деньги/суммы СЕРВЕРНЫЕ (amountKop приходит из воркера, посчитан из orders.grand_total),
+   * из запроса не берутся. Транспорт/бизнес-ошибка GetState (Success=false) → ok=false
+   * без записи лога (повторим на следующем прогоне cron).
+   */
+  async reconcilePayment(input: {
+    orderId: string;
+    orderNumber: string;
+    paymentId: string;
+    amountKop?: number;
+  }): Promise<ReconcilePaymentResult> {
+    const cfg = this.manager.config;
+    const isMock = this.manager.isMock;
+
+    let status: string | null;
+    if (isMock) {
+      status = this.manager.mock.mockGetState(input.paymentId).status;
+    } else {
+      const body: TbankGetStateRequest = {
+        TerminalKey: cfg.terminalKey!,
+        PaymentId: input.paymentId,
+      };
+      const res = await this.manager.client.call<TbankGetStateResponse>('GetState', body);
+      if (!res.Success) {
+        return {
+          ok: false,
+          status: null,
+          applied: false,
+          isMock: false,
+          reason: res.ErrorCode ?? res.Message ?? 'getstate_failed',
+        };
+      }
+      status = res.Status ?? null;
+    }
+
+    const next = mapTbankStatus(status);
+    const { processed } = await recordWebhookEvent({
+      log: {
+        orderId: input.orderId,
+        paymentId: input.paymentId,
+        status: status ?? 'UNKNOWN',
+        amountKop: input.amountKop ?? null,
+        isMock,
+        rawPayload: { source: 'reconcile-getstate', orderNumber: input.orderNumber },
+      },
+      nextStatus: next,
+      comment: `reconcile-getstate:${status}`,
+    });
+    return { ok: true, status, applied: processed, isMock };
+  }
+
+  /**
+   * ШЛЮЗОВОЙ ВОЗВРАТ денег через Cancel (Фича #15). ВЫЗЫВАЕТСЯ экшеном refundOrder
+   * ДО смены статуса заказа.
+   *
+   * ИНВАРИАНТ «двойного сетла нет»: метод ТОЛЬКО дёргает шлюз (/v2/Cancel; в mock —
+   * manager.mock.mockCancel) и пишет аудит-лог (insertPaymentLog) — payment_status он
+   * НЕ меняет. Освобождение резерва, откат промокода и перевод payment_status='refunded'
+   * делает внутренний сетл applyOrderStatusTransition в экшене. Реальный REFUNDED-webhook,
+   * который придёт позже, идемпотентен (UNIQUE payment_id,status → no-op).
+   *
+   * Пропуски (ok:true, skipped:true): провайдер не tbank / нет payment_ref (COD/manual —
+   * шлюзовой возврат не нужен) ИЛИ платёж не захвачен (payment_status не paid/authorized:
+   * возвращать нечего). В обоих случаях экшен делает внутренний сетл.
+   */
+  async refundPayment(input: {
+    orderId: string;
+    orderNumber: string;
+    paymentStatus: string;
+    paymentProvider: string | null;
+    paymentRef: string | null;
+    amountKop: number;
+  }): Promise<RefundPaymentResult> {
+    const cfg = this.manager.config;
+    const isMock = this.manager.isMock;
+
+    // COD/manual или нет PaymentId — шлюзовой возврат не требуется.
+    if (input.paymentProvider !== 'tbank' || !input.paymentRef) {
+      return { ok: true, skipped: true, status: null, isMock, reason: 'no_gateway' };
+    }
+    // Деньги не захвачены (pending/failed/refunded) — возвращать нечего.
+    if (input.paymentStatus !== 'paid' && input.paymentStatus !== 'authorized') {
+      return { ok: true, skipped: true, status: null, isMock, reason: 'not_captured' };
+    }
+
+    let status: string | null;
+    if (isMock) {
+      // authorized → REVERSED (отмена холда до списания), paid → REFUNDED (возврат).
+      status = this.manager.mock.mockCancel({
+        authorizedOnly: input.paymentStatus === 'authorized',
+      }).status;
+    } else {
+      const body: TbankCancelRequest = {
+        TerminalKey: cfg.terminalKey!,
+        PaymentId: input.paymentRef,
+      };
+      const res = await this.manager.client.call<TbankCancelResponse>('Cancel', body);
+      if (!res.Success) {
+        return {
+          ok: false,
+          status: null,
+          isMock: false,
+          reason: res.ErrorCode ?? res.Message ?? 'cancel_failed',
+        };
+      }
+      status = res.Status ?? null;
+    }
+
+    // Аудит факта шлюзового возврата (идемпотентно; payment_status НЕ меняем).
+    // СИНТЕТИЧЕСКИЙ статус 'ADMIN_REFUND' (не реальный Т-Банк-статус) — чтобы аудит-строка
+    // НЕ заняла ключ UNIQUE (payment_id, 'REFUNDED'/'REVERSED'). Иначе при редкой гонке
+    // «Cancel успешен, но переход упал на DB-ошибке» поздний НАСТОЯЩИЙ REFUNDED-webhook
+    // получил бы ON CONFLICT DO NOTHING и не довёл бы payment_status='refunded' →
+    // заказ навсегда застрял бы в paid. Реальный статус шлюза — в rawPayload.gatewayStatus.
+    await insertPaymentLog({
+      orderId: input.orderId,
+      paymentId: input.paymentRef,
+      status: 'ADMIN_REFUND',
+      amountKop: input.amountKop,
+      isMock,
+      rawPayload: { source: 'admin-refund', orderNumber: input.orderNumber, gatewayStatus: status },
+    });
+    return { ok: true, status, isMock };
   }
 }
 

@@ -17,6 +17,7 @@ import {
   updateShopSeoSettings as _updateShopSeo,
   updateHomeAction as _updateHome,
   updateNavigationAction as _updateNavigation,
+  updateAccessSettings as _updateAccess,
   uploadSettingsImageAction as _uploadSettingsImage,
   uploadStoreImageAction as _uploadStoreImage,
   resetSetting as _resetSetting,
@@ -46,6 +47,9 @@ export async function updateHomeContentAction(input: unknown): Promise<ActionRes
 }
 export async function updateNavigationContentAction(input: unknown): Promise<ActionResult<unknown>> {
   return _updateNavigation(input);
+}
+export async function updateAccessAction(input: unknown): Promise<ActionResult<unknown>> {
+  return _updateAccess(input);
 }
 export async function uploadSettingsImageAction(
   formData: FormData,

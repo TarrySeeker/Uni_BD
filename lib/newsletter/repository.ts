@@ -37,3 +37,31 @@ export async function countActiveSubscribers(): Promise<number> {
   `;
   return Number(rows[0]?.count ?? 0);
 }
+
+/**
+ * Общее число подписчиков (active + unsubscribed). Нужно для «X из N» и плашки
+ * усечения списка (находка #9): listSubscribers отдаёт смешанный список, поэтому
+ * countActiveSubscribers для тотала не годится.
+ */
+export async function countSubscribers(): Promise<number> {
+  const rows = await sql<{ count: string }[]>`
+    SELECT count(*)::text AS count FROM newsletter_subscribers
+  `;
+  return Number(rows[0]?.count ?? 0);
+}
+
+/**
+ * Отписывает подписчика (status='unsubscribed'). GUARDED `AND status = 'active'`:
+ * повторная отписка/несуществующий id вернут 0 строк (идемпотентно, без ложного
+ * успеха). Возвращает строку при реальном переходе active→unsubscribed, иначе
+ * null. Решение «не найден / уже отписан» принимает вызывающий action.
+ */
+export async function unsubscribe(id: string): Promise<SubscriberRow | null> {
+  const rows = await sql<SubscriberRow[]>`
+    UPDATE newsletter_subscribers
+       SET status = 'unsubscribed'
+     WHERE id = ${id} AND status = 'active'
+    RETURNING id, email, status, created_at
+  `;
+  return rows[0] ?? null;
+}

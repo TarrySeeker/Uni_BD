@@ -13,6 +13,8 @@ import {
   deliveryStatusBadgeClass,
   formatDateTime,
   promoValueSummary,
+  formatMinQty,
+  formatScopeWithTargets,
 } from '@/lib/admin/order-format';
 import {
   ORDER_STATUSES,
@@ -111,5 +113,35 @@ describe('order-format — promoValueSummary', () => {
   });
   it('fixed → сырое значение (форматирует вызывающий через formatPrice)', () => {
     expect(promoValueSummary({ kind: 'fixed', value: '500.00' })).toBe('500.00');
+  });
+});
+
+describe('order-format — formatMinQty (C15)', () => {
+  it('число → строка числа', () => {
+    expect(formatMinQty(3)).toBe('3');
+    expect(formatMinQty(0)).toBe('0');
+  });
+  it('null → «—»', () => {
+    expect(formatMinQty(null)).toBe('—');
+  });
+});
+
+describe('order-format — formatScopeWithTargets (C16)', () => {
+  it('cart → «Вся корзина» (labels игнорируются)', () => {
+    expect(formatScopeWithTargets('cart', ['что-то'])).toBe('Вся корзина');
+  });
+  it('brand с метками → «Бренд: Nike, Adidas»', () => {
+    expect(formatScopeWithTargets('brand', ['Nike', 'Adidas'])).toBe('Бренд: Nike, Adidas');
+  });
+  it('category без меток → только базовая метка (graceful)', () => {
+    expect(formatScopeWithTargets('category', [])).toBe('Категория');
+  });
+  it('усечение: 5 меток при max=3 → первые 3 + «и ещё 2»', () => {
+    expect(
+      formatScopeWithTargets('set', ['a', 'b', 'c', 'd', 'e'], 3),
+    ).toBe('Набор: a, b, c и ещё 2');
+  });
+  it('неизвестный scope → сам scope', () => {
+    expect(formatScopeWithTargets('weird', [])).toBe('weird');
   });
 });

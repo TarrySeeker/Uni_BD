@@ -225,6 +225,40 @@ export function paymentStatusOnSettle(
 }
 
 /**
+ * Очевидные противоречия между независимыми машинами заказа и доставки (§2.8),
+ * баг #4 аудита тупиков.
+ *
+ * Машины ОРТОГОНАЛЬНЫ и остаются независимыми источниками истины — это НЕ
+ * блокировка и НЕ авто-синхронизация, а вход для МЯГКОЙ подсказки оператору в UI
+ * (role=status). Возвращает список человекочитаемых предупреждений; пустой список
+ * — противоречий нет. Сознательно консервативна: репортит только заведомо
+ * нелогичные сочетания, чтобы не плодить ложные предупреждения на легитимных
+ * транзитных состояниях (например, «отгружен» при доставке «в пути»/«зарегистр.»).
+ */
+export function detectStatusContradictions(input: {
+  orderStatus: OrderStatus;
+  deliveryStatus: DeliveryStatus;
+}): string[] {
+  const out: string[] = [];
+
+  // (1) Заказ уже отгружён/доставлен/завершён, но доставка ещё «Ожидает» (не
+  //     начата): отгрузить, не зарегистрировав доставку, нелогично.
+  const shippedOrBeyond: OrderStatus[] = ['shipped', 'delivered', 'completed'];
+  if (shippedOrBeyond.includes(input.orderStatus) && input.deliveryStatus === 'pending') {
+    out.push('Заказ отгружен, но статус доставки всё ещё «Ожидает» — обновите статус доставки.');
+  }
+
+  // (2) Доставка отмечена «Доставлена», но статус заказа этого ещё не отражает
+  //     (заказ не дошёл даже до отгрузки).
+  const beforeShipped: OrderStatus[] = ['new', 'awaiting_payment', 'paid', 'packed'];
+  if (input.deliveryStatus === 'delivered' && beforeShipped.includes(input.orderStatus)) {
+    out.push('Доставка отмечена «Доставлена», но статус заказа ещё не отражает отгрузку.');
+  }
+
+  return out;
+}
+
+/**
  * Можно ли инициировать оплату заказа (backend-инвариант для initPayment/webhook).
  *
  * БЛОКИРУЕТ:

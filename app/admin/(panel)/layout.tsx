@@ -2,7 +2,11 @@ import type { ReactNode } from 'react';
 
 import { requireUser } from '@/lib/auth/session';
 import { buildAdminNav } from '@/lib/admin/nav';
-import { getEffectiveSettings, getEffectiveModuleSet } from '@/lib/config/settings';
+import {
+  getEffectiveSettings,
+  getEffectiveModuleSet,
+  isSingleUserMode,
+} from '@/lib/config/settings';
 
 import { Sidebar } from './_components/Sidebar';
 import { Topbar } from './_components/Topbar';
@@ -34,11 +38,16 @@ export default async function AdminLayout({
   // гейтов. Меню реагирует на выключение модуля из UI, а не только на ADMIK_MODULES.
   const enabledModules = await getEffectiveModuleSet();
 
-  // Меню = f(включённые модули, права пользователя) — §6.3.
-  const nav = buildAdminNav(user, enabledModules);
+  // Эффективные настройки (env ⊕ БД): брендинг шапки + флаг однопольз. режима (B9).
+  const eff = await getEffectiveSettings();
+  const { branding } = eff;
 
-  // Брендинг — из эффективных настроек (env ⊕ БД), docs/11 §5.4.5.
-  const { branding } = await getEffectiveSettings();
+  // Меню = f(включённые модули, права, однопольз. режим B9) — §6.3. В режиме
+  // одного пользователя пункты «Пользователи»/«Роли» скрыты (UI-фильтр; реальная
+  // защита — guard страниц + серверная блокировка мутаций).
+  const nav = buildAdminNav(user, enabledModules, {
+    singleUserMode: isSingleUserMode(eff),
+  });
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-gray-900">

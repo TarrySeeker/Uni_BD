@@ -1,8 +1,10 @@
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 import { listRolesWithPermissionCounts } from '@/lib/auth/admin-repository';
+import { isSingleUserModeEnabled } from '@/lib/config/settings';
 
 import { Forbidden } from '../../_components/Forbidden';
+import { SingleUserModeNotice } from '../../_components/SingleUserModeNotice';
 import { PageHeader } from '../../_components/PageHeader';
 import { UserForm } from '../_components/UserForm';
 
@@ -18,6 +20,10 @@ export default async function NewUserPage() {
   const user = await requireUser();
   if (!can(user, 'users.manage')) {
     return <Forbidden permission="users.manage" />;
+  }
+  // Однопользовательский режим (B9): создание пользователей отключено.
+  if (await isSingleUserModeEnabled()) {
+    return <SingleUserModeNotice kind="users" />;
   }
 
   const roles = await listRolesWithPermissionCounts();

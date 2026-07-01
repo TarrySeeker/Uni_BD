@@ -65,6 +65,17 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
   const [deliveryItems, setDeliveryItems] = useState(
     (home.delivery.items ?? []).map((i) => `${i.title} | ${i.text}`).join('\n'),
   );
+  // valuesStrip (B1) — лента ценностей: показ + список пар title/text.
+  const [valuesStripEnabled, setValuesStripEnabled] = useState(home.valuesStrip.enabled);
+  const [valuesStripItems, setValuesStripItems] = useState(
+    (home.valuesStrip.items ?? []).map((i) => `${i.title} | ${i.text}`).join('\n'),
+  );
+  // philosophy (B3)
+  const [philEyebrow, setPhilEyebrow] = useState(home.philosophy.eyebrow ?? '');
+  const [philTitle, setPhilTitle] = useState(home.philosophy.title ?? '');
+  const [philText, setPhilText] = useState(home.philosophy.text ?? '');
+  const [philLinkLabel, setPhilLinkLabel] = useState(home.philosophy.linkLabel ?? '');
+  const [philLinkHref, setPhilLinkHref] = useState(home.philosophy.linkHref ?? '');
 
   function s(v: string): string | undefined {
     const t = v.trim();
@@ -96,6 +107,17 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
         },
         delivery: {
           items: pairsToArr(deliveryItems),
+        },
+        valuesStrip: {
+          enabled: valuesStripEnabled,
+          items: pairsToArr(valuesStripItems),
+        },
+        philosophy: {
+          eyebrow: s(philEyebrow),
+          title: s(philTitle),
+          text: s(philText),
+          linkLabel: s(philLinkLabel),
+          linkHref: s(philLinkHref),
         },
       },
     });
@@ -215,6 +237,64 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
           <textarea id="home-delivery" value={deliveryItems} onChange={(e) => setDeliveryItems(e.target.value)}
             rows={4} className={inputCls} placeholder={'СДЭК | Доставка по всей России…\nСроки | Москва — 1–2 дня…'} />
           <p className={hintCls}>Например: <code>СДЭК | Доставка по всей России. Пункты выдачи и курьер.</code></p>
+        </div>
+      </fieldset>
+
+      {/* Лента ценностей (B1) */}
+      <fieldset className="mb-6 rounded border border-gray-200 p-4">
+        <legend className="px-1 text-sm font-semibold text-gray-800">Лента ценностей</legend>
+        <div className="grid grid-cols-1 gap-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={valuesStripEnabled}
+              onChange={(e) => setValuesStripEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Показывать ленту на главной
+          </label>
+          <div>
+            <label htmlFor="home-values-strip" className={labelCls}>
+              Пункты: «Заголовок | Описание» (по одному на строку)
+            </label>
+            <textarea id="home-values-strip" value={valuesStripItems} onChange={(e) => setValuesStripItems(e.target.value)}
+              rows={4} className={inputCls} placeholder={'Форма | Структурные силуэты…\nФункция | Продуманный крой…'} />
+            <p className={hintCls}>Лента показывается, только если включён флажок выше. Пусто — пункты по умолчанию.</p>
+          </div>
+        </div>
+      </fieldset>
+
+      {/* Философия (B3) */}
+      <fieldset className="mb-6 rounded border border-gray-200 p-4">
+        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Философия»</legend>
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label htmlFor="home-phil-eyebrow" className={labelCls}>Надзаголовок</label>
+            <input id="home-phil-eyebrow" value={philEyebrow} onChange={(e) => setPhilEyebrow(e.target.value)}
+              placeholder="Философия" className={inputCls} />
+          </div>
+          <div>
+            <label htmlFor="home-phil-title" className={labelCls}>Заголовок</label>
+            <input id="home-phil-title" value={philTitle} onChange={(e) => setPhilTitle(e.target.value)}
+              placeholder="Например: качество, забота, стиль" className={inputCls} />
+          </div>
+          <div>
+            <label htmlFor="home-phil-text" className={labelCls}>Абзац</label>
+            <textarea id="home-phil-text" value={philText} onChange={(e) => setPhilText(e.target.value)}
+              rows={3} className={inputCls} />
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div>
+              <label htmlFor="home-phil-link-label" className={labelCls}>Текст ссылки</label>
+              <input id="home-phil-link-label" value={philLinkLabel} onChange={(e) => setPhilLinkLabel(e.target.value)}
+                placeholder="О бренде" className={inputCls} />
+            </div>
+            <div>
+              <label htmlFor="home-phil-link-href" className={labelCls}>Адрес ссылки</label>
+              <input id="home-phil-link-href" value={philLinkHref} onChange={(e) => setPhilLinkHref(e.target.value)}
+                placeholder="/#about" className={inputCls} />
+            </div>
+          </div>
         </div>
       </fieldset>
 

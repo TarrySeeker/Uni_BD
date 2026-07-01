@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import type { CmsPageWithSections } from '@/lib/cms/types';
 import { SITEMAP_CHANGEFREQS } from '@/lib/cms/types';
+import { slugify } from '@/lib/cms/slug';
 import type { ActionResult } from '@/lib/server/action';
 import { SeoFieldset, type SeoFieldsetValue } from '../../_components/SeoFieldset';
 
@@ -17,6 +18,7 @@ import {
 } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
 import { SectionEditor } from './SectionEditor';
+import { CmsImageUploadButton } from './CmsImageUploadButton';
 
 /**
  * Форма CMS-страницы (docs/11 §5.1.5, пакет 5.C-3). Создание/редактирование.
@@ -26,26 +28,45 @@ import { SectionEditor } from './SectionEditor';
  * В режиме редактирования снизу — SectionEditor (drag-and-drop секции).
  *
  * Все мутации — Server Actions CMS (cms.write + assertCmsEnabled на сервере).
- * SeoFieldset универсален; для CMS-страницы используем подмножество его полей:
- * seoTitle/seoDescription/canonicalUrl/noindex и поле «ключ OG» как ogImageUrl
- * (схема страницы хранит ogImageUrl text; ogTitle/ogDescription у страницы нет).
+ * SeoFieldset универсален; для CMS-страницы используем seoTitle/seoDescription/
+ * ogTitle/ogDescription/canonicalUrl/noindex и поле «ключ OG» как ogImageUrl
+ * (схема страницы хранит ogImageUrl text; OG-текст — в og_title/og_description, C18).
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
 const inputCls = 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm';
 const labelCls = 'block text-sm font-medium text-gray-700';
 
-/** slugify-превью на клиенте (UX-подсказка; источник правды — сервер). */
+/**
+ * slugify-превью на клиенте (UX-подсказка; источник правды — сервер).
+ *
+ * ПЕРЕИСПОЛЬЗУЕМ серверный slugify (lib/cms/slug → lib/catalog/slug): он
+ * транслитерирует кириллицу → латиницу («О компании» → «o-kompanii»), а значит
+ * превью тождественно тому, что примет серверная slugSchema. Раньше здесь был
+ * самописный regex, оставлявший кириллицу — форма слала непустой кириллический
+ * slug, Zod-схема его отвергала, и создание русскоязычной страницы падало с
+ * ошибкой у поля «ЧПУ», которое владелец даже не заполнял (находка 7 аудита).
+ *
+ * slugify — чистая функция (только String API, без Node-зависимостей в этой
+ * ветке), поэтому безопасна в client-компоненте.
+ */
 function previewSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9а-яё\s-]/gi, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+  return slugify(title);
 }
 
-export function PageForm({ page }: { page: CmsPageWithSections | null }) {
+export function PageForm({
+  page,
+  canWrite = true,
+}: {
+  page: CmsPageWithSections | null;
+  /**
+   * Есть ли у пользователя право cms.write (находка 14 аудита). По умолчанию true
+   * (создание страницы гейтится cms.write на странице /admin/cms/new). При false —
+   * форма в режиме «только чтение»: поля дизейблены, кнопки мутаций скрыты, сверху
+   * плашка. Серверная защита (permission cms.write в Server Actions) сохраняется.
+   */
+  canWrite?: boolean;
+}) {
   const router = useRouter();
   const isEdit = page !== null;
 
@@ -65,12 +86,12 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
   );
 
   // SeoFieldset: для страницы маппим ogImageKey ↔ ogImageUrl; ogTitle/ogDescription
-  // у страницы нет (не входят в схему) — поля скрыты ниже не будут, но не отправляются.
+  // хранятся в og_title/og_description (C18) — инициализируем из страницы и шлём в payload.
   const [seo, setSeo] = useState<SeoFieldsetValue>({
     seoTitle: page?.seoTitle ?? '',
     seoDescription: page?.seoDescription ?? '',
-    ogTitle: '',
-    ogDescription: '',
+    ogTitle: page?.ogTitle ?? '',
+    ogDescription: page?.ogDescription ?? '',
     ogImageKey: page?.ogImageUrl ?? '',
     canonicalUrl: page?.canonicalUrl ?? '',
     noindex: page?.noindex ?? false,
@@ -85,6 +106,8 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
     return {
       seoTitle: seo.seoTitle.trim() || undefined,
       seoDescription: seo.seoDescription.trim() || undefined,
+      ogTitle: seo.ogTitle.trim() || undefined,
+      ogDescription: seo.ogDescription.trim() || undefined,
       ogImageUrl: seo.ogImageKey.trim() || undefined,
       canonicalUrl: seo.canonicalUrl.trim() || undefined,
       noindex: seo.noindex,
@@ -93,20 +116,27 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
     };
   }
 
-  async function save() {
-    setPending(true);
-    setError(null);
-    setSuccess(null);
-    // 'published' через create/update запрещён схемой (баг B волны 5): публикация
-    // идёт только через кнопку «Опубликовать» (publishCmsPage). При сохранении уже
-    // опубликованной страницы статус не трогаем (undefined → COALESCE сохраняет
-    // 'published' и published_at в БД); отправляем лишь редактируемый 'draft'/'archived'.
-    const base = {
+  /**
+   * Базовый payload полей страницы (заголовок/slug/SEO/sitemap).
+   * 'published' через create/update запрещён схемой (баг B волны 5): публикация
+   * идёт только через кнопку «Опубликовать» (publishCmsPage). При сохранении уже
+   * опубликованной страницы статус не трогаем (undefined → COALESCE сохраняет
+   * 'published' и published_at в БД); отправляем лишь редактируемый 'draft'/'archived'.
+   */
+  function buildBasePayload() {
+    return {
       title: title.trim(),
       slug: slug.trim() || undefined,
       status: status === 'published' ? undefined : status,
       ...pageSeoPayload(),
     };
+  }
+
+  async function save() {
+    setPending(true);
+    setError(null);
+    setSuccess(null);
+    const base = buildBasePayload();
     const result = isEdit
       ? await updateCmsPageAction({ id: page!.id, ...base })
       : await createCmsPageAction(base);
@@ -120,6 +150,33 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
       }
     } else {
       setError(result);
+    }
+  }
+
+  /**
+   * Публикация (находка 15 аудита): СНАЧАЛА сохраняем текущие поля формы
+   * (updateCmsPage), затем публикуем. publishCmsPage делает снимок ревизии из
+   * текущей строки БД, поэтому без предварительного сохранения публиковалась бы
+   * прежняя версия — несохранённые правки заголовка/SEO терялись бы.
+   */
+  async function saveAndPublish() {
+    if (!isEdit) return;
+    setPending(true);
+    setError(null);
+    setSuccess(null);
+    const saved = await updateCmsPageAction({ id: page!.id, ...buildBasePayload() });
+    if (!saved.ok) {
+      setPending(false);
+      setError(saved);
+      return;
+    }
+    const published = await publishCmsPageAction({ id: page!.id });
+    setPending(false);
+    if (published.ok) {
+      setSuccess('Страница сохранена и опубликована.');
+      router.refresh();
+    } else {
+      setError(published);
     }
   }
 
@@ -178,6 +235,17 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
         </div>
       ) : null}
 
+      {!canWrite ? (
+        <div
+          role="status"
+          className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          У вас нет права на редактирование этой страницы (нужно «cms.write»).
+          Поля доступны только для просмотра — изменения сохранить нельзя.
+          Обратитесь к администратору, чтобы получить право.
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <label htmlFor="p-title" className={labelCls}>
@@ -189,6 +257,7 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
             onChange={(e) => onTitleChange(e.target.value)}
             className={inputCls}
             required
+            disabled={!canWrite}
           />
           {fe('title') ? <p className="mt-1 text-xs text-red-600">{fe('title')}</p> : null}
         </div>
@@ -205,6 +274,7 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
             }}
             placeholder="авто из заголовка"
             className={inputCls}
+            disabled={!canWrite}
           />
           {fe('slug') ? <p className="mt-1 text-xs text-red-600">{fe('slug')}</p> : null}
         </div>
@@ -218,6 +288,7 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
             value={status}
             onChange={(e) => setStatus(e.target.value as typeof status)}
             className={inputCls}
+            disabled={!canWrite}
           >
             <option value="draft">Черновик</option>
             {/* «Опубликована» НЕ выбирается вручную (баг B волны 5): публикация —
@@ -247,6 +318,7 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
               value={sitemapPriority}
               onChange={(e) => setSitemapPriority(e.target.value)}
               className={inputCls}
+              disabled={!canWrite}
             />
             {fe('sitemapPriority') ? (
               <p className="mt-1 text-xs text-red-600">{fe('sitemapPriority')}</p>
@@ -261,6 +333,7 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
               value={sitemapChangefreq}
               onChange={(e) => setSitemapChangefreq(e.target.value)}
               className={inputCls}
+              disabled={!canWrite}
             >
               <option value="">—</option>
               {SITEMAP_CHANGEFREQS.map((cf) => (
@@ -278,45 +351,63 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
             onChange={setSeo}
             idPrefix="p-seo"
             canonicalPlaceholder={`Авто: /pages/${slug || 'slug-страницы'}`}
+            disabled={!canWrite}
             fieldErrors={{
               seoTitle: fe('seoTitle'),
               seoDescription: fe('seoDescription'),
+              ogTitle: fe('ogTitle'),
+              ogDescription: fe('ogDescription'),
               ogImageKey: fe('ogImageUrl'),
               canonicalUrl: fe('canonicalUrl'),
             }}
+            // Загрузчик OG-картинки страницы (находка 13): переиспользуем
+            // CMS-загрузчик (cms.write), кладём возвращённый ключ в ogImageKey ↔
+            // og_image_url; витрина резолвит ключ в URL (pageMeta).
+            ogImageSlot={
+              <CmsImageUploadButton
+                label="Загрузить картинку"
+                onUploaded={(key) => setSeo((prev) => ({ ...prev, ogImageKey: key }))}
+              />
+            }
           />
         </div>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-200 pt-4">
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-        >
-          {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать страницу'}
-        </button>
+        {/* Кнопки мутаций — только при наличии cms.write (находка 14): иначе
+            интерфейс выглядел бы рабочим, но сервер отклонял бы любое действие. */}
+        {canWrite ? (
+          <>
+            <button
+              type="button"
+              onClick={save}
+              disabled={pending}
+              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            >
+              {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать страницу'}
+            </button>
 
-        {isEdit && page!.status !== 'published' ? (
-          <button
-            type="button"
-            onClick={() => runPageAction(publishCmsPageAction, 'Страница опубликована.')}
-            disabled={pending}
-            className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50"
-          >
-            Опубликовать
-          </button>
-        ) : null}
-        {isEdit && page!.status === 'published' ? (
-          <button
-            type="button"
-            onClick={() => runPageAction(unpublishCmsPageAction, 'Снято с публикации.')}
-            disabled={pending}
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            Снять с публикации
-          </button>
+            {isEdit && page!.status !== 'published' ? (
+              <button
+                type="button"
+                onClick={saveAndPublish}
+                disabled={pending}
+                className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50"
+              >
+                Сохранить и опубликовать
+              </button>
+            ) : null}
+            {isEdit && page!.status === 'published' ? (
+              <button
+                type="button"
+                onClick={() => runPageAction(unpublishCmsPageAction, 'Снято с публикации.')}
+                disabled={pending}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Снять с публикации
+              </button>
+            ) : null}
+          </>
         ) : null}
 
         <button
@@ -324,10 +415,10 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
           onClick={() => router.push('/admin/cms')}
           className="text-sm text-gray-600 hover:underline"
         >
-          Отмена
+          {canWrite ? 'Отмена' : 'Назад к списку'}
         </button>
 
-        {isEdit ? (
+        {isEdit && canWrite ? (
           <button
             type="button"
             onClick={remove}
@@ -343,8 +434,12 @@ export function PageForm({ page }: { page: CmsPageWithSections | null }) {
         <p className="mt-4 text-sm text-gray-500">
           Секции страницы станут доступны после её создания.
         </p>
-      ) : (
+      ) : canWrite ? (
         <SectionEditor pageId={page!.id} sections={page!.sections} />
+      ) : (
+        <p className="mt-6 border-t border-gray-200 pt-4 text-sm text-gray-500">
+          Редактор секций доступен только с правом «cms.write».
+        </p>
       )}
     </div>
   );

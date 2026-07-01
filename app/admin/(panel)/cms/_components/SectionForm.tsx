@@ -13,6 +13,7 @@ import {
 import type { CmsSectionType } from '@/lib/cms/types';
 
 import { RichTextEditor } from './RichTextEditor';
+import { CmsImageUploadButton } from './CmsImageUploadButton';
 
 /**
  * Форма содержимого одной секции (docs/11 §5.1.5). Единый редактор: набор полей
@@ -116,7 +117,9 @@ function FieldControl({
         {field.required ? '*' : ''}
       </label>
 
-      {field.kind === 'richtext' ? (
+      {field.kind === 'image' ? (
+        <ImageField field={field} value={value} onChange={onChange} />
+      ) : field.kind === 'richtext' ? (
         <div className="mt-1">
           <RichTextEditor value={value} onChange={onChange} ariaLabel={field.label} />
         </div>
@@ -153,10 +156,73 @@ function FieldControl({
         />
       )}
 
-      {field.hint && field.kind !== 'pairs' && field.kind !== 'number' ? (
+      {field.hint && field.kind !== 'pairs' && field.kind !== 'number' && field.kind !== 'image' ? (
         <p className="mt-1 text-xs text-gray-400">{field.hint}</p>
       ) : null}
       {errNode}
+    </div>
+  );
+}
+
+/**
+ * Контрол поля-изображения (kind='image'): загрузчик файла + ручной ввод ключа.
+ *
+ * Закрывает находку 8: hero/banner/gallery больше не требуют от владельца вписывать
+ * машинный S3-ключ вручную. Кнопка вызывает uploadCmsSectionImageAction (загрузка
+ * → S3-ключ cms/<uuid>.webp) и подставляет ключ в значение поля.
+ *
+ * Две формы значения (по контракту section-form.ts):
+ *   - gallery.images — multiline «ключ|alt» (несколько картинок) → textarea;
+ *     загрузка ДОБАВЛЯЕТ ключ новой строкой (не затирает уже добавленные);
+ *   - hero/banner.imageKey — один ключ → input; загрузка ЗАМЕНЯЕТ значение.
+ * Ручной ввод/правка ключа сохраняются как фолбэк (поле остаётся редактируемым).
+ */
+function ImageField({
+  field,
+  value,
+  onChange,
+}: {
+  field: SectionFieldSpec;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const isMulti = field.name === 'images';
+
+  /** Добавляет загруженный ключ: для галереи — новой строкой, иначе заменяет. */
+  function applyUploadedKey(key: string) {
+    if (!isMulti) {
+      onChange(key);
+      return;
+    }
+    const existing = value.trim();
+    onChange(existing.length > 0 ? `${existing}\n${key}` : key);
+  }
+
+  return (
+    <div className="mt-1">
+      {isMulti ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={4}
+          className={inputCls}
+          placeholder={field.hint}
+          aria-label={field.label}
+        />
+      ) : (
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputCls}
+          placeholder={field.hint}
+          aria-label={field.label}
+        />
+      )}
+      <CmsImageUploadButton
+        label={isMulti ? 'Загрузить и добавить изображение' : 'Загрузить изображение'}
+        onUploaded={applyUploadedKey}
+      />
+      {field.hint ? <p className="mt-1 text-xs text-gray-400">{field.hint}</p> : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { sql } from '@/lib/db/client';
 import { isCdekMock, getCdekConfig } from '@/lib/cdek/config';
+import { deliveryModeLabel, destinationLabel } from '@/lib/cdek/format';
 import { formatDateTime } from '@/lib/admin/order-format';
 
 import { Forbidden } from '../_components/Forbidden';
@@ -48,25 +49,12 @@ function cdekMode(): { label: string; cls: string; hint: string } {
   };
 }
 
-/** Человекочитаемый способ доставки. */
-function deliveryModeLabel(mode: string | null): string {
-  switch (mode) {
-    case 'pvz':
-      return 'ПВЗ';
-    case 'postamat':
-      return 'Постамат';
-    case 'door':
-      return 'Курьер';
-    default:
-      return '—';
-  }
-}
-
 interface ShipmentRow {
   id: string;
   cdek_number: string | null;
   cdek_uuid: string | null;
   delivery_mode: string | null;
+  pvz_code: string | null;
   status_code: string | null;
   status_name: string | null;
   status_at: Date | null;
@@ -78,6 +66,8 @@ interface ShipmentRow {
   order_number: string;
   customer_name: string | null;
   customer_email: string | null;
+  delivery_city: string | null;
+  delivery_pvz_code: string | null;
 }
 
 async function loadShipments(
@@ -98,11 +88,12 @@ async function loadShipments(
     `,
     sql<ShipmentRow[]>`
       SELECT
-        s.id, s.cdek_number, s.cdek_uuid, s.delivery_mode,
+        s.id, s.cdek_number, s.cdek_uuid, s.delivery_mode, s.pvz_code,
         s.status_code, s.status_name, s.status_at, s.is_mock, s.error,
         s.updated_at, s.print_url,
         o.id AS order_id, o.number AS order_number,
-        o.customer_name, o.customer_email
+        o.customer_name, o.customer_email,
+        o.delivery_city, o.delivery_pvz_code
       FROM cdek_shipments s JOIN orders o ON o.id = s.order_id ${where}
       ORDER BY s.updated_at DESC
       LIMIT ${PAGE_SIZE} OFFSET ${offset}
@@ -193,6 +184,7 @@ export default async function CdekPage({
               <th scope="col" className="px-4 py-2 font-medium">Заказ</th>
               <th scope="col" className="px-4 py-2 font-medium">Покупатель</th>
               <th scope="col" className="px-4 py-2 font-medium">Способ</th>
+              <th scope="col" className="px-4 py-2 font-medium">Назначение</th>
               <th scope="col" className="px-4 py-2 font-medium">Статус СДЭК</th>
               <th scope="col" className="px-4 py-2 font-medium">Обновлён</th>
               <th scope="col" className="px-4 py-2 font-medium">Печать</th>
@@ -201,7 +193,7 @@ export default async function CdekPage({
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                   Отправлений нет. Накладные СДЭК создаются из карточки заказа
                   (блок «Доставка СДЭК») после успешной оплаты.
                 </td>
@@ -237,6 +229,7 @@ export default async function CdekPage({
                   <td className="px-4 py-2 text-gray-600">
                     {deliveryModeLabel(row.delivery_mode)}
                   </td>
+                  <td className="px-4 py-2 text-gray-600">{destinationLabel(row)}</td>
                   <td className="px-4 py-2 text-gray-700">
                     {row.status_name ?? row.status_code ?? '—'}
                     {row.status_at ? (
@@ -248,14 +241,26 @@ export default async function CdekPage({
                   <td className="px-4 py-2 text-gray-500">{formatDateTime(row.updated_at)}</td>
                   <td className="px-4 py-2">
                     {row.print_url ? (
-                      <a
-                        href={row.print_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-700 hover:underline"
-                      >
-                        Накладная
-                      </a>
+                      row.is_mock ? (
+                        // MOCK: print_url ведёт на example.invalid (RFC 2606) и
+                        // никогда не откроется — вместо мёртвой ссылки показываем
+                        // некликабельный бейдж-пояснение (находка #12).
+                        <span
+                          className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700"
+                          title="MOCK: реальная накладная появится в боевом режиме (с боевыми ключами СДЭК)"
+                        >
+                          mock
+                        </span>
+                      ) : (
+                        <a
+                          href={row.print_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-700 hover:underline"
+                        >
+                          Накладная
+                        </a>
+                      )
                     ) : (
                       <span className="text-gray-300">—</span>
                     )}

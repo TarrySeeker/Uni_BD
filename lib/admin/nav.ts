@@ -59,12 +59,30 @@ export const NAV: NavItem[] = [
   { href: '/admin/settings', label: 'Настройки', permission: 'settings.manage' },
 ];
 
+/** Опции построения меню. */
+export interface AdminNavOptions {
+  /**
+   * Однопользовательский режим магазина (B9). Когда true — пункты «Пользователи»
+   * и «Роли» скрываются из меню. Это лишь UI-фильтр для удобства; настоящая защита
+   * — guard страниц + серверная блокировка мутаций (admin-actions). Дефолт OFF.
+   */
+  singleUserMode?: boolean;
+}
+
+/**
+ * Пункты, скрываемые в однопользовательском режиме — по СТАБИЛЬНОМУ href (не по
+ * подписи, которая локализуема). Управление пользователями и ролями инстансу
+ * с единственным пользователем не нужно.
+ */
+const SINGLE_USER_HIDDEN_HREFS: ReadonlySet<string> = new Set(['/admin/users', '/admin/roles']);
+
 /**
  * Строит видимое для пользователя меню.
  *
- * Пункт показывается, если выполнены ОБА условия:
+ * Пункт показывается, если выполнены ВСЕ условия:
  *   - нет модуля ИЛИ модуль входит в эффективный набор (`enabledModules.has(module)`);
- *   - нет права ИЛИ пользователь им обладает (`can(user, permission)`).
+ *   - нет права ИЛИ пользователь им обладает (`can(user, permission)`);
+ *   - не скрыт однопользовательским режимом (`opts.singleUserMode`, B9).
  *
  * `enabledModules` — ЭФФЕКТИВНЫЙ набор модулей (env ⊕ БД-оверрайд), вычисленный
  * вызывающим (layout: getEffectiveModuleSet()). Функция остаётся чистой/детерми-
@@ -73,6 +91,7 @@ export const NAV: NavItem[] = [
 export function buildAdminNav(
   user: AuthUser,
   enabledModules: ReadonlySet<ModuleName> | readonly ModuleName[],
+  opts: AdminNavOptions = {},
 ): NavItem[] {
   const enabled =
     enabledModules instanceof Set
@@ -80,6 +99,7 @@ export function buildAdminNav(
       : new Set<ModuleName>(enabledModules as readonly ModuleName[]);
   return NAV.filter(
     (item) =>
+      !(opts.singleUserMode && SINGLE_USER_HIDDEN_HREFS.has(item.href)) &&
       (!item.module || enabled.has(item.module)) &&
       (!item.permission || can(user, item.permission)),
   );

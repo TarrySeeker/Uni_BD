@@ -155,6 +155,8 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paidAt: Date | null;
   paymentRef: string | null;
+  /** Платёжный провайдер (orders.payment_provider): 'tbank' | 'manual' | null. */
+  paymentProvider: string | null;
 
   // ---- Доставка (поля под СДЭК Этап 4) ----
   deliveryType: DeliveryType;

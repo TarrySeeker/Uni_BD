@@ -4,10 +4,12 @@ import {
   CartQuoteSchema,
   ChangeOrderStatusSchema,
   CreateOrderSchema,
+  ManualOrderSchema,
   PromoCreateSchema,
   PromoUpdateSchema,
   SetDeliveryStatusSchema,
   SetPaymentStatusSchema,
+  allowedTargetTypesForScope,
   cartLineSchema,
   moneySchema,
   quantitySchema,
@@ -402,5 +404,150 @@ describe('orders/schemas — free_delivery + scope (баг #10)', () => {
       targets: [{ targetType: 'brand', brandId: UUID }],
     });
     expect(res.success).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// БАГ #32 (аудит тупиков): курьерская доставка ТРЕБУЕТ адрес при СОЗДАНИИ заказа,
+// иначе заказ нельзя отгрузить. На quote адрес НЕ обязателен (только оценка).
+// -----------------------------------------------------------------------------
+
+describe('orders/schemas — курьер требует адрес при создании заказа (баг #32)', () => {
+  const base = {
+    items: [{ variantId: UUID, qty: 1 }],
+    customer: { name: 'Иван', email: 'ivan@example.com', phone: '+79990000000' },
+    paymentMethod: 'cod' as const,
+  };
+
+  it('CreateOrderSchema: курьер БЕЗ адреса → отклоняется', () => {
+    const res = CreateOrderSchema.safeParse({
+      ...base,
+      delivery: { type: 'courier', city: 'Москва' },
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('CreateOrderSchema: курьер с пустым адресом (пробелы) → отклоняется', () => {
+    const res = CreateOrderSchema.safeParse({
+      ...base,
+      delivery: { type: 'courier', city: 'Москва', address: '   ' },
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('CreateOrderSchema: курьер с адресом → принимается', () => {
+    const res = CreateOrderSchema.safeParse({
+      ...base,
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('CreateOrderSchema: pickup без адреса → принимается (самовывоз)', () => {
+    const res = CreateOrderSchema.safeParse({
+      ...base,
+      delivery: { type: 'pickup' },
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('CreateOrderSchema: pvz по-прежнему требует pvzCode (без регресса)', () => {
+    expect(
+      CreateOrderSchema.safeParse({ ...base, delivery: { type: 'pvz', city: 'Москва' } }).success,
+    ).toBe(false);
+    expect(
+      CreateOrderSchema.safeParse({
+        ...base,
+        delivery: { type: 'pvz', city: 'Москва', pvzCode: 'MSK1' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('ManualOrderSchema: курьер без адреса → отклоняется (та же проверка)', () => {
+    const res = ManualOrderSchema.safeParse({
+      ...base,
+      source: 'admin',
+      delivery: { type: 'courier', city: 'Москва' },
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('CartQuoteSchema: курьер без адреса ОСТАЁТСЯ валидным (на quote адрес не нужен)', () => {
+    const res = CartQuoteSchema.safeParse({
+      items: [{ variantId: UUID, qty: 1 }],
+      delivery: { type: 'courier', city: 'Москва' },
+    });
+    expect(res.success).toBe(true);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// БАГ #5 (аудит тупиков): область применения (scope) ДОЛЖНА ограничивать тип
+// таргета — иначе «Категория/Бренд» вели себя одинаково (any-target).
+// -----------------------------------------------------------------------------
+
+describe('orders/schemas — allowedTargetTypesForScope (баг #5)', () => {
+  it('cart → таргеты не нужны (пустой список типов)', () => {
+    expect(allowedTargetTypesForScope('cart')).toEqual([]);
+  });
+  it('category → только category', () => {
+    expect(allowedTargetTypesForScope('category')).toEqual(['category']);
+  });
+  it('brand → только brand', () => {
+    expect(allowedTargetTypesForScope('brand')).toEqual(['brand']);
+  });
+  it('set → произвольный набор всех типов', () => {
+    expect([...allowedTargetTypesForScope('set')].sort()).toEqual(
+      ['brand', 'category', 'product', 'variant'].sort(),
+    );
+  });
+});
+
+describe('orders/schemas — scope ↔ тип таргета связаны (баг #5)', () => {
+  it('scope=category с таргетом-БРЕНДОМ → отклоняется', () => {
+    const res = PromoCreateSchema.safeParse({
+      code: 'CATB',
+      kind: 'percent',
+      value: '10',
+      applyScope: 'category',
+      targets: [{ targetType: 'brand', brandId: UUID }],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('scope=brand с таргетом-КАТЕГОРИЕЙ → отклоняется', () => {
+    const res = PromoCreateSchema.safeParse({
+      code: 'BRC',
+      kind: 'percent',
+      value: '10',
+      applyScope: 'brand',
+      targets: [{ targetType: 'category', categoryId: UUID }],
+    });
+    expect(res.success).toBe(false);
+  });
+
+  it('scope=category с таргетом-категорией → принимается', () => {
+    const res = PromoCreateSchema.safeParse({
+      code: 'CATC',
+      kind: 'percent',
+      value: '10',
+      applyScope: 'category',
+      targets: [{ targetType: 'category', categoryId: UUID }],
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it('scope=set допускает смешанные типы таргетов (товар + бренд)', () => {
+    const res = PromoCreateSchema.safeParse({
+      code: 'SETMIX',
+      kind: 'percent',
+      value: '10',
+      applyScope: 'set',
+      targets: [
+        { targetType: 'product', productId: UUID },
+        { targetType: 'brand', brandId: UUID },
+      ],
+    });
+    expect(res.success).toBe(true);
   });
 });

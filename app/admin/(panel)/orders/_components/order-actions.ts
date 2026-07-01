@@ -6,11 +6,16 @@ import {
   refundOrder,
   setPaymentStatus,
   setDeliveryStatus,
+  createManualOrder,
   createPromoCode,
   updatePromoCode,
   deactivatePromoCode,
   deletePromoCode,
 } from '@/lib/orders/actions';
+import {
+  searchProductsForOrder,
+  type OrderProductOption,
+} from '@/lib/orders/product-search';
 import type { ActionResult } from '@/lib/server/action';
 
 /**
@@ -45,6 +50,22 @@ export async function setPaymentStatusAction(input: unknown): Promise<ActionResu
 }
 export async function setDeliveryStatusAction(input: unknown): Promise<ActionResult<unknown>> {
   return setDeliveryStatus(input);
+}
+
+// --- Ручное создание заказа (orders.write) -----------------------------------
+
+/** Создать заказ вручную из админки (source='admin'). Возвращает id/number для редиректа. */
+export async function createManualOrderAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string; number: string }>> {
+  return createManualOrder(input) as Promise<ActionResult<{ id: string; number: string }>>;
+}
+
+/** Поиск товаров для подбора позиций в форме ручного заказа (read-only, orders.write). */
+export async function searchProductsForOrderAction(
+  input: unknown,
+): Promise<ActionResult<{ products: OrderProductOption[] }>> {
+  return searchProductsForOrder(input);
 }
 
 // --- Промокоды (CRUD) ---------------------------------------------------------

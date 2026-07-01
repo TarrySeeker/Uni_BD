@@ -40,6 +40,9 @@ export async function updateHomeAction(raw: unknown) {
 export async function updateNavigationAction(raw: unknown) {
   return prod.updateNavigationAction(raw);
 }
+export async function updateAccessSettings(raw: unknown) {
+  return prod.updateAccessSettings(raw);
+}
 
 /**
  * Загрузка изображения настроек (logo|favicon|og) из FormData. Фабричный action

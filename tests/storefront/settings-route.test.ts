@@ -17,6 +17,7 @@ const ORIGINAL_ORIGINS = process.env.STOREFRONT_ALLOWED_ORIGINS;
 function fakeEffective(): EffectiveSettings {
   return {
     modules: { overrides: {} },
+    access: { singleUserMode: false },
     home: HOME_DEFAULTS,
     navigation: { header: [], footer: [] },
     branding: {

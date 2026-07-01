@@ -10,6 +10,7 @@ import {
   reorderCmsSections,
   setCmsSectionEnabled,
   deleteCmsSection,
+  uploadCmsImageAction as uploadCmsImage,
 } from '@/lib/cms/actions';
 import type { ActionResult } from '@/lib/server/action';
 
@@ -72,4 +73,18 @@ export async function deleteCmsSectionAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   return deleteCmsSection(input);
+}
+
+// --- Загрузка изображений секций (ADR-018) ----------------------------------
+
+/**
+ * Загрузка изображения секции (hero/banner/gallery): FormData с полем `file` →
+ * S3-ключ. Вся серверная валидация (cms.write, assertCmsEnabled, validateUpload
+ * magic-bytes, webp-конверсия, генерация ключа cms/<uuid>.webp) внутри
+ * uploadCmsImageAction в lib/cms/actions — здесь только реэкспорт под формы.
+ */
+export async function uploadCmsSectionImageAction(
+  formData: FormData,
+): Promise<ActionResult<{ key: string; url: string }>> {
+  return uploadCmsImage(formData) as Promise<ActionResult<{ key: string; url: string }>>;
 }

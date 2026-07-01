@@ -9,6 +9,7 @@ import type {
   ProductDetail,
 } from '@/lib/catalog/types';
 import { PRODUCT_STATUSES, type ProductStatus } from '@/lib/catalog/types';
+import { normalizeMoney } from '@/lib/catalog/schemas';
 import { isPubliclyVisible } from '@/lib/catalog/visibility';
 import type { ActionResult } from '@/lib/server/action';
 
@@ -153,8 +154,12 @@ export function ProductForm({
       name: name.trim(),
       description,
       status,
-      basePrice: basePrice.trim() || '0',
-      compareAtPrice: compareAtPrice.trim() ? compareAtPrice.trim() : null,
+      // Нормализуем деньги (trim + запятая→точка) перед отправкой — RU-ввод
+      // «1500,50» доходит до сервера корректным (находка 2 аудита). Серверная
+      // moneySchema нормализует тоже; здесь — чтобы сохранённое значение и его
+      // показ после refresh совпадали.
+      basePrice: normalizeMoney(basePrice) || '0',
+      compareAtPrice: normalizeMoney(compareAtPrice) || null,
       isFeatured,
       isNew,
       brandId: brandId || null,
@@ -259,7 +264,7 @@ export function ProductForm({
   // НЕ влияют: активный товар с остатком 0 витрина ПОКАЗЫВАЕТ (с «Нет в наличии»).
   // Раньше индикатор требовал ещё цену>0 и остаток>0 → ложно писал «скрыт с сайта»
   // про товар, который на витрине ЕСТЬ (рассинхрон предиката).
-  const priceNum = Number(String(basePrice).replace(',', '.'));
+  const priceNum = Number(normalizeMoney(basePrice));
   const hasPrice = Number.isFinite(priceNum) && priceNum > 0;
   const totalAvailable = (product?.inventory ?? []).reduce(
     (sum, i) => sum + Math.max(0, (i.quantity ?? 0) - (i.reserved ?? 0)),
@@ -531,7 +536,7 @@ export function ProductForm({
                     checked={isFeatured}
                     onChange={(e) => setIsFeatured(e.target.checked)}
                   />
-                  Рекомендуемый (хит продаж) — бейдж на витрине
+                  Показать на главной (бейдж «хит продаж» + блок «Коллекция»)
                 </label>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <label htmlFor="p-isnew">Бейдж «Новинка»:</label>

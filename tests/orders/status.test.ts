@@ -17,6 +17,7 @@ import {
   nextPaymentStatuses,
   nextStatuses,
   deliveryForwardPath,
+  detectStatusContradictions,
 } from '@/lib/orders/status';
 import {
   DELIVERY_STATUSES,
@@ -29,6 +30,35 @@ import {
  * Покрывают разрешённые/запрещённые переходы, терминальные статусы, согласие
  * таблиц переходов с whitelist-значениями из types.ts.
  */
+
+describe('orders/status — detectStatusContradictions (баг #4: мягкие подсказки)', () => {
+  it('заказ отгружен/доставлен/завершён, а доставка «Ожидает» → предупреждение', () => {
+    for (const orderStatus of ['shipped', 'delivered', 'completed'] as const) {
+      const warns = detectStatusContradictions({ orderStatus, deliveryStatus: 'pending' });
+      expect(warns.length).toBeGreaterThan(0);
+      expect(warns.join(' ')).toMatch(/Ожидает|доставк/i);
+    }
+  });
+
+  it('доставка «Доставлена», а заказ ещё до отгрузки → предупреждение', () => {
+    for (const orderStatus of ['new', 'awaiting_payment', 'paid', 'packed'] as const) {
+      const warns = detectStatusContradictions({ orderStatus, deliveryStatus: 'delivered' });
+      expect(warns.length).toBeGreaterThan(0);
+      expect(warns.join(' ')).toMatch(/Доставлена|отгруз/i);
+    }
+  });
+
+  it('легитимные транзитные сочетания НЕ дают ложных предупреждений', () => {
+    // Отгружен + доставка в пути/зарегистрирована — нормально.
+    expect(detectStatusContradictions({ orderStatus: 'shipped', deliveryStatus: 'in_transit' })).toEqual([]);
+    expect(detectStatusContradictions({ orderStatus: 'shipped', deliveryStatus: 'registered' })).toEqual([]);
+    // Доставлен заказ + доставка доставлена — согласовано.
+    expect(detectStatusContradictions({ orderStatus: 'delivered', deliveryStatus: 'delivered' })).toEqual([]);
+    expect(detectStatusContradictions({ orderStatus: 'completed', deliveryStatus: 'delivered' })).toEqual([]);
+    // Новый заказ + доставка ожидает — согласовано (ничего ещё не произошло).
+    expect(detectStatusContradictions({ orderStatus: 'new', deliveryStatus: 'pending' })).toEqual([]);
+  });
+});
 
 describe('orders/status — paymentStatusOnSettle (сетл оплаты при отмене/возврате)', () => {
   it('paid + отмена/возврат → refunded (деньги получены — возвращаем)', () => {

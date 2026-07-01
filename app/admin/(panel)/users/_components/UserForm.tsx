@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { RoleRef, UserWithRoles } from '@/lib/auth/admin-repository';
+import { rolesChanged } from '@/lib/admin/user-roles';
 
 import {
   createUserAction,
@@ -66,12 +67,18 @@ export function UserForm({
     setPending(true);
     setError(null);
     setSuccess(null);
+    // Anti-escalation (находка #16): сервер требует roles.manage при ЛЮБОМ
+    // присутствии roleIds. Чтобы носитель только users.manage мог сохранить имя/
+    // статус, шлём roleIds лишь когда состав ролей реально менялся. Иначе чистая
+    // правка профиля упиралась бы в «Недостаточно прав для назначения ролей».
+    const originalRoleIds = user ? user.roles.map((r) => r.id) : [];
+    const includeRoles = rolesChanged(originalRoleIds, roleIds);
     const result = isEdit
       ? await updateUserAction({
           id: user!.id,
           displayName: displayName.trim(),
           status,
-          roleIds,
+          ...(includeRoles ? { roleIds } : {}),
         })
       : await createUserAction({
           email: email.trim(),
@@ -115,10 +122,11 @@ export function UserForm({
     return fieldError(error, f);
   }
 
-  // Статусы, доступные для выбора: на создании — без «Приглашён».
-  const statusOptions = isEdit
-    ? (['active', 'disabled', 'invited'] as const)
-    : (['active', 'disabled'] as const);
+  // Статусы для выбора: только active/disabled. «Приглашён» убран как мёртвая
+  // опция — флоу приглашений (письмо-инвайт) нет, а пользователь со статусом
+  // invited войти НЕ может (session пускает только active) → тупик «создал, а
+  // человек не заходит». Вернуть «Приглашён», когда появится реальный invite-флоу.
+  const statusOptions = ['active', 'disabled'] as const;
 
   return (
     <div>

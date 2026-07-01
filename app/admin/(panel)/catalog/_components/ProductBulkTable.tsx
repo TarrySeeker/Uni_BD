@@ -152,7 +152,7 @@ export function ProductBulkTable({
               <th scope="col" className="px-4 py-2 font-medium">Цена</th>
               <th scope="col" className="px-4 py-2 font-medium">Статус</th>
               <th scope="col" className="px-4 py-2 font-medium">Флаги</th>
-              <th scope="col" className="px-4 py-2 font-medium">Остаток</th>
+              <th scope="col" className="px-4 py-2 font-medium" title="Доступно к заказу / всего на складе">Остаток</th>
               <th scope="col" className="px-4 py-2 font-medium text-right">Действия</th>
             </tr>
           </thead>
@@ -228,7 +228,17 @@ export function ProductBulkTable({
                       ) : null}
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-gray-700">{row.totalStock}</td>
+                  <td className="px-4 py-2 text-gray-700">
+                    {row.availableStock !== row.totalStock ? (
+                      <span
+                        title={`Доступно к заказу: ${row.availableStock}; всего на складе: ${row.totalStock} (часть зарезервирована под заказы)`}
+                      >
+                        {row.availableStock} / {row.totalStock}
+                      </span>
+                    ) : (
+                      row.totalStock
+                    )}
+                  </td>
                   <td className="px-4 py-2">
                     <div className="flex justify-end gap-2">
                       <Link

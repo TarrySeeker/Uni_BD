@@ -74,6 +74,24 @@ const H = vi.hoisted(() => {
     sqlBeginMock,
     sqlMock,
     writeAuditSpy: vi.fn(async (..._args: unknown[]) => {}),
+    // Шлюзовой возврат Т-Банка (Фича #15). По умолчанию — успех (ok:true), чтобы
+    // refundOrder доходил до перехода. Отдельные тесты подменяют на ok:false.
+    refundPaymentMock: vi.fn(
+      async (
+        ..._args: unknown[]
+      ): Promise<{
+        ok: boolean;
+        status: string | null;
+        isMock: boolean;
+        skipped?: boolean;
+        reason?: string;
+      }> => ({
+        ok: true,
+        status: 'REFUNDED',
+        isMock: true,
+        skipped: false,
+      }),
+    ),
     getCurrentUserMock: vi.fn(async () => state.currentUser),
     getOrderByIdMock: vi.fn(async (..._args: unknown[]) => state.getOrderByIdQueue.shift() ?? null),
     releaseReservationMock: vi.fn(async (..._args: unknown[]) => true),
@@ -90,6 +108,7 @@ const {
   sqlBeginMock,
   sqlMock,
   writeAuditSpy,
+  refundPaymentMock,
   getCurrentUserMock,
   getOrderByIdMock,
   releaseReservationMock,
@@ -137,6 +156,18 @@ vi.mock('@/lib/orders/repository', () => ({
   // мапперы реэкспортируются модулем — actions их типизирует, но в рантайме не зовёт
   mapOrder: (r: unknown) => r,
   mapOrderItem: (r: unknown) => r,
+}));
+
+// Платёжный модуль (Фича #15): refundOrder дёргает PaymentService.refundPayment
+// ДО смены статуса. Мокаем его классом (вызывается через `new`), чтобы тест был
+// детерминированным (без env/сети).
+vi.mock('@/lib/payments/tbank', () => ({
+  PaymentService: class {
+    refundPayment(...a: unknown[]) {
+      return H.refundPaymentMock(...(a as []));
+    }
+  },
+  toKopecks: (v: string | number) => Math.round(Number(v) * 100),
 }));
 
 // Импорт actions ПОСЛЕ моков.
@@ -196,6 +227,8 @@ beforeEach(() => {
   releaseReservationMock.mockClear();
   commitReservationMock.mockClear();
   createOrderMock.mockClear();
+  refundPaymentMock.mockClear();
+  refundPaymentMock.mockResolvedValue({ ok: true, status: 'REFUNDED', isMock: true, skipped: false });
 });
 
 afterEach(() => {
@@ -1147,5 +1180,128 @@ describe('createManualOrder', () => {
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
     expect(res.message).toBe('нет остатка');
+  });
+});
+
+// =============================================================================
+// ШЛЮЗОВОЙ ВОЗВРАТ Т-БАНКА В refundOrder (Фича #15).
+//
+// refundOrder ДО смены статуса вызывает PaymentService.refundPayment (вернуть деньги
+// через Т-Банк Cancel). Инвариант «двойного сетла нет»: метод НЕ меняет payment_status
+// — внутренний сетл делает applyOrderStatusTransition. При провале шлюза (ok:false)
+// переход НЕ выполняется (не врём про refunded).
+// =============================================================================
+
+describe('refundOrder: шлюзовой возврат Т-Банка', () => {
+  type RefundAudit = {
+    action: string;
+    after: { gatewayRefund?: { status: string | null; skipped: boolean; isMock: boolean } };
+  };
+
+  it('paid+tbank: refundPayment вызван ДО перехода; переход выполняется; audit несёт gatewayRefund', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({
+        status: 'paid',
+        paymentStatus: 'paid',
+        paymentProvider: 'tbank',
+        paymentRef: 'mock-pay-1',
+        grandTotal: '1000.00',
+      }),
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'tbank' }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok, JSON.stringify(res)).toBe(true);
+
+    // Шлюз вызван ровно раз с корректными (серверными) суммами/реквизитами.
+    expect(refundPaymentMock).toHaveBeenCalledTimes(1);
+    const arg = refundPaymentMock.mock.calls[0]![0] as Record<string, unknown>;
+    expect(arg).toMatchObject({
+      paymentProvider: 'tbank',
+      paymentStatus: 'paid',
+      paymentRef: 'mock-pay-1',
+      amountKop: 100000, // 1000.00 ₽ → копейки (считает сервер, не запрос)
+    });
+    // refundPayment вызван РАНЬШЕ транзакции перехода (sql.begin).
+    expect(refundPaymentMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      sqlBeginMock.mock.invocationCallOrder[0]!,
+    );
+    // Переход выполнен: резерв освобождён (paid→refunded, резерв ещё держится).
+    expect(releaseReservationMock).toHaveBeenCalledTimes(1);
+    // Аудит несёт трассировку шлюза.
+    const [entry] = writeAuditSpy.mock.calls[0] as [RefundAudit];
+    expect(entry.action).toBe('order.refund');
+    expect(entry.after.gatewayRefund).toMatchObject({ status: 'REFUNDED', skipped: false });
+  });
+
+  it('refundRes.ok=false: переход НЕ выполняется, возвращается ошибка, release/audit НЕ пишутся', async () => {
+    refundPaymentMock.mockResolvedValueOnce({
+      ok: false,
+      status: null,
+      isMock: false,
+      reason: 'cancel_failed',
+    });
+    H.state.getOrderByIdQueue = [
+      orderDetail({
+        status: 'paid',
+        paymentStatus: 'paid',
+        paymentProvider: 'tbank',
+        paymentRef: 'mock-pay-1',
+        grandTotal: '1000.00',
+      }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+    expect(res.message).toContain('платёжный шлюз');
+    // Деньги не вернулись → НЕ помечаем заказ refunded (нет транзакции/эффектов).
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+    expect(releaseReservationMock).not.toHaveBeenCalled();
+    expect(writeAuditSpy).not.toHaveBeenCalled();
+  });
+
+  it('ФИКС1: невалидный переход (order.status=new) → шлюз refundPayment НЕ зовётся, invalid_transition', async () => {
+    // Заказ authorized + статус new (откуда refunded недопустим). БЕЗ предпроверки
+    // refundPayment сделал бы REVERSED (холд снят в банке), а потом переход упал бы →
+    // деньги отпущены, заказ не refunded. Предпроверка перехода ДО шлюза это закрывает.
+    H.state.getOrderByIdQueue = [
+      orderDetail({
+        status: 'new',
+        paymentStatus: 'authorized',
+        paymentProvider: 'tbank',
+        paymentRef: 'mock-pay-1',
+        grandTotal: '1000.00',
+      }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+    expect(res.message).toContain('Недопустимый переход статуса заказа');
+    // Шлюз НЕ дёргался (холд/деньги не тронуты) и транзакция перехода не открывалась.
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+    expect(writeAuditSpy).not.toHaveBeenCalled();
+  });
+
+  it('COD/manual (provider!=tbank): refundPayment вернул skipped → переход всё равно идёт', async () => {
+    refundPaymentMock.mockResolvedValueOnce({
+      ok: true,
+      status: null,
+      isMock: true,
+      skipped: true,
+      reason: 'no_gateway',
+    });
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'paid', paymentStatus: 'pending', paymentProvider: null, grandTotal: '500.00' }),
+      orderDetail({ status: 'refunded', paymentStatus: 'pending', paymentProvider: null }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(true);
+    expect(refundPaymentMock).toHaveBeenCalledTimes(1);
+    const arg = refundPaymentMock.mock.calls[0]![0] as Record<string, unknown>;
+    expect(arg.paymentProvider).toBeNull();
+    // Внутренний сетл всё равно отработал: резерв paid→refunded освобождён.
+    expect(releaseReservationMock).toHaveBeenCalledTimes(1);
   });
 });

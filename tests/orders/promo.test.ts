@@ -168,13 +168,31 @@ describe('promo/validatePromo — N×M (Пакет 5.P-1)', () => {
     expect(res).toMatchObject({ valid: false, reason: 'invalid_kind' });
   });
 
-  it('min_qty не достигнут (itemsQty < minQty) → below_min_total', () => {
+  it('min_qty не достигнут (itemsQty < minQty) → below_min_qty (про количество, не про сумму)', () => {
     const res = validatePromo(makePromo({ minQty: 3 }), {
       itemsTotal: '1000.00',
       itemsQty: 2,
       now: NOW,
     });
+    // Баг #6 аудита тупиков: причина — НЕДОСТАТОК ЕДИНИЦ, а не суммы. Отдельный
+    // reason 'below_min_qty', а сообщение говорит про количество, не про сумму.
+    expect(res).toMatchObject({ valid: false, reason: 'below_min_qty' });
+    if (!res.valid) {
+      expect(res.message).not.toBe('Сумма заказа меньше минимальной для этого промокода.');
+      expect(res.message.toLowerCase()).toMatch(/единиц|количеств/);
+    }
+  });
+
+  it('недостаток суммы по-прежнему отдаёт below_min_total (про сумму)', () => {
+    const res = validatePromo(makePromo({ minOrderTotal: '2000.00' }), {
+      itemsTotal: '1000.00',
+      itemsQty: 10,
+      now: NOW,
+    });
     expect(res).toMatchObject({ valid: false, reason: 'below_min_total' });
+    if (!res.valid) {
+      expect(res.message.toLowerCase()).toMatch(/сумм/);
+    }
   });
 
   it('min_qty достигнут → valid', () => {

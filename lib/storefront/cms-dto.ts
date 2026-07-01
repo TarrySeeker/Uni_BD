@@ -64,8 +64,10 @@ function pageMeta(page: CmsPage, ctx: SeoCtx): SeoMetaDto {
       name: page.title,
       seoTitle: page.seoTitle,
       seoDescription: page.seoDescription,
-      ogTitle: null,
-      ogDescription: null,
+      // C18: og-текст страницы доходит до витрины (раньше был хардкод null,
+      // и og:title/description молча откатывались на seo-fallback билдера).
+      ogTitle: page.ogTitle,
+      ogDescription: page.ogDescription,
       ogImageKey: page.ogImageUrl,
       canonicalUrl: page.canonicalUrl,
       noindex: page.noindex,

@@ -3,12 +3,15 @@ import { describe, expect, it } from 'vitest';
 import {
   slugSchema,
   moneySchema,
+  normalizeMoney,
   ProductCreateSchema,
   ProductUpdateSchema,
   CategoryCreateSchema,
   CategoryMoveSchema,
   VariantCreateSchema,
+  VariantReorderSchema,
   AttributeCreateSchema,
+  AttributeValueDeleteSchema,
   ProductAttributeItemSchema,
   StockSetSchema,
   StockAdjustSchema,
@@ -48,6 +51,35 @@ describe('moneySchema — цена NUMERIC ≥ 0', () => {
   it('отклоняет >2 знаков после точки и нечисловое', () => {
     expect(moneySchema.safeParse('1.999').success).toBe(false);
     expect(moneySchema.safeParse('abc').success).toBe(false);
+  });
+
+  // Находка 2 аудита (ux, каталог): русский ввод «1500,50» с запятой-разделителем
+  // должен приниматься и нормализоваться к точке на сервере (любой клиент: форма,
+  // импорт, будущие магазины), а не падать «не более 2 знаков после точки».
+  it('принимает запятую как десятичный разделитель и нормализует к точке', () => {
+    const res = moneySchema.safeParse('1500,50');
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data).toBe('1500.50');
+  });
+
+  it('тримит пробелы вокруг значения с запятой', () => {
+    const res = moneySchema.safeParse('  1500,50  ');
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data).toBe('1500.50');
+  });
+
+  it('точка по-прежнему валидна (запятая не ломает прежний контракт)', () => {
+    const res = moneySchema.safeParse('99.99');
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data).toBe('99.99');
+  });
+});
+
+describe('normalizeMoney — хелпер нормализации денежного ввода', () => {
+  it('trim + запятая → точка', () => {
+    expect(normalizeMoney('1500,50')).toBe('1500.50');
+    expect(normalizeMoney('  100  ')).toBe('100');
+    expect(normalizeMoney('99.99')).toBe('99.99');
   });
 });
 
@@ -305,6 +337,37 @@ describe('VariantCreateSchema', () => {
     expect(
       VariantCreateSchema.safeParse({ productId: UUID, name: '48' }).success,
     ).toBe(true);
+  });
+});
+
+describe('VariantReorderSchema (C12)', () => {
+  it('валидный порядок (массив uuid) принимается', () => {
+    expect(
+      VariantReorderSchema.safeParse({ productId: UUID, order: [UUID2] }).success,
+    ).toBe(true);
+  });
+  it('пустой order отклонён (min 1)', () => {
+    expect(
+      VariantReorderSchema.safeParse({ productId: UUID, order: [] }).success,
+    ).toBe(false);
+  });
+  it('не-uuid в order отклонён', () => {
+    expect(
+      VariantReorderSchema.safeParse({ productId: UUID, order: ['x'] }).success,
+    ).toBe(false);
+  });
+  it('без productId отклонён', () => {
+    expect(VariantReorderSchema.safeParse({ order: [UUID2] }).success).toBe(false);
+  });
+});
+
+describe('AttributeValueDeleteSchema (C14)', () => {
+  it('валидный uuid принимается', () => {
+    expect(AttributeValueDeleteSchema.safeParse({ id: UUID }).success).toBe(true);
+  });
+  it('не-uuid / без id отклонён', () => {
+    expect(AttributeValueDeleteSchema.safeParse({ id: 'nope' }).success).toBe(false);
+    expect(AttributeValueDeleteSchema.safeParse({}).success).toBe(false);
   });
 });
 

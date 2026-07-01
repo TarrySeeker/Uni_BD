@@ -42,9 +42,15 @@ export function buildCorsHeaders(
     'Access-Control-Allow-Methods': methods,
     'Access-Control-Allow-Headers': STOREFRONT_ALLOWED_HEADERS,
   };
-  // При конкретном origin сообщаем кешам, что ответ зависит от Origin.
+  // При конкретном origin сообщаем кешам, что ответ зависит от Origin, и
+  // разрешаем credentials: navigator.sendBeacon (beacon посещений) всегда шлёт
+  // запрос в режиме credentials:include, и браузер режет его на preflight, если
+  // нет Access-Control-Allow-Credentials:true. С конкретным (не «*») origin это
+  // безопасно — спека CORS запрещает пару «*»+credentials, поэтому при «*» флаг
+  // НЕ ставим (публичный read-каталог и так без cookie-авторизации).
   if (allowOrigin !== '*') {
     headers.Vary = 'Origin';
+    headers['Access-Control-Allow-Credentials'] = 'true';
   }
   return headers;
 }

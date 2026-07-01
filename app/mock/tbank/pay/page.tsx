@@ -24,22 +24,37 @@ function isMockMode(): boolean {
   return !cfg.terminalKey || !cfg.password;
 }
 
+/**
+ * Доверенный fallback-URL магазина (баг #20 аудита тупиков). РАНЬШЕ при returnUrl
+ * вне allowlist страница молча редиректила на '/' — корень Admik, а не витрина
+ * покупателя (тупик «оплатил и попал не туда»). Теперь fallback — ПЕРВЫЙ
+ * доверенный origin витрины из STOREFRONT_ALLOWED_ORIGINS (уже валидирован, без
+ * open-redirect-риска). Пустой allowlist = «demo без секретов» → '/' как раньше
+ * (отдельной витрины для проверки нет).
+ */
+export function storefrontFallback(allowed: string[]): string {
+  return allowed.length > 0 ? allowed[0]! : '/';
+}
+
 /** Безопасно добавляет query-параметр к returnUrl. ANTI-OPEN-REDIRECT: origin
  *  returnUrl должен быть в allowlist витрины (STOREFRONT_ALLOWED_ORIGINS) — иначе
- *  '/'. Не-http(s)/битый URL → тоже '/'. (Страница публична → returnUrl из query
- *  нельзя слепо использовать для редиректа.) */
-function withParam(url: string, key: string, val: string, allowed: string[]): string {
+ *  доверенный fallback (storefrontFallback), а НЕ тупиковый '/' домена Admik.
+ *  Не-http(s)/битый URL → тоже доверенный fallback. (Страница публична → returnUrl
+ *  из query нельзя слепо использовать для редиректа.) */
+export function withParam(url: string, key: string, val: string, allowed: string[]): string {
   try {
     const u = new URL(url);
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '/';
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return storefrontFallback(allowed);
     // Allowlist применяем ТОЛЬКО когда он задан. Пустой STOREFRONT_ALLOWED_ORIGINS —
     // это режим «demo без секретов» (auth.ts: доступ открыт всем); жёсткая проверка
-    // тогда отправляла бы ЛЮБОЙ легитимный возврат в '/' и ломала demo-оплату.
-    if (allowed.length > 0 && !allowed.includes(normalizeOrigin(u.origin) ?? '')) return '/';
+    // тогда отправляла бы ЛЮБОЙ легитимный возврат в fallback и ломала demo-оплату.
+    if (allowed.length > 0 && !allowed.includes(normalizeOrigin(u.origin) ?? '')) {
+      return storefrontFallback(allowed);
+    }
     u.searchParams.set(key, val);
     return u.toString();
   } catch {
-    return '/';
+    return storefrontFallback(allowed);
   }
 }
 
@@ -68,13 +83,15 @@ export default async function MockPayPage({
     // Подтверждаем платёж; paid=1 ставим ТОЛЬКО при успехе confirmMockPayment
     // (иначе ?payment=failed — не выдаём неуспех за оплату).
     const res = await new PaymentService().confirmMockPayment(orderId, paymentId);
-    if (!returnUrl) redirect('/');
+    // Пустой returnUrl → доверенный origin витрины, а не корень Admik (фикс #20
+    // ревью Batch 6: '/' — тупик в домене админки для покупателя).
+    if (!returnUrl) redirect(storefrontFallback(allowed));
     redirect(res.ok ? withParam(returnUrl, 'paid', '1', allowed) : withParam(returnUrl, 'payment', 'failed', allowed));
   }
 
   async function cancel() {
     'use server';
-    redirect(returnUrl ? withParam(returnUrl, 'payment', 'cancelled', allowed) : '/');
+    redirect(returnUrl ? withParam(returnUrl, 'payment', 'cancelled', allowed) : storefrontFallback(allowed));
   }
 
   return (
@@ -117,6 +134,20 @@ export default async function MockPayPage({
             </button>
           </form>
         </div>
+
+        {/* Баг #20: явный безопасный путь назад в магазин (на доверенный origin
+            витрины), если возврат по returnUrl не сработает. Показываем только при
+            заданном allowlist — иначе ссылка вела бы на корень Admik (тупик). */}
+        {storefrontFallback(allowed) !== '/' ? (
+          <p className="text-center mt-4">
+            <a
+              href={storefrontFallback(allowed)}
+              className="text-xs text-neutral-500 underline hover:text-neutral-700"
+            >
+              Вернуться в магазин
+            </a>
+          </p>
+        ) : null}
 
         <p className="text-[11px] text-neutral-400 mt-6 text-center">
           После подключения боевых ключей Т-Банк оплата пойдёт через настоящий платёжный шлюз.

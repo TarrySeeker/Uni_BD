@@ -48,3 +48,6 @@ backups/
 # (см. START-HERE.md и docs/20). Его внутренние node_modules/.next/.env должны
 # игнорироваться вложенным storefront/.gitignore — в этот репозиторий платформы
 # исходники витрины не коммитятся.
+
+# Артефакты MCP-playwright (скриншоты/трейсы ручных прогонов)
+.playwright-mcp/

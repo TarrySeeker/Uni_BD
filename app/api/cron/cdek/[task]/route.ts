@@ -21,29 +21,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getCdekConfig } from '@/lib/cdek/config';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { runCreatePending, runRefreshActive, runNotifyStuck } from '@/lib/cdek/cron';
+import { extractCronSecret, cronSecretMatches } from '@/lib/cron/secret';
 
 export const dynamic = 'force-dynamic';
 
 const TASKS = ['create-pending', 'refresh-active', 'notify-stuck'] as const;
 type CronTask = (typeof TASKS)[number];
-
-/** Извлекает секрет из ?key= или заголовка X-Cron-Secret. */
-function extractSecret(req: NextRequest): string | null {
-  const fromQuery = req.nextUrl.searchParams.get('key');
-  if (fromQuery) return fromQuery;
-  const fromHeader = req.headers.get('x-cron-secret');
-  return fromHeader && fromHeader.length > 0 ? fromHeader : null;
-}
-
-/** Постоянное по времени сравнение секрета (анти-timing). */
-function secretMatches(provided: string, expected: string): boolean {
-  if (provided.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < provided.length; i += 1) {
-    diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
-}
 
 async function dispatch(task: CronTask): Promise<unknown> {
   switch (task) {
@@ -76,8 +59,8 @@ async function handle(
     );
   }
 
-  const provided = extractSecret(req);
-  if (!provided || !secretMatches(provided, cfg.cronSecret)) {
+  const provided = extractCronSecret(req);
+  if (!provided || !cronSecretMatches(provided, cfg.cronSecret)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 

@@ -3,8 +3,11 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 import { listUsersWithRoles } from '@/lib/auth/admin-repository';
+import { formatDateTime } from '@/lib/admin/order-format';
+import { isSingleUserModeEnabled } from '@/lib/config/settings';
 
 import { Forbidden } from '../_components/Forbidden';
+import { SingleUserModeNotice } from '../_components/SingleUserModeNotice';
 import { PageHeader } from '../_components/PageHeader';
 
 /**
@@ -27,6 +30,10 @@ export default async function UsersPage() {
   const user = await requireUser();
   if (!can(user, 'users.read')) {
     return <Forbidden permission="users.read" />;
+  }
+  // Однопользовательский режим (B9): прямой заход по URL → заглушка вместо списка.
+  if (await isSingleUserModeEnabled()) {
+    return <SingleUserModeNotice kind="users" />;
   }
   const canManage = can(user, 'users.manage');
 
@@ -58,6 +65,7 @@ export default async function UsersPage() {
               <th scope="col" className="px-4 py-2 font-medium">Имя</th>
               <th scope="col" className="px-4 py-2 font-medium">Статус</th>
               <th scope="col" className="px-4 py-2 font-medium">Роли</th>
+              <th scope="col" className="px-4 py-2 font-medium">Последний вход</th>
               <th scope="col" className="px-4 py-2 font-medium">Владелец</th>
               {canManage ? <th scope="col" className="px-4 py-2 font-medium" /> : null}
             </tr>
@@ -65,7 +73,7 @@ export default async function UsersPage() {
           <tbody className="divide-y divide-gray-100">
             {users.length === 0 ? (
               <tr>
-                <td colSpan={canManage ? 6 : 5} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={canManage ? 7 : 6} className="px-4 py-6 text-center text-gray-400">
                   Пользователей пока нет.
                 </td>
               </tr>
@@ -79,6 +87,9 @@ export default async function UsersPage() {
                   </td>
                   <td className="px-4 py-2 text-gray-600">
                     {row.roles.length === 0 ? '—' : row.roles.map((r) => r.title).join(', ')}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2 text-gray-600">
+                    {formatDateTime(row.lastLoginAt)}
                   </td>
                   <td className="px-4 py-2 text-gray-600">{row.isOwner ? 'да' : '—'}</td>
                   {canManage ? (

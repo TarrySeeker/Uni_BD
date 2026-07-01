@@ -15,7 +15,7 @@ import type { TransactionSql } from 'postgres';
 
 import { sql } from '@/lib/db/client';
 import { getEnv } from '@/lib/config/env';
-import { getEffectiveSettings } from '@/lib/config/settings';
+import { getEffectiveSettings, isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { getProductById } from '@/lib/catalog/repository';
 import { effectiveCompareAt } from '@/lib/catalog/pricing';
 import type { Product, ProductDetail, ProductVariant } from '@/lib/catalog/types';
@@ -41,7 +41,7 @@ import {
   type DeliveryDestination,
   type DeliveryCostLine,
 } from './delivery-cost';
-import type { DeliveryType, Order, OrderItem, PromoCode } from './types';
+import type { DeliveryType, Order, OrderItem, PaymentMethod, PromoCode } from './types';
 import type { CartQuoteInput, CreateOrderInput } from './schemas';
 
 // Сентинель для COALESCE(variant_id, ...) в inventory_unit_uniq (0010).
@@ -131,6 +131,7 @@ export function mapOrder(row: Record<string, unknown>): Order {
     paymentStatus: row.payment_status as Order['paymentStatus'],
     paidAt: row.paid_at ? asDate(row.paid_at) : null,
     paymentRef: strOrNull(row.payment_ref),
+    paymentProvider: strOrNull(row.payment_provider),
     deliveryType: row.delivery_type as Order['deliveryType'],
     deliveryStatus: row.delivery_status as Order['deliveryStatus'],
     deliveryCity: strOrNull(row.delivery_city),
@@ -811,11 +812,35 @@ export interface CreateOrderContext {
   now?: Date;
 }
 
+/**
+ * Онлайн-методы оплаты — инициируют платёж Т-Банк (initPayment) и потому требуют
+ * включённого модуля payments. Это card/sbp.
+ *
+ * cdek_pay сюда НЕ входит (регресс-фикс ревью Batch 6): «СДЭК Pay» — оплата на ПВЗ
+ * при получении, онлайн-инициации платежа нет (витрина зовёт initPayment ТОЛЬКО для
+ * card/sbp), поэтому модуль payments ей не нужен. Иначе магазин с СДЭК, но без
+ * эквайринга Т-Банк (payments off) не мог бы принять легитимный заказ cdek_pay.
+ */
+export const ONLINE_PAYMENT_METHODS: readonly PaymentMethod[] = ['card', 'sbp'];
+
+/**
+ * Требует ли способ оплаты включённого модуля payments (онлайн-инициация Т-Банк).
+ * Баг #33: card/sbp невозможно оплатить при выключенном модуле payments.
+ */
+export function isOnlinePaymentMethod(method: PaymentMethod): boolean {
+  return ONLINE_PAYMENT_METHODS.includes(method);
+}
+
 export type CreateOrderResult =
   | { ok: true; order: Order; reused: boolean }
   | {
       ok: false;
-      code: 'out_of_stock' | 'invalid_item' | 'invalid_promo' | 'delivery_unavailable';
+      code:
+        | 'out_of_stock'
+        | 'invalid_item'
+        | 'invalid_promo'
+        | 'delivery_unavailable'
+        | 'payments_disabled';
       message: string;
     };
 
@@ -830,6 +855,25 @@ export async function createOrder(
   input: CreateOrderInput,
   ctx: CreateOrderContext = {},
 ): Promise<CreateOrderResult> {
+  // Баг #33 (аудит тупиков): онлайн-метод оплаты (card/sbp — инициация Т-Банк) при
+  // ВЫКЛЮЧЕННОМ модуле payments → заведомо тупиковый заказ (init оплаты вернёт
+  // 404, заказ навсегда «ожидает оплаты»). Отсекаем ДО создания заказа: 422
+  // payments_disabled (route мапит non-out_of_stock в 422). Модули orders и
+  // payments независимы (lib/config/modules), поэтому такая конфигурация реальна.
+  // Проверка идёт ПЕРВОЙ — до любого обращения к БД.
+  if (
+    isOnlinePaymentMethod(input.paymentMethod) &&
+    !(await isModuleEffectivelyEnabled('payments'))
+  ) {
+    return {
+      ok: false,
+      code: 'payments_disabled',
+      message:
+        'Онлайн-оплата недоступна: приём платежей отключён. ' +
+        'Выберите оплату при получении или свяжитесь с магазином.',
+    };
+  }
+
   const env = getEnv();
   const now = ctx.now ?? new Date();
   const source = ctx.source ?? 'storefront';

@@ -199,7 +199,9 @@ services:
   #       оплаченным заказам, по которым отправление ещё не создано;
   #     • refresh-active  — каждый час: подтягивает статусы активных отправлений
   #       (страховка, если webhook от СДЭК не пришёл);
-  #     • notify-stuck    — раз в сутки: предупреждает о «зависших» заказах.
+  #     • notify-stuck    — раз в сутки: предупреждает о «зависших» заказах;
+  #     • payments/reconcile-pending — каждые 15 минут: сверяет статус оплаты
+  #       (Т-Банк GetState) по «зависшим» заказам (страховка от потерянного webhook).
   #   Запросы защищены секретом CDEK_CRON_SECRET (.env) — снаружи их выполнить
   #   нельзя. Контейнер ходит ВНУТРИ docker-сети на http://app:3000, наружу
   #   эти адреса не публикуются.
@@ -216,6 +218,7 @@ services:
   #   */5 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/cdek/create-pending?key=СЕКРЕТ"
   #   0   * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/cdek/refresh-active?key=СЕКРЕТ"
   #   0  10 * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/cdek/notify-stuck?key=СЕКРЕТ"
+  #   */15 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/payments/reconcile-pending?key=СЕКРЕТ"
   # ---------------------------------------------------------------------------
   cron:
     image: alpine:3.20
@@ -249,6 +252,7 @@ services:
           echo "*/5 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/cdek/create-pending\" >/proc/1/fd/1 2>&1";
           echo "0   * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/cdek/refresh-active\"  >/proc/1/fd/1 2>&1";
           echo "0  10 * * * $$HIT \"$$CDEK_CRON_URL/api/cron/cdek/notify-stuck\"    >/proc/1/fd/1 2>&1";
+          echo "*/15 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/payments/reconcile-pending\" >/proc/1/fd/1 2>&1";
         } > /etc/crontabs/root
         echo "[cdek-cron] расписание установлено; запуск crond"
         exec crond -f -l 8

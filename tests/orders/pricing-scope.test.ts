@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   emptyScopeTargets,
+  lineInScope,
   scopeDiscountMinor,
   scopedQty,
   type PricedLine,
@@ -89,6 +90,48 @@ describe('scopedQty — кол-во единиц в scope (баг A волны 7
   it('scope=category без совпадений → 0', () => {
     const lines = [line({ qty: 3, categoryIds: ['c9'] })];
     expect(scopedQty(lines, 'category', targetsWithCategory('c1'))).toBe(0);
+  });
+});
+
+describe('lineInScope — СТРОГИЙ матчинг по области применения (баг #5)', () => {
+  function targets(over: Partial<{
+    categoryIds: string[];
+    brandIds: string[];
+    productIds: string[];
+    variantIds: string[];
+  }> = {}): PromoScopeTargets {
+    const t = emptyScopeTargets();
+    for (const c of over.categoryIds ?? []) t.categoryIds.add(c);
+    for (const b of over.brandIds ?? []) t.brandIds.add(b);
+    for (const p of over.productIds ?? []) t.productIds.add(p);
+    for (const v of over.variantIds ?? []) t.variantIds.add(v);
+    return t;
+  }
+
+  it('scope=cart → всегда true', () => {
+    expect(lineInScope(line(), 'cart', emptyScopeTargets())).toBe(true);
+  });
+
+  it('scope=category матчит ТОЛЬКО по категории (бренд-совпадение игнорируется)', () => {
+    const l = line({ brandId: 'b1', categoryIds: ['cX'] });
+    // Бренд линии есть в brand-таргетах, но scope=category → совпадения по бренду быть НЕ должно.
+    expect(lineInScope(l, 'category', targets({ brandIds: ['b1'] }))).toBe(false);
+    // Совпадение по категории — матчит.
+    expect(lineInScope(l, 'category', targets({ categoryIds: ['cX'] }))).toBe(true);
+  });
+
+  it('scope=brand матчит ТОЛЬКО по бренду (категория-совпадение игнорируется)', () => {
+    const l = line({ brandId: 'b2', categoryIds: ['c1'] });
+    expect(lineInScope(l, 'brand', targets({ categoryIds: ['c1'] }))).toBe(false);
+    expect(lineInScope(l, 'brand', targets({ brandIds: ['b2'] }))).toBe(true);
+  });
+
+  it('scope=set матчит по любому таргету (товар/вариант/бренд/категория)', () => {
+    expect(lineInScope(line({ productId: 'p1' }), 'set', targets({ productIds: ['p1'] }))).toBe(true);
+    expect(lineInScope(line({ variantId: 'v1' }), 'set', targets({ variantIds: ['v1'] }))).toBe(true);
+    expect(lineInScope(line({ brandId: 'b9' }), 'set', targets({ brandIds: ['b9'] }))).toBe(true);
+    expect(lineInScope(line({ categoryIds: ['c9'] }), 'set', targets({ categoryIds: ['c9'] }))).toBe(true);
+    expect(lineInScope(line({ productId: 'p1' }), 'set', targets({ productIds: ['other'] }))).toBe(false);
   });
 });
 

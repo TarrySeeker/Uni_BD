@@ -19,6 +19,8 @@ import { z } from 'zod';
 import {
   seoTitleSchema,
   seoDescriptionSchema,
+  ogTitleSchema,
+  ogDescriptionSchema,
   canonicalUrlSchema,
   noindexSchema,
 } from '@/lib/seo/schemas';
@@ -224,6 +226,9 @@ const sitemapChangefreqSchema = z.enum(
 const pageSeoFields = {
   seoTitle: seoTitleSchema,
   seoDescription: seoDescriptionSchema,
+  // OG-текст страницы — те же примитивы, что у каталога (C18, docs/20 §C18).
+  ogTitle: ogTitleSchema,
+  ogDescription: ogDescriptionSchema,
   ogImageUrl: z.string().trim().max(2048).optional(),
   canonicalUrl: canonicalUrlSchema,
   noindex: noindexSchema,

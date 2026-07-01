@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getCmsPageById } from '@/lib/cms/repository';
+import { can } from '@/lib/auth/rbac';
 
 import { Forbidden } from '../../_components/Forbidden';
 import { guardCms } from '../_components/guard';
@@ -36,6 +37,12 @@ export default async function CmsPageDetail({
     notFound();
   }
 
+  // Доступ к карточке — по cms.read; правки/публикация/удаление требуют cms.write
+  // (находка 14 аудита). Прокидываем флаг в форму: без права записи она показывается
+  // в режиме «только чтение» (поля дизейблены, кнопки мутаций скрыты). Серверная
+  // защита остаётся в Server Actions (двойная защита).
+  const canWrite = can(guard.user, 'cms.write');
+
   return (
     <div>
       <nav className="text-sm text-gray-500" aria-label="Хлебные крошки">
@@ -53,7 +60,7 @@ export default async function CmsPageDetail({
       </p>
 
       <div className="mt-6">
-        <PageForm page={page} />
+        <PageForm page={page} canWrite={canWrite} />
       </div>
     </div>
   );

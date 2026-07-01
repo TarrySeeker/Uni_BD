@@ -1,12 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
 
-import { updateBrandingAction } from './form-actions';
+import { updateBrandingAction, uploadSettingsImageAction } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
 
 /**
@@ -15,6 +15,68 @@ import { errorMessage, fieldError } from './action-result';
  * Пустые поля отправляются как undefined (не оверрайдим — падаем на env).
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
+
+/**
+ * Локальный загрузчик изображения настроек (находка 19 аудита): грузит файл через
+ * uploadSettingsImageAction с указанием kind (logo|favicon|og), который сам
+ * валидирует magic-bytes, конвертирует в webp, кладёт в S3 и ПИШЕТ значение в
+ * настройки (для logo/favicon — URL, для og — ключ). Возвращённое значение
+ * подставляем в видимое поле через onUploaded, чтобы форма и поле остались
+ * согласованными. Виджет inline (а не общий ImageUploadButton), т.к. тот
+ * возвращает только S3-ключ и не годится для URL-полей логотипа/favicon.
+ */
+export function SettingsImageUpload({
+  kind,
+  label,
+  onUploaded,
+}: {
+  kind: 'logo' | 'favicon' | 'og';
+  label?: string;
+  onUploaded: (value: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPending(true);
+    setErr(null);
+    setDone(false);
+    const fd = new FormData();
+    fd.set('kind', kind);
+    fd.set('file', file);
+    const res = (await uploadSettingsImageAction(fd)) as ActionResult<{ value: string }>;
+    setPending(false);
+    if (inputRef.current) inputRef.current.value = '';
+    if (res.ok) {
+      onUploaded(res.data.value);
+      setDone(true);
+    } else {
+      setErr(errorMessage(res as Fail));
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <input ref={inputRef} type="file" accept="image/*" onChange={onChange} className="hidden" />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={pending}
+        className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+      >
+        {pending ? 'Загрузка…' : (label ?? 'Загрузить файл')}
+      </button>
+      {done ? (
+        <span className="ml-2 text-xs text-green-700">✓ файл загружен, адрес подставлен в поле</span>
+      ) : null}
+      {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+    </div>
+  );
+}
 
 export function BrandingForm({ branding }: { branding: EffectiveSettings['branding'] }) {
   const router = useRouter();
@@ -80,15 +142,17 @@ export function BrandingForm({ branding }: { branding: EffectiveSettings['brandi
           {fe('shopName') ? <p className="mt-1 text-xs text-red-600">{fe('shopName')}</p> : null}
         </div>
         <div>
-          <label htmlFor="s-logo" className="block text-sm font-medium text-gray-700">URL логотипа</label>
+          <label htmlFor="s-logo" className="block text-sm font-medium text-gray-700">Логотип</label>
           <input id="s-logo" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://…" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+            placeholder="https://… или загрузите файл" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          <SettingsImageUpload kind="logo" label="Загрузить логотип" onUploaded={setLogoUrl} />
           {fe('logoUrl') ? <p className="mt-1 text-xs text-red-600">{fe('logoUrl')}</p> : null}
         </div>
         <div>
-          <label htmlFor="s-favicon" className="block text-sm font-medium text-gray-700">URL favicon</label>
+          <label htmlFor="s-favicon" className="block text-sm font-medium text-gray-700">Favicon</label>
           <input id="s-favicon" value={faviconUrl} onChange={(e) => setFaviconUrl(e.target.value)}
-            placeholder="https://…" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+            placeholder="https://… или загрузите файл" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          <SettingsImageUpload kind="favicon" label="Загрузить favicon" onUploaded={setFaviconUrl} />
         </div>
         <div>
           <label htmlFor="s-mode" className="block text-sm font-medium text-gray-700">Тема</label>

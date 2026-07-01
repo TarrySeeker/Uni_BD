@@ -22,6 +22,7 @@ function order(extra: Partial<Order> = {}): Order {
     paymentStatus: 'pending',
     paidAt: null,
     paymentRef: null,
+    paymentProvider: null,
     deliveryType: 'pvz',
     deliveryStatus: 'pending',
     deliveryCity: null,

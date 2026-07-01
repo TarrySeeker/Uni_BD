@@ -49,7 +49,10 @@ const h = vi.hoisted(() => {
     invalidateUserSessions: vi.fn(async (_userId: string) => {}),
     writeAudit: vi.fn(async () => {}),
     assignUserRoles: vi.fn(async () => {}),
+    setRolePermissions: vi.fn(async () => {}),
     currentUser: { value: null as unknown },
+    // Управляемый флаг однопользовательского режима (B9). По умолчанию OFF.
+    singleUserMode: { value: false },
   };
 });
 
@@ -66,11 +69,22 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('@/lib/auth/admin-repository', () => ({
   assignUserRoles: h.assignUserRoles,
-  setRolePermissions: vi.fn(async () => {}),
+  setRolePermissions: h.setRolePermissions,
+}));
+// Однопользовательский режим (B9): admin-actions спрашивает флаг у слоя настроек.
+vi.mock('@/lib/config/settings', () => ({
+  isSingleUserModeEnabled: vi.fn(async () => h.singleUserMode.value),
 }));
 
 // Импорт ПОСЛЕ объявления моков.
-import { createUser, resetUserPassword, updateUser } from '@/lib/auth/admin-actions';
+import {
+  createUser,
+  resetUserPassword,
+  updateUser,
+  createRole,
+  updateRole,
+  deleteRole,
+} from '@/lib/auth/admin-actions';
 import type { AuthUser } from '@/lib/auth/rbac';
 import type { PermissionCode } from '@/lib/auth/permissions';
 
@@ -105,8 +119,10 @@ beforeEach(() => {
   h.invalidateUserSessions.mockClear();
   h.writeAudit.mockClear();
   h.assignUserRoles.mockClear();
+  h.setRolePermissions.mockClear();
   h.sqlMock.begin.mockClear();
   h.currentUser.value = adminUser();
+  h.singleUserMode.value = false;
 });
 
 // =============================================================================
@@ -410,5 +426,139 @@ describe('updateUser — запрет смены собственных роле
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('ожидался успех');
     expect(h.assignUserRoles).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// Однопользовательский режим (B9): серверная блокировка управления
+// пользователями и ролями ДО любых записей в БД. Флаг — per-shop настройка
+// (access.singleUserMode), дефолт OFF. Блок применяется ко ВСЕМ, включая
+// владельца (isOwner) — это режим магазина, а не право.
+// =============================================================================
+
+/** Владелец — проходит любые RBAC-проверки, но НЕ обходит режим магазина. */
+function ownerUser(): AuthUser {
+  return {
+    id: ACTOR,
+    email: 'owner@shop.io',
+    isOwner: true,
+    permissions: new Set<PermissionCode>(),
+  };
+}
+
+describe('createUser — однопользовательский режим', () => {
+  it('режим включён → отказ, INSERT пользователя НЕ выполняется (даже у владельца)', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = true;
+
+    const res = await createUser({ email: 'new@shop.io', password: 'secret123', roleIds: [] });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+    expect(res.message).toBe('Однопользовательский режим: создание пользователей отключено.');
+
+    const ranInsert = h.state.sqlCalls.some((c) => /INSERT\s+INTO\s+users/i.test(c.text));
+    expect(ranInsert).toBe(false);
+    expect(h.assignUserRoles).not.toHaveBeenCalled();
+    // Пароль даже не хешируется (проверка до тяжёлой крипты).
+    expect(h.hashPassword).not.toHaveBeenCalled();
+  });
+
+  it('режим выключен (дефолт) → создание работает как раньше', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = false;
+    h.state.sqlResults = [[{ id: TARGET }]];
+
+    const res = await createUser({ email: 'new@shop.io', password: 'secret123', roleIds: [] });
+
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('ожидался успех');
+    expect(res.data).toEqual({ id: TARGET });
+  });
+});
+
+describe('createRole — однопользовательский режим', () => {
+  it('режим включён → отказ, INSERT роли НЕ выполняется', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = true;
+
+    const res = await createRole({ code: 'support', title: 'Поддержка', permissionCodes: [] });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toBe('Однопользовательский режим: управление ролями отключено.');
+    const ranInsert = h.state.sqlCalls.some((c) => /INSERT\s+INTO\s+roles/i.test(c.text));
+    expect(ranInsert).toBe(false);
+    expect(h.setRolePermissions).not.toHaveBeenCalled();
+  });
+
+  it('режим выключен → создание роли работает', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = false;
+    h.state.sqlResults = [[{ id: TARGET }]];
+
+    const res = await createRole({ code: 'support', title: 'Поддержка', permissionCodes: [] });
+    expect(res.ok).toBe(true);
+  });
+});
+
+describe('updateRole / deleteRole — однопользовательский режим', () => {
+  it('updateRole при включённом режиме → отказ, UPDATE roles НЕ выполняется', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = true;
+
+    const res = await updateRole({ id: TARGET, title: 'Новое' });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toBe('Однопользовательский режим: управление ролями отключено.');
+    const ranUpdate = h.state.sqlCalls.some((c) => /UPDATE\s+roles\s+SET/i.test(c.text));
+    expect(ranUpdate).toBe(false);
+  });
+
+  it('deleteRole при включённом режиме → отказ, DELETE roles НЕ выполняется', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = true;
+
+    const res = await deleteRole({ id: TARGET });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toBe('Однопользовательский режим: управление ролями отключено.');
+    const ranDelete = h.state.sqlCalls.some((c) => /DELETE\s+FROM\s+roles/i.test(c.text));
+    expect(ranDelete).toBe(false);
+  });
+});
+
+// F1 security-review: блок применяется ко ВСЕМ 6 user/role-мутациям, не только к
+// create*. Тесты ниже инвентаризируют оставшиеся два (updateUser/resetUserPassword),
+// чтобы будущая правка не сняла guard незаметно.
+describe('updateUser / resetUserPassword — однопользовательский режим', () => {
+  it('updateUser при включённом режиме → отказ, UPDATE users НЕ выполняется', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = true;
+
+    const res = await updateUser({ id: TARGET, displayName: 'Hacked' });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toBe('Однопользовательский режим: управление пользователями отключено.');
+    const ranUpdate = h.state.sqlCalls.some((c) => /UPDATE\s+users\s+SET/i.test(c.text));
+    expect(ranUpdate).toBe(false);
+  });
+
+  it('resetUserPassword при включённом режиме → отказ, без хеша пароля и UPDATE', async () => {
+    h.currentUser.value = ownerUser();
+    h.singleUserMode.value = true;
+
+    const res = await resetUserPassword({ id: TARGET, password: 'newsecret1' });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toBe('Однопользовательский режим: управление пользователями отключено.');
+    expect(h.hashPassword).not.toHaveBeenCalled();
+    const ranUpdate = h.state.sqlCalls.some((c) => /UPDATE\s+users\s+SET/i.test(c.text));
+    expect(ranUpdate).toBe(false);
   });
 });

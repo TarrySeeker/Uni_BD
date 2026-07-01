@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
 import { errorMessage } from '../../_components/action-result';
+import { resolveLabelOutcome } from '@/lib/cdek/print-label';
 
 import {
   createCdekShipmentAction,
@@ -93,14 +94,25 @@ export function CdekBlock({
     const result = await fn();
     setPending(false);
     if (result.ok) {
-      if (
-        opts.openUrl &&
-        result.data &&
-        typeof (result.data as { url?: unknown }).url === 'string'
-      ) {
-        window.open((result.data as { url: string }).url, '_blank', 'noopener');
+      if (opts.openUrl) {
+        // Печать: в mock-режиме НЕ открываем мёртвый example.invalid (находка #12),
+        // а поясняем, что реальная накладная появится в боевом режиме. Боевую ветку
+        // (реальный URL) не трогаем — решение принимает чистая resolveLabelOutcome.
+        const url =
+          result.data && typeof (result.data as { url?: unknown }).url === 'string'
+            ? (result.data as { url: string }).url
+            : null;
+        const outcome = resolveLabelOutcome(label, {
+          isMock: shipment?.isMock ?? false,
+          url,
+        });
+        if (outcome.open && url) {
+          window.open(url, '_blank', 'noopener');
+        }
+        setSuccess(outcome.message);
+      } else {
+        setSuccess(`${label}: выполнено.`);
       }
-      setSuccess(`${label}: выполнено.`);
       router.refresh();
     } else {
       setError(result);

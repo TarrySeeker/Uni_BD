@@ -31,6 +31,7 @@ import {
   type SeoSettings,
   type HomeSettings,
   type NavigationSettings,
+  type AccessSettings,
 } from '@/lib/settings/schemas';
 import { HOME_DEFAULTS, type HomeContent } from '@/lib/config/home-defaults';
 import { toMinor } from '@/lib/orders/money';
@@ -107,6 +108,15 @@ export interface EffectiveSettings {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
   };
+  /**
+   * Флаги доступа уровня магазина (B9). singleUserMode — «однопользовательский
+   * режим»: per-shop флаг с дефолтом false, скрывающий/блокирующий управление
+   * пользователями и ролями для конкретного инстанса. По умолчанию OFF —
+   * мультитенантность не нарушается (другие магазины не затронуты).
+   */
+  access: {
+    singleUserMode: boolean;
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -117,11 +127,17 @@ export interface EffectiveSettings {
  * Очищает URL логотипа: пустое/невалидное/плейсхолдер `example.com` (из
  * `.env.example`) → null, чтобы в шапке админки не висела «битая картинка».
  * Реальный битый URL дополнительно гасится onError в ShopLogo (клиент).
+ *
+ * Относительный путь от «/» (так отдаёт локальное хранилище: '/media/…') —
+ * валидная same-origin ссылка на картинку, пропускаем как есть (фикс ревью
+ * Batch 6: иначе `new URL()` бросал и логотип, загруженный в local-режиме,
+ * никогда не рендерился).
  */
-function cleanLogoUrl(url: string | null | undefined): string | null {
+export function cleanLogoUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
+  if (trimmed.startsWith('/')) return trimmed;
   try {
     const host = new URL(trimmed).hostname.toLowerCase();
     if (host === 'example.com' || host === 'www.example.com' || host === 'example.org') {
@@ -168,6 +184,26 @@ function mergeHome(db: HomeSettings): HomeContent {
     delivery: db.delivery?.items
       ? { items: db.delivery.items.map((i) => ({ title: i.title, text: i.text })) }
       : HOME_DEFAULTS.delivery,
+    valuesStrip: db.valuesStrip
+      ? {
+          // enabled по умолчанию false (лента opt-in): отсутствие флага в оверрайде
+          // не включает ленту молча. items пусты/нет → дефолтные тезисы.
+          enabled: db.valuesStrip.enabled ?? HOME_DEFAULTS.valuesStrip.enabled,
+          items:
+            db.valuesStrip.items && db.valuesStrip.items.length > 0
+              ? db.valuesStrip.items.map((i) => ({ title: i.title, text: i.text }))
+              : HOME_DEFAULTS.valuesStrip.items,
+        }
+      : HOME_DEFAULTS.valuesStrip,
+    philosophy: db.philosophy
+      ? {
+          eyebrow: db.philosophy.eyebrow ?? HOME_DEFAULTS.philosophy.eyebrow,
+          title: db.philosophy.title ?? HOME_DEFAULTS.philosophy.title,
+          text: db.philosophy.text ?? HOME_DEFAULTS.philosophy.text,
+          linkLabel: db.philosophy.linkLabel ?? HOME_DEFAULTS.philosophy.linkLabel,
+          linkHref: db.philosophy.linkHref ?? HOME_DEFAULTS.philosophy.linkHref,
+        }
+      : HOME_DEFAULTS.philosophy,
   };
 }
 
@@ -203,6 +239,7 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
   const home: HomeSettings = parseSettingValue('home', rows.get('home')) ?? {};
   const navigation: NavigationSettings =
     parseSettingValue('navigation', rows.get('navigation')) ?? {};
+  const access: AccessSettings = parseSettingValue('access', rows.get('access')) ?? {};
   // module_overrides — мягкий парс (.strip): кривая строка БД → {} (нет оверрайда).
   const moduleOverrides: ModuleOverrides =
     parseSettingValue('module_overrides', rows.get('module_overrides')) ?? {};
@@ -262,6 +299,11 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
     navigation: {
       header: navigation.header ?? [],
       footer: (navigation.footer ?? []).map((c) => ({ title: c.title, links: c.links ?? [] })),
+    },
+    access: {
+      // Дефолт OFF: отсутствие/пустой объект access → однопользовательский режим
+      // выключен (другие магазины не затронуты без явного включения).
+      singleUserMode: access.singleUserMode ?? false,
     },
   };
 }
@@ -449,4 +491,39 @@ export async function isModuleEffectivelyEnabled(
 ): Promise<boolean> {
   const set = await getEffectiveModuleSet(deps);
   return set.has(name);
+}
+
+// -----------------------------------------------------------------------------
+// Однопользовательский режим (B9): per-shop access-флаг.
+// -----------------------------------------------------------------------------
+
+/**
+ * ЧИСТАЯ проверка «однопользовательского режима» по уже посчитанным эффективным
+ * настройкам. true → управление пользователями и ролями скрыто/заблокировано для
+ * инстанса. Без БД/await — для синхронных мест (layout уже держит снапшот настроек).
+ */
+export function isSingleUserMode(eff: EffectiveSettings): boolean {
+  return eff.access.singleUserMode === true;
+}
+
+/**
+ * Async-проверка однопользовательского режима через тот же memo-кэш настроек,
+ * что и остальной рантайм (read-your-own-writes после updateAccessSettings).
+ *
+ * Graceful (как getEffectiveModuleSet): если чтение настроек невозможно (БД
+ * недоступна/не сконфигурирована — сборка, ранний старт, тесты без БД), возвращает
+ * false — недоступность БД не должна молча блокировать управление. Авторитетная
+ * блокировка мутаций всё равно живёт в Server Actions, где БД заведомо доступна.
+ *
+ * @param deps - инъекция readRows/env для тестов без БД (как у getEffectiveSettings).
+ */
+export async function isSingleUserModeEnabled(
+  deps: EffectiveSettingsDeps = {},
+): Promise<boolean> {
+  try {
+    const eff = await getEffectiveSettings(deps);
+    return isSingleUserMode(eff);
+  } catch {
+    return false;
+  }
 }

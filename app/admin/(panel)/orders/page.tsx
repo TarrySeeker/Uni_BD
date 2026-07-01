@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { sql } from '@/lib/db/client';
+import { can } from '@/lib/auth/rbac';
 import { getEnv } from '@/lib/config/env';
 import { formatPrice } from '@/lib/admin/format';
 import {
@@ -48,7 +49,7 @@ export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 25;
 
-interface OrdersFilter {
+export interface OrdersFilter {
   q?: string;
   status?: OrderStatus;
   paymentStatus?: PaymentStatus;
@@ -57,6 +58,23 @@ interface OrdersFilter {
   dateFrom?: string;
   dateTo?: string;
   page: number;
+}
+
+/**
+ * Заданы ли хоть какие-то фильтры (кроме страницы). Баг #3 аудита тупиков:
+ * пустое состояние таблицы должно различать «ничего не найдено по фильтрам» и
+ * «заказов ещё нет» (новый магазин) — иначе совет «измените фильтры» бессмыслен.
+ */
+export function hasActiveOrderFilters(filter: OrdersFilter): boolean {
+  return Boolean(
+    filter.q ||
+      filter.status ||
+      filter.paymentStatus ||
+      filter.deliveryType ||
+      filter.promoCode ||
+      filter.dateFrom ||
+      filter.dateTo,
+  );
 }
 
 function parseFilter(sp: Record<string, string | string[] | undefined>): OrdersFilter {
@@ -162,6 +180,9 @@ export default async function OrdersPage({
   const sp = await searchParams;
   const filter = parseFilter(sp);
   const currency = getEnv().SHOP_CURRENCY;
+  // Кнопка «Создать заказ» — только при праве orders.write (UI-фильтр RBAC; сама
+  // страница /orders/new и экшен createManualOrder защищены отдельно на сервере).
+  const canWrite = can(guard.user, 'orders.write');
 
   const { rows, total } = await loadOrders(filter);
 
@@ -175,12 +196,22 @@ export default async function OrdersPage({
         subtitle={`Найдено заказов: ${total}. Суммы в ${currency}.`}
         breadcrumbs={[{ label: 'Заказы' }]}
         action={
-          <Link
-            href="/admin/promo"
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-          >
-            Промокоды
-          </Link>
+          <>
+            {canWrite ? (
+              <Link
+                href="/admin/orders/new"
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Создать заказ
+              </Link>
+            ) : null}
+            <Link
+              href="/admin/promo"
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Промокоды
+            </Link>
+          </>
         }
       />
 
@@ -206,7 +237,21 @@ export default async function OrdersPage({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
-                  Заказы не найдены. Измените фильтры.
+                  {hasActiveOrderFilters(filter) ? (
+                    'По заданным фильтрам ничего не найдено. Сбросьте фильтры.'
+                  ) : (
+                    <span>
+                      Заказов пока нет.{' '}
+                      {canWrite ? (
+                        <Link
+                          href="/admin/orders/new"
+                          className="font-medium text-blue-700 hover:underline"
+                        >
+                          Создать заказ
+                        </Link>
+                      ) : null}
+                    </span>
+                  )}
                 </td>
               </tr>
             ) : (

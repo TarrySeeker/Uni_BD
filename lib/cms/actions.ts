@@ -111,12 +111,14 @@ export const createCmsPage = defineAction({
     const row = await insertWithUniqueSlug(base, async (slug) => {
       const rows = await sql<{ id: string }[]>`
         INSERT INTO cms_pages
-          (slug, title, status, seo_title, seo_description, og_image_url,
+          (slug, title, status, seo_title, seo_description,
+           og_title, og_description, og_image_url,
            canonical_url, noindex, sitemap_priority, sitemap_changefreq,
            created_by, updated_by)
         VALUES (
           ${slug}, ${data.title}, ${data.status ?? 'draft'},
           ${data.seoTitle ?? null}, ${data.seoDescription ?? null},
+          ${data.ogTitle ?? null}, ${data.ogDescription ?? null},
           ${data.ogImageUrl ?? null}, ${data.canonicalUrl ?? null},
           ${data.noindex ?? false}, ${data.sitemapPriority ?? null},
           ${data.sitemapChangefreq ?? null},
@@ -167,6 +169,10 @@ export const updateCmsPage = defineAction({
                                     THEN ${data.seoTitle ?? null} ELSE seo_title END,
           seo_description    = CASE WHEN ${data.seoDescription !== undefined}
                                     THEN ${data.seoDescription ?? null} ELSE seo_description END,
+          og_title           = CASE WHEN ${data.ogTitle !== undefined}
+                                    THEN ${data.ogTitle ?? null} ELSE og_title END,
+          og_description     = CASE WHEN ${data.ogDescription !== undefined}
+                                    THEN ${data.ogDescription ?? null} ELSE og_description END,
           og_image_url       = CASE WHEN ${data.ogImageUrl !== undefined}
                                     THEN ${data.ogImageUrl ?? null} ELSE og_image_url END,
           canonical_url      = CASE WHEN ${data.canonicalUrl !== undefined}

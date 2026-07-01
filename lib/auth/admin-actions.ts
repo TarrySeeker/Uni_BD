@@ -8,6 +8,7 @@ import { hashPassword } from '@/lib/auth/password';
 import { invalidateUserSessions } from '@/lib/auth/session';
 import { ALL_PERMISSIONS } from '@/lib/auth/permissions';
 import { can } from '@/lib/auth/rbac';
+import { isSingleUserModeEnabled } from '@/lib/config/settings';
 
 import {
   UserCreateSchema,
@@ -98,6 +99,25 @@ async function assertNotOwner(id: string): Promise<{ id: string; is_owner: boole
   return row ?? null;
 }
 
+/**
+ * Гард однопользовательского режима (B9): per-shop настройка `access.singleUserMode`.
+ *
+ * Когда режим включён, управление пользователями и ролями заблокировано на сервере
+ * ДО любых записей в БД и до тяжёлой крипты (хеш пароля) — для ВСЕХ инициаторов,
+ * включая владельца (`is_owner`): это режим МАГАЗИНА, а не право, поэтому короткое
+ * замыкание `can()` его не обходит. Парная защита к UI-фильтру меню (buildAdminNav)
+ * и guard'ам страниц `/admin/users` и `/admin/roles`. Бросает PublicActionError →
+ * пайплайн отдаёт `{ ok:false, error:'validation', message }`.
+ *
+ * Graceful: при недоступной БД `isSingleUserModeEnabled` → false (не блокируем
+ * вслепую); но в Server Action БД заведомо доступна, так что эффект надёжен.
+ */
+async function assertSingleUserModeAllows(message: string): Promise<void> {
+  if (await isSingleUserModeEnabled()) {
+    throw new PublicActionError(message);
+  }
+}
+
 // =============================================================================
 // ПОЛЬЗОВАТЕЛИ.
 // =============================================================================
@@ -106,6 +126,11 @@ export const createUser = defineAction({
   permission: 'users.manage',
   input: UserCreateSchema,
   handler: async (data, ctx: ActionCtx) => {
+    // Однопользовательский режим (B9): отказ ДО хеша пароля и любой записи.
+    await assertSingleUserModeAllows(
+      'Однопользовательский режим: создание пользователей отключено.',
+    );
+
     // Anti-escalation: назначение ролей требует roles.manage (до любой записи).
     // Создание без ролей доступно носителю одного users.manage.
     if (data.roleIds.length > 0) {
@@ -156,6 +181,11 @@ export const updateUser = defineAction({
   permission: 'users.manage',
   input: UserUpdateSchema,
   handler: async (data, ctx: ActionCtx) => {
+    // Однопользовательский режим (B9): управление пользователями заблокировано.
+    await assertSingleUserModeAllows(
+      'Однопользовательский режим: управление пользователями отключено.',
+    );
+
     // Защита владельца — единый хелпер (бросает PublicActionError, если is_owner).
     await assertNotOwner(data.id);
 
@@ -239,6 +269,11 @@ export const resetUserPassword = defineAction({
   permission: 'users.manage',
   input: UserPasswordResetSchema,
   handler: async (data, _ctx: ActionCtx) => {
+    // Однопользовательский режим (B9): управление пользователями заблокировано.
+    await assertSingleUserModeAllows(
+      'Однопользовательский режим: управление пользователями отключено.',
+    );
+
     // Защита владельца (RBAC §5.4): нельзя сбросить пароль владельцу — иначе
     // носитель users.manage перехватил бы его учётку (privilege escalation).
     // Симметрично updateUser — общий хелпер бросает PublicActionError для is_owner.
@@ -279,6 +314,9 @@ export const createRole = defineAction({
   permission: 'roles.manage',
   input: RoleCreateSchema,
   handler: async (data, _ctx: ActionCtx) => {
+    // Однопользовательский режим (B9): управление ролями заблокировано (до записи).
+    await assertSingleUserModeAllows('Однопользовательский режим: управление ролями отключено.');
+
     const codes = filterKnownPermissions(data.permissionCodes);
 
     let roleId: string;
@@ -317,6 +355,9 @@ export const updateRole = defineAction({
   permission: 'roles.manage',
   input: RoleUpdateSchema,
   handler: async (data, _ctx: ActionCtx) => {
+    // Однопользовательский режим (B9): управление ролями заблокировано (до записи).
+    await assertSingleUserModeAllows('Однопользовательский режим: управление ролями отключено.');
+
     const before = await sql<{ id: string; code: string; title: string; is_system: boolean }[]>`
       SELECT id, code, title, is_system FROM roles WHERE id = ${data.id} LIMIT 1
     `;
@@ -363,6 +404,9 @@ export const deleteRole = defineAction({
   permission: 'roles.manage',
   input: RoleIdSchema,
   handler: async (data, _ctx: ActionCtx) => {
+    // Однопользовательский режим (B9): управление ролями заблокировано (до записи).
+    await assertSingleUserModeAllows('Однопользовательский режим: управление ролями отключено.');
+
     const before = await sql<{ id: string; code: string; is_system: boolean }[]>`
       SELECT id, code, is_system FROM roles WHERE id = ${data.id} LIMIT 1
     `;

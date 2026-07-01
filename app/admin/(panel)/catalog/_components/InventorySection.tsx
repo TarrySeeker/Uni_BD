@@ -21,6 +21,10 @@ interface Unit {
   label: string;
   variantId: string | null;
   quantity: number;
+  /** Зарезервировано под незавершённые заказы (anti-oversell). */
+  reserved: number;
+  /** Доступно к продаже = max(quantity − reserved, 0). */
+  available: number;
 }
 
 export function InventorySection({ product }: { product: ProductDetail }) {
@@ -29,22 +33,37 @@ export function InventorySection({ product }: { product: ProductDetail }) {
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   // Собираем юниты: товар без вариантов (variantId null) + каждый вариант.
-  function stockFor(variantId: string | null): number {
+  // Строка inventory склада main несёт quantity (физический остаток) и reserved
+  // (резерв под незавершённые заказы); доступно к продаже = quantity − reserved.
+  function invFor(variantId: string | null): { quantity: number; reserved: number } {
     const inv = product.inventory.find(
       (i) => (i.variantId ?? null) === variantId && i.warehouseCode === 'main',
     );
-    return inv?.quantity ?? 0;
+    return { quantity: inv?.quantity ?? 0, reserved: inv?.reserved ?? 0 };
+  }
+
+  function unitFor(
+    key: string,
+    label: string,
+    variantId: string | null,
+  ): Unit {
+    const { quantity, reserved } = invFor(variantId);
+    return {
+      key,
+      label,
+      variantId,
+      quantity,
+      reserved,
+      available: Math.max(quantity - reserved, 0),
+    };
   }
 
   const units: Unit[] =
     product.variants.length === 0
-      ? [{ key: 'product', label: 'Товар (без вариантов)', variantId: null, quantity: stockFor(null) }]
-      : product.variants.map((v) => ({
-          key: v.id,
-          label: `${v.sku}${v.name ? ` — ${v.name}` : ''}`,
-          variantId: v.id,
-          quantity: stockFor(v.id),
-        }));
+      ? [unitFor('product', 'Товар (без вариантов)', null)]
+      : product.variants.map((v) =>
+          unitFor(v.id, `${v.sku}${v.name ? ` — ${v.name}` : ''}`, v.id),
+        );
 
   const [draft, setDraft] = useState<Record<string, string>>(
     Object.fromEntries(units.map((u) => [u.key, String(u.quantity)])),
@@ -73,6 +92,11 @@ export function InventorySection({ product }: { product: ProductDetail }) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-800">Остатки (склад main)</h3>
+      <p className="mt-1 text-xs text-gray-500">
+        Редактируется физический остаток. При оформлении заказа товар уходит в
+        резерв (столбец «Зарезервировано») и списывается с остатка только при
+        отгрузке — поэтому «Доступно» = остаток − резерв.
+      </p>
       {error ? (
         <div role="alert" className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
           {errorMessage(error)}
@@ -83,7 +107,15 @@ export function InventorySection({ product }: { product: ProductDetail }) {
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
               <th scope="col" className="px-3 py-2 font-medium">Юнит</th>
-              <th scope="col" className="px-3 py-2 font-medium">Остаток</th>
+              <th scope="col" className="px-3 py-2 font-medium" title="Физический остаток на складе">
+                Физический остаток
+              </th>
+              <th scope="col" className="px-3 py-2 font-medium" title="Зарезервировано под незавершённые заказы">
+                Зарезервировано
+              </th>
+              <th scope="col" className="px-3 py-2 font-medium" title="Доступно к продаже = физический остаток − зарезервировано">
+                Доступно
+              </th>
               <th scope="col" className="px-3 py-2 font-medium">Действие</th>
             </tr>
           </thead>
@@ -103,6 +135,13 @@ export function InventorySection({ product }: { product: ProductDetail }) {
                     onChange={(e) => setDraft((p) => ({ ...p, [u.key]: e.target.value }))}
                     className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
                   />
+                </td>
+                <td className="px-3 py-2 text-gray-700">{u.reserved}</td>
+                <td
+                  className="px-3 py-2 font-medium text-gray-900"
+                  title="Физический остаток − зарезервировано"
+                >
+                  {u.available}
                 </td>
                 <td className="px-3 py-2">
                   <button

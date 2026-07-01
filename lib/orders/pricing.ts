@@ -90,9 +90,20 @@ export interface PromoScopeTargets {
 
 /**
  * Принадлежит ли линия scope акции (по резолвнутым таргетам). cart → всегда true.
- * Линия попадает в scope, если её variantId/productId напрямую в таргетах ИЛИ её
- * бренд/одна из категорий пересекаются с таргет-множествами (anti-tamper: поля
- * линии заполнены сервером из каталога).
+ *
+ * Баг #5 (аудит тупиков): матчинг СТРОГО по области применения — раньше любой
+ * совпавший таргет (вариант/товар/бренд/категория) давал скидку независимо от
+ * scope, из-за чего «Категория»/«Бренд»/«Набор» вели себя одинаково (подпись
+ * обещала ограничение, которого не было). Теперь:
+ *  - category → совпадение ТОЛЬКО по категории;
+ *  - brand    → совпадение ТОЛЬКО по бренду;
+ *  - set      → произвольный набор: совпадение по любому таргету (вариант/товар/
+ *               бренд/категория) — это и есть смысл «набора».
+ * Поля линии заполнены сервером из каталога (anti-tamper). Совместимость с уже
+ * валидными данными сохраняется: после связки scope↔тип таргета (refinePromo)
+ * у category-промокода есть только категорийные таргеты, поэтому строгий матчинг
+ * совпадает со старым any-match; меняется лишь поведение для рассогласованных
+ * (легаси) записей — именно так, как требует находка.
  */
 export function lineInScope(
   line: PricedLine,
@@ -101,6 +112,16 @@ export function lineInScope(
 ): boolean {
   if (scope === 'cart') return true;
 
+  if (scope === 'category') {
+    return Boolean(
+      line.categoryIds && line.categoryIds.some((c) => targets.categoryIds.has(c)),
+    );
+  }
+  if (scope === 'brand') {
+    return Boolean(line.brandId && targets.brandIds.has(line.brandId));
+  }
+
+  // scope === 'set' — произвольный набор: матчим по любому совпавшему таргету.
   if (line.variantId && targets.variantIds.has(line.variantId)) return true;
   if (line.productId && targets.productIds.has(line.productId)) return true;
   if (line.brandId && targets.brandIds.has(line.brandId)) return true;

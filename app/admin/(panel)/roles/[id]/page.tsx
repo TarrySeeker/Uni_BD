@@ -3,8 +3,10 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 import { getRoleById } from '@/lib/auth/admin-repository';
+import { isSingleUserModeEnabled } from '@/lib/config/settings';
 
 import { Forbidden } from '../../_components/Forbidden';
+import { SingleUserModeNotice } from '../../_components/SingleUserModeNotice';
 import { PageHeader } from '../../_components/PageHeader';
 import { RoleForm } from '../_components/RoleForm';
 
@@ -24,6 +26,10 @@ export default async function RoleDetailPage({
   const user = await requireUser();
   if (!can(user, 'roles.manage')) {
     return <Forbidden permission="roles.manage" />;
+  }
+  // Однопользовательский режим (B9): управление ролями отключено.
+  if (await isSingleUserModeEnabled()) {
+    return <SingleUserModeNotice kind="roles" />;
   }
 
   const { id } = await params;

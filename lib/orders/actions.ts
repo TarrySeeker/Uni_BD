@@ -29,6 +29,7 @@ import { canTransition, paymentStatusOnSettle } from './status';
 import { settleRefundEffectsTx } from './refund-settle';
 import { OrderError } from './errors';
 import type { Order, OrderItem, PromoCode } from './types';
+import { PaymentService, toKopecks } from '@/lib/payments/tbank';
 
 /**
  * Server Actions админки модуля orders (docs/07 §4.1).
@@ -176,8 +177,14 @@ async function applyOrderStatusTransition(args: {
   to: Order['status'];
   comment: string;
   actorUserId: string | null;
+  /**
+   * Уже загруженный заказ (опц.): refundOrder загружает заказ заранее для шлюзового
+   * возврата и передаёт его сюда, чтобы НЕ дублировать SELECT. Без preloaded —
+   * загружаем сами (поведение прочих переходов не меняется).
+   */
+  preloaded?: OrderWithItems;
 }): Promise<{ before: Order; after: OrderWithItems }> {
-  const current = await getOrderById(args.id);
+  const current = args.preloaded ?? (await getOrderById(args.id));
   if (!current) {
     throw new OrderError('not_found', 'Заказ не найден.');
   }
@@ -394,11 +401,57 @@ export const refundOrder = defineAction({
   input: RefundOrderSchema,
   handler: async (data, ctx) => {
     await assertOrdersEnabled();
+
+    // Загружаем заказ ОДИН раз: нужен для (а) шлюзового возврата Т-Банка и (б)
+    // передаётся в applyOrderStatusTransition (preloaded) — без второго SELECT.
+    const cur = await getOrderById(data.id);
+    if (!cur) {
+      throw new OrderError('not_found', 'Заказ не найден.');
+    }
+
+    // ПРЕДПРОВЕРКА ПЕРЕХОДА ДО ШЛЮЗА (security-fix MEDIUM). Cancel дёргаем ТОЛЬКО если
+    // переход заказа в 'refunded' допустим. Иначе (например authorized-заказ в статусе
+    // new/awaiting_payment, откуда refunded недопустим) Cancel снял бы холд в банке, а
+    // applyOrderStatusTransition затем бросил бы invalid_transition → деньги/холд отпущены,
+    // а заказ не возвращён. applyOrderStatusTransition ниже перепроверит переход под
+    // guarded-UPDATE (двойная проверка — норма против гонок).
+    if (!canTransition('order', cur.order.status, 'refunded')) {
+      throw new OrderError(
+        'invalid_transition',
+        `Недопустимый переход статуса заказа: "${cur.order.status}" → "refunded".`,
+      );
+    }
+
+    // ШЛЮЗОВОЙ ВОЗВРАТ (Фича #15): возвращаем деньги через Т-Банк (Cancel) ДО смены
+    // статуса. refundPayment ТОЛЬКО дёргает шлюз и пишет аудит-лог — payment_status
+    // он НЕ меняет (внутренний сетл делает applyOrderStatusTransition ниже → двойного
+    // сетла нет). Суммы — СЕРВЕРНЫЕ (копейки из grand_total, anti-tamper). Для
+    // COD/manual (provider!=='tbank') вернёт skipped, и внутренний сетл всё равно
+    // отработает.
+    const refundRes = await new PaymentService().refundPayment({
+      orderId: cur.order.id,
+      orderNumber: cur.order.number,
+      paymentStatus: cur.order.paymentStatus,
+      paymentProvider: cur.order.paymentProvider ?? null,
+      paymentRef: cur.order.paymentRef,
+      amountKop: toKopecks(cur.order.grandTotal),
+    });
+
+    // Деньги НЕ вернулись (шлюз отказал) → НЕ помечаем заказ refunded (не врём про
+    // возврат): переход не выполняется, оператор повторит позже.
+    if (!refundRes.ok) {
+      throw new OrderError(
+        'payment_refund_failed',
+        'Не удалось вернуть оплату через платёжный шлюз. Возврат заказа отменён, повторите позже.',
+      );
+    }
+
     const { before, after } = await applyOrderStatusTransition({
       id: data.id,
       to: 'refunded',
       comment: data.reason ?? '',
       actorUserId: ctx.user.id,
+      preloaded: cur,
     });
     return {
       result: orderDetailResult(after),
@@ -411,6 +464,12 @@ export const refundOrder = defineAction({
         after: {
           status: after.order.status,
           paymentStatus: after.order.paymentStatus,
+          // Трассировка шлюзового возврата (для аудита/разбора).
+          gatewayRefund: {
+            status: refundRes.status,
+            skipped: refundRes.skipped ?? false,
+            isMock: refundRes.isMock,
+          },
         },
       },
     };

@@ -3,7 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineAction, type ActionDeps } from '@/lib/server/action';
 import type { AuthUser } from '@/lib/auth/rbac';
 import type { PermissionCode } from '@/lib/auth/permissions';
-import { ProductCreateSchema, ProductIdSchema } from '@/lib/catalog/schemas';
+import {
+  ProductCreateSchema,
+  ProductIdSchema,
+  VariantReorderSchema,
+  AttributeValueDeleteSchema,
+} from '@/lib/catalog/schemas';
 
 // ЮНИТ: проверяем, что мутации каталога, собранные через defineAction с реальными
 // Zod-схемами каталога, корректно проходят guard (catalog.write) и валидацию —
@@ -138,6 +143,82 @@ describe('deleteProduct через defineAction — guard + ProductIdSchema', ()
   it('невалидный id (не uuid) → validation, handler не вызван', async () => {
     const deps = makeDeps(makeUser(['catalog.write']));
     const { action, handler } = buildDeleteAction(deps);
+    const res = await action({ id: 'not-a-uuid' });
+    expect(res.ok).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+// C12 — reorderVariant: guard catalog.write + VariantReorderSchema (productId uuid,
+// order — непустой массив uuid). Round-trip SQL — в variant-attribute-mutations.test.ts.
+describe('reorderVariant через defineAction — guard + VariantReorderSchema', () => {
+  function buildReorderAction(deps: ActionDeps, handler = vi.fn(async () => ({ result: { productId: 'p-1' } }))) {
+    return {
+      action: defineAction({ permission: 'catalog.write', input: VariantReorderSchema, handler, deps }),
+      handler,
+    };
+  }
+  const validInput = {
+    productId: '123e4567-e89b-42d3-a456-426614174000',
+    order: ['223e4567-e89b-42d3-a456-426614174000'],
+  };
+
+  it('только catalog.read → forbidden, handler не вызван', async () => {
+    const deps = makeDeps(makeUser(['catalog.read']));
+    const { action, handler } = buildReorderAction(deps);
+    const res = await action(validInput);
+    expect(res).toEqual({ ok: false, error: 'forbidden' });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('catalog.write + валидный вход → проходит, handler вызван', async () => {
+    const deps = makeDeps(makeUser(['catalog.write']));
+    const { action, handler } = buildReorderAction(deps);
+    const res = await action(validInput);
+    expect(res.ok).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('пустой order → validation, handler не вызван', async () => {
+    const deps = makeDeps(makeUser(['catalog.write']));
+    const { action, handler } = buildReorderAction(deps);
+    const res = await action({ productId: validInput.productId, order: [] });
+    expect(res.ok).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+// C14 — deleteAttributeValue: guard catalog.write + AttributeValueDeleteSchema.
+// Поведение хендлера (conflict при использовании / DELETE) — в
+// variant-attribute-mutations.test.ts.
+describe('deleteAttributeValue через defineAction — guard + AttributeValueDeleteSchema', () => {
+  function buildAction(deps: ActionDeps, handler = vi.fn(async () => ({ result: { id: 'av-1' } }))) {
+    return {
+      action: defineAction({ permission: 'catalog.write', input: AttributeValueDeleteSchema, handler, deps }),
+      handler,
+    };
+  }
+  const validId = { id: '123e4567-e89b-42d3-a456-426614174000' };
+
+  it('только catalog.read → forbidden, handler не вызван', async () => {
+    const deps = makeDeps(makeUser(['catalog.read']));
+    const { action, handler } = buildAction(deps);
+    const res = await action(validId);
+    expect(res).toEqual({ ok: false, error: 'forbidden' });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('catalog.write + валидный uuid → проходит, handler вызван', async () => {
+    const deps = makeDeps(makeUser(['catalog.write']));
+    const { action, handler } = buildAction(deps);
+    const res = await action(validId);
+    expect(res.ok).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('невалидный id → validation, handler не вызван', async () => {
+    const deps = makeDeps(makeUser(['catalog.write']));
+    const { action, handler } = buildAction(deps);
     const res = await action({ id: 'not-a-uuid' });
     expect(res.ok).toBe(false);
     expect(handler).not.toHaveBeenCalled();

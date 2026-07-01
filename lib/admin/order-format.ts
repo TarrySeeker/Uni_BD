@@ -164,6 +164,30 @@ export function promoScopeLabel(scope: string): string {
   }
 }
 
+/** Текст «Мин. кол-во» для списка промокодов: число или «—» при отсутствии порога. */
+export function formatMinQty(minQty: number | null): string {
+  return minQty != null ? String(minQty) : '—';
+}
+
+/**
+ * Метка scope акции с конкретными таргетами для списка промокодов: к базовой
+ * метке (Категория/Бренд/Набор) добавляются имена связанных сущностей —
+ * например «Бренд: Nike, Adidas». scope='cart' — таргетов нет, возвращается
+ * «Вся корзина». Пустой список меток → только базовая метка (graceful). При
+ * числе таргетов больше max список усечён с суффиксом «и ещё N».
+ */
+export function formatScopeWithTargets(
+  scope: string,
+  labels: string[],
+  max = 3,
+): string {
+  const base = promoScopeLabel(scope);
+  if (scope === 'cart' || labels.length === 0) return base;
+  const shown = labels.slice(0, max).join(', ');
+  const rest = labels.length - max;
+  return rest > 0 ? `${base}: ${shown} и ещё ${rest}` : `${base}: ${shown}`;
+}
+
 export function promoValueSummary(promo: {
   kind: string;
   value: string;

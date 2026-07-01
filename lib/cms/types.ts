@@ -76,6 +76,10 @@ export interface CmsPage {
   // SEO/sitemap:
   seoTitle: string | null;
   seoDescription: string | null;
+  // OG-текст страницы (C18). Опциональны для обратной совместимости с уже
+  // существующими фикстурами/вызовами; mapCmsPage всегда проставляет (string|null).
+  ogTitle?: string | null;
+  ogDescription?: string | null;
   ogImageUrl: string | null;
   canonicalUrl: string | null;
   noindex: boolean;

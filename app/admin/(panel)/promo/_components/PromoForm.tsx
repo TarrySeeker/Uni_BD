@@ -6,9 +6,9 @@ import { useState } from 'react';
 import {
   PROMO_KINDS,
   PROMO_APPLY_SCOPES,
-  PROMO_TARGET_TYPES,
 } from '@/lib/orders/types';
-import type { PromoCode, PromoTarget, PromoTargetType } from '@/lib/orders/types';
+import type { PromoApplyScope, PromoCode, PromoTarget, PromoTargetType } from '@/lib/orders/types';
+import { allowedTargetTypesForScope } from '@/lib/orders/schemas';
 import { promoKindLabel, promoScopeLabel } from '@/lib/admin/order-format';
 import type { ActionResult } from '@/lib/server/action';
 
@@ -141,14 +141,32 @@ export function PromoForm({
   const [giftVariantId, setGiftVariantId] = useState(promo?.giftVariantId ?? '');
   const [giftQty, setGiftQty] = useState(promo?.giftQty != null ? String(promo.giftQty) : '');
 
+  // Баг #5 (аудит тупиков): область применения ОГРАНИЧИВАЕТ тип таргета (единый
+  // источник правды со схемой — allowedTargetTypesForScope), иначе подпись scope
+  // обещала бы поведение, которого нет. cart → []; category → [category]; brand →
+  // [brand]; set → все типы.
+  const allowedTargetTypes = allowedTargetTypesForScope(applyScope);
+
   function addTargetRow() {
-    setTargetRows((rows) => [...rows, { targetType: 'category', id: '' }]);
+    const t = allowedTargetTypes[0] ?? 'category';
+    setTargetRows((rows) => [...rows, { targetType: t, id: '' }]);
   }
   function updateTargetRow(i: number, patch: Partial<TargetRow>) {
     setTargetRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
   function removeTargetRow(i: number) {
     setTargetRows((rows) => rows.filter((_, idx) => idx !== i));
+  }
+
+  /** Смена области применения: приводим строки таргетов к допустимым по scope типам
+   *  (для category/brand тип фиксирован — сбрасываем id, т.к. сущность другого типа). */
+  function changeScope(next: PromoApplyScope) {
+    setApplyScope(next);
+    const allowed = allowedTargetTypesForScope(next);
+    if (allowed.length === 0) return; // cart — таргеты не используются
+    setTargetRows((rows) =>
+      rows.map((r) => (allowed.includes(r.targetType) ? r : { targetType: allowed[0]!, id: '' })),
+    );
   }
 
   async function save() {
@@ -262,6 +280,9 @@ export function PromoForm({
             inputMode="decimal"
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('minOrderTotal') ? <p className="mt-1 text-xs text-red-600">{fe('minOrderTotal')}</p> : null}
+          <p className="mt-1 text-xs text-gray-500">
+            Минимальная сумма заказа для срабатывания акции. Пусто — без порога.
+          </p>
         </div>
 
         <div>
@@ -332,7 +353,7 @@ export function PromoForm({
                   name="applyScope"
                   value={s}
                   checked={applyScope === s}
-                  onChange={() => setApplyScope(s)}
+                  onChange={() => changeScope(s)}
                 />
                 {promoScopeLabel(s)}
               </label>
@@ -360,7 +381,7 @@ export function PromoForm({
                       onChange={(e) => updateTargetRow(i, { targetType: e.target.value as PromoTargetType })}
                       className="rounded border border-gray-300 px-2 py-1.5 text-sm"
                     >
-                      {PROMO_TARGET_TYPES.map((tt) => (
+                      {allowedTargetTypes.map((tt) => (
                         <option key={tt} value={tt}>{TARGET_TYPE_LABEL[tt]}</option>
                       ))}
                     </select>
@@ -429,6 +450,11 @@ export function PromoForm({
             inputMode="numeric" placeholder="без порога"
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('minQty') ? <p className="mt-1 text-xs text-red-600">{fe('minQty')}</p> : null}
+          <p className="mt-1 text-xs text-gray-500">
+            Скидка применится, только если в корзине набрано не меньше указанного числа
+            единиц товаров из «Области применения». Оставьте пусто — без ограничения по
+            количеству.
+          </p>
         </div>
 
         {SHOW_GIFT_BLOCK ? (

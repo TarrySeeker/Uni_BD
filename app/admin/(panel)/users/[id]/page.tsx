@@ -6,8 +6,10 @@ import {
   getUserById,
   listRolesWithPermissionCounts,
 } from '@/lib/auth/admin-repository';
+import { isSingleUserModeEnabled } from '@/lib/config/settings';
 
 import { Forbidden } from '../../_components/Forbidden';
+import { SingleUserModeNotice } from '../../_components/SingleUserModeNotice';
 import { PageHeader } from '../../_components/PageHeader';
 import { UserForm } from '../_components/UserForm';
 
@@ -28,6 +30,10 @@ export default async function UserDetailPage({
   const current = await requireUser();
   if (!can(current, 'users.manage')) {
     return <Forbidden permission="users.manage" />;
+  }
+  // Однопользовательский режим (B9): управление пользователями отключено.
+  if (await isSingleUserModeEnabled()) {
+    return <SingleUserModeNotice kind="users" />;
   }
 
   const { id } = await params;

@@ -101,6 +101,7 @@ function makeOrder(over: Partial<Order> = {}): Order {
     paymentStatus: 'paid',
     paidAt: new Date(),
     paymentRef: null,
+    paymentProvider: null,
     deliveryType: 'pvz',
     deliveryStatus: 'pending',
     deliveryCity: 'Москва',

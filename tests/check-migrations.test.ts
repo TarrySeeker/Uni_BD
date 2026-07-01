@@ -223,7 +223,14 @@ describe('check-migrations.sh — аддитивный DDL → exit 0', () => {
 });
 
 describe('check-migrations.sh — реальные миграции 0001..0024', () => {
-  it('все db/migrations/*.sql аддитивны (exit 0)', () => {
+  // retry: тест запускает bash-скрипт через execFileSync, а тот под set -e/pipefail
+  // порождает много подпроцессов (grep/sed/awk/cut в циклах). При полном прогоне с
+  // 16 параллельными воркерами fork может временно не пройти (EAGAIN «Resource
+  // temporarily unavailable») → скрипт падает с ненулевым кодом БЕЗ нарушения схемы.
+  // Реальная не-аддитивная миграция детерминирована (регэксп сматчит каждый раз) и
+  // провалит все попытки; retry гасит только окружённый flake fork-а, не ослабляя
+  // проверку. Изолированно тест и прямой вызов скрипта стабильно дают exit 0.
+  it('все db/migrations/*.sql аддитивны (exit 0)', { retry: 2 }, () => {
     // Без аргументов линтер берёт все db/migrations/*.sql.
     const { code, stdout } = runLint();
     if (code !== 0) {

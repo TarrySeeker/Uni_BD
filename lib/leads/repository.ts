@@ -44,3 +44,33 @@ export async function countNewLeads(): Promise<number> {
   const rows = await sql<{ count: string }[]>`SELECT count(*)::text AS count FROM leads WHERE status = 'new'`;
   return Number(rows[0]?.count ?? 0);
 }
+
+/**
+ * Общее число заявок (все статусы) — для «Всего: N» и плашки усечения списка
+ * (C7), зеркало countSubscribers: listLeads отдаёт усечённый по LIMIT список,
+ * поэтому для тотала нужен отдельный count.
+ */
+export async function countLeads(): Promise<number> {
+  const rows = await sql<{ count: string }[]>`SELECT count(*)::text AS count FROM leads`;
+  return Number(rows[0]?.count ?? 0);
+}
+
+/** Текущий статус заявки (null — заявка не найдена). Для before-снимка/гварда перехода. */
+export async function getLeadStatus(id: string): Promise<string | null> {
+  const rows = await sql<{ status: string }[]>`SELECT status FROM leads WHERE id = ${id} LIMIT 1`;
+  return rows[0]?.status ?? null;
+}
+
+/** Меняет статус заявки. Возвращает true, если строка найдена и обновлена. */
+export async function updateLeadStatus(id: string, status: string): Promise<boolean> {
+  const rows = await sql<{ id: string }[]>`
+    UPDATE leads SET status = ${status} WHERE id = ${id} RETURNING id
+  `;
+  return rows.length > 0;
+}
+
+/** Удаляет заявку. Возвращает true, если строка существовала. */
+export async function deleteLead(id: string): Promise<boolean> {
+  const rows = await sql<{ id: string }[]>`DELETE FROM leads WHERE id = ${id} RETURNING id`;
+  return rows.length > 0;
+}

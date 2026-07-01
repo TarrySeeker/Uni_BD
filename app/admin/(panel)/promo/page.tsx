@@ -5,9 +5,10 @@ import { getEnv } from '@/lib/config/env';
 import { formatPrice } from '@/lib/admin/format';
 import {
   promoKindLabel,
-  promoScopeLabel,
   promoValueSummary,
   formatDateTime,
+  formatMinQty,
+  formatScopeWithTargets,
 } from '@/lib/admin/order-format';
 import { mapPromoCode } from '@/lib/orders/repository';
 import type { PromoCode } from '@/lib/orders/types';
@@ -41,6 +42,39 @@ async function loadPromos(): Promise<PromoCode[]> {
   return rows.map(mapPromoCode);
 }
 
+/**
+ * Метки конкретных таргетов по всем промокодам списка одним batch-запросом (без
+ * N+1): имя категории/бренда/товара или имя/sku варианта. При ошибке/выключенном
+ * каталоге деградирует в пустую Map (как loadPromoPickerData) — список всё равно
+ * показывает обобщённый scope. Имена берутся из БД магазина (мультитенантно).
+ */
+async function loadPromoTargetLabels(ids: string[]): Promise<Map<string, string[]>> {
+  const byPromo = new Map<string, string[]>();
+  if (ids.length === 0) return byPromo;
+  try {
+    const rows = await sql<{ promo_code_id: string; label: string | null }[]>`
+      SELECT pt.promo_code_id,
+             COALESCE(c.name, b.name, p.name, v.name, v.sku) AS label
+      FROM promo_targets pt
+      LEFT JOIN categories c       ON c.id = pt.category_id
+      LEFT JOIN brands b           ON b.id = pt.brand_id
+      LEFT JOIN products p         ON p.id = pt.product_id
+      LEFT JOIN product_variants v ON v.id = pt.variant_id
+      WHERE pt.promo_code_id = ANY(${ids}::uuid[])
+      ORDER BY pt.created_at, pt.id
+    `;
+    for (const r of rows) {
+      if (r.label == null) continue;
+      const arr = byPromo.get(r.promo_code_id) ?? [];
+      arr.push(String(r.label));
+      byPromo.set(r.promo_code_id, arr);
+    }
+  } catch {
+    return new Map();
+  }
+  return byPromo;
+}
+
 /** Текст лимитов «X / ∞» (всего / на покупателя). */
 function limitText(total: number | null, perCustomer: number | null): string {
   const a = total == null ? '∞' : String(total);
@@ -66,6 +100,7 @@ export default async function PromoPage() {
   }
 
   const promos = await loadPromos();
+  const labelsByPromo = await loadPromoTargetLabels(promos.map((p) => p.id));
   const currency = getEnv().SHOP_CURRENCY;
 
   return (
@@ -102,6 +137,7 @@ export default async function PromoPage() {
               <th scope="col" className="px-4 py-2 font-medium">Scope</th>
               <th scope="col" className="px-4 py-2 font-medium">Приоритет</th>
               <th scope="col" className="px-4 py-2 font-medium">Мин. сумма</th>
+              <th scope="col" className="px-4 py-2 font-medium">Мин. кол-во</th>
               <th scope="col" className="px-4 py-2 font-medium">Лимит (всего/на чел.)</th>
               <th scope="col" className="px-4 py-2 font-medium">Использован</th>
               <th scope="col" className="px-4 py-2 font-medium">Срок</th>
@@ -112,7 +148,7 @@ export default async function PromoPage() {
           <tbody className="divide-y divide-gray-100">
             {promos.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={12} className="px-4 py-6 text-center text-gray-400">
                   Промокодов пока нет. Создайте первый.
                 </td>
               </tr>
@@ -134,7 +170,7 @@ export default async function PromoPage() {
                       : promoValueSummary(p)}
                   </td>
                   <td className="px-4 py-2 text-gray-600">
-                    {promoScopeLabel(p.applyScope)}
+                    {formatScopeWithTargets(p.applyScope, labelsByPromo.get(p.id) ?? [])}
                     {p.stackable ? (
                       <span className="ml-1 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
                         суммируемая
@@ -149,6 +185,7 @@ export default async function PromoPage() {
                   <td className="px-4 py-2 text-gray-600">
                     {Number(p.minOrderTotal) > 0 ? formatPrice(p.minOrderTotal, currency) : '—'}
                   </td>
+                  <td className="px-4 py-2 text-gray-600">{formatMinQty(p.minQty)}</td>
                   <td className="px-4 py-2 text-gray-600">
                     {limitText(p.usageLimit, p.perCustomerLimit)}
                   </td>

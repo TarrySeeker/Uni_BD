@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -177,6 +178,24 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
               <button type="button" onClick={() => startMove(node)} className={`${btn} text-gray-700`}>
                 Переместить
               </button>
+              {/* C4: скрыть/показать категорию (is_active) — синхронизирует видимость
+                  на витрине через updateCategory (COALESCE is_active). */}
+              <button
+                type="button"
+                onClick={() =>
+                  void run(
+                    () => updateCategoryAction({ id: node.id, isActive: !node.isActive }),
+                    node.isActive ? 'Категория скрыта на сайте.' : 'Категория показана на сайте.',
+                  )
+                }
+                className={`${btn} ${node.isActive ? 'text-amber-700' : 'text-green-700'}`}
+              >
+                {node.isActive ? 'Скрыть' : 'Показать'}
+              </button>
+              {/* C13: переход к полной форме категории (описание + SEO/OG). */}
+              <Link href={`/admin/catalog/categories/${node.id}`} className={`${btn} text-gray-700`}>
+                Изменить
+              </Link>
               <button
                 type="button"
                 onClick={() => {

@@ -42,6 +42,18 @@ export interface SeoFieldsetProps {
   canonicalPlaceholder?: string;
   /** Ошибки по полям (из ActionResult.fieldErrors). */
   fieldErrors?: Record<string, string | undefined>;
+  /**
+   * Слот под полем «Картинка для соцсетей» — сюда вызывающая форма помещает свой
+   * загрузчик файла (находка 13 аудита). Компонент общий (товар/бренд/CMS), поэтому
+   * конкретный экшен загрузки в него НЕ вшит: каждая форма передаёт свой виджет,
+   * который кладёт полученный ключ/URL в value.ogImageKey через onChange.
+   */
+  ogImageSlot?: React.ReactNode;
+  /**
+   * Режим «только чтение» (находка 14 аудита): дизейблит все поля для пользователя
+   * без права записи, чтобы интерфейс не выглядел рабочим там, где сервер отклонит.
+   */
+  disabled?: boolean;
 }
 
 const inputCls = 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm';
@@ -53,6 +65,8 @@ export function SeoFieldset({
   idPrefix = 'seo',
   canonicalPlaceholder,
   fieldErrors = {},
+  ogImageSlot,
+  disabled = false,
 }: SeoFieldsetProps) {
   const set = <K extends keyof SeoFieldsetValue>(k: K, v: SeoFieldsetValue[K]) =>
     onChange({ ...value, [k]: v });
@@ -76,6 +90,7 @@ export function SeoFieldset({
             onChange={(e) => set('seoTitle', e.target.value)}
             className={inputCls}
             placeholder="По умолчанию — название сущности"
+            disabled={disabled}
           />
           {err('seoTitle')}
         </div>
@@ -90,6 +105,7 @@ export function SeoFieldset({
             onChange={(e) => set('seoDescription', e.target.value)}
             rows={2}
             className={inputCls}
+            disabled={disabled}
           />
           {/* Превью-сниппет поисковой выдачи. */}
           {(value.seoTitle || value.seoDescription) && (
@@ -115,6 +131,7 @@ export function SeoFieldset({
               value={value.ogTitle}
               onChange={(e) => set('ogTitle', e.target.value)}
               className={inputCls}
+              disabled={disabled}
             />
             {err('ogTitle')}
           </div>
@@ -128,7 +145,11 @@ export function SeoFieldset({
               onChange={(e) => set('ogImageKey', e.target.value)}
               className={inputCls}
               placeholder="products/<id>/og.webp"
+              disabled={disabled}
             />
+            {/* Слот загрузчика OG-картинки (находка 13): форма передаёт свой
+                виджет загрузки; адрес подставляется в поле автоматически. */}
+            {!disabled && ogImageSlot ? ogImageSlot : null}
             {err('ogImageKey')}
           </div>
         </div>
@@ -143,6 +164,7 @@ export function SeoFieldset({
             onChange={(e) => set('ogDescription', e.target.value)}
             rows={2}
             className={inputCls}
+            disabled={disabled}
           />
           {err('ogDescription')}
         </div>
@@ -157,6 +179,7 @@ export function SeoFieldset({
             onChange={(e) => set('canonicalUrl', e.target.value)}
             className={inputCls}
             placeholder={canonicalPlaceholder ?? 'Автоген из slug и домена'}
+            disabled={disabled}
           />
           <p className="mt-1 text-xs text-gray-400">
             Абсолютный https-URL или путь с ведущим «/». Пусто — авто из slug.
@@ -169,6 +192,7 @@ export function SeoFieldset({
             type="checkbox"
             checked={value.noindex}
             onChange={(e) => set('noindex', e.target.checked)}
+            disabled={disabled}
           />
           Скрыть страницу от поисковиков
         </label>

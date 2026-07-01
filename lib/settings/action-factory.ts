@@ -40,6 +40,7 @@ import {
   seoSettingsSchema,
   homeSchema,
   navigationSchema,
+  accessSchema,
   SETTING_KEYS,
 } from '@/lib/settings/schemas';
 import {
@@ -125,6 +126,9 @@ export const HomeInputSchema = z.object({ home: homeSchema });
 
 /** navigation на ВХОДЕ действия (G-10/G-11): меню шапки + колонки футера. */
 export const NavigationInputSchema = z.object({ navigation: navigationSchema });
+
+/** access на ВХОДЕ действия (B9): флаги доступа уровня магазина (singleUserMode). */
+export const AccessInputSchema = z.object({ access: accessSchema });
 
 /**
  * Вход загрузки изображения настроек: kind (logo|favicon|og) + байты файла.
@@ -456,6 +460,30 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     },
   });
 
+  const updateAccessSettings = defineAction({
+    permission: 'settings.manage',
+    input: AccessInputSchema,
+    deps: actionDeps,
+    handler: async (data, ctx: ActionCtx) => {
+      const before = await deps.getSetting('access');
+      const row = await deps.upsertSetting('access', data.access, ctx.user.id);
+      deps.invalidateCache();
+      return {
+        result: { key: 'access' as const },
+        // Меняется состав меню (Пользователи/Роли) и доступность управления —
+        // инвалидируем всю админку. Витрины это не касается (флаг чисто админский).
+        revalidate: ['/admin', SETTINGS_PATH],
+        audit: {
+          action: 'settings.access.update',
+          entityType: 'shop_settings',
+          entityId: 'access',
+          before: before?.value,
+          after: row.value,
+        },
+      };
+    },
+  });
+
   /**
    * Загрузка изображения настроек (логотип/фавикон/og). Переиспользует пайплайн
    * медиа: validateUpload (magic-bytes) → generatePreviews (webp) → storage.put.
@@ -626,6 +654,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     updateShopSeoSettings,
     updateHomeAction,
     updateNavigationAction,
+    updateAccessSettings,
     uploadSettingsImageAction,
     uploadStoreImageAction,
     resetSetting,

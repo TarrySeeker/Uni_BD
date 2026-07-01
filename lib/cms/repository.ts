@@ -60,6 +60,8 @@ export function mapCmsPage(row: any): CmsPage {
     publishedAt: asNullableDate(row.published_at),
     seoTitle: row.seo_title ?? null,
     seoDescription: row.seo_description ?? null,
+    ogTitle: row.og_title ?? null,
+    ogDescription: row.og_description ?? null,
     ogImageUrl: row.og_image_url ?? null,
     canonicalUrl: row.canonical_url ?? null,
     noindex: Boolean(row.noindex),
@@ -157,7 +159,8 @@ export async function getCmsPageById(
 ): Promise<CmsPageWithSections | null> {
   const pageRows = await sql<Record<string, unknown>[]>`
     SELECT id, slug, title, status, published_at,
-           seo_title, seo_description, og_image_url, canonical_url, noindex,
+           seo_title, seo_description, og_title, og_description,
+           og_image_url, canonical_url, noindex,
            sitemap_priority, sitemap_changefreq,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages WHERE id = ${id} LIMIT 1
@@ -186,7 +189,8 @@ export async function getCmsPageById(
 export async function listPublishedCmsPages(): Promise<CmsPage[]> {
   const rows = await sql<Record<string, unknown>[]>`
     SELECT id, slug, title, status, published_at,
-           seo_title, seo_description, og_image_url, canonical_url, noindex,
+           seo_title, seo_description, og_title, og_description,
+           og_image_url, canonical_url, noindex,
            sitemap_priority, sitemap_changefreq,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages
@@ -205,7 +209,8 @@ export async function getPublishedCmsPageBySlug(
 ): Promise<CmsPageWithSections | null> {
   const pageRows = await sql<Record<string, unknown>[]>`
     SELECT id, slug, title, status, published_at,
-           seo_title, seo_description, og_image_url, canonical_url, noindex,
+           seo_title, seo_description, og_title, og_description,
+           og_image_url, canonical_url, noindex,
            sitemap_priority, sitemap_changefreq,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages

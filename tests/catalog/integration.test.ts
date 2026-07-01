@@ -12,6 +12,8 @@ import {
   getBrandBySlug,
 } from '@/lib/catalog/repository';
 import { rebuildProductAttributesCache } from '@/lib/catalog/cache';
+import { toCategoryTreeDto } from '@/lib/storefront/dto';
+import { getActiveCategoryIdBySlug } from '@/lib/storefront/queries';
 
 // ИНТЕГРАЦИЯ: требует реальную БД с накатанными миграциями 0005–0010.
 // Локально (без DATABASE_URL) — пропускается. Сети/Next не требует: только sql.
@@ -483,6 +485,49 @@ describe.skipIf(!hasDb)('каталог — пагинация: свободны
     expect(page2.rows.map((r) => r.id)).toEqual(fullIds.slice(2, 4));
 
     await sql`DELETE FROM products WHERE id = ANY(${ids}::uuid[])`;
+  });
+});
+
+// ИНТЕГРАЦИЯ C4: категорию можно скрыть и снова показать — витрина это отражает.
+// Round-trip is_active, на который опирается кнопка «Скрыть/Показать» в
+// CategoryManager. Мутацию делаем сырым UPDATE (зеркало updateCategory COALESCE
+// is_active — сам Action покрыт guard/schema-юнитами), проверяем согласованность
+// дерева (getCategoryTree+toCategoryTreeDto) и резолва категории по slug.
+describe.skipIf(!hasDb)('каталог C4 — скрытие/показ категории отражается на витрине', () => {
+  afterAll(async () => {
+    await closeSql();
+  });
+
+  it('активна → видна; is_active=false → скрыта в DTO и getActiveCategoryIdBySlug=null; обратно → снова видна', async () => {
+    const suffix = Date.now().toString(36);
+    const slug = `c4-cat-${suffix}`;
+    const [{ id }] = await sql<{ id: string }[]>`
+      INSERT INTO categories (slug, name) VALUES (${slug}, 'C4 категория')
+      RETURNING id
+    `;
+
+    // 1) Активна: видна в дереве/DTO, резолвится по slug.
+    let node = findNode(await getCategoryTree(), id);
+    expect(node).toBeTruthy();
+    expect(node!.isActive).toBe(true);
+    expect(toCategoryTreeDto([node!]).length).toBe(1);
+    expect(await getActiveCategoryIdBySlug(slug)).toBe(id);
+
+    // 2) Скрываем (как updateCategory COALESCE is_active).
+    await sql`UPDATE categories SET is_active = false WHERE id = ${id}`;
+    node = findNode(await getCategoryTree(), id);
+    expect(node!.isActive).toBe(false);
+    expect(toCategoryTreeDto([node!]).length).toBe(0); // скрыта на витрине
+    expect(await getActiveCategoryIdBySlug(slug)).toBeNull();
+
+    // 3) Показываем снова — категория опять видна на витрине.
+    await sql`UPDATE categories SET is_active = true WHERE id = ${id}`;
+    node = findNode(await getCategoryTree(), id);
+    expect(node!.isActive).toBe(true);
+    expect(toCategoryTreeDto([node!]).length).toBe(1);
+    expect(await getActiveCategoryIdBySlug(slug)).toBe(id);
+
+    await sql`DELETE FROM categories WHERE id = ${id}`;
   });
 });
 

@@ -3,8 +3,10 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 import { listRolesWithPermissionCounts } from '@/lib/auth/admin-repository';
+import { isSingleUserModeEnabled } from '@/lib/config/settings';
 
 import { Forbidden } from '../_components/Forbidden';
+import { SingleUserModeNotice } from '../_components/SingleUserModeNotice';
 import { PageHeader } from '../_components/PageHeader';
 import { RoleDeleteButton } from './_components/RoleDeleteButton';
 
@@ -21,6 +23,10 @@ export default async function RolesPage() {
   const user = await requireUser();
   if (!can(user, 'roles.manage')) {
     return <Forbidden permission="roles.manage" />;
+  }
+  // Однопользовательский режим (B9): прямой заход по URL → заглушка вместо списка.
+  if (await isSingleUserModeEnabled()) {
+    return <SingleUserModeNotice kind="roles" />;
   }
 
   const roles = await listRolesWithPermissionCounts();

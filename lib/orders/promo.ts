@@ -20,6 +20,7 @@ export type PromoRejectReason =
   | 'not_started'
   | 'expired'
   | 'below_min_total'
+  | 'below_min_qty'
   | 'usage_limit_reached'
   | 'per_customer_limit_reached'
   | 'invalid_kind';
@@ -48,6 +49,9 @@ const REASON_MESSAGE: Record<PromoRejectReason, string> = {
   not_started: 'Промокод ещё не действует.',
   expired: 'Срок действия промокода истёк.',
   below_min_total: 'Сумма заказа меньше минимальной для этого промокода.',
+  // Баг #6 аудита тупиков: причина — НЕДОСТАТОК ЕДИНИЦ (min_qty), а не суммы;
+  // сообщение говорит про количество, чтобы покупатель не искал проблему с суммой.
+  below_min_qty: 'Недостаточно единиц товара для этого промокода — добавьте ещё.',
   usage_limit_reached: 'Достигнут лимит использований промокода.',
   per_customer_limit_reached: 'Вы уже использовали этот промокод максимальное число раз.',
   invalid_kind: 'Промокод не может быть применён.',
@@ -86,8 +90,12 @@ export function validatePromo(
   }
 
   // 2a) Минимальное количество единиц (min_qty, §5.2 Пакет 5.P-1).
+  // Баг #6: отдельная причина below_min_qty (про КОЛИЧЕСТВО), а не below_min_total
+  // (про сумму) — иначе покупатель/владелец видит сообщение про сумму при реальной
+  // нехватке единиц. Проброс к витрине/созданию заказа — теми же путями, что и
+  // below_min_total (cart/quote route и repository v.message).
   if (promo.minQty != null && (ctx.itemsQty ?? 0) < promo.minQty) {
-    return reject('below_min_total');
+    return reject('below_min_qty');
   }
 
   // 3) Лимит «всего» (usedCount < usageLimit; null = безлимит).

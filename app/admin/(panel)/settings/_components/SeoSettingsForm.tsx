@@ -8,6 +8,7 @@ import type { EffectiveSettings } from '@/lib/config/settings';
 
 import { updateShopSeoAction } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
+import { SettingsImageUpload } from './BrandingForm';
 
 /**
  * Форма SEO-настроек магазина (docs/11 §5.3.5): site_name, site_url,
@@ -109,7 +110,8 @@ export function SeoSettingsForm({ seo }: { seo: EffectiveSettings['seo'] }) {
         <div className="lg:col-span-2">
           <label htmlFor="seo-og" className={labelCls}>Картинка для соцсетей по умолчанию (адрес файла)</label>
           <input id="seo-og" value={defaultOgImageKey} onChange={(e) => setDefaultOgImageKey(e.target.value)}
-            placeholder="defaults/og.webp" className={inputCls} />
+            placeholder="defaults/og.webp или загрузите файл" className={inputCls} />
+          <SettingsImageUpload kind="og" label="Загрузить картинку" onUploaded={setDefaultOgImageKey} />
         </div>
         <div className="lg:col-span-2">
           <label htmlFor="seo-robots" className={labelCls}>Доп. правила для поисковых роботов (для специалистов, необязательно)</label>
