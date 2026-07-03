@@ -36,6 +36,18 @@ S3/MinIO → локальное файловое хранилище (`lib/storag
 `skipped` (критичен только `db`), статус остаётся `ok`. Для профиля без Docker —
 **оставь `REDIS_URL` и `S3_*`/`MINIO_*` пустыми** в `.env` (см. `.env.example`).
 
+## 2.1. Медиа (загрузка фото) без Docker/MinIO
+
+В Docker медиа хранит MinIO, а отдаёт Caddy (`handle_path /media/*`). Без Docker:
+- **Хранилище** — LocalStorage (файлы в `.data/uploads`): в `.env` оставь `S3_BUCKET`
+  пустым (`hasS3Config` → false). Иначе платформа шлёт файлы в НЕзапущенный MinIO →
+  «не удалось сохранить файл в хранилище».
+- **Публичный URL** — задай `S3_PUBLIC_URL=https://<admin-домен>/media` (абсолютный,
+  чтобы картинки открывались и с домена витрины); `createStorage()` проводит его в
+  `LocalStorage.publicBase`.
+- **Отдача** — роут `app/media/[...key]/route.ts` отдаёт файлы через `ObjectStorage.get()`
+  (за Caddy, который проксирует `/media` в приложение). Никакого MinIO/Caddy-file_server.
+
 ## 3. Боевой деплой без Docker — bare-metal профиль `scripts/bare-metal/`
 
 Опциональная альтернатива `docker compose`: приложения — systemd-сервисы (Next.js

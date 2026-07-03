@@ -64,7 +64,12 @@ export function createStorage(
         '(нет S3_ENDPOINT/S3_BUCKET). Файлы сохраняются локально.',
     );
   }
-  return new LocalStorage();
+  // publicBase из S3_PUBLIC_URL — абсолютный URL медиа (напр. на admin-домене),
+  // иначе относительный /media не открылся бы с домена витрины. Отдача — роут
+  // app/media/[...key] (в Docker медиа отдаёт Caddy→MinIO; без Docker — приложение).
+  return new LocalStorage(
+    env.S3_PUBLIC_URL ? { publicBase: env.S3_PUBLIC_URL } : {},
+  );
 }
 
 /**
