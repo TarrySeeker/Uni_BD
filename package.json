@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:up": "node scripts/dev-db/start.mjs",
+    "db:init": "node scripts/dev-db/init-db.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",
@@ -39,6 +41,7 @@
     "@types/sanitize-html": "^2.16.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
+    "embedded-postgres": "^17.0.0",
     "eslint": "^9.18.0",
     "eslint-config-next": "^16.2.9",
     "postcss": "^8.5.15",

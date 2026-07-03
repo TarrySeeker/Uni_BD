@@ -21,6 +21,9 @@
   (playwright, context7). Проверка: `node --version`.
 - **Docker** (+ Docker Compose) — база данных (PostgreSQL), а также Redis, MinIO и
   Caddy поднимаются контейнерами из коробки (`make up`). БД работает в Docker.
+  - *Нет Docker / нет sudo* (напр. автоматизированная сессия на «голом» хосте)? Есть
+    полный профиль без Docker: БД через `pnpm db:up` (embedded-postgres) + `pnpm db:init`,
+    Redis/MinIO не нужны, деплой — `scripts/bare-metal/`. См. **docs/25-без-docker-профиль.md**.
 - **Разовый trust-диалог Claude Code.** При первом открытии папки Claude Code один
   раз спросит доверие к каталогу — **подтверди**. Иначе закоммиченный
   `.claude/settings.json` не применится и MCP-серверы не включатся.

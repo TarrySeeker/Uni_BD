@@ -154,9 +154,19 @@ make init          # scripts/init-shop.sh ВНУТРИ контейнера app:
                    #   → seed владельца (OWNER_EMAIL/PASSWORD) → опц. demo-каталог
 make smoke         # health-проверки /api/health и ключевых эндпоинтов
 ```
-Вариант Б (локальная разработка без полного Docker): поднять Postgres/Redis/MinIO
-(или dev-БД), экспортировать `DATABASE_URL`/`PG*`, прогнать `scripts/init-shop.sh`,
-затем `pnpm dev`.
+Вариант Б (БЕЗ Docker / БЕЗ sudo — напр. автоматизированная сессия ассистента на
+«голом» хосте) — полностью в **docs/25-без-docker-профиль.md**. Кратко:
+```bash
+pnpm install                        # ставит embedded-postgres (npm) → Postgres без Docker/sudo
+node scripts/dev-db/start.mjs &     # локальный Postgres на 127.0.0.1:5442
+PGHOST=127.0.0.1 PGPORT=5442 PGUSER=postgres PGPASSWORD=postgres \
+  node scripts/dev-db/init-db.mjs   # схема+роли+seed через postgres.js (без psql, обходит 0001)
+# Redis/MinIO НЕ нужны: оставь REDIS_URL/S3_* пустыми → in-memory rate-limit + локальное
+# хранилище, /api/health помечает их 'skipped' (критичен только 'db').
+export DATABASE_URL=postgres://admik_app:app-local@127.0.0.1:5442/admik
+pnpm dev
+```
+Боевой деплой без Docker — опциональный bare-metal профиль `scripts/bare-metal/` (Caddy + systemd), тоже в docs/25.
 
 Что важно знать про `init-shop.sh` (идемпотентен, см. `docs/09`/`docs/12`):
 - роли БД least-privilege: `admik_migrator` (DDL/владелец таблиц), `admik_app`
