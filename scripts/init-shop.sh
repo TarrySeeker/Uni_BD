@@ -253,6 +253,40 @@ else
         fail "Ошибка при применении миграции ${name} (под ${run_label})."
         exit 1
       fi
+
+      # Reconciliation владения после superuser-миграций (least-privilege инвариант).
+      # Файлы с CREATE EXTENSION/ROLE идут под superuser (см. выбор роли выше), поэтому
+      # ВСЕ прикладные объекты такого файла (не только расширение) создаются с
+      # owner = POSTGRES_USER (superuser). Следующие migrator-миграции, которые ссылаются
+      # на эти объекты (inline-FK REFERENCES, ALTER, CREATE INDEX), падают с
+      # "permission denied", т.к. admik_migrator не владеет ими. Переназначаем владение
+      # прикладных объектов public на admik_migrator СРАЗУ после superuser-миграции —
+      # тогда последующие migrator-миграции видят корректного владельца.
+      # Идемпотентно (фильтр по owner = POSTGRES_USER). Расширения/системные объекты
+      # не трогаем; REASSIGN OWNED не используем (падает на зависимостях superuser-роли).
+      if [ "${run_label}" = "superuser" ]; then
+        PGUSER="${POSTGRES_USER}" PGPASSWORD="${POSTGRES_PASSWORD}" \
+          psql -v ON_ERROR_STOP=1 -q <<SQL || { fail "Не удалось выровнять владение объектов после ${name}."; exit 1; }
+DO \$\$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT c.oid::regclass::text AS obj, c.relkind
+           FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+           JOIN pg_roles o ON o.oid = c.relowner
+           WHERE n.nspname = 'public' AND c.relkind IN ('r','p','S','v','m')
+             AND o.rolname = '${POSTGRES_USER}'
+  LOOP
+    IF r.relkind = 'S' THEN EXECUTE format('ALTER SEQUENCE %s OWNER TO admik_migrator', r.obj);
+    ELSE EXECUTE format('ALTER TABLE %s OWNER TO admik_migrator', r.obj); END IF;
+  END LOOP;
+  FOR r IN SELECT p.oid::regprocedure::text AS obj
+           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+           JOIN pg_roles o ON o.oid = p.proowner
+           WHERE n.nspname = 'public' AND o.rolname = '${POSTGRES_USER}'
+  LOOP EXECUTE format('ALTER ROUTINE %s OWNER TO admik_migrator', r.obj); END LOOP;
+END \$\$;
+SQL
+      fi
     done
     ok "Миграции применены (${#MIGRATION_FILES[@]} шт.; DDL — под admik_migrator)"
   fi
