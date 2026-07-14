@@ -5,6 +5,7 @@ import {
   parseMigrationName,
   sortMigrationNames,
 } from '@/lib/db/migrate';
+import { applyAllMigrations } from '@/tests/helpers/apply-migrations';
 
 /**
  * Удаляет SQL-комментарии (-- ... до конца строки) перед статическим анализом DDL,
@@ -146,32 +147,9 @@ const INTEGRATION_DB_URL =
 describe.skipIf(!INTEGRATION_DB_URL)('db/migrations — идемпотентность и роли (интеграция)', () => {
   // Ленивая загрузка postgres.js, чтобы юнит-окружение без БД не тянуло драйвер.
   let postgres: any;
-  let listMigrationsFn: typeof listMigrations;
   let parseFn: typeof parseMigrationName;
 
   let sql: any;
-
-  /** Применяет все миграции по порядку, подставляя psql-переменные паролей. */
-  async function applyAllMigrations(): Promise<void> {
-    const migrations = await listMigrationsFn();
-    const appPassword = process.env.APP_PASSWORD ?? 'app_test_password';
-    const migratorPassword =
-      process.env.MIGRATOR_PASSWORD ?? 'migrator_test_password';
-
-    for (const migration of migrations) {
-      let text = await readFile(migration.path, 'utf8');
-      // psql-переменные :'APP_PASSWORD' заменяем на безопасно-экранированные литералы.
-      text = text
-        .replaceAll(":'APP_PASSWORD'", quoteLiteral(appPassword))
-        .replaceAll(":'MIGRATOR_PASSWORD'", quoteLiteral(migratorPassword));
-      await sql.unsafe(text);
-    }
-  }
-
-  /** Экранирование строкового литерала для подстановки в DDL (тест-окружение). */
-  function quoteLiteral(value: string): string {
-    return `'${value.replaceAll("'", "''")}'`;
-  }
 
   // Динамический импорт в beforeAll, чтобы файл компилировался без БД.
   // (Vitest допускает top-level imports; для драйвера используем динамический.)
@@ -179,7 +157,6 @@ describe.skipIf(!INTEGRATION_DB_URL)('db/migrations — идемпотентно
     if (!postgres) {
       postgres = (await import('postgres')).default;
       const mod: typeof import('@/lib/db/migrate') = await import('@/lib/db/migrate');
-      listMigrationsFn = mod.listMigrations;
       parseFn = mod.parseMigrationName;
     }
     if (!sql) {

@@ -604,8 +604,27 @@ describe('orders/[number] route — защита доступа (конвейе�
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe.skipIf(!hasDb)('storefront orders (integration, требует БД)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Драйвер 404 — модульный кэш getEnv() (lib/config/env.ts): ранний тест файла
+    // кэширует ADMIK_MODULES='catalog', и без сброса графа модулей роут видит старый
+    // набор (orders выключен). vi.resetModules() заставляет роут переимпортироваться
+    // и перечитать process.env; invalidateSettingsCache() чистит process-глобальный
+    // снапшот настроек (read-your-own-writes) — defense-in-depth.
+    vi.resetModules();
     process.env.ADMIK_MODULES = 'orders,catalog';
+    // Storefront в mock-режим (пустые ключи/origins → auth открыт). Явно, потому что
+    // afterEach соседних describe пишут `= ORIGINAL_KEYS` (undefined → строка
+    // "undefined"), а свежий getEnv() после resetModules прочитал бы её как
+    // непустой ключ и вернул 403 вместо ожидаемого пути quote.
+    process.env.STOREFRONT_API_KEYS = '';
+    process.env.STOREFRONT_ALLOWED_ORIGINS = '';
+    const { invalidateSettingsCache } = await import('@/lib/config/settings');
+    invalidateSettingsCache();
+  });
+  afterEach(() => {
+    process.env.ADMIK_MODULES = ORIGINAL_MODULES;
+    process.env.STOREFRONT_API_KEYS = ORIGINAL_KEYS;
+    process.env.STOREFRONT_ALLOWED_ORIGINS = ORIGINAL_ORIGINS;
   });
 
   it('POST /cart/quote отдаёт серверный итог { data: { grandTotal, ... } }', async () => {

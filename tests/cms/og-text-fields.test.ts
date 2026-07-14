@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { listMigrations } from '@/lib/db/migrate';
+import { applyAllMigrations } from '@/tests/helpers/apply-migrations';
 import { mapCmsPage } from '@/lib/cms/repository';
 
 /**
@@ -87,23 +88,6 @@ const INTEGRATION_DB_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE
 describe.skipIf(!INTEGRATION_DB_URL)('cms — og-текст пишется в БД (интеграция)', () => {
   let postgres: any;
   let sql: any;
-
-  function quoteLiteral(v: string): string {
-    return `'${v.replaceAll("'", "''")}'`;
-  }
-
-  async function applyAllMigrations(): Promise<void> {
-    const migrations = await listMigrations();
-    const appPassword = process.env.APP_PASSWORD ?? 'app_test_password';
-    const migratorPassword = process.env.MIGRATOR_PASSWORD ?? 'migrator_test_password';
-    for (const migration of migrations) {
-      let text = await readFile(migration.path, 'utf8');
-      text = text
-        .replaceAll(":'APP_PASSWORD'", quoteLiteral(appPassword))
-        .replaceAll(":'MIGRATOR_PASSWORD'", quoteLiteral(migratorPassword));
-      await sql.unsafe(text);
-    }
-  }
 
   async function freshPage(slug: string): Promise<string> {
     const rows = await sql`

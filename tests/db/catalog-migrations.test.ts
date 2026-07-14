@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listMigrations, parseMigrationName } from '@/lib/db/migrate';
+import { applyAllMigrations } from '@/tests/helpers/apply-migrations';
 
 /**
  * Тесты пакета П1 Этапа 2 — миграции каталога 0005…0010 (docs/05 §2).
@@ -162,33 +163,11 @@ const INTEGRATION_DB_URL =
 
 describe.skipIf(!INTEGRATION_DB_URL)('db/migrations — каталог (интеграция)', () => {
   let postgres: any;
-  let listMigrationsFn: typeof listMigrations;
   let sql: any;
-
-  function quoteLiteral(value: string): string {
-    return `'${value.replaceAll("'", "''")}'`;
-  }
-
-  /** Применяет ВСЕ миграции по порядку (включая ядро 0001..0004 + каталог). */
-  async function applyAllMigrations(): Promise<void> {
-    const migrations = await listMigrationsFn();
-    const appPassword = process.env.APP_PASSWORD ?? 'app_test_password';
-    const migratorPassword =
-      process.env.MIGRATOR_PASSWORD ?? 'migrator_test_password';
-    for (const migration of migrations) {
-      let text = await readFile(migration.path, 'utf8');
-      text = text
-        .replaceAll(":'APP_PASSWORD'", quoteLiteral(appPassword))
-        .replaceAll(":'MIGRATOR_PASSWORD'", quoteLiteral(migratorPassword));
-      await sql.unsafe(text);
-    }
-  }
 
   async function ensureLoaded(): Promise<void> {
     if (!postgres) {
       postgres = (await import('postgres')).default;
-      const mod: typeof import('@/lib/db/migrate') = await import('@/lib/db/migrate');
-      listMigrationsFn = mod.listMigrations;
     }
     if (!sql) {
       sql = postgres(INTEGRATION_DB_URL!, { onnotice: () => {} });
@@ -206,7 +185,11 @@ describe.skipIf(!INTEGRATION_DB_URL)('db/migrations — каталог (инте
     await applyAllMigrations();
     const second = await sql`SELECT version FROM schema_migrations ORDER BY version`;
     expect(second).toEqual(first);
-    expect(second.map((r: { version: string }) => r.version)).toEqual([
+    // Ядро + каталог 0001..0010 присутствуют в журнале (containment, как в соседних
+    // интеграционных тестах: orders/cdek/settings). Полный список не фиксируем —
+    // dev-БД содержит ВСЕ миграции (0001..0049), а не только каталожный срез.
+    const versions = second.map((r: { version: string }) => r.version);
+    for (const v of [
       '0001',
       '0002',
       '0003',
@@ -217,7 +200,9 @@ describe.skipIf(!INTEGRATION_DB_URL)('db/migrations — каталог (инте
       '0008',
       '0009',
       '0010',
-    ]);
+    ]) {
+      expect(versions).toContain(v);
+    }
   });
 
   it('ключевые таблицы каталога созданы', async () => {

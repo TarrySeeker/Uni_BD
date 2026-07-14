@@ -12,6 +12,7 @@ import { getEnv } from '@/lib/config/env';
 import { getEnabledModules, ALL_MODULES } from '@/lib/config/modules';
 import { toMinor, fromMinor } from '@/lib/orders/money';
 import { listMigrations } from '@/lib/db/migrate';
+import { applyAllMigrations } from '@/tests/helpers/apply-migrations';
 
 /**
  * Тесты пакета 5.D-1 (docs/11 §5.4.6, §8) — фундамент DB-driven настроек.
@@ -372,31 +373,11 @@ const INTEGRATION_DB_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE
 
 describe.skipIf(!INTEGRATION_DB_URL)('db/migrations — настройки (интеграция, накат в БД)', () => {
   let postgres: any;
-  let listMigrationsFn: typeof listMigrations;
   let sql: any;
-
-  function quoteLiteral(value: string): string {
-    return `'${value.replaceAll("'", "''")}'`;
-  }
-
-  async function applyAllMigrations(): Promise<void> {
-    const migrations = await listMigrationsFn();
-    const appPassword = process.env.APP_PASSWORD ?? 'app_test_password';
-    const migratorPassword = process.env.MIGRATOR_PASSWORD ?? 'migrator_test_password';
-    for (const migration of migrations) {
-      let text = await readFile(migration.path, 'utf8');
-      text = text
-        .replaceAll(":'APP_PASSWORD'", quoteLiteral(appPassword))
-        .replaceAll(":'MIGRATOR_PASSWORD'", quoteLiteral(migratorPassword));
-      await sql.unsafe(text);
-    }
-  }
 
   async function ensureLoaded(): Promise<void> {
     if (!postgres) {
       postgres = (await import('postgres')).default;
-      const mod: typeof import('@/lib/db/migrate') = await import('@/lib/db/migrate');
-      listMigrationsFn = mod.listMigrations;
     }
     if (!sql) {
       sql = postgres(INTEGRATION_DB_URL!, { onnotice: () => {} });

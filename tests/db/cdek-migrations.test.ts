@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listMigrations, parseMigrationName } from '@/lib/db/migrate';
+import { applyAllMigrations } from '@/tests/helpers/apply-migrations';
 
 /**
  * Тесты пакета A Этапа 4 — миграции СДЭК 0017/0018 (docs/08 §3).
@@ -159,31 +160,11 @@ const INTEGRATION_DB_URL = process.env.TEST_DATABASE_URL ?? process.env.DATABASE
 
 describe.skipIf(!INTEGRATION_DB_URL)('db/migrations — СДЭК (интеграция)', () => {
   let postgres: any;
-  let listMigrationsFn: typeof listMigrations;
   let sql: any;
-
-  function quoteLiteral(value: string): string {
-    return `'${value.replaceAll("'", "''")}'`;
-  }
-
-  async function applyAllMigrations(): Promise<void> {
-    const migrations = await listMigrationsFn();
-    const appPassword = process.env.APP_PASSWORD ?? 'app_test_password';
-    const migratorPassword = process.env.MIGRATOR_PASSWORD ?? 'migrator_test_password';
-    for (const migration of migrations) {
-      let text = await readFile(migration.path, 'utf8');
-      text = text
-        .replaceAll(":'APP_PASSWORD'", quoteLiteral(appPassword))
-        .replaceAll(":'MIGRATOR_PASSWORD'", quoteLiteral(migratorPassword));
-      await sql.unsafe(text);
-    }
-  }
 
   async function ensureLoaded(): Promise<void> {
     if (!postgres) {
       postgres = (await import('postgres')).default;
-      const mod: typeof import('@/lib/db/migrate') = await import('@/lib/db/migrate');
-      listMigrationsFn = mod.listMigrations;
     }
     if (!sql) {
       sql = postgres(INTEGRATION_DB_URL!, { onnotice: () => {} });

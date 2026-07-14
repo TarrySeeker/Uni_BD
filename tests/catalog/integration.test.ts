@@ -138,15 +138,21 @@ describe.skipIf(!hasDb)('каталог — availableStock в списке уч�
       VALUES (${sku}, ${sku}, 'Частичный резерв', 'active', '100.00')
       RETURNING id
     `;
+    // ВНИМАНИЕ ВЛАДЕЛЬЦУ: наличие в каталоге считается ТОЛЬКО по складу 'main'
+    // (repository.ts m5 — намеренный переход на main-only; показ наличия совпадает
+    // с резервом/заказом, которые тоже main-only). Ранее тест вставлял два склада
+    // ('a'/'b') и суммировал их — это отставший от контракта сценарий. Одна
+    // main-строка quantity=8/reserved=5 сохраняет прежние ассерты без правки
+    // прод-кода. Если мультисклад станет целевым контрактом — вернуть проверку.
     await sql`
       INSERT INTO inventory (product_id, variant_id, warehouse_code, quantity, reserved)
-      VALUES (${id}, NULL, 'a', 5, 2), (${id}, NULL, 'b', 3, 3)
+      VALUES (${id}, NULL, 'main', 8, 5)
     `;
 
     const { rows } = await listProducts({ search: sku, page: 1, pageSize: 5 });
     const found = rows.find((r) => r.id === id);
-    expect(found!.totalStock).toBe(8); // 5 + 3
-    expect(found!.availableStock).toBe(3); // (5−2) + max(3−3,0) = 3 + 0
+    expect(found!.totalStock).toBe(8); // sum(quantity) main-only = 8
+    expect(found!.availableStock).toBe(3); // GREATEST(8 − 5, 0) = 3
 
     await sql`DELETE FROM products WHERE id = ${id}`;
   });
