@@ -211,9 +211,17 @@ GRANT SELECT                 ON schema_migrations TO admik_app;
 -- Least-privilege (ADR-002/006): admik_migrator НЕ должен быть членом суперроли.
 -- Убираем возможный ручной dev-костыль `GRANT postgres TO admik_migrator`, который
 -- маскировал утечку владения таблицами (FK REFERENCES проходил лишь потому, что
--- migrator временно наследовал права суперпользователя). REVOKE несуществующего
--- членства — безвредный no-op (NOTICE «is not a member … skipping»).
-REVOKE postgres FROM admik_migrator;
+-- migrator временно наследовал права суперпользователя).
+-- ВАЖНО: REVOKE членства в НЕсуществующей роли — это ОШИБКА (не no-op) под
+-- ON_ERROR_STOP=1; роль суперпользователя называется `postgres` не во всех
+-- кластерах (в .env.example дефолт POSTGRES_USER=admik). Поэтому выполняем REVOKE
+-- только если роль `postgres` реально существует — иначе костыля и так быть не может.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+    EXECUTE 'REVOKE postgres FROM admik_migrator';
+  END IF;
+END $$;
 SQL
 then
   fail "Ошибка bootstrap БД (создание ролей/расширений суперпользователем)."
