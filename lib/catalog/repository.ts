@@ -11,6 +11,7 @@
 import { sql } from '@/lib/db/client';
 import { escapeLike } from '@/lib/db/like';
 import { getEffectiveSettings } from '@/lib/config/settings';
+import type { TranslationsMap } from '@/lib/i18n';
 import type {
   Attribute,
   AttributeValue,
@@ -27,6 +28,7 @@ import type {
   ProductStatus,
   ProductVariant,
 } from './types';
+import type { DesignerRef } from '@/lib/designers/types';
 import type { CategoryEdge } from './tree';
 import { discountPercent, isOnSale, resolveIsNew } from './pricing';
 
@@ -42,6 +44,26 @@ function asJson(v: any): Record<string, unknown> {
   if (typeof v === 'string') {
     try {
       return JSON.parse(v) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+/**
+ * Сырой jsonb-оверлей переводов → TranslationsMap (locale→{field→value}).
+ * Не-объект/массив/NULL → {} (locale-агностично; резолв — в DTO по ctx.locale).
+ */
+function asTranslations(v: any): TranslationsMap {
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    return v as TranslationsMap;
+  }
+  if (typeof v === 'string') {
+    try {
+      const parsed = JSON.parse(v);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as TranslationsMap)
+        : {};
     } catch {
       return {};
     }
@@ -93,9 +115,11 @@ export function mapCategory(row: any): Category {
     description: row.description ?? '',
     sort: Number(row.sort),
     isActive: Boolean(row.is_active),
+    imageKey: row.image_key ?? null,
     seoTitle: row.seo_title ?? null,
     seoDescription: row.seo_description ?? null,
     ...mapSeoFields(row),
+    translations: asTranslations(row.translations),
     createdAt: asDate(row.created_at),
     updatedAt: asDate(row.updated_at),
   };
@@ -120,11 +144,13 @@ export function mapProduct(row: any): Product {
         ? null
         : Boolean(row.is_new),
     brandId: row.brand_id ?? null,
+    designerId: row.designer_id ?? null,
     attributesCache: asJson(row.attributes_cache),
     seoTitle: row.seo_title ?? null,
     seoDescription: row.seo_description ?? null,
     ...mapSeoFields(row),
     ...mapDimsFields(row),
+    translations: asTranslations(row.translations),
     createdAt: asDate(row.created_at),
     updatedAt: asDate(row.updated_at),
   };
@@ -144,6 +170,20 @@ export function mapBrandRef(row: any): BrandRef | null {
   };
 }
 
+/** Маппер развёрнутого дизайнера из LEFT JOIN (префикс d_); null, если дизайнера нет. */
+export function mapDesignerRef(row: any): DesignerRef | null {
+  if (!row || row.d_id === null || row.d_id === undefined) {
+    return null;
+  }
+  return {
+    id: row.d_id,
+    slug: row.d_slug,
+    name: row.d_name,
+    // SQL JOIN отдаёт только d_image_key; URL резолвится в DTO/админке.
+    imageKey: row.d_image_key ?? null,
+  };
+}
+
 /** Полный маппер бренда (brands). */
 export function mapBrand(row: any): Brand {
   return {
@@ -155,9 +195,11 @@ export function mapBrand(row: any): Brand {
     logoKey: row.logo_key ?? null,
     isActive: Boolean(row.is_active),
     sort: Number(row.sort),
+    externalUrl: row.external_url ?? null,
     seoTitle: row.seo_title ?? null,
     seoDescription: row.seo_description ?? null,
     ...mapSeoFields(row),
+    translations: asTranslations(row.translations),
     createdAt: asDate(row.created_at),
     updatedAt: asDate(row.updated_at),
   };
@@ -181,6 +223,7 @@ export function mapVariant(row: any): ProductVariant {
     sort: Number(row.sort),
     attributesCache: asJson(row.attributes_cache),
     ...mapDimsFields(row),
+    translations: asTranslations(row.translations),
     createdAt: asDate(row.created_at),
     updatedAt: asDate(row.updated_at),
   };
@@ -272,9 +315,10 @@ export async function listCategoryEdges(): Promise<CategoryEdge[]> {
 /** Плоский список всех категорий (отсортирован для сборки дерева). */
 export async function listCategories(): Promise<Category[]> {
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, parent_id, slug, name, description, sort, is_active,
+    SELECT id, parent_id, slug, name, description, sort, is_active, image_key,
            seo_title, seo_description,
            og_title, og_description, og_image_key, canonical_url, noindex,
+           translations,
            created_at, updated_at
     FROM categories
     ORDER BY parent_id NULLS FIRST, sort, name
@@ -431,7 +475,7 @@ export async function listProducts(
   const rows = await sql<Record<string, unknown>[]>`
     SELECT
       p.id, p.sku, p.slug, p.name, p.status, p.base_price, p.created_at,
-      p.compare_at_price, p.is_featured, p.is_new, p.brand_id,
+      p.compare_at_price, p.is_featured, p.is_new, p.brand_id, p.translations,
       b.id AS b_id, b.slug AS b_slug, b.name AS b_name, b.logo_key AS b_logo_key,
       -- Остаток товара: строки вариантов всегда; строку уровня товара
       -- (variant_id IS NULL) учитываем ТОЛЬКО если у товара нет вариантов — иначе
@@ -491,6 +535,7 @@ export async function listProducts(
       totalStock: Number(r.total_stock ?? 0),
       availableStock: Number(r.available_stock ?? 0),
       primaryMediaUrl: r.primary_media_url ?? null,
+      translations: asTranslations(r.translations),
       createdAt,
     };
   });
@@ -504,14 +549,16 @@ export async function getProductById(
 ): Promise<ProductDetail | null> {
   const prodRows = await sql<Record<string, unknown>[]>`
     SELECT p.id, p.sku, p.slug, p.name, p.description, p.status, p.base_price,
-           p.compare_at_price, p.is_featured, p.is_new, p.brand_id,
+           p.compare_at_price, p.is_featured, p.is_new, p.brand_id, p.designer_id,
            p.attributes_cache, p.seo_title, p.seo_description,
            p.og_title, p.og_description, p.og_image_key, p.canonical_url, p.noindex,
-           p.weight_g, p.length_cm, p.width_cm, p.height_cm,
+           p.weight_g, p.length_cm, p.width_cm, p.height_cm, p.translations,
            p.created_at, p.updated_at,
-           b.id AS b_id, b.slug AS b_slug, b.name AS b_name, b.logo_key AS b_logo_key
+           b.id AS b_id, b.slug AS b_slug, b.name AS b_name, b.logo_key AS b_logo_key,
+           d.id AS d_id, d.slug AS d_slug, d.name AS d_name, d.image_key AS d_image_key
     FROM products p
     LEFT JOIN brands b ON b.id = p.brand_id
+    LEFT JOIN designers d ON d.id = p.designer_id
     WHERE p.id = ${id} LIMIT 1
   `;
   if (!prodRows[0]) {
@@ -519,6 +566,7 @@ export async function getProductById(
   }
   const product = mapProduct(prodRows[0]);
   const brand = mapBrandRef(prodRows[0]);
+  const designer = mapDesignerRef(prodRows[0]);
 
   const [catRows, variantRows, attrRows, mediaRows, invRows] = await Promise.all([
     sql<{ category_id: string; is_primary: boolean }[]>`
@@ -527,7 +575,8 @@ export async function getProductById(
     sql<Record<string, unknown>[]>`
       SELECT id, product_id, sku, name, price_override, price_delta,
              compare_at_price, is_active, sort, attributes_cache,
-             weight_g, length_cm, width_cm, height_cm, created_at, updated_at
+             weight_g, length_cm, width_cm, height_cm, translations,
+             created_at, updated_at
       FROM product_variants WHERE product_id = ${id} ORDER BY sort, name
     `,
     sql<Record<string, unknown>[]>`
@@ -556,6 +605,7 @@ export async function getProductById(
     media: mediaRows.map(mapMedia),
     inventory: invRows.map(mapInventory),
     brand,
+    designer,
   };
 }
 
@@ -628,9 +678,10 @@ export async function listBrands(
 ): Promise<Brand[]> {
   const activeOnly = opts.activeOnly ?? false;
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, slug, name, description, logo_key, is_active, sort,
+    SELECT id, slug, name, description, logo_key, is_active, sort, external_url,
            seo_title, seo_description,
            og_title, og_description, og_image_key, canonical_url, noindex,
+           translations,
            created_at, updated_at
     FROM brands
     WHERE (${activeOnly} = false OR is_active = true)
@@ -642,9 +693,10 @@ export async function listBrands(
 /** Бренд по id или null. */
 export async function getBrandById(id: string): Promise<Brand | null> {
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, slug, name, description, logo_key, is_active, sort,
+    SELECT id, slug, name, description, logo_key, is_active, sort, external_url,
            seo_title, seo_description,
            og_title, og_description, og_image_key, canonical_url, noindex,
+           translations,
            created_at, updated_at
     FROM brands WHERE id = ${id} LIMIT 1
   `;
@@ -654,9 +706,10 @@ export async function getBrandById(id: string): Promise<Brand | null> {
 /** Бренд по slug или null (для страницы бренда /brand/{slug}). */
 export async function getBrandBySlug(slug: string): Promise<Brand | null> {
   const rows = await sql<Record<string, unknown>[]>`
-    SELECT id, slug, name, description, logo_key, is_active, sort,
+    SELECT id, slug, name, description, logo_key, is_active, sort, external_url,
            seo_title, seo_description,
            og_title, og_description, og_image_key, canonical_url, noindex,
+           translations,
            created_at, updated_at
     FROM brands WHERE slug = ${slug} LIMIT 1
   `;

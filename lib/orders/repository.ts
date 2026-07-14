@@ -24,6 +24,7 @@ import { MAIN_WAREHOUSE } from '@/lib/catalog/types';
 import { fromMinor, normalizeMoney, toMinor } from './money';
 import { cartLineIssueMessage } from './cart-messages';
 import {
+  applyGiftCertificate,
   calculateQuote,
   effectiveUnitPriceMinor,
   emptyScopeTargets,
@@ -35,6 +36,11 @@ import {
   type QuoteResult,
 } from './pricing';
 import { validatePromo, type PromoValidationResult } from './promo';
+import { findByCode as findGiftByCode, redeemGiftTx } from '@/lib/gift-certificates/repository';
+import { certRemaining } from '@/lib/gift-certificates/balance';
+import { assertRedeemable } from '@/lib/gift-certificates/service';
+import { GiftCertificateError } from '@/lib/gift-certificates/errors';
+import type { GiftCertificate } from '@/lib/gift-certificates/types';
 import {
   computeDeliveryCost,
   DeliveryCalculationError,
@@ -133,6 +139,7 @@ export function mapOrder(row: Record<string, unknown>): Order {
     paymentRef: strOrNull(row.payment_ref),
     paymentProvider: strOrNull(row.payment_provider),
     deliveryType: row.delivery_type as Order['deliveryType'],
+    isPostamat: Boolean(row.is_postamat),
     deliveryStatus: row.delivery_status as Order['deliveryStatus'],
     deliveryCity: strOrNull(row.delivery_city),
     deliveryAddress: strOrNull(row.delivery_address),
@@ -142,6 +149,8 @@ export function mapOrder(row: Record<string, unknown>): Order {
     cdekTrack: strOrNull(row.cdek_track),
     promoCodeId: strOrNull(row.promo_code_id),
     promoCode: strOrNull(row.promo_code),
+    giftCertificateId: strOrNull(row.gift_certificate_id),
+    giftDiscountTotal: String(row.gift_discount_total ?? '0.00'),
     customerId: strOrNull(row.customer_id),
     customerName: String(row.customer_name),
     customerEmail: String(row.customer_email),
@@ -567,6 +576,8 @@ export interface QuoteCartResult {
   }>;
   /** Результат валидации промокода (если код передан). */
   promo: PromoValidationResult | null;
+  /** Результат применения подарочного сертификата (если код передан); null — код не передан. */
+  gift: GiftQuoteInfo | null;
   /** Достаточно ли остатка по всем позициям (можно оформлять). */
   fulfillable: boolean;
   /**
@@ -575,6 +586,65 @@ export interface QuoteCartResult {
    * и не даёт оформить — createOrder всё равно заблокирует, anti-undercharge).
    */
   deliveryResolved: boolean;
+}
+
+/**
+ * Итог применения подарочного сертификата к корзине/заказу (read-only для quote).
+ * СКРЫВАЕТ номинал/потрачено — отдаём только применённую сумму и остаток ПОСЛЕ.
+ */
+export interface GiftQuoteInfo {
+  /** Сертификат реально уменьшил сумму к оплате (appliedAmount > 0). */
+  applied: boolean;
+  /** Эхо переданного кода (для UI). */
+  code: string;
+  /** Списано сертификатом = min(остаток, нетто-товары после промо), СЕРВЕР (anti-tamper). */
+  appliedAmount: string;
+  /** Остаток сертификата ПОСЛЕ применения (для UI «останется N ₽»). */
+  balanceRemainingAfter: string;
+  /** Машиночитаемая причина, если не применён (код GiftErrorCode); null — применён. */
+  reason: string | null;
+}
+
+/**
+ * SOFT-резолв подарочного сертификата для quote (docs/24 §5): находит по коду,
+ * валидирует применимость (active/не-истёк/остаток), считает applied =
+ * min(остаток, нетто-товары после промо). НЕ декрементирует баланс (списание —
+ * redeemGiftTx в createOrder). Ошибки НЕ бросает: невалидный код → applied=false
+ * + машиночитаемый reason (как промокод в quote), корзина не роняется.
+ */
+async function resolveGiftForQuote(
+  code: string,
+  quote: QuoteResult,
+  now: Date,
+): Promise<GiftQuoteInfo> {
+  const notApplied = (reason: string): GiftQuoteInfo => ({
+    applied: false,
+    code,
+    appliedAmount: fromMinor(0),
+    balanceRemainingAfter: fromMinor(0),
+    reason,
+  });
+
+  const cert = await findGiftByCode(code);
+  if (!cert) return notApplied('not_found');
+  try {
+    assertRedeemable(cert, now);
+  } catch (e) {
+    if (e instanceof GiftCertificateError) return notApplied(e.code);
+    throw e;
+  }
+
+  const applied = applyGiftCertificate(quote, certRemaining(cert));
+  const appliedMinor = toMinor(applied.giftDiscount);
+  const remainingAfterMinor = Math.max(0, toMinor(certRemaining(cert)) - appliedMinor);
+  return {
+    applied: appliedMinor > 0,
+    code,
+    appliedAmount: applied.giftDiscount,
+    balanceRemainingAfter: fromMinor(remainingAfterMinor),
+    // appliedMinor===0 (нечего покрывать: нетто 0) — сертификат валиден, но эффекта нет.
+    reason: appliedMinor > 0 ? null : 'no_amount_due',
+  };
 }
 
 /**
@@ -696,6 +766,13 @@ export async function quoteCart(
     }
   }
 
+  // Подарочный сертификат (§5): SOFT-резолв поверх итога (стекается ПОСЛЕ промо, к
+  // нетто-товарам; доставку не покрывает). Read-only — баланс не декрементируется.
+  let gift: GiftQuoteInfo | null = null;
+  if (input.giftCertificateCode) {
+    gift = await resolveGiftForQuote(input.giftCertificateCode, quote, input.now ?? new Date());
+  }
+
   const fulfillable =
     issues.length === 0 && lines.length === input.items.length && lines.length > 0;
 
@@ -704,6 +781,7 @@ export async function quoteCart(
     currency,
     issues,
     promo: promoResult,
+    gift,
     fulfillable,
     deliveryResolved: delivery.resolved,
   };
@@ -810,6 +888,15 @@ export interface CreateOrderContext {
   ip?: string | null;
   actorUserId?: string | null;
   now?: Date;
+  /**
+   * ID покупателя из ВАЛИДНОЙ СЕРВЕРНОЙ сессии (customer-auth, docs/24 §6, 7b).
+   * Резолвится роутом/экшеном ИЗ СЕССИИ (cookie/Bearer), НИКОГДА из тела запроса —
+   * иначе покупатель подставил бы чужой customer_id и присвоил чужие заказы.
+   * Гость (нет валидной сессии) → undefined/null → orders.customer_id = NULL как
+   * раньше. FK orders.customer_id → customers(id) (0013) гарантирует ссылочную
+   * целостность (несуществующий id упал бы на INSERT).
+   */
+  customerId?: string | null;
 }
 
 /**
@@ -839,6 +926,7 @@ export type CreateOrderResult =
         | 'out_of_stock'
         | 'invalid_item'
         | 'invalid_promo'
+        | 'invalid_gift'
         | 'delivery_unavailable'
         | 'payments_disabled';
       message: string;
@@ -975,6 +1063,41 @@ export async function createOrder(
   // C6-3) — иначе лимит съедался бы по giftLine!=null, даже если подарок не выдан.
   const giftLine: ResolvedLine | null = promoRow ? await resolveGiftLine(promoRow) : null;
 
+  // Подарочный СЕРТИФИКАТ (§5): пред-резолв ДО транзакции (чтение). Сумма списания
+  // считается СЕРВЕРОМ = min(остаток, нетто-товары после промо) — anti-tamper, тело
+  // запроса игнорируется. ПРЕДпроверка (найден/active/не-истёк) даёт быстрый отказ;
+  // РЕАЛЬНОЕ атомарное списание (FOR UPDATE + guarded UPDATE) — redeemGiftTx в
+  // транзакции ниже (анти-TOCTOU/гонка двух заказов). Итог к оплате уменьшается на
+  // giftDiscount; доставку сертификат НЕ покрывает (grandTotal ≥ deliveryCost ≥ 0).
+  let giftCert: GiftCertificate | null = null;
+  let giftDiscount = fromMinor(0);
+  let finalGrandTotal = quote.grandTotal;
+  if (input.giftCertificateCode) {
+    giftCert = await findGiftByCode(input.giftCertificateCode);
+    if (!giftCert) {
+      return { ok: false, code: 'invalid_gift', message: 'Подарочный сертификат не найден.' };
+    }
+    try {
+      assertRedeemable(giftCert, now);
+    } catch (e) {
+      if (e instanceof GiftCertificateError) {
+        return { ok: false, code: 'invalid_gift', message: e.message };
+      }
+      throw e;
+    }
+    const g = applyGiftCertificate(quote, certRemaining(giftCert));
+    giftDiscount = g.giftDiscount;
+    finalGrandTotal = g.grandTotal;
+  }
+  // Сертификат «применяется» только если реально уменьшает сумму (нетто > 0). Нулевой
+  // эффект (нечего покрывать) → не списываем и не привязываем сертификат к заказу.
+  const giftApplies = toMinor(giftDiscount) > 0;
+  // ПОЛНОЕ покрытие: к оплате 0 (товары+доставка покрыты/самовывоз) → онлайн-шлюз не
+  // нужен, платёж помечаем manual/paid сразу (провайдер без шлюза, docs/24 §5 COVERAGE).
+  const fullyGiftCovered = giftApplies && toMinor(finalGrandTotal) === 0;
+  const giftCertId = giftApplies ? giftCert!.id : null;
+  const giftDiscountTotal = giftApplies ? giftDiscount : fromMinor(0);
+
   try {
     const order = await sql.begin(async (tx) => {
       // Повторная проверка идемпотентности внутри транзакции (гонка двух запросов).
@@ -1058,20 +1181,31 @@ export async function createOrder(
       // 3) Номер заказа (атомарно).
       const number = await nextOrderNumber(tx, now);
 
-      // 4) Вставка заголовка заказа (суммы — серверные, ADR-010).
+      // 4) Вставка заголовка заказа (суммы — серверные, ADR-010). grand_total —
+      //    ПОСЛЕ сертификата (finalGrandTotal); gift_certificate_id/gift_discount_total —
+      //    снимок применения. При ПОЛНОМ покрытии (к оплате 0) платёж сразу paid+manual
+      //    (онлайн-шлюз не нужен). Иначе pending (остаток платит выбранный шлюз/COD).
+      const paymentStatus = fullyGiftCovered ? 'paid' : 'pending';
+      const paymentProvider = fullyGiftCovered ? 'manual' : null;
+      const paidAt = fullyGiftCovered ? now : null;
       const [orderRow] = await tx<Record<string, unknown>[]>`
         INSERT INTO orders (
           number, status, items_total, discount_total, delivery_total, grand_total,
-          currency, payment_method, payment_status, delivery_type, delivery_city,
+          currency, payment_method, payment_status, payment_provider, paid_at,
+          delivery_type, is_postamat, delivery_city,
           delivery_address, delivery_pvz_code, delivery_cost, promo_code_id, promo_code,
-          customer_name, customer_email, customer_phone, comment, idempotency_key,
+          gift_certificate_id, gift_discount_total,
+          customer_id, customer_name, customer_email, customer_phone, comment, idempotency_key,
           source, ip
         ) VALUES (
           ${number}, 'new', ${quote.itemsTotal}, ${quote.discount}, ${quote.deliveryCost},
-          ${quote.grandTotal}, ${env.SHOP_CURRENCY}, ${input.paymentMethod}, 'pending',
-          ${input.delivery.type}, ${input.delivery.city ?? null},
+          ${finalGrandTotal}, ${env.SHOP_CURRENCY}, ${input.paymentMethod}, ${paymentStatus},
+          ${paymentProvider}, ${paidAt},
+          ${input.delivery.type}, ${input.delivery.isPostamat ?? false}, ${input.delivery.city ?? null},
           ${input.delivery.address ?? null}, ${input.delivery.pvzCode ?? null},
           ${quote.deliveryCost}, ${promoRow?.id ?? null}, ${appliedPromo?.code ?? null},
+          ${giftCertId}, ${giftDiscountTotal},
+          ${ctx.customerId ?? null},
           ${input.customer.name}, ${input.customer.email}, ${input.customer.phone},
           ${input.comment ?? ''}, ${input.idempotencyKey ?? null}, ${source}, ${ctx.ip ?? null}
         )
@@ -1126,6 +1260,24 @@ export async function createOrder(
         `;
       }
 
+      // 6c) Подарочный СЕРТИФИКАТ (§5) — АТОМАРНОЕ списание баланса В ТОЙ ЖЕ
+      //     транзакции (redeemGiftTx: SELECT ... FOR UPDATE + guarded UPDATE +
+      //     идемпотентный INSERT леджера). Сумма — СЕРВЕРНАЯ (giftDiscount, из
+      //     applyGiftCertificate). Гонка/исчерпание между пред-резолвом и
+      //     транзакцией → GiftOverspendError → throw → ROLLBACK всего заказа
+      //     (консистентный безопасный путь: заказ НЕ создаётся, баланс не в минус;
+      //     покупатель переоформит по актуальному остатку). Идемпотентный повтор
+      //     заказа сюда НЕ доходит — dup-check выше возвращает существующий заказ,
+      //     так что status-гвард redeemGiftTx (стоит до ON CONFLICT) не срабатывает
+      //     на исчерпанном сертификате повторного сабмита (заметка 4a).
+      if (giftApplies) {
+        await redeemGiftTx(tx, {
+          certificateId: giftCert!.id,
+          orderId,
+          amount: giftDiscount,
+        });
+      }
+
       // 7) Начальная запись истории статуса.
       await tx`
         INSERT INTO order_status_history (order_id, kind, from_status, to_status, actor_user_id, comment)
@@ -1148,6 +1300,19 @@ export async function createOrder(
         ok: false,
         code: 'invalid_promo',
         message: 'Лимит промокода на одного покупателя исчерпан.',
+      };
+    }
+    // Сертификат исчерпан/недоступен между пред-резолвом и атомарным списанием
+    // (redeemGiftTx: GiftOverspendError ⊂ GiftCertificateError) → заказ НЕ создан
+    // (ROLLBACK). Безопасный консистентный путь: баланс не в минус, покупатель
+    // переоформит по актуальному остатку. 422 (route мапит non-out_of_stock).
+    if (err instanceof GiftCertificateError) {
+      return {
+        ok: false,
+        code: 'invalid_gift',
+        message:
+          'Не удалось применить подарочный сертификат: баланс изменился. ' +
+          'Обновите корзину и попробуйте снова.',
       };
     }
     // BUG #2 (reliability): гонка идемпотентного создания. Предтранзакционная

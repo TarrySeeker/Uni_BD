@@ -9,9 +9,10 @@
 -- Системные роли (is_system = true, неудаляемы, code неизменяем):
 --   * owner   — пользователь-владелец (is_owner). Явных прав НЕТ: проверка
 --               короткозамкнута в can() (§5.4), роль — лишь маркер для seed/UI.
---   * admin   — все права (core/catalog/orders/cms/cdek).
+--   * admin   — все права ALL_PERMISSIONS (core/catalog/orders/cms/cdek/news/
+--               reviews/account/i18n).
 --   * manager — операционный набор: orders.read/write, catalog.read,
---               cdek.manage, audit.read.
+--               cdek.manage, audit.read, reviews.read/write, customers.read.
 --
 -- ВАЖНО про порядок: этот файл накатывается ПОСЛЕ permissions.sql, т.к.
 -- role_permissions ссылается на permissions(code) (FK) и берёт коды подзапросом.
@@ -50,7 +51,17 @@ WHERE r.code = 'admin'
     'orders.write',
     'cdek.manage',
     'cms.read',
-    'cms.write'
+    'cms.write',
+    'news.read',
+    'news.write',
+    'reviews.read',
+    'reviews.write',
+    'gift.read',
+    'gift.write',
+    'customers.read',
+    'customers.write',
+    'i18n.read',
+    'i18n.manage'
   )
 ON CONFLICT (role_id, permission_code) DO NOTHING;
 
@@ -67,7 +78,10 @@ WHERE r.code = 'manager'
     'orders.write',
     'catalog.read',
     'cdek.manage',
-    'audit.read'
+    'audit.read',
+    'reviews.read',
+    'reviews.write',
+    'customers.read'
   )
 ON CONFLICT (role_id, permission_code) DO NOTHING;
 

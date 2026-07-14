@@ -96,6 +96,21 @@ const envSchema = z.object({
   SHOP_ORDER_PREFIX: z.string().default(''),
 
   // ---------------------------------------------------------------------------
+  // ЛК покупателя (customer-auth, docs/24 §6, шаг 7b).
+  // ---------------------------------------------------------------------------
+  // Требуется ли ПОДТВЕРЖДЁННЫЙ email покупателя, чтобы привязать его ПРОШЛЫЕ
+  // гостевые заказы (customer_id IS NULL, тот же email) к аккаунту. Дефолт true
+  // (ASSUMED §11): линковка ТОЛЬКО после верификации email — закрывает
+  // account-takeover (first-to-register с чужим email не присвоит чужую историю,
+  // low из 7a). Владелец МОЖЕТ выключить (false) — тогда линковка происходит сразу
+  // при регистрации/апгрейде гостя (магазин доверяет владению email на этапе заказа).
+  // coerce: 'true'/'1'/'false'/'0' из строки env → boolean.
+  CUSTOMER_EMAIL_VERIFICATION_REQUIRED: z
+    .enum(['true', 'false', '1', '0'])
+    .default('true')
+    .transform((v) => v === 'true' || v === '1'),
+
+  // ---------------------------------------------------------------------------
   // СДЭК (Этап 4, docs/08 §13.2). ВСЕ переменные опциональны: при пустых
   // CDEK_ACCOUNT/CDEK_SECRET модуль работает в MOCK-режиме (см. lib/cdek/config.ts
   // isCdekMock). Это позволяет demo-магазину и CI работать без боевых ключей.
@@ -185,6 +200,38 @@ const envSchema = z.object({
     .transform((v) => v === 'true' || v === '1'),
   // Срок жизни ссылки/QR оплаты (минуты) → Init.RedirectDueDate.
   TBANK_REDIRECT_DUE_MIN: z.coerce.number().int().min(1).default(60),
+
+  // ---------------------------------------------------------------------------
+  // PAYKEEPER ИНВОЙСНЫЙ ЭКВАЙРИНГ (docs/24 §2). ВСЕ переменные опциональны:
+  // при пустых PAYKEEPER_LOGIN/PAYKEEPER_PASSWORD модуль работает в MOCK-режиме
+  // (см. lib/payments/paykeeper/config.ts isPaykeeperMock) — demo/CI без боевого
+  // эквайера. Два секрета: Basic-Auth (LOGIN/PASSWORD, серверное API) и секретное
+  // слово (SECRET, подпись колбэка md5(id+sum+clientid+orderid+secret)).
+  // ---------------------------------------------------------------------------
+  // Базовый URL сервера эквайринга PayKeeper (напр. https://<shop>.server.paykeeper.ru).
+  PAYKEEPER_BASE_URL: z.string().url().default('https://demo.paykeeper.ru'),
+  // Логин/пароль Basic-Auth серверного API. ПУСТО → mock.
+  PAYKEEPER_LOGIN: z.string().optional(),
+  PAYKEEPER_PASSWORD: z.string().optional(),
+  // Секретное слово для подписи колбэка (Личный кабинет → «Получение информации о платежах»).
+  PAYKEEPER_SECRET: z.string().optional(),
+  // service_name счёта (уходит в банк/чек, не в UI).
+  PAYKEEPER_SERVICE_NAME: z.string().default('Sale'),
+  // Ставка НДС позиции по умолчанию для чека (vat0|vat10|vat20|none|…).
+  PAYKEEPER_DEFAULT_TAX: z.string().default('vat20'),
+  // Язык, уходящий в service_name счёта.
+  PAYKEEPER_LANG: z.string().default('ru'),
+  // Доп. IP/CIDR whitelist колбэка (csv); главная защита — подпись. Пусто допустимо.
+  PAYKEEPER_WEBHOOK_IPS: z.string().optional(),
+  // Доверять прокси-заголовку IP (за Caddy).
+  PAYKEEPER_WEBHOOK_TRUST_PROXY: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+
+  // Активный платёжный провайдер витрины (выбор эквайера по конфигу магазина).
+  // Один активный online-эквайер на магазин (docs/24 §2). Дефолт — tbank.
+  PAYMENTS_PROVIDER: z.enum(['tbank', 'paykeeper', 'manual']).default('tbank'),
 });
 
 export type Env = z.infer<typeof envSchema>;

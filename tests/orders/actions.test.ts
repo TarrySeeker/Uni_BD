@@ -92,6 +92,25 @@ const H = vi.hoisted(() => {
         skipped: false,
       }),
     ),
+    // Шлюзовой возврат PayKeeper (ADR-P1-3): dispatchRefund маршрутизирует сюда при
+    // provider='paykeeper'. По умолчанию — MVP skipped:'manual'.
+    paykeeperRefundMock: vi.fn(
+      async (
+        ..._args: unknown[]
+      ): Promise<{
+        ok: boolean;
+        status: string | null;
+        isMock: boolean;
+        skipped?: boolean;
+        reason?: string;
+      }> => ({
+        ok: true,
+        status: null,
+        isMock: true,
+        skipped: true,
+        reason: 'manual',
+      }),
+    ),
     getCurrentUserMock: vi.fn(async () => state.currentUser),
     getOrderByIdMock: vi.fn(async (..._args: unknown[]) => state.getOrderByIdQueue.shift() ?? null),
     releaseReservationMock: vi.fn(async (..._args: unknown[]) => true),
@@ -109,6 +128,7 @@ const {
   sqlMock,
   writeAuditSpy,
   refundPaymentMock,
+  paykeeperRefundMock,
   getCurrentUserMock,
   getOrderByIdMock,
   releaseReservationMock,
@@ -170,6 +190,15 @@ vi.mock('@/lib/payments/tbank', () => ({
   toKopecks: (v: string | number) => Math.round(Number(v) * 100),
 }));
 
+// PayKeeper-сервис (ADR-P1-3): dispatchRefund зовёт его при provider='paykeeper'.
+vi.mock('@/lib/payments/paykeeper', () => ({
+  PaymentService: class {
+    refundPayment(...a: unknown[]) {
+      return H.paykeeperRefundMock(...(a as []));
+    }
+  },
+}));
+
 // Импорт actions ПОСЛЕ моков.
 import {
   changeOrderStatus,
@@ -229,6 +258,8 @@ beforeEach(() => {
   createOrderMock.mockClear();
   refundPaymentMock.mockClear();
   refundPaymentMock.mockResolvedValue({ ok: true, status: 'REFUNDED', isMock: true, skipped: false });
+  paykeeperRefundMock.mockClear();
+  paykeeperRefundMock.mockResolvedValue({ ok: true, status: null, isMock: true, skipped: true, reason: 'manual' });
 });
 
 afterEach(() => {
@@ -1284,24 +1315,62 @@ describe('refundOrder: шлюзовой возврат Т-Банка', () => {
     expect(writeAuditSpy).not.toHaveBeenCalled();
   });
 
-  it('COD/manual (provider!=tbank): refundPayment вернул skipped → переход всё равно идёт', async () => {
-    refundPaymentMock.mockResolvedValueOnce({
-      ok: true,
-      status: null,
-      isMock: true,
-      skipped: true,
-      reason: 'no_gateway',
-    });
+  it('COD/NULL provider (ADR-P1-3): tbank НЕ вызывается, внутренний сетл всё равно идёт', async () => {
+    // Новый контракт диспетчера: NULL provider (COD/офлайн) НЕ маршрутизируется в
+    // tbank (иначе Cancel по чужому PaymentId), но внутренний сетл возврата работает.
     H.state.getOrderByIdQueue = [
       orderDetail({ status: 'paid', paymentStatus: 'pending', paymentProvider: null, grandTotal: '500.00' }),
       orderDetail({ status: 'refunded', paymentStatus: 'pending', paymentProvider: null }),
     ];
     const res = await refundOrder({ id: UUID });
     expect(res.ok).toBe(true);
-    expect(refundPaymentMock).toHaveBeenCalledTimes(1);
-    const arg = refundPaymentMock.mock.calls[0]![0] as Record<string, unknown>;
-    expect(arg.paymentProvider).toBeNull();
+    // Шлюз tbank НЕ дёргался для NULL-провайдера (ключевое отличие ADR-P1-3).
+    expect(refundPaymentMock).not.toHaveBeenCalled();
     // Внутренний сетл всё равно отработал: резерв paid→refunded освобождён.
     expect(releaseReservationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('paykeeper: dispatchRefund зовёт PayKeeper-сервис (НЕ tbank), переход идёт', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({
+        status: 'paid',
+        paymentStatus: 'paid',
+        paymentProvider: 'paykeeper',
+        paymentRef: 'inv-42',
+        grandTotal: '700.00',
+      }),
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'paykeeper' }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(true);
+    // Маршрут: PayKeeper вызван, tbank НЕ вызван (не перепутали шлюз).
+    expect(paykeeperRefundMock).toHaveBeenCalledTimes(1);
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+    const arg = paykeeperRefundMock.mock.calls[0]![0] as Record<string, unknown>;
+    expect(arg).toMatchObject({ paymentProvider: 'paykeeper', paymentRef: 'inv-42', amountKop: 70000 });
+    // Внутренний сетл возврата отработал (paid→refunded, резерв держится → release).
+    expect(releaseReservationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('неизвестный НЕ-null провайдер → validation, НИ один шлюз не вызван, перехода нет', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({
+        status: 'paid',
+        paymentStatus: 'paid',
+        paymentProvider: 'stripe',
+        paymentRef: 'x',
+        grandTotal: '100.00',
+      }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+    // Безопасность: НЕ дефолтим в tbank и не зовём paykeeper для неизвестного провайдера.
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+    expect(paykeeperRefundMock).not.toHaveBeenCalled();
+    // Возврат отклонён ДО транзакции перехода.
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+    expect(releaseReservationMock).not.toHaveBeenCalled();
   });
 });

@@ -63,6 +63,14 @@ export const MAX_CART_ITEMS = 200;
 /** Промокод (citext в БД): непустой, без пробелов по краям, до 64 символов. */
 export const promoCodeSchema = z.string().trim().min(1).max(64);
 
+/**
+ * Код подарочного сертификата (§5). Стекается ОТДЕЛЬНО от promoCode (промокод →
+ * gift к остатку). Форма совпадает с giftCodeSchema (lib/gift-certificates), но
+ * задаётся здесь локально во избежание циклического импорта orders↔gift-certificates
+ * (gift-certificates/schemas импортирует moneySchema из этого модуля).
+ */
+export const giftCertificateCodeSchema = z.string().trim().min(1).max(64);
+
 /** Контакты покупателя (гостевой чекаут — хранятся в заказе). */
 export const customerContactSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -88,6 +96,12 @@ export const deliverySelectionSchema = z
     cityCode: z.number().int().positive().optional(),
     address: z.string().trim().max(500).optional(),
     pvzCode: z.string().trim().max(64).optional(),
+    /**
+     * Постамат (§9): подвид ПВЗ с автоматической выдачей. Отдельным типом не
+     * моделируется (CHECK delivery_type не трогаем) — флаг поверх type='pvz'.
+     * Опционален (обратная совместимость: старая витрина его не шлёт → false).
+     */
+    isPostamat: z.boolean().optional(),
   })
   .superRefine((val, ctx) => {
     if (val.type === 'pvz' && !val.pvzCode) {
@@ -124,6 +138,8 @@ export const CartQuoteSchema = z.object({
     .min(1, 'Корзина пуста.')
     .max(MAX_CART_ITEMS, `Слишком много позиций (максимум ${MAX_CART_ITEMS}).`),
   promoCode: promoCodeSchema.optional(),
+  /** Код подарочного сертификата — стекается поверх промокода к остатку (§5). */
+  giftCertificateCode: giftCertificateCodeSchema.optional(),
   delivery: deliverySelectionSchema.optional(),
 });
 export type CartQuoteInput = z.infer<typeof CartQuoteSchema>;
@@ -147,6 +163,8 @@ const createOrderShape = {
   delivery: deliverySelectionSchema,
   paymentMethod: z.enum(PAYMENT_METHODS),
   promoCode: promoCodeSchema.optional(),
+  /** Код подарочного сертификата — списывается атомарно в транзакции заказа (§5). */
+  giftCertificateCode: giftCertificateCodeSchema.optional(),
   comment: z.string().trim().max(2000).optional(),
   /** Ключ идемпотентности (обычно из заголовка Idempotency-Key). */
   idempotencyKey: z.string().trim().min(1).max(200).optional(),

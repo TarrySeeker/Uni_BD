@@ -15,6 +15,8 @@
  */
 
 import { buildSeoMeta, type SeoCtx } from '@/lib/seo/meta';
+import { localizeStructured, CMS_PAGE_TR_FIELDS } from '@/lib/i18n';
+import { localizeEntity, type LocalizeCtx } from './locale';
 import type { SeoMetaDto, PublicUrlResolver } from './dto';
 import type {
   CmsPage,
@@ -22,6 +24,10 @@ import type {
   CmsSection,
   CmsSectionType,
 } from '@/lib/cms/types';
+
+// Whitelist переводимых полей CMS-страницы (title + SEO/OG) — единый источник
+// lib/i18n/fields (CMS_PAGE_TR_FIELDS), общий с write-path. Контент секций
+// локализуется отдельно (структурный deep-merge через localizeStructured).
 
 /** Публичная секция: только дискриминатор type + валидированный content. */
 export interface PublicSectionDto {
@@ -129,10 +135,22 @@ function resolveSectionMedia(
 function toPublicSectionDto(
   section: CmsSection,
   publicUrl: PublicUrlResolver,
+  loc?: LocalizeCtx,
 ): PublicSectionDto {
+  // Структурная локализация контента секции: per-locale патч deep-merge'ится в
+  // базовый content (только изменённые строки; структурные ключи type/section_key/
+  // order из патча не приходят). При loc===undefined или default-locale — база.
+  const content = loc
+    ? (localizeStructured(
+        section.content,
+        section.translations ?? null,
+        loc.locale,
+        loc.defaultLocale,
+      ) as Record<string, unknown>)
+    : section.content;
   return {
     type: section.type,
-    content: resolveSectionMedia(section.type, section.content, publicUrl),
+    content: resolveSectionMedia(section.type, content, publicUrl),
   };
 }
 
@@ -146,7 +164,10 @@ export function toPublicPageDto(
   page: CmsPageWithSections,
   seoCtx: SeoCtx,
   publicUrl: PublicUrlResolver = seoCtx.publicUrl,
+  loc?: LocalizeCtx,
 ): PublicPageDto {
+  // Локализуем заголовок/SEO страницы; секции — структурно (см. toPublicSectionDto).
+  const lp = localizeEntity(page, CMS_PAGE_TR_FIELDS, loc);
   const sections = page.sections
     .filter((s) => s.enabled)
     .slice()
@@ -155,12 +176,12 @@ export function toPublicPageDto(
         ? a.displayOrder - b.displayOrder
         : a.id.localeCompare(b.id),
     )
-    .map((s) => toPublicSectionDto(s, publicUrl));
+    .map((s) => toPublicSectionDto(s, publicUrl, loc));
 
   return {
-    slug: page.slug,
-    title: page.title,
-    meta: pageMeta(page, seoCtx),
+    slug: lp.slug,
+    title: lp.title,
+    meta: pageMeta(lp, seoCtx),
     sections,
   };
 }
@@ -169,10 +190,12 @@ export function toPublicPageDto(
 export function toPublicPageListItemDto(
   page: CmsPage,
   seoCtx: SeoCtx,
+  loc?: LocalizeCtx,
 ): PublicPageListItemDto {
+  const lp = localizeEntity(page, CMS_PAGE_TR_FIELDS, loc);
   return {
-    slug: page.slug,
-    title: page.title,
-    meta: pageMeta(page, seoCtx),
+    slug: lp.slug,
+    title: lp.title,
+    meta: pageMeta(lp, seoCtx),
   };
 }

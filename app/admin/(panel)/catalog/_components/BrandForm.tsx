@@ -13,6 +13,13 @@ import {
 import { errorMessage, fieldError } from './action-result';
 import type { ActionResult } from '@/lib/server/action';
 import { SeoFieldset, type SeoFieldsetValue } from '../../_components/SeoFieldset';
+import {
+  LocaleTabs,
+  CATALOG_ENTITY_TR_FIELD_DEFS,
+  toTranslationsState,
+  translationsPayload,
+  type TranslationsState,
+} from '../../_components/LocaleTabs';
 
 /**
  * Форма бренда (docs/06 §3.3, П4.4). Создание/редактирование + загрузка лого.
@@ -27,10 +34,23 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
  */
 export type BrandFormBrand = Brand & { logoUrl?: string | null };
 
-export function BrandForm({ brand }: { brand: BrandFormBrand | null }) {
+export function BrandForm({
+  brand,
+  locales = ['ru'],
+  defaultLocale = 'ru',
+}: {
+  brand: BrandFormBrand | null;
+  /** Включённые языки магазина (shop_settings.i18n.locales). */
+  locales?: readonly string[];
+  /** Язык по умолчанию (база = обычные колонки). */
+  defaultLocale?: string;
+}) {
   const router = useRouter();
   const isEdit = brand !== null;
   const fileRef = useRef<HTMLInputElement>(null);
+  const [translations, setTranslations] = useState<TranslationsState>(
+    toTranslationsState(brand?.translations),
+  );
 
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -39,6 +59,7 @@ export function BrandForm({ brand }: { brand: BrandFormBrand | null }) {
   const [name, setName] = useState(brand?.name ?? '');
   const [slug, setSlug] = useState(brand?.slug ?? '');
   const [description, setDescription] = useState(brand?.description ?? '');
+  const [externalUrl, setExternalUrl] = useState(brand?.externalUrl ?? '');
   const [isActive, setIsActive] = useState(brand?.isActive ?? true);
   const [seo, setSeo] = useState<SeoFieldsetValue>({
     seoTitle: brand?.seoTitle ?? '',
@@ -58,6 +79,8 @@ export function BrandForm({ brand }: { brand: BrandFormBrand | null }) {
       name: name.trim(),
       slug: slug.trim() || undefined,
       description,
+      // §9: внешний сайт бренда. Пусто → undefined (create/update: не трогаем).
+      externalUrl: externalUrl.trim() || undefined,
       isActive,
       seoTitle: seo.seoTitle.trim() || undefined,
       seoDescription: seo.seoDescription.trim() || undefined,
@@ -71,7 +94,12 @@ export function BrandForm({ brand }: { brand: BrandFormBrand | null }) {
       noindex: seo.noindex,
     };
     const result = isEdit
-      ? await updateBrandAction({ id: brand!.id, ...payload, ...seoExtra })
+      ? await updateBrandAction({
+          id: brand!.id,
+          ...payload,
+          ...seoExtra,
+          translations: translationsPayload(translations),
+        })
       : await createBrandAction(payload);
     setPending(false);
     if (result.ok) {
@@ -125,6 +153,16 @@ export function BrandForm({ brand }: { brand: BrandFormBrand | null }) {
         </div>
       ) : null}
 
+      <LocaleTabs
+        locales={locales}
+        defaultLocale={defaultLocale}
+        fields={CATALOG_ENTITY_TR_FIELD_DEFS}
+        value={translations}
+        onChange={setTranslations}
+        enabled={isEdit}
+        pending={pending}
+        onSave={save}
+      >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <label htmlFor="b-name" className="block text-sm font-medium text-gray-700">Название*</label>
@@ -143,6 +181,13 @@ export function BrandForm({ brand }: { brand: BrandFormBrand | null }) {
           <label htmlFor="b-desc" className="block text-sm font-medium text-gray-700">Описание</label>
           <textarea id="b-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div className="lg:col-span-2">
+          <label htmlFor="b-ext-url" className="block text-sm font-medium text-gray-700">Внешний сайт бренда</label>
+          <input id="b-ext-url" type="url" value={externalUrl} onChange={(e) => setExternalUrl(e.target.value)}
+            placeholder="https://brand.example.com"
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          {fe('externalUrl') ? <p className="mt-1 text-xs text-red-600">{fe('externalUrl')}</p> : null}
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
@@ -205,6 +250,7 @@ export function BrandForm({ brand }: { brand: BrandFormBrand | null }) {
           </div>
         </div>
       ) : null}
+      </LocaleTabs>
     </div>
   );
 }

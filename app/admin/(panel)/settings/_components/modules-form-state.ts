@@ -25,6 +25,9 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   cdek: 'Доставка (СДЭК)',
   cms: 'Контент (CMS)',
   payments: 'Оплата (Т-Банк)',
+  news: 'Новости',
+  reviews: 'Отзывы',
+  account: 'Личный кабинет покупателя',
 };
 
 /** Ключи ядра, исключаемые из формы (always-on). Сейчас пуст. */

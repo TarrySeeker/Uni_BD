@@ -5,7 +5,8 @@
  *   POST|GET /api/cron/payments/<task>?key=<CRON_SECRET>
  *   либо заголовок X-Cron-Secret: <CRON_SECRET>
  *
- * <task> ∈ { reconcile-pending } — сверка статуса оплаты по «зависшим» tbank-заказам.
+ * <task> ∈ { reconcile-pending, reconcile-pending-paykeeper } — сверка статуса
+ * оплаты по «зависшим» заказам соответствующего эквайера (tbank / paykeeper).
  *
  * Защита (как /api/cron/cdek):
  *   • cron-секрет не задан → 503 (роут выключен, не работаем открытым);
@@ -21,17 +22,20 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getCdekConfig } from '@/lib/cdek/config';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { runReconcilePending } from '@/lib/payments/tbank/cron';
+import { runReconcilePending as runReconcilePendingPaykeeper } from '@/lib/payments/paykeeper/cron';
 import { extractCronSecret, cronSecretMatches } from '@/lib/cron/secret';
 
 export const dynamic = 'force-dynamic';
 
-const TASKS = ['reconcile-pending'] as const;
+const TASKS = ['reconcile-pending', 'reconcile-pending-paykeeper'] as const;
 type CronTask = (typeof TASKS)[number];
 
 async function dispatch(task: CronTask): Promise<unknown> {
   switch (task) {
     case 'reconcile-pending':
       return runReconcilePending();
+    case 'reconcile-pending-paykeeper':
+      return runReconcilePendingPaykeeper();
   }
 }
 

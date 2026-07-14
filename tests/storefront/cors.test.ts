@@ -26,6 +26,24 @@ describe('storefront/cors — buildCorsHeaders', () => {
     expect(h.Vary).toBeUndefined();
     expect(h['Access-Control-Allow-Credentials']).toBeUndefined();
   });
+
+  it('credentials:false → эхо origin + Vary, но БЕЗ Allow-Credentials (account/* с недоверенным origin)', () => {
+    const h = buildCorsHeaders('https://evil.com', { credentials: false });
+    expect(h['Access-Control-Allow-Origin']).toBe('https://evil.com');
+    expect(h.Vary).toBe('Origin');
+    // 7a security-medium: credentialed-ответ НЕ выдаётся стороннему origin.
+    expect(h['Access-Control-Allow-Credentials']).toBeUndefined();
+  });
+
+  it('credentials:true (default) при конкретном origin → Allow-Credentials:true', () => {
+    const h = buildCorsHeaders('https://shop.com', { credentials: true });
+    expect(h['Access-Control-Allow-Credentials']).toBe('true');
+  });
+
+  it('methods через opts сохраняются', () => {
+    const h = buildCorsHeaders('https://shop.com', { methods: 'GET, POST, OPTIONS' });
+    expect(h['Access-Control-Allow-Methods']).toBe('GET, POST, OPTIONS');
+  });
 });
 
 describe('storefront/cors — preflight', () => {

@@ -29,7 +29,17 @@ export type PermissionCode =
   | 'orders.write'
   | 'cdek.manage'
   | 'cms.read'
-  | 'cms.write';
+  | 'cms.write'
+  | 'news.read'
+  | 'news.write'
+  | 'reviews.read'
+  | 'reviews.write'
+  | 'gift.read'
+  | 'gift.write'
+  | 'customers.read'
+  | 'customers.write'
+  | 'i18n.read'
+  | 'i18n.manage';
 
 /** Описание одного права для seed и UI. */
 export interface PermissionDef {
@@ -56,6 +66,19 @@ export const ALL_PERMISSIONS: readonly PermissionDef[] = [
   { code: 'cdek.manage', title: 'Управление доставкой СДЭК', module: 'cdek' },
   { code: 'cms.read', title: 'Просмотр контента', module: 'cms' },
   { code: 'cms.write', title: 'Изменение контента', module: 'cms' },
+  { code: 'news.read', title: 'Просмотр новостей', module: 'news' },
+  { code: 'news.write', title: 'Изменение новостей', module: 'news' },
+  { code: 'reviews.read', title: 'Просмотр отзывов', module: 'reviews' },
+  { code: 'reviews.write', title: 'Модерация отзывов', module: 'reviews' },
+  // Подарочные сертификаты — часть операционного модуля orders (отдельного
+  // модуля gift на платформе нет; данные живут в orders/gift-миграциях).
+  { code: 'gift.read', title: 'Просмотр подарочных сертификатов', module: 'orders' },
+  { code: 'gift.write', title: 'Управление подарочными сертификатами', module: 'orders' },
+  { code: 'customers.read', title: 'Просмотр покупателей', module: 'account' },
+  { code: 'customers.write', title: 'Изменение покупателей', module: 'account' },
+  // i18n — сквозной core-слой (всегда включён), не отдельный переключаемый модуль.
+  { code: 'i18n.read', title: 'Просмотр переводов', module: 'core' },
+  { code: 'i18n.manage', title: 'Управление переводами и языками', module: 'core' },
 ] as const;
 
 /** Код системной роли (docs/04 §5.2). Системные роли неудаляемы (is_system). */
@@ -86,7 +109,9 @@ export const SYSTEM_ROLES: readonly SystemRoleDef[] = [
   {
     code: 'admin',
     title: 'Администратор',
-    // Все read + write/manage по всем доменам (core/catalog/orders/cms/cdek).
+    // Все read + write/manage по всем доменам платформы. Инвариант: admin держит
+    // ВЕСЬ ALL_PERMISSIONS (проверяется тестом полноты) — новый код права здесь
+    // обязателен, иначе он остаётся «сиротой» без роли.
     permissions: [
       'users.read',
       'users.manage',
@@ -100,19 +125,32 @@ export const SYSTEM_ROLES: readonly SystemRoleDef[] = [
       'cdek.manage',
       'cms.read',
       'cms.write',
+      'news.read',
+      'news.write',
+      'reviews.read',
+      'reviews.write',
+      'gift.read',
+      'gift.write',
+      'customers.read',
+      'customers.write',
+      'i18n.read',
+      'i18n.manage',
     ],
   },
   {
     code: 'manager',
     title: 'Менеджер',
     // Операционная работа: заказы (чтение/запись), каталог (чтение),
-    // доставка СДЭК, чтение аудита.
+    // доставка СДЭК, чтение аудита, модерация отзывов и чтение покупателей.
     permissions: [
       'orders.read',
       'orders.write',
       'catalog.read',
       'cdek.manage',
       'audit.read',
+      'reviews.read',
+      'reviews.write',
+      'customers.read',
     ],
   },
 ] as const;

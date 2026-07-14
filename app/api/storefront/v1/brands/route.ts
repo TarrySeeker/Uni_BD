@@ -6,6 +6,7 @@
 import { runStorefront, jsonData, handlePreflight } from '@/lib/storefront/response';
 import { listBrands } from '@/lib/catalog/repository';
 import { toFullBrandDto } from '@/lib/storefront/dto';
+import { localizeCtxFrom } from '@/lib/storefront/locale';
 import { buildEntitySeoCtx } from '@/lib/storefront/seo-ctx';
 import { getEffectiveSettings } from '@/lib/config/settings';
 import { getStorage } from '@/lib/storage';
@@ -13,14 +14,16 @@ import { getStorage } from '@/lib/storage';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request): Promise<Response> {
-  return runStorefront(req, async ({ cors }) => {
+  return runStorefront(req, async (ctx) => {
+    const { cors } = ctx;
+    const loc = localizeCtxFrom(ctx);
     const brands = await listBrands({ activeOnly: true });
     // SEO-контекст брендов: домен/шаблон из настроек, og:image-URL — через storage.
     const settings = await getEffectiveSettings();
     const storage = getStorage();
     const seoCtx = buildEntitySeoCtx(settings, (k) => storage.url(k), 'brand');
     return jsonData(
-      brands.map((b) => toFullBrandDto(b, { seoCtx })),
+      brands.map((b) => toFullBrandDto(b, { seoCtx, loc })),
       { count: brands.length },
       cors,
     );

@@ -5,6 +5,14 @@ import type { TransactionSql } from 'postgres';
 import { defineAction, type ActionCtx } from '@/lib/server/action';
 import { sql } from '@/lib/db/client';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
+import {
+  getLocaleConfig,
+  resolveTranslationsUpdate,
+  PRODUCT_TR_FIELDS,
+  CATEGORY_TR_FIELDS,
+  BRAND_TR_FIELDS,
+} from '@/lib/i18n';
+import type { TranslationsMap } from '@/lib/i18n';
 import { getStorage } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/validate';
 import { generatePreviews } from '@/lib/storage/image';
@@ -136,10 +144,10 @@ export const createCategory = defineAction({
     const row = await insertWithUniqueSlug(base, async (slug) => {
       const rows = await sql<{ id: string }[]>`
         INSERT INTO categories
-          (parent_id, slug, name, description, sort, is_active, seo_title, seo_description)
+          (parent_id, slug, name, description, sort, is_active, image_key, seo_title, seo_description)
         VALUES (
           ${data.parentId ?? null}, ${slug}, ${data.name}, ${data.description ?? ''},
-          ${data.sort ?? 0}, ${data.isActive ?? true},
+          ${data.sort ?? 0}, ${data.isActive ?? true}, ${data.imageKey ?? null},
           ${data.seoTitle ?? null}, ${data.seoDescription ?? null}
         )
         RETURNING id
@@ -171,6 +179,15 @@ export const updateCategory = defineAction({
     if (!before[0]) {
       throw new CatalogError('not_found', 'Категория не найдена.');
     }
+    // Оверлей переводов (ADR-i18n, инкремент 2b): whitelist CATEGORY_TR_FIELDS,
+    // только не-дефолтные языки; provided=false → колонку не трогаем.
+    const localeConfig = await getLocaleConfig();
+    const tr = resolveTranslationsUpdate(
+      CATEGORY_TR_FIELDS,
+      data.translations,
+      before[0].translations as TranslationsMap | null,
+      localeConfig,
+    );
     const after = await sql<Record<string, unknown>[]>`
       UPDATE categories SET
         slug            = COALESCE(${data.slug ?? null}, slug),
@@ -180,6 +197,8 @@ export const updateCategory = defineAction({
         is_active       = COALESCE(${data.isActive ?? null}, is_active),
         seo_title       = COALESCE(${data.seoTitle ?? null}, seo_title),
         seo_description = COALESCE(${data.seoDescription ?? null}, seo_description),
+        image_key       = CASE WHEN ${data.imageKey !== undefined}
+                               THEN ${data.imageKey ?? null} ELSE image_key END,
         og_title        = CASE WHEN ${data.ogTitle !== undefined}
                                THEN ${data.ogTitle ?? null} ELSE og_title END,
         og_description  = CASE WHEN ${data.ogDescription !== undefined}
@@ -189,6 +208,9 @@ export const updateCategory = defineAction({
         canonical_url   = CASE WHEN ${data.canonicalUrl !== undefined}
                                THEN ${data.canonicalUrl ?? null} ELSE canonical_url END,
         noindex         = COALESCE(${data.noindex ?? null}, noindex),
+        translations    = CASE WHEN ${tr.provided}
+                               THEN ${sql.json(tr.value as Record<string, never>)}
+                               ELSE translations END,
         updated_at      = now()
       WHERE id = ${data.id}
       RETURNING *
@@ -328,14 +350,14 @@ export const createProduct = defineAction({
       const skuValue = data.sku || slug;
       const rows = await sql<{ id: string }[]>`
         INSERT INTO products (sku, slug, name, description, status, base_price,
-                              compare_at_price, is_featured, is_new, brand_id,
+                              compare_at_price, is_featured, is_new, brand_id, designer_id,
                               seo_title, seo_description,
                               weight_g, length_cm, width_cm, height_cm)
         VALUES (
           ${skuValue}, ${slug}, ${data.name}, ${data.description ?? ''},
           ${data.status ?? 'draft'}, ${data.basePrice ?? '0'},
           ${data.compareAtPrice ?? null}, ${data.isFeatured ?? false},
-          ${data.isNew ?? null}, ${data.brandId ?? null},
+          ${data.isNew ?? null}, ${data.brandId ?? null}, ${data.designerId ?? null},
           ${data.seoTitle ?? null}, ${data.seoDescription ?? null},
           ${data.weightG ?? null}, ${data.lengthCm ?? null},
           ${data.widthCm ?? null}, ${data.heightCm ?? null}
@@ -376,6 +398,17 @@ export const updateProduct = defineAction({
       throw new CatalogError('not_found', 'Товар не найден.');
     }
 
+    // Оверлей переводов (ADR-i18n, инкремент 2b): пишем ТОЛЬКО переданные не-дефолтные
+    // языки (whitelist PRODUCT_TR_FIELDS), не затрагивая базовые ru-колонки и переводы
+    // прочих языков. provided=false → колонку translations не трогаем (обратная совместимость).
+    const localeConfig = await getLocaleConfig();
+    const tr = resolveTranslationsUpdate(
+      PRODUCT_TR_FIELDS,
+      data.translations,
+      before[0].translations as TranslationsMap | null,
+      localeConfig,
+    );
+
     const after = await sql<Record<string, unknown>[]>`
       UPDATE products SET
         sku             = COALESCE(${data.sku ?? null}, sku),
@@ -391,6 +424,8 @@ export const updateProduct = defineAction({
                                THEN ${data.isNew ?? null} ELSE is_new END,
         brand_id        = CASE WHEN ${data.brandId !== undefined}
                                THEN ${data.brandId ?? null} ELSE brand_id END,
+        designer_id     = CASE WHEN ${data.designerId !== undefined}
+                               THEN ${data.designerId ?? null} ELSE designer_id END,
         seo_title       = COALESCE(${data.seoTitle ?? null}, seo_title),
         seo_description = COALESCE(${data.seoDescription ?? null}, seo_description),
         og_title        = CASE WHEN ${data.ogTitle !== undefined}
@@ -410,6 +445,9 @@ export const updateProduct = defineAction({
                                THEN ${data.widthCm ?? null} ELSE width_cm END,
         height_cm       = CASE WHEN ${data.heightCm !== undefined}
                                THEN ${data.heightCm ?? null} ELSE height_cm END,
+        translations    = CASE WHEN ${tr.provided}
+                               THEN ${sql.json(tr.value as Record<string, never>)}
+                               ELSE translations END,
         updated_at      = now()
       WHERE id = ${data.id}
       RETURNING *
@@ -563,6 +601,7 @@ export const duplicateProduct = defineAction({
         is_featured: boolean | null;
         is_new: boolean | null;
         brand_id: string | null;
+        designer_id: string | null;
         seo_title: string | null;
         seo_description: string | null;
         weight_g: number | null;
@@ -572,7 +611,7 @@ export const duplicateProduct = defineAction({
       }[]
     >`
       SELECT id, sku, slug, name, description, base_price, compare_at_price,
-             is_featured, is_new, brand_id, seo_title, seo_description,
+             is_featured, is_new, brand_id, designer_id, seo_title, seo_description,
              weight_g, length_cm, width_cm, height_cm
       FROM products WHERE id = ${data.id} LIMIT 1
     `;
@@ -598,14 +637,14 @@ export const duplicateProduct = defineAction({
       try {
         const ins = await sql<{ id: string }[]>`
           INSERT INTO products (sku, slug, name, description, status, base_price,
-                                compare_at_price, is_featured, is_new, brand_id,
+                                compare_at_price, is_featured, is_new, brand_id, designer_id,
                                 seo_title, seo_description,
                                 weight_g, length_cm, width_cm, height_cm)
           VALUES (
             ${sku}, ${slug}, ${copyName}, ${src.description ?? ''},
             'draft', ${src.base_price ?? '0'},
             ${src.compare_at_price ?? null}, ${src.is_featured ?? false},
-            ${src.is_new ?? null}, ${src.brand_id ?? null},
+            ${src.is_new ?? null}, ${src.brand_id ?? null}, ${src.designer_id ?? null},
             ${src.seo_title ?? null}, ${src.seo_description ?? null},
             ${src.weight_g ?? null}, ${src.length_cm ?? null},
             ${src.width_cm ?? null}, ${src.height_cm ?? null}
@@ -1345,10 +1384,10 @@ export const createBrand = defineAction({
     const row = await insertWithUniqueSlug(base, async (slug) => {
       const rows = await sql<{ id: string }[]>`
         INSERT INTO brands
-          (slug, name, description, is_active, sort, seo_title, seo_description)
+          (slug, name, description, is_active, sort, external_url, seo_title, seo_description)
         VALUES (
           ${slug}, ${data.name}, ${data.description ?? ''},
-          ${data.isActive ?? true}, ${data.sort ?? 0},
+          ${data.isActive ?? true}, ${data.sort ?? 0}, ${data.externalUrl ?? null},
           ${data.seoTitle ?? null}, ${data.seoDescription ?? null}
         )
         RETURNING id
@@ -1380,6 +1419,15 @@ export const updateBrand = defineAction({
     if (!before[0]) {
       throw new CatalogError('not_found', 'Бренд не найден.');
     }
+    // Оверлей переводов (ADR-i18n, инкремент 2b): whitelist BRAND_TR_FIELDS,
+    // только не-дефолтные языки; provided=false → колонку не трогаем.
+    const localeConfig = await getLocaleConfig();
+    const tr = resolveTranslationsUpdate(
+      BRAND_TR_FIELDS,
+      data.translations,
+      before[0].translations as TranslationsMap | null,
+      localeConfig,
+    );
     const after = await sql<Record<string, unknown>[]>`
       UPDATE brands SET
         slug            = COALESCE(${data.slug ?? null}, slug),
@@ -1387,6 +1435,8 @@ export const updateBrand = defineAction({
         description     = COALESCE(${data.description ?? null}, description),
         is_active       = COALESCE(${data.isActive ?? null}, is_active),
         sort            = COALESCE(${data.sort ?? null}, sort),
+        external_url    = CASE WHEN ${data.externalUrl !== undefined}
+                               THEN ${data.externalUrl ?? null} ELSE external_url END,
         seo_title       = COALESCE(${data.seoTitle ?? null}, seo_title),
         seo_description = COALESCE(${data.seoDescription ?? null}, seo_description),
         og_title        = CASE WHEN ${data.ogTitle !== undefined}
@@ -1398,6 +1448,9 @@ export const updateBrand = defineAction({
         canonical_url   = CASE WHEN ${data.canonicalUrl !== undefined}
                                THEN ${data.canonicalUrl ?? null} ELSE canonical_url END,
         noindex         = COALESCE(${data.noindex ?? null}, noindex),
+        translations    = CASE WHEN ${tr.provided}
+                               THEN ${sql.json(tr.value as Record<string, never>)}
+                               ELSE translations END,
         updated_at      = now()
       WHERE id = ${data.id}
       RETURNING *

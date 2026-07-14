@@ -92,7 +92,7 @@ describe('storefront/auth — authorizeStorefront по ключу', () => {
 });
 
 describe('storefront/auth — authorizeStorefront по Origin', () => {
-  it('разрешённый Origin → ok + возвращает нормализованный origin', () => {
+  it('разрешённый Origin → ok + возвращает нормализованный origin + originAllowed', () => {
     const res = authorizeStorefront(
       headers({ origin: 'https://Shop.com' }),
       withOrigins,
@@ -100,14 +100,32 @@ describe('storefront/auth — authorizeStorefront по Origin', () => {
     expect(res.ok).toBe(true);
     expect(res.via).toBe('origin');
     expect(res.origin).toBe('https://shop.com');
+    // Явно сконфигурированный origin — доверенный для credentialed CORS.
+    expect(res.originAllowed).toBe(true);
   });
 
-  it('чужой Origin → !ok', () => {
+  it('чужой Origin → !ok + originAllowed=false', () => {
     const res = authorizeStorefront(
       headers({ origin: 'https://evil.com' }),
       withOrigins,
     );
     expect(res.ok).toBe(false);
+    expect(res.originAllowed).toBe(false);
+  });
+
+  it('originAllowed=true даже когда доступ выдан по ключу, но origin сконфигурирован', () => {
+    // Ключ И список origins настроены; запрос по валидному ключу с доверенного origin.
+    const both: StorefrontConfig = {
+      apiKeys: [{ key: 'sk_secret' }],
+      allowedOrigins: ['https://shop.com'],
+    };
+    const res = authorizeStorefront(
+      headers({ 'x-storefront-key': 'sk_secret', origin: 'https://shop.com' }),
+      both,
+    );
+    expect(res.ok).toBe(true);
+    expect(res.via).toBe('key');
+    expect(res.originAllowed).toBe(true);
   });
 });
 
@@ -122,6 +140,8 @@ describe('storefront/auth — mock-режим', () => {
     expect(r1.mock).toBe(true);
     expect(r1.via).toBe('mock');
     expect(r1.origin).toBe('https://any.com');
+    // mock-режим: origin отражён, но НЕ доверенный — credentialed CORS для account/* не выдаётся.
+    expect(r1.originAllowed).toBe(false);
     expect(r2.ok).toBe(true);
     // warn ровно один раз на оба вызова.
     expect(spy).toHaveBeenCalledTimes(1);

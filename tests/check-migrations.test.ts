@@ -222,6 +222,92 @@ describe('check-migrations.sh — аддитивный DDL → exit 0', () => {
   });
 });
 
+describe('check-migrations.sh — carve-out ADR-P1-2 (расширение множества CHECK)', () => {
+  // Единственное разрешённое исключение из запрета DROP CONSTRAINT: пара
+  // «DROP CONSTRAINT <name>» + «ADD CONSTRAINT <name> CHECK(...)» под явным
+  // маркером-комментарием `-- check-migrations:allow-widen-check <proof>`.
+  // Тесты доказывают УЗОСТЬ: разрешён ровно этот паттерн, всё прочее — отвергается.
+
+  // Реальный паттерн миграции 0038: расширение orders_payment_provider_chk.
+  const WIDEN_0038 =
+    '-- check-migrations:allow-widen-check orders_payment_provider_chk superset + paykeeper\n' +
+    'DO $$\nBEGIN\n' +
+    "  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='orders_payment_provider_chk') THEN\n" +
+    '    ALTER TABLE orders DROP CONSTRAINT orders_payment_provider_chk;\n' +
+    '  END IF;\n' +
+    '  ALTER TABLE orders ADD CONSTRAINT orders_payment_provider_chk\n' +
+    "    CHECK (payment_provider IS NULL OR payment_provider IN ('tbank','manual','paykeeper')) NOT VALID;\n" +
+    'END $$;\n';
+
+  it('паттерн 0038 (маркер + DROP+ADD того же имени с CHECK) → ok', () => {
+    const f = fixture('ok_widen_0038.sql', WIDEN_0038);
+    expect(runLint(f).code).toBe(0);
+  });
+
+  it('реальный файл db/migrations/0038_orders_provider_paykeeper.sql → ok', () => {
+    const p = join(PROJECT_ROOT, 'db', 'migrations', '0038_orders_provider_paykeeper.sql');
+    expect(runLint(p).code).toBe(0);
+  });
+
+  it('обычный DROP CONSTRAINT БЕЗ маркера → fail (не-widening)', () => {
+    const f = fixture('bad_drop_con_no_marker.sql', 'ALTER TABLE x DROP CONSTRAINT x_chk;\n');
+    expect(runLint(f).code).not.toBe(0);
+  });
+
+  it('маркер есть, но парного ADD ... CHECK нет → fail (только снятие)', () => {
+    const f = fixture(
+      'bad_widen_no_add.sql',
+      '-- check-migrations:allow-widen-check bogus\nALTER TABLE x DROP CONSTRAINT x_chk;\n',
+    );
+    expect(runLint(f).code).not.toBe(0);
+  });
+
+  it('маркер + DROP/ADD, но имена РАЗНЫЕ → fail (снятое имя не пересоздано)', () => {
+    const f = fixture(
+      'bad_widen_name_mismatch.sql',
+      '-- check-migrations:allow-widen-check proof\n' +
+        'ALTER TABLE x DROP CONSTRAINT foo_chk;\n' +
+        'ALTER TABLE x ADD CONSTRAINT bar_chk CHECK (y IN (1,2));\n',
+    );
+    expect(runLint(f).code).not.toBe(0);
+  });
+
+  it('DROP+ADD того же имени с CHECK, но БЕЗ маркера → fail', () => {
+    const f = fixture(
+      'bad_widen_no_marker.sql',
+      'DO $$ BEGIN ALTER TABLE x DROP CONSTRAINT z_chk;' +
+        ' ALTER TABLE x ADD CONSTRAINT z_chk CHECK (y IN (1,2,3)); END $$;\n',
+    );
+    expect(runLint(f).code).not.toBe(0);
+  });
+
+  it('маркер без непустого <proof> → fail (proof обязателен, owner-signed)', () => {
+    const f = fixture(
+      'bad_widen_empty_proof.sql',
+      '-- check-migrations:allow-widen-check\n' +
+        'DO $$ BEGIN ALTER TABLE x DROP CONSTRAINT z_chk;' +
+        ' ALTER TABLE x ADD CONSTRAINT z_chk CHECK (y IN (1,2,3)); END $$;\n',
+    );
+    expect(runLint(f).code).not.toBe(0);
+  });
+
+  it('валидный widen, но в том же файле есть DROP TABLE → fail (carve-out только для CONSTRAINT)', () => {
+    const f = fixture(
+      'bad_widen_plus_drop_table.sql',
+      WIDEN_0038 + 'DROP TABLE legacy;\n',
+    );
+    expect(runLint(f).code).not.toBe(0);
+  });
+
+  it('валидный widen, но в том же файле есть DROP COLUMN → fail', () => {
+    const f = fixture(
+      'bad_widen_plus_drop_column.sql',
+      WIDEN_0038 + 'ALTER TABLE x DROP COLUMN y;\n',
+    );
+    expect(runLint(f).code).not.toBe(0);
+  });
+});
+
 describe('check-migrations.sh — реальные миграции 0001..0024', () => {
   // retry: тест запускает bash-скрипт через execFileSync, а тот под set -e/pipefail
   // порождает много подпроцессов (grep/sed/awk/cut в циклах). При полном прогоне с

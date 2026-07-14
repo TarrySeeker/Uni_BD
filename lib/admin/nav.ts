@@ -45,12 +45,26 @@ export const NAV: NavItem[] = [
   { href: '/admin/catalog', label: 'Каталог', permission: 'catalog.read', module: 'catalog' },
   { href: '/admin/orders', label: 'Заказы', permission: 'orders.read', module: 'orders' },
   { href: '/admin/promo', label: 'Промокоды', permission: 'orders.write', module: 'orders' },
+  // «Подарочные сертификаты» — балансовый инструмент под модулем orders; право
+  // gift.read (docs/24 §5). Список/выпуск/остаток/деактивация.
+  { href: '/admin/gift-certificates', label: 'Сертификаты', permission: 'gift.read', module: 'orders' },
   // «Заявки» — core (без module): сообщения с формы витрины; право orders.read (G-09).
   { href: '/admin/leads', label: 'Заявки', permission: 'orders.read' },
   // «Подписчики» — core: email-подписки из футера витрины; orders.read (G-12).
   { href: '/admin/subscribers', label: 'Подписчики', permission: 'orders.read' },
   { href: '/admin/cdek', label: 'Доставка', permission: 'cdek.manage', module: 'cdek' },
   { href: '/admin/cms', label: 'Контент', permission: 'cms.read', module: 'cms' },
+  // «Новости» — тумблируемый модуль news; право news.read (docs/24 §3). Страница
+  // /admin/news существует (шаг 5), поэтому включённый модуль не даёт битой ссылки.
+  { href: '/admin/news', label: 'Новости', permission: 'news.read', module: 'news' },
+  // «Отзывы» — тумблируемый модуль reviews; право reviews.read (docs/24 §4).
+  // Страница /admin/reviews существует (шаг 6), поэтому включённый модуль не даёт
+  // битой ссылки.
+  { href: '/admin/reviews', label: 'Отзывы', permission: 'reviews.read', module: 'reviews' },
+  // «Покупатели» — модуль account; право customers.read (docs/24 §6). Просмотр
+  // аккаунтов/гостевых контактов витрины. Страница /admin/customers существует
+  // (шаг 7a), поэтому включённый модуль не даёт битой ссылки.
+  { href: '/admin/customers', label: 'Покупатели', permission: 'customers.read', module: 'account' },
   { href: '/admin/users', label: 'Пользователи', permission: 'users.read' },
   { href: '/admin/roles', label: 'Роли', permission: 'roles.manage' },
   { href: '/admin/audit', label: 'Аудит', permission: 'audit.read' },

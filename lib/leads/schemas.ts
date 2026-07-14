@@ -14,9 +14,22 @@ export const LeadInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
   contact: z.string().trim().min(1).max(200),
   message: z.string().trim().min(1).max(5000),
+  // Доп. поля формы (§9, ← b_os_feedback) — опциональны, старая форма их не шлёт.
+  // Пустая строка допустима (min не задан), нормализуется в null роутом.
+  company: z.string().trim().max(200).optional(),
+  city: z.string().trim().max(200).optional(),
+  subject: z.string().trim().max(300).optional(),
 });
 
 export type LeadInput = z.infer<typeof LeadInputSchema>;
+
+/** Вход ответа оператора на заявку (§9): id заявки + текст ответа (пустой → снять). */
+export const LeadAnswerInputSchema = z.object({
+  id: z.uuid(),
+  answer: z.string().trim().max(5000),
+});
+
+export type LeadAnswerInput = z.infer<typeof LeadAnswerInputSchema>;
 
 /** Вход смены статуса заявки: id заявки + целевой статус (из whitelist). */
 export const LeadStatusInputSchema = z.object({
@@ -41,6 +54,9 @@ export type LeadIdInput = z.infer<typeof LeadIdInputSchema>;
  */
 export const LEAD_SOURCE_LABELS: Readonly<Record<string, string>> = {
   contact_form: 'Форма контактов',
+  // §9: обратный звонок (← b_os_call). CHECK на leads.source нет — значение
+  // добавляется без миграции; ETL заказов проставит его в Фазе 3.
+  callback: 'Обратный звонок',
 };
 
 /** Подпись источника заявки (фолбэк — сама строка, если источник неизвестен). */

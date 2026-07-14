@@ -18,6 +18,8 @@ export interface CategoryFormValues {
   slug: string;
   description: string;
   isActive: boolean;
+  /** Ключ S3-картинки категории (§9); пусто → undefined (не трогаем). */
+  imageKey: string;
   /** Расширенные SEO/OG-поля (общий SeoFieldset, как у бренда/товара). */
   seo: SeoFieldsetValue;
 }
@@ -43,6 +45,7 @@ export function buildCategoryUpdateInput(
     slug: blankToUndefined(v.slug),
     description: v.description,
     isActive: v.isActive,
+    imageKey: blankToUndefined(v.imageKey),
     seoTitle: blankToUndefined(v.seo.seoTitle),
     seoDescription: blankToUndefined(v.seo.seoDescription),
     ogTitle: blankToUndefined(v.seo.ogTitle),

@@ -49,6 +49,7 @@ export async function POST(req: Request): Promise<Response> {
         currency: result.currency,
         fulfillable: result.fulfillable,
         promoReason: result.promo && !result.promo.valid ? result.promo.reason : null,
+        gift: result.gift,
         issues: result.issues,
         deliveryResolved: result.deliveryResolved,
       });

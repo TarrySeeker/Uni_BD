@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getCmsPageById } from '@/lib/cms/repository';
 import { can } from '@/lib/auth/rbac';
+import { getLocaleConfig } from '@/lib/i18n';
 
 import { Forbidden } from '../../_components/Forbidden';
 import { guardCms } from '../_components/guard';
@@ -32,7 +33,7 @@ export default async function CmsPageDetail({
   }
 
   const { id } = await params;
-  const page = await getCmsPageById(id);
+  const [page, localeConfig] = await Promise.all([getCmsPageById(id), getLocaleConfig()]);
   if (!page) {
     notFound();
   }
@@ -60,7 +61,12 @@ export default async function CmsPageDetail({
       </p>
 
       <div className="mt-6">
-        <PageForm page={page} canWrite={canWrite} />
+        <PageForm
+          page={page}
+          canWrite={canWrite}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
+        />
       </div>
     </div>
   );

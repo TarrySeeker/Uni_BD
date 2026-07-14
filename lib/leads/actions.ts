@@ -24,11 +24,12 @@ import {
   type ActionCtx,
 } from '@/lib/server/action';
 
-import { LeadStatusInputSchema, LeadIdInputSchema } from './schemas';
+import { LeadStatusInputSchema, LeadIdInputSchema, LeadAnswerInputSchema } from './schemas';
 import { canLeadTransition, leadStatusLabel } from './status';
 import {
   getLeadStatus as dbGetLeadStatus,
   updateLeadStatus as dbUpdateLeadStatus,
+  updateLeadAnswer as dbUpdateLeadAnswer,
   deleteLead as dbDeleteLead,
 } from './repository';
 
@@ -45,6 +46,8 @@ export interface LeadActionDeps {
   getLeadStatus: (id: string) => Promise<string | null>;
   /** Смена статуса; true — строка найдена и обновлена. */
   updateLeadStatus: (id: string, status: string) => Promise<boolean>;
+  /** Запись ответа оператора (§9); true — строка найдена и обновлена. */
+  updateLeadAnswer: (id: string, answer: string | null) => Promise<boolean>;
   /** Удаление; true — строка существовала. */
   deleteLead: (id: string) => Promise<boolean>;
 }
@@ -55,6 +58,7 @@ export function productionLeadDeps(): LeadActionDeps {
     actionDeps: defaultDeps,
     getLeadStatus: dbGetLeadStatus,
     updateLeadStatus: dbUpdateLeadStatus,
+    updateLeadAnswer: dbUpdateLeadAnswer,
     deleteLead: dbDeleteLead,
   };
 }
@@ -106,6 +110,37 @@ export function createLeadActions(deps: LeadActionDeps) {
     },
   });
 
+  /**
+   * Запись ответа оператора на заявку (§9). Ответ провалидирован Zod (длина);
+   * пустой (после trim) снимает ответ (NULL). Заявка обязана существовать.
+   * Право orders.write — то же, под которым идут прочие мутации раздела.
+   */
+  const answerLead = defineAction({
+    permission: 'orders.write',
+    input: LeadAnswerInputSchema,
+    deps: actionDeps,
+    handler: async (data, _ctx: ActionCtx) => {
+      const current = await deps.getLeadStatus(data.id);
+      if (current === null) {
+        throw new PublicActionError('Заявка не найдена.');
+      }
+      const updated = await deps.updateLeadAnswer(data.id, data.answer);
+      if (!updated) {
+        throw new PublicActionError('Заявка не найдена.');
+      }
+      return {
+        result: { id: data.id },
+        revalidate: [LEADS_PATH],
+        audit: {
+          action: 'lead.answer',
+          entityType: 'lead',
+          entityId: data.id,
+          after: { answered: data.answer.trim() !== '' },
+        },
+      };
+    },
+  });
+
   /** Удаление заявки (необратимо). Заявка обязана существовать. */
   const deleteLead = defineAction({
     permission: 'orders.write',
@@ -130,5 +165,5 @@ export function createLeadActions(deps: LeadActionDeps) {
     },
   });
 
-  return { setLeadStatus, deleteLead };
+  return { setLeadStatus, answerLead, deleteLead };
 }

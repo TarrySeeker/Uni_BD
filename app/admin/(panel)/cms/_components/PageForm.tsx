@@ -19,6 +19,13 @@ import {
 import { errorMessage, fieldError } from './action-result';
 import { SectionEditor } from './SectionEditor';
 import { CmsImageUploadButton } from './CmsImageUploadButton';
+import {
+  LocaleTabs,
+  CMS_PAGE_TR_FIELD_DEFS,
+  toTranslationsState,
+  translationsPayload,
+  type TranslationsState,
+} from '../../_components/LocaleTabs';
 
 /**
  * Форма CMS-страницы (docs/11 §5.1.5, пакет 5.C-3). Создание/редактирование.
@@ -57,6 +64,8 @@ function previewSlug(title: string): string {
 export function PageForm({
   page,
   canWrite = true,
+  locales = ['ru'],
+  defaultLocale = 'ru',
 }: {
   page: CmsPageWithSections | null;
   /**
@@ -66,9 +75,16 @@ export function PageForm({
    * плашка. Серверная защита (permission cms.write в Server Actions) сохраняется.
    */
   canWrite?: boolean;
+  /** Включённые языки магазина (shop_settings.i18n.locales). */
+  locales?: readonly string[];
+  /** Язык по умолчанию (база = обычные колонки). */
+  defaultLocale?: string;
 }) {
   const router = useRouter();
   const isEdit = page !== null;
+  const [translations, setTranslations] = useState<TranslationsState>(
+    toTranslationsState(page?.translations),
+  );
 
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -138,7 +154,11 @@ export function PageForm({
     setSuccess(null);
     const base = buildBasePayload();
     const result = isEdit
-      ? await updateCmsPageAction({ id: page!.id, ...base })
+      ? await updateCmsPageAction({
+          id: page!.id,
+          ...base,
+          translations: translationsPayload(translations),
+        })
       : await createCmsPageAction(base);
     setPending(false);
     if (result.ok) {
@@ -164,7 +184,11 @@ export function PageForm({
     setPending(true);
     setError(null);
     setSuccess(null);
-    const saved = await updateCmsPageAction({ id: page!.id, ...buildBasePayload() });
+    const saved = await updateCmsPageAction({
+      id: page!.id,
+      ...buildBasePayload(),
+      translations: translationsPayload(translations),
+    });
     if (!saved.ok) {
       setPending(false);
       setError(saved);
@@ -246,6 +270,16 @@ export function PageForm({
         </div>
       ) : null}
 
+      <LocaleTabs
+        locales={locales}
+        defaultLocale={defaultLocale}
+        fields={CMS_PAGE_TR_FIELD_DEFS}
+        value={translations}
+        onChange={setTranslations}
+        enabled={isEdit && canWrite}
+        pending={pending}
+        onSave={save}
+      >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <label htmlFor="p-title" className={labelCls}>
@@ -429,6 +463,7 @@ export function PageForm({
           </button>
         ) : null}
       </div>
+      </LocaleTabs>
 
       {!isEdit ? (
         <p className="mt-4 text-sm text-gray-500">

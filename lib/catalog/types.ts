@@ -7,6 +7,9 @@
  * чтобы не терять точность); парсинг в число — на уровне представления.
  */
 
+import type { TranslationsMap } from '@/lib/i18n';
+import type { DesignerRef } from '@/lib/designers/types';
+
 // -----------------------------------------------------------------------------
 // Перечисления / литеральные типы (соответствуют CHECK-ограничениям в БД).
 // -----------------------------------------------------------------------------
@@ -49,6 +52,12 @@ export interface Category {
   description: string;
   sort: number;
   isActive: boolean;
+  /**
+   * Ключ объекта изображения категории в хранилище (§9, ← c_catalog.image). URL
+   * собирается на границе представления через storage.url(key) — сырой S3-ключ
+   * наружу не отдаём (зеркально ogImageKey/logoKey). null → без картинки.
+   */
+  imageKey: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   ogTitle: string | null;
@@ -57,6 +66,8 @@ export interface Category {
   ogImageKey: string | null;
   canonicalUrl: string | null;
   noindex: boolean;
+  /** Сырой jsonb-оверлей переводов (ADR-i18n): locale→{field→value}. Резолв в DTO. */
+  translations?: TranslationsMap;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +95,8 @@ export interface Product {
   isNew: boolean | null;
   /** Бренд товара (docs/06 §3.3); null → без бренда. */
   brandId: string | null;
+  /** Дизайнер/персона товара (§9, ADR §4.4); null → без дизайнера. */
+  designerId: string | null;
   /** Денормализованная проекция характеристик (ADR-007). */
   attributesCache: Record<string, unknown>;
   seoTitle: string | null;
@@ -100,6 +113,8 @@ export interface Product {
   lengthCm: number | null;
   widthCm: number | null;
   heightCm: number | null;
+  /** Сырой jsonb-оверлей переводов (ADR-i18n): locale→{field→value}. Резолв в DTO. */
+  translations?: TranslationsMap;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -131,6 +146,11 @@ export interface Brand {
   logoKey: string | null;
   isActive: boolean;
   sort: number;
+  /**
+   * Внешний сайт бренда (§9, ← b_brands.url); null → без ссылки. Отдаётся наружу
+   * как есть (публичный URL, не S3-ключ).
+   */
+  externalUrl: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   ogTitle: string | null;
@@ -139,6 +159,8 @@ export interface Brand {
   ogImageKey: string | null;
   canonicalUrl: string | null;
   noindex: boolean;
+  /** Сырой jsonb-оверлей переводов (ADR-i18n): locale→{field→value}. Резолв в DTO. */
+  translations?: TranslationsMap;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -164,6 +186,8 @@ export interface ProductVariant {
   lengthCm: number | null;
   widthCm: number | null;
   heightCm: number | null;
+  /** Сырой jsonb-оверлей переводов (ADR-i18n): whitelist = name. Резолв в DTO. */
+  translations?: TranslationsMap;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -251,6 +275,8 @@ export interface ProductDetail extends Product {
   inventory: InventoryItem[];
   /** Развёрнутый бренд (LEFT JOIN brands), если у товара есть brand_id. */
   brand: BrandRef | null;
+  /** Развёрнутый дизайнер (LEFT JOIN designers), если у товара есть designer_id. */
+  designer: DesignerRef | null;
 }
 
 /** Строка списка товаров (компактная проекция для таблицы админки). */
@@ -283,5 +309,7 @@ export interface ProductListRow {
   availableStock: number;
   /** URL главного изображения (is_primary), если есть. */
   primaryMediaUrl: string | null;
+  /** Сырой jsonb-оверлей переводов (ADR-i18n): whitelist списка = name. Резолв в DTO. */
+  translations?: TranslationsMap;
   createdAt: Date;
 }

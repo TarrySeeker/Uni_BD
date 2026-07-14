@@ -86,3 +86,93 @@ describe('storefront/response — конвейер', () => {
     expect(res.headers.get('Access-Control-Max-Age')).toBe('600');
   });
 });
+
+/**
+ * 7a security-medium (cors-credentials): credentialed account/*-роуты НЕ должны
+ * выдавать Access-Control-Allow-Credentials:true произвольному/несконфигурированному
+ * origin. Проверяем на конвейере runStorefront/handlePreflight с credentialed=true.
+ */
+describe('storefront/response — credentialed CORS (account/*)', () => {
+  beforeEach(() => {
+    process.env.ADMIK_MODULES = 'catalog,account';
+  });
+  afterEach(() => {
+    process.env.ADMIK_MODULES = ORIGINAL_MODULES;
+    process.env.STOREFRONT_API_KEYS = ORIGINAL_KEYS;
+    process.env.STOREFRONT_ALLOWED_ORIGINS = ORIGINAL_ORIGINS;
+  });
+
+  it('mock-режим (ничего не настроено): сторонний origin → эхо, но БЕЗ Allow-Credentials', async () => {
+    process.env.STOREFRONT_API_KEYS = '';
+    process.env.STOREFRONT_ALLOWED_ORIGINS = '';
+    const { runStorefront, jsonData } = await load();
+    const req = new Request('http://x/', { headers: { origin: 'https://evil.com' } });
+    const res = await runStorefront(
+      req,
+      async ({ cors }) => jsonData({ ok: true }, {}, cors),
+      { module: 'account', credentialed: true },
+    );
+    expect(res.status).toBe(200);
+    // Стороннему сайту credentialed-ответ НЕ отдаём.
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+  });
+
+  it('сконфигурированный origin → Allow-Credentials:true (штатный поток цел)', async () => {
+    process.env.STOREFRONT_API_KEYS = '';
+    process.env.STOREFRONT_ALLOWED_ORIGINS = 'https://shop.com';
+    const { runStorefront, jsonData } = await load();
+    const req = new Request('http://x/', { headers: { origin: 'https://shop.com' } });
+    const res = await runStorefront(
+      req,
+      async ({ cors }) => jsonData({ ok: true }, {}, cors),
+      { module: 'account', credentialed: true },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://shop.com');
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+  });
+
+  it('credentialed preflight: сторонний origin в mock → БЕЗ Allow-Credentials', async () => {
+    process.env.STOREFRONT_API_KEYS = '';
+    process.env.STOREFRONT_ALLOWED_ORIGINS = '';
+    const { handlePreflight } = await load();
+    const req = new Request('http://x/', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://evil.com',
+        'access-control-request-method': 'POST',
+      },
+    });
+    const res = handlePreflight(req, 'GET, POST, OPTIONS', true);
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+  });
+
+  it('credentialed preflight: сконфигурированный origin → Allow-Credentials:true', async () => {
+    process.env.STOREFRONT_API_KEYS = '';
+    process.env.STOREFRONT_ALLOWED_ORIGINS = 'https://shop.com';
+    const { handlePreflight } = await load();
+    const req = new Request('http://x/', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://shop.com',
+        'access-control-request-method': 'POST',
+      },
+    });
+    const res = handlePreflight(req, 'GET, POST, OPTIONS', true);
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+  });
+
+  it('НЕ-auth роут (credentialed не задан): beacon-поток цел — Allow-Credentials:true при origin', async () => {
+    process.env.STOREFRONT_API_KEYS = '';
+    process.env.STOREFRONT_ALLOWED_ORIGINS = '';
+    const { runStorefront, jsonData } = await load();
+    const req = new Request('http://x/', { headers: { origin: 'https://demo.com' } });
+    const res = await runStorefront(req, async ({ cors }) => jsonData({ ok: true }, {}, cors));
+    expect(res.status).toBe(200);
+    // Публичные роуты не ослаблены: origin echo + credentials сохранены (beacon).
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://demo.com');
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+  });
+});

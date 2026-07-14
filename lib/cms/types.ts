@@ -7,6 +7,7 @@
  */
 
 import type { z } from 'zod';
+import type { TranslationsMap } from '@/lib/i18n';
 import type { CmsSectionContentSchema } from './schemas';
 
 // -----------------------------------------------------------------------------
@@ -85,6 +86,8 @@ export interface CmsPage {
   noindex: boolean;
   sitemapPriority: number | null;
   sitemapChangefreq: SitemapChangefreq | null;
+  /** Сырой jsonb-оверлей переводов (ADR-i18n): whitelist = title/seo/og. Резолв в DTO. */
+  translations?: TranslationsMap;
   // audit:
   createdBy: string | null;
   updatedBy: string | null;
@@ -100,6 +103,11 @@ export interface CmsSection {
   type: CmsSectionType;
   /** Сырой JSONB из БД (валидируется CmsSectionContentSchema при записи/отдаче). */
   content: Record<string, unknown>;
+  /**
+   * Сырой jsonb-оверлей переводов секции (ADR-i18n). Несёт per-locale СТРУКТУРНЫЙ
+   * патч content (deep-merge); структурные ключи type/section_key/order не переводятся.
+   */
+  translations?: TranslationsMap;
   displayOrder: number;
   enabled: boolean;
   createdAt: Date;

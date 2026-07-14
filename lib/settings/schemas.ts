@@ -166,6 +166,12 @@ export const legalEntitySchema = z
       .optional(),
     legalAddress: z.string().trim().min(1).optional(),
     bankDetails: z.string().trim().min(1).optional(),
+    // §9 (← c_options): аддитивные опц. поля, обратно совместимы (.strip() уже
+    // терпит отсутствие; старые настройки без них валидны).
+    /** Ключ S3-файла оферты (offer_doc). Как og_image_key — КЛЮЧ, URL собирает storage. */
+    offerDocKey: z.string().trim().max(512).optional(),
+    /** Почта для заявок дизайнеров (email_designers). */
+    emailDesigners: z.string().trim().email('Некорректный e-mail').optional(),
   })
   .strip();
 
@@ -203,6 +209,9 @@ export const moduleOverridesSchema = z
     cdek: z.boolean().optional(),
     cms: z.boolean().optional(),
     payments: z.boolean().optional(),
+    news: z.boolean().optional(),
+    reviews: z.boolean().optional(),
+    account: z.boolean().optional(),
   })
   .strip();
 

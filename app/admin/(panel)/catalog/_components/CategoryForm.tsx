@@ -10,6 +10,13 @@ import { buildCategoryUpdateInput } from './category-payload';
 import { errorMessage, fieldError } from './action-result';
 import type { ActionResult } from '@/lib/server/action';
 import { SeoFieldset, type SeoFieldsetValue } from '../../_components/SeoFieldset';
+import {
+  LocaleTabs,
+  CATALOG_ENTITY_TR_FIELD_DEFS,
+  toTranslationsState,
+  translationsPayload,
+  type TranslationsState,
+} from '../../_components/LocaleTabs';
 
 /**
  * Полная форма редактирования категории (тупик C13 — SEO/OG-поля категории были
@@ -20,15 +27,29 @@ import { SeoFieldset, type SeoFieldsetValue } from '../../_components/SeoFieldse
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
-export function CategoryForm({ category }: { category: Category }) {
+export function CategoryForm({
+  category,
+  locales = ['ru'],
+  defaultLocale = 'ru',
+}: {
+  category: Category;
+  /** Включённые языки магазина (shop_settings.i18n.locales). */
+  locales?: readonly string[];
+  /** Язык по умолчанию (база = обычные колонки). */
+  defaultLocale?: string;
+}) {
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [translations, setTranslations] = useState<TranslationsState>(
+    toTranslationsState(category.translations),
+  );
 
   const [name, setName] = useState(category.name);
   const [slug, setSlug] = useState(category.slug);
   const [description, setDescription] = useState(category.description);
+  const [imageKey, setImageKey] = useState(category.imageKey ?? '');
   const [isActive, setIsActive] = useState(category.isActive);
   const [seo, setSeo] = useState<SeoFieldsetValue>({
     seoTitle: category.seoTitle ?? '',
@@ -44,9 +65,10 @@ export function CategoryForm({ category }: { category: Category }) {
     setPending(true);
     setError(null);
     setSuccess(null);
-    const result = await updateCategoryAction(
-      buildCategoryUpdateInput(category.id, { name, slug, description, isActive, seo }),
-    );
+    const result = await updateCategoryAction({
+      ...buildCategoryUpdateInput(category.id, { name, slug, description, isActive, imageKey, seo }),
+      translations: translationsPayload(translations),
+    });
     setPending(false);
     if (result.ok) {
       setSuccess('Изменения сохранены.');
@@ -73,6 +95,15 @@ export function CategoryForm({ category }: { category: Category }) {
         </div>
       ) : null}
 
+      <LocaleTabs
+        locales={locales}
+        defaultLocale={defaultLocale}
+        fields={CATALOG_ENTITY_TR_FIELD_DEFS}
+        value={translations}
+        onChange={setTranslations}
+        pending={pending}
+        onSave={save}
+      >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <label htmlFor="c-name" className="block text-sm font-medium text-gray-700">Название*</label>
@@ -91,6 +122,18 @@ export function CategoryForm({ category }: { category: Category }) {
           <label htmlFor="c-desc" className="block text-sm font-medium text-gray-700">Описание</label>
           <textarea id="c-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div className="lg:col-span-2">
+          <label htmlFor="c-image" className="block text-sm font-medium text-gray-700">
+            Картинка категории (ключ в хранилище)
+          </label>
+          <input id="c-image" value={imageKey} onChange={(e) => setImageKey(e.target.value)}
+            placeholder="напр. categories/scarves.webp"
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          <p className="mt-1 text-xs text-gray-500">
+            S3-ключ, как og-изображение; URL для витрины собирает хранилище.
+          </p>
+          {fe('imageKey') ? <p className="mt-1 text-xs text-red-600">{fe('imageKey')}</p> : null}
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
@@ -124,6 +167,7 @@ export function CategoryForm({ category }: { category: Category }) {
           Отмена
         </button>
       </div>
+      </LocaleTabs>
     </div>
   );
 }

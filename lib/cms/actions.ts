@@ -5,6 +5,12 @@ import type { TransactionSql } from 'postgres';
 import { defineAction, PublicActionError, type ActionCtx } from '@/lib/server/action';
 import { sql } from '@/lib/db/client';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
+import {
+  getLocaleConfig,
+  resolveTranslationsUpdate,
+  CMS_PAGE_TR_FIELDS,
+} from '@/lib/i18n';
+import type { TranslationsMap } from '@/lib/i18n';
 import { getStorage } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/validate';
 import { generatePreviews } from '@/lib/storage/image';
@@ -154,6 +160,16 @@ export const updateCmsPage = defineAction({
       throw new CmsError('not_found', 'Страница не найдена.');
     }
 
+    // Оверлей переводов (ADR-i18n, инкремент 2b): whitelist CMS_PAGE_TR_FIELDS
+    // (title/seo/og), только не-дефолтные языки; provided=false → колонку не трогаем.
+    const localeConfig = await getLocaleConfig();
+    const tr = resolveTranslationsUpdate(
+      CMS_PAGE_TR_FIELDS,
+      data.translations,
+      before[0].translations as TranslationsMap | null,
+      localeConfig,
+    );
+
     // Уникальный индекс slug может нарушиться при смене slug на уже занятый.
     // Ловим 23505 и отдаём ПОНЯТНОЕ сообщение (PublicActionError → validation),
     // иначе ошибка всплыла бы как невнятный 'internal' (образец createOrder для
@@ -182,6 +198,9 @@ export const updateCmsPage = defineAction({
                                     THEN ${data.sitemapPriority ?? null} ELSE sitemap_priority END,
           sitemap_changefreq = CASE WHEN ${data.sitemapChangefreq !== undefined}
                                     THEN ${data.sitemapChangefreq ?? null} ELSE sitemap_changefreq END,
+          translations       = CASE WHEN ${tr.provided}
+                                    THEN ${sql.json(tr.value as Record<string, never>)}
+                                    ELSE translations END,
           updated_by         = ${ctx.user.id},
           updated_at         = now()
         WHERE id = ${data.id}

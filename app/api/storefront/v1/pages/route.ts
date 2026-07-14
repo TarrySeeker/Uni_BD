@@ -9,6 +9,7 @@
 import { runStorefront, jsonData, handlePreflight } from '@/lib/storefront/response';
 import { listPublishedCmsPages } from '@/lib/cms/repository';
 import { toPublicPageListItemDto } from '@/lib/storefront/cms-dto';
+import { localizeCtxFrom } from '@/lib/storefront/locale';
 import { buildEntitySeoCtx } from '@/lib/storefront/seo-ctx';
 import { getEffectiveSettings } from '@/lib/config/settings';
 import { getStorage } from '@/lib/storage';
@@ -18,14 +19,16 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request): Promise<Response> {
   return runStorefront(
     req,
-    async ({ cors }) => {
+    async (ctx) => {
+      const { cors } = ctx;
+      const loc = localizeCtxFrom(ctx);
       const pages = await listPublishedCmsPages();
 
       const settings = await getEffectiveSettings();
       const storage = getStorage();
       const seoCtx = buildEntitySeoCtx(settings, (k) => storage.url(k), 'page');
 
-      const data = pages.map((p) => toPublicPageListItemDto(p, seoCtx));
+      const data = pages.map((p) => toPublicPageListItemDto(p, seoCtx, loc));
       return jsonData(data, { count: data.length }, cors);
     },
     { module: 'cms' },

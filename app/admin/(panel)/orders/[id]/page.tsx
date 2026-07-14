@@ -309,7 +309,14 @@ export default async function OrderDetailPage({
           <section className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-gray-800">Доставка</h2>
             <dl className="mt-2">
-              <Row label="Тип" value={deliveryTypeLabel(order.deliveryType)} />
+              <Row
+                label="Тип"
+                value={
+                  order.isPostamat
+                    ? `${deliveryTypeLabel(order.deliveryType)} · Постамат`
+                    : deliveryTypeLabel(order.deliveryType)
+                }
+              />
               <Row label="Статус" value={<DeliveryStatusBadge status={order.deliveryStatus} />} />
               {order.deliveryCity ? <Row label="Город" value={order.deliveryCity} /> : null}
               {order.deliveryAddress ? <Row label="Адрес" value={order.deliveryAddress} /> : null}

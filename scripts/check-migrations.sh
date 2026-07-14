@@ -21,6 +21,23 @@
 #                          Запрещаем целиком ради простоты (CHECK/FK/UNIQUE — все).
 #                          Снятие ограничения — через expand/contract, не в одном
 #                          релизе с зависимым кодом.
+#                          ЕДИНСТВЕННОЕ ИСКЛЮЧЕНИЕ (carve-out ADR-P1-2, docs/24 §7):
+#                          РАСШИРЕНИЕ множества значений CHECK — семантически
+#                          аддитивно (новое множество ⊇ старого, ни одно прежде
+#                          валидное значение не отвергается). Разрешаем DROP
+#                          CONSTRAINT ТОЛЬКО когда в ТОМ ЖЕ файле выполнены ВСЕ
+#                          условия одновременно:
+#                            (a) присутствует явный маркер-комментарий
+#                                `-- check-migrations:allow-widen-check <proof>`
+#                                (proof = человекочитаемое доказательство superset,
+#                                 owner-signed по ADR-P1-2), И
+#                            (b) то же имя ограничения немедленно пересоздаётся:
+#                                `ADD CONSTRAINT <same-name> CHECK (...)`.
+#                          Superset статически не доказуем (эвристика по токенам) —
+#                          он подтверждается человеком в тексте proof. Любой DROP
+#                          CONSTRAINT без маркера ИЛИ без парного ADD ... CHECK того
+#                          же имени по-прежнему ОТВЕРГАЕТСЯ. DROP TABLE/COLUMN/INDEX,
+#                          RENAME и пр. carve-out НЕ затрагивает.
 #   4. DROP DEFAULT      — снятие DEFAULT: старый код, полагавшийся на дефолт при
 #                          INSERT без значения, начнёт получать NULL/ошибку.
 #   5. DROP NOT NULL     — само по себе ослабление допустимо, НО оно сужает гарантии,
@@ -54,7 +71,10 @@
 #   ADD COLUMN [IF NOT EXISTS] ... [NOT NULL DEFAULT ...]  — аддитивно;
 #   CREATE TABLE/INDEX/... IF NOT EXISTS                    — аддитивно;
 #   ALTER TABLE ... ADD CONSTRAINT ... CHECK (... NOT VALID) — расширение;
-#   ON DELETE CASCADE / IS NOT NULL / NOT NULL в CREATE TABLE — НЕ деструктив.
+#   ON DELETE CASCADE / IS NOT NULL / NOT NULL в CREATE TABLE — НЕ деструктив;
+#   DROP CONSTRAINT <name> + ADD CONSTRAINT <name> CHECK(...) под маркером
+#     `-- check-migrations:allow-widen-check <proof>` — расширение множества CHECK
+#     (carve-out ADR-P1-2, см. правило №3 выше). ТОЛЬКО эта пара, ТОЛЬКО с маркером.
 #
 # Эвристика, не доказательство (как и сказано в §6.4): ловит очевидные нарушения
 # по токенам, не парсит SQL целиком. Цель — заблокировать заведомо опасный выкат.
@@ -226,10 +246,49 @@ for f in "${FILES[@]}"; do
     'drop[[:space:]]+column' \
     'запрещён DROP COLUMN (удаление колонки ломает старый код; expand/contract)'
 
-  # 3. DROP CONSTRAINT
-  check_rule "${content}" "${f}" \
-    'drop[[:space:]]+constraint' \
-    'запрещён DROP CONSTRAINT (снятие инварианта в одном релизе; expand/contract)'
+  # 3. DROP CONSTRAINT — с точечным carve-out ADR-P1-2 (расширение множества CHECK).
+  #    Общее правило: любой DROP CONSTRAINT запрещён. Исключение — ТОЛЬКО пара
+  #    «DROP CONSTRAINT <name>» + «ADD CONSTRAINT <name> CHECK(...)» под явным
+  #    маркером-комментарием. Реализуем отдельным блоком (как SET NOT NULL), а не
+  #    generic check_rule, потому что решение зависит от имени ограничения и от
+  #    наличия парного ADD ... CHECK того же имени.
+  #
+  #    Маркер ищем в СЫРОМ файле (normalize_statements срезает --комментарии, где
+  #    он и живёт). Требуем непустой <proof> после токена — owner-signed по ADR-P1-2.
+  widen_marker=0
+  if grep -qiE 'check-migrations:allow-widen-check[[:space:]]+[^[:space:]]' "${f}"; then
+    widen_marker=1
+  fi
+
+  # Множество имён ограничений, которые в ЭТОМ файле пересоздаются с CHECK
+  # (кандидаты на «расширение»): токен после `ADD CONSTRAINT`, за которым идёт CHECK.
+  widened_names="$(printf '%s\n' "${content}" \
+    | grep -ioE 'add[[:space:]]+constraint[[:space:]]+[a-z0-9_"]+[[:space:]]+check' \
+    | sed -E 's/.*constraint[[:space:]]+([a-z0-9_"]+)[[:space:]]+check.*/\1/I' \
+    | tr 'A-Z' 'a-z' | sort -u || true)"
+
+  drop_con="$(printf '%s\n' "${content}" | grep -inE 'drop[[:space:]]+constraint' || true)"
+  if [ -n "${drop_con}" ]; then
+    while IFS= read -r raw; do
+      [ -z "${raw}" ] && continue
+      orig_no="$(printf '%s' "${raw}" | cut -d: -f2)"
+      rest="$(printf '%s' "${raw}" | cut -d: -f3-)"
+      # Имя снимаемого ограничения: токен после `DROP CONSTRAINT [IF EXISTS]`.
+      dname="$(printf '%s' "${rest}" \
+        | grep -ioE 'drop[[:space:]]+constraint[[:space:]]+(if[[:space:]]+exists[[:space:]]+)?[a-z0-9_"]+' \
+        | sed -E 's/.*[[:space:]]([a-z0-9_"]+)[[:space:]]*$/\1/' \
+        | tr 'A-Z' 'a-z' | head -1 || true)"
+      # Разрешаем ТОЛЬКО если: есть маркер И это же имя пересоздаётся ADD ... CHECK.
+      if [ "${widen_marker}" -eq 1 ] && [ -n "${dname}" ] \
+         && printf '%s\n' "${widened_names}" | grep -qxF "${dname}"; then
+        continue  # carve-out ADR-P1-2: расширение множества CHECK — аддитивно.
+      fi
+      rest_trim="$(printf '%s' "${rest}" | sed 's/^[[:space:]]*//')"
+      fail "${f}:${orig_no}: запрещён DROP CONSTRAINT (снятие инварианта в одном релизе; expand/contract). Расширение множества CHECK — только парой DROP+ADD того же имени под маркером -- check-migrations:allow-widen-check <proof> (ADR-P1-2)"
+      printf "        ${YELLOW}%s${NC}\n" "${rest_trim}" >&2
+      violations_total=$((violations_total + 1))
+    done <<< "${drop_con}"
+  fi
 
   # 4. DROP DEFAULT
   check_rule "${content}" "${f}" \

@@ -20,6 +20,7 @@ function form(overrides: Partial<CategoryFormValues> = {}): CategoryFormValues {
     slug: 'kresla',
     description: '',
     isActive: true,
+    imageKey: '',
     seo: { ...EMPTY_SEO_FIELDSET },
     ...overrides,
   };

@@ -1,4 +1,5 @@
 import { listBrands, getCategoryTree, listAttributes } from '@/lib/catalog/repository';
+import { listDesigners } from '@/lib/designers/repository';
 
 import { Forbidden } from '../../../_components/Forbidden';
 import { PageHeader } from '../../../_components/PageHeader';
@@ -22,8 +23,9 @@ export default async function NewProductPage() {
     return <Forbidden permission={guard.permission} />;
   }
 
-  const [brands, categoryTree, attributes] = await Promise.all([
+  const [brands, designers, categoryTree, attributes] = await Promise.all([
     listBrands(),
+    listDesigners(),
     getCategoryTree(),
     listAttributes(),
   ]);
@@ -42,6 +44,7 @@ export default async function NewProductPage() {
         <ProductForm
           product={null}
           brands={brands}
+          designers={designers}
           categoryTree={categoryTree}
           attributes={attributes}
         />

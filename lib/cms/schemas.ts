@@ -25,6 +25,7 @@ import {
   noindexSchema,
 } from '@/lib/seo/schemas';
 import { slugSchema } from '@/lib/catalog/schemas';
+import { translationsBlockSchema } from '@/lib/i18n';
 import { CMS_PAGE_STATUSES, SITEMAP_CHANGEFREQS } from './types';
 
 // -----------------------------------------------------------------------------
@@ -267,6 +268,9 @@ export const CmsPageUpdateSchema = z.object({
   slug: slugSchema.optional(),
   status: cmsPageEditableStatusSchema.optional(),
   ...pageSeoFields,
+  // Оверлей переводов (ADR-i18n, инкремент 2b): { [locale]: { [field]: string } }.
+  // Тонкая фильтрация whitelist/языков — в handler (resolveTranslationsUpdate).
+  translations: translationsBlockSchema,
 });
 
 /** Фильтр списка страниц (поиск/статус/пагинация — образец listProducts). */

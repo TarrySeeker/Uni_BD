@@ -26,5 +26,15 @@ INSERT INTO permissions (code, title, module) VALUES
   ('orders.write',    'Изменение заказов',                    'orders'),
   ('cdek.manage',     'Управление доставкой СДЭК',            'cdek'),
   ('cms.read',        'Просмотр контента',                    'cms'),
-  ('cms.write',       'Изменение контента',                   'cms')
+  ('cms.write',       'Изменение контента',                   'cms'),
+  ('news.read',       'Просмотр новостей',                    'news'),
+  ('news.write',      'Изменение новостей',                   'news'),
+  ('reviews.read',    'Просмотр отзывов',                     'reviews'),
+  ('reviews.write',   'Модерация отзывов',                    'reviews'),
+  ('gift.read',       'Просмотр подарочных сертификатов',     'orders'),
+  ('gift.write',      'Управление подарочными сертификатами', 'orders'),
+  ('customers.read',  'Просмотр покупателей',                 'account'),
+  ('customers.write', 'Изменение покупателей',                'account'),
+  ('i18n.read',       'Просмотр переводов',                   'core'),
+  ('i18n.manage',     'Управление переводами и языками',       'core')
 ON CONFLICT (code) DO NOTHING;

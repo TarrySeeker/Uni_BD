@@ -39,6 +39,12 @@ const VALID_ID = '48bd42cf-ada2-46ea-bc7d-eaba35828d74';
 /**
  * tagged-template sql-мок: первый вызов (SELECT before) возвращает строку,
  * второй (UPDATE) бросает 23505.
+ *
+ * `.json()` повторяет контракт postgres.js `sql.json(value)`: помечает значение
+ * как jsonb-параметр (а не строку). Реальный клиент возвращает специальный
+ * Parameter-объект с типом jsonb; здесь достаточно эквивалентной обёртки —
+ * тэг-функция мока всё равно не собирает SQL, но код (`updateCmsPage`, catalog)
+ * теперь может вызывать `sql.json(tr.value)` как в проде, не падая TypeError.
  */
 function makeSqlMock() {
   let call = 0;
@@ -48,7 +54,10 @@ function makeSqlMock() {
       return [{ id: VALID_ID, slug: 'old', title: 'Старое' }];
     }
     throw new FakeUniqueViolation();
-  });
+  }) as ReturnType<typeof vi.fn> & {
+    json: (value: unknown) => { __pgjsonb: true; value: unknown };
+  };
+  sql.json = (value: unknown) => ({ __pgjsonb: true as const, value });
   return sql;
 }
 

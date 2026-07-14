@@ -3,11 +3,13 @@ import { PageHeader } from '../_components/PageHeader';
 import { guardLeads } from './_components/guard';
 import { LeadStatusBadge } from './_components/LeadStatusBadge';
 import { LeadRowActions } from './_components/LeadRowActions';
+import { LeadAnswerForm } from './_components/LeadAnswerForm';
 import { ExportToolbar } from './_components/ExportToolbar';
 import { listLeads, countLeads } from '@/lib/leads/repository';
 import { leadSourceLabel } from '@/lib/leads/schemas';
 import { formatDateTime } from '@/lib/admin/order-format';
 import { listTruncationNotice } from '@/lib/admin/list-truncation';
+import { getStorage } from '@/lib/storage';
 
 /**
  * Раздел «Заявки» (G-09): сообщения с формы обратной связи витрины. Доступ —
@@ -29,6 +31,9 @@ export default async function LeadsPage() {
   // сколько влезло в лимит (C7, паттерн подписчиков).
   const [leads, total] = await Promise.all([listLeads(LIST_LIMIT), countLeads()]);
   const truncation = listTruncationNotice(leads.length, total, LIST_LIMIT);
+
+  // Ключ вложения (§9) → публичный URL для скачивания (как og:image/логотип).
+  const storage = getStorage();
 
   // Строки для клиентского экспорта (копирование/CSV, C8). Date → ISO для
   // сериализации из Server Component в Client Component (Date приходит строкой).
@@ -70,7 +75,9 @@ export default async function LeadsPage() {
                 <th className="px-4 py-2 font-medium">Имя</th>
                 <th className="px-4 py-2 font-medium">Контакт</th>
                 <th className="px-4 py-2 font-medium">Источник</th>
+                <th className="px-4 py-2 font-medium">Детали</th>
                 <th className="px-4 py-2 font-medium">Сообщение</th>
+                <th className="px-4 py-2 font-medium">Ответ оператора</th>
                 <th className="px-4 py-2 font-medium">Статус</th>
                 <th className="px-4 py-2 font-medium">Действия</th>
               </tr>
@@ -82,7 +89,28 @@ export default async function LeadsPage() {
                   <td className="px-4 py-2">{l.name}</td>
                   <td className="px-4 py-2">{l.contact}</td>
                   <td className="px-4 py-2 text-gray-600">{leadSourceLabel(l.source)}</td>
+                  <td className="px-4 py-2 text-xs text-gray-600">
+                    {l.company ? <div>Организация: {l.company}</div> : null}
+                    {l.city ? <div>Город: {l.city}</div> : null}
+                    {l.subject ? <div>Тема: {l.subject}</div> : null}
+                    {l.attachment_key ? (
+                      <a
+                        href={storage.url(l.attachment_key)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Скачать вложение
+                      </a>
+                    ) : null}
+                    {!l.company && !l.city && !l.subject && !l.attachment_key ? (
+                      <span className="text-gray-400">—</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-2 text-gray-700">{l.message}</td>
+                  <td className="px-4 py-2">
+                    <LeadAnswerForm id={l.id} answer={l.answer} />
+                  </td>
                   <td className="px-4 py-2">
                     <LeadStatusBadge status={l.status} />
                   </td>

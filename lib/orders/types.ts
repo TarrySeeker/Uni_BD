@@ -160,6 +160,13 @@ export interface Order {
 
   // ---- Доставка (поля под СДЭК Этап 4) ----
   deliveryType: DeliveryType;
+  /**
+   * Постамат (§9, ← delivery_type=3): подвид доставки в ПВЗ (deliveryType='pvz')
+   * с автоматической выдачей. Отдельным значением enum не моделируется (не
+   * трогаем CHECK delivery_type), а флагом. false для курьера/самовывоза/обычного
+   * ПВЗ. Существующие заказы → false (DEFAULT).
+   */
+  isPostamat: boolean;
   deliveryStatus: DeliveryStatus;
   deliveryCity: string | null;
   deliveryAddress: string | null;
@@ -172,6 +179,12 @@ export interface Order {
   // ---- Промокод (ссылка + денормализованный снимок кода) ----
   promoCodeId: string | null;
   promoCode: string | null;
+
+  // ---- Подарочный сертификат (§5): ссылка + снимок списанной суммы ----
+  /** Применённый к заказу сертификат (FK, SET NULL при удалении); null — без сертификата. */
+  giftCertificateId: string | null;
+  /** Сумма, списанная сертификатом на этот заказ (снимок, ≥ 0). */
+  giftDiscountTotal: string;
 
   // ---- Покупатель (гостевой чекаут; опц. связь с customers) ----
   customerId: string | null;

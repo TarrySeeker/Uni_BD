@@ -33,6 +33,9 @@ export function LegalContactsForm({
   const [ogrn, setOgrn] = useState(legalEntity.ogrn ?? '');
   const [legalAddress, setLegalAddress] = useState(legalEntity.legalAddress ?? '');
   const [bankDetails, setBankDetails] = useState(legalEntity.bankDetails ?? '');
+  // §9 (← c_options): файл оферты (S3-ключ) + почта для заявок дизайнеров.
+  const [offerDocKey, setOfferDocKey] = useState(legalEntity.offerDocKey ?? '');
+  const [emailDesigners, setEmailDesigners] = useState(legalEntity.emailDesigners ?? '');
 
   const [phone, setPhone] = useState(contacts.phone ?? '');
   const [email, setEmail] = useState(contacts.email ?? '');
@@ -59,6 +62,8 @@ export function LegalContactsForm({
         ogrn: ogrn.trim() || undefined,
         legalAddress: legalAddress.trim() || undefined,
         bankDetails: bankDetails.trim() || undefined,
+        offerDocKey: offerDocKey.trim() || undefined,
+        emailDesigners: emailDesigners.trim() || undefined,
       },
       contacts: {
         phone: phone.trim() || undefined,
@@ -130,6 +135,27 @@ export function LegalContactsForm({
           </label>
           <textarea id="l-bank" value={bankDetails} onChange={(e) => setBankDetails(e.target.value)} rows={2}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label htmlFor="l-offer" className="block text-sm font-medium text-gray-700">
+            Файл оферты (ключ в хранилище)
+          </label>
+          <input id="l-offer" value={offerDocKey} onChange={(e) => setOfferDocKey(e.target.value)}
+            placeholder="напр. docs/offer.pdf"
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          {fe('legalEntity.offerDocKey')
+            ? <p className="mt-1 text-xs text-red-600">{fe('legalEntity.offerDocKey')}</p> : null}
+        </div>
+        <div>
+          <label htmlFor="l-email-designers" className="block text-sm font-medium text-gray-700">
+            E-mail для заявок дизайнеров
+          </label>
+          <input id="l-email-designers" type="email" value={emailDesigners}
+            onChange={(e) => setEmailDesigners(e.target.value)}
+            placeholder="designers@example.com"
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          {fe('legalEntity.emailDesigners')
+            ? <p className="mt-1 text-xs text-red-600">{fe('legalEntity.emailDesigners')}</p> : null}
         </div>
       </div>
 

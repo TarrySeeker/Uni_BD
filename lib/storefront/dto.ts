@@ -19,6 +19,18 @@
 
 import { discountPercent, isOnSale, effectiveCompareAt } from '@/lib/catalog/pricing';
 import { buildSeoMeta, type SeoCtx } from '@/lib/seo/meta';
+import {
+  PRODUCT_TR_FIELDS,
+  PRODUCT_LIST_TR_FIELDS,
+  BRAND_TR_FIELDS,
+  DESIGNER_TR_FIELDS,
+  CATEGORY_TR_FIELDS,
+  VARIANT_TR_FIELDS,
+  localizeField,
+} from '@/lib/i18n';
+import { localizeBlockTabs } from '@/lib/product-blocks';
+import type { ProductBlock, ProductBlockType } from '@/lib/product-blocks';
+import { localizeEntity, type LocalizeCtx } from './locale';
 import type {
   Brand,
   BrandRef,
@@ -31,6 +43,12 @@ import type {
   ProductVariant,
 } from '@/lib/catalog/types';
 import { MAIN_WAREHOUSE } from '@/lib/catalog/types';
+import type { Designer, DesignerRef } from '@/lib/designers/types';
+
+// ---------------------------------------------------------------------------
+// Whitelist переводимых полей — единый источник (lib/i18n/fields), общий с
+// write-path (admin actions, инкремент 2b). См. импорт выше.
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Типы публичных DTO.
@@ -65,15 +83,61 @@ export interface BrandDto {
 
 export interface FullBrandDto extends BrandDto {
   description: string;
+  /** Внешний сайт бренда (§9); null → без ссылки. Публичный URL, не S3-ключ. */
+  externalUrl: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   meta: SeoMetaDto;
+}
+
+/** Краткий дизайнер для кросс-линка из карточки товара (§9, ADR §4.4). */
+export interface DesignerDto {
+  slug: string;
+  name: string;
+  imageUrl: string | null;
+}
+
+/** Полный дизайнер для публичной страницы /designers (внутренние поля скрыты). */
+export interface FullDesignerDto extends DesignerDto {
+  country: string | null;
+  description: string;
+  pageImageUrl: string | null;
+  videoUrl: string | null;
+  socials: Record<string, string>;
+  workCount: number;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  meta: SeoMetaDto;
+}
+
+/** Один таб структурной секции (локализованный). */
+export interface ProductBlockTabDto {
+  name: string;
+  text: string;
+}
+
+/**
+ * Публичная структурная секция карточки товара (§9). Переводимые поля
+ * (title/blockquot/body/tabs) резолвятся по ctx.locale; сырой S3-ключ картинки не
+ * отдаём (→ imageUrl); автор цитаты — кросс-линк на дизайнера.
+ */
+export interface ProductBlockDto {
+  type: ProductBlockType;
+  title: string | null;
+  blockquot: string | null;
+  body: string | null;
+  imageUrl: string | null;
+  tabs: ProductBlockTabDto[];
+  /** Автор цитаты (кросс-линк на /designers); null — без автора. */
+  author: DesignerDto | null;
 }
 
 export interface CategoryDto {
   slug: string;
   name: string;
   description: string;
+  /** Картинка категории (§9); null → без картинки. Публичный URL, не S3-ключ. */
+  imageUrl: string | null;
   children: CategoryDto[];
   /** SEO-мета категории (опц.: дерево-маппер её не собирает). */
   meta?: SeoMetaDto;
@@ -142,10 +206,14 @@ export interface ProductDetailDto {
   isNew: boolean;
   isFeatured: boolean;
   brand: BrandDto | null;
+  /** Кросс-линк на дизайнера/персону товара (§9, ADR §4.4); null → без дизайнера. */
+  designer: DesignerDto | null;
   categories: string[];
   attributes: Record<string, unknown>;
   variants: VariantDto[];
   media: MediaDto[];
+  /** Структурные секции карточки (цитата/табы/текст/картинка), локализованы (§9). */
+  blocks: ProductBlockDto[];
   inStock: boolean;
   /**
    * Доступное к заказу количество на уровне ТОВАРА (для товара без вариантов —
@@ -191,6 +259,11 @@ export interface SeoMapOpts {
    * иной pathPrefix, но резолвер логотипа должен совпадать.
    */
   publicUrl?: PublicUrlResolver;
+  /**
+   * Контекст локализации (ADR-i18n): целевой язык + язык-канон. Отсутствие или
+   * locale===defaultLocale → значения базовые (ru). Форма DTO не меняется.
+   */
+  loc?: LocalizeCtx;
 }
 
 /** Строит SeoMetaDto сущности через чистый билдер (наружу — ogImageUrl, не ключ). */
@@ -220,14 +293,93 @@ function entityMeta(
  */
 export function toFullBrandDto(brand: Brand, opts: SeoMapOpts): FullBrandDto {
   const publicUrl = opts.publicUrl ?? opts.seoCtx.publicUrl;
+  // Локализуем переводимые поля бренда по ctx.locale (оверлей → база ru). SEO-мета
+  // собирается из уже локализованного объекта (name/seo/og), поэтому og:title и т.п.
+  // тоже уходят на нужном языке.
+  const b = localizeEntity(brand, BRAND_TR_FIELDS, opts.loc);
   return {
-    slug: brand.slug,
-    name: brand.name,
-    logoUrl: brand.logoKey ? publicUrl(brand.logoKey) : null,
-    description: brand.description,
-    seoTitle: brand.seoTitle,
-    seoDescription: brand.seoDescription,
-    meta: entityMeta(brand, opts.seoCtx),
+    slug: b.slug,
+    name: b.name,
+    logoUrl: b.logoKey ? publicUrl(b.logoKey) : null,
+    description: b.description,
+    externalUrl: b.externalUrl,
+    seoTitle: b.seoTitle,
+    seoDescription: b.seoDescription,
+    meta: entityMeta(b, opts.seoCtx),
+  };
+}
+
+/**
+ * Дизайнер-ref → публичный DesignerDto (только slug/name/аватар). Аватар
+ * резолвится тем же storage.url, что og:image; сырой S3-ключ наружу не отдаём.
+ */
+export function toDesignerDto(
+  designer: DesignerRef | null,
+  publicUrl?: PublicUrlResolver,
+): DesignerDto | null {
+  if (!designer) {
+    return null;
+  }
+  return {
+    slug: designer.slug,
+    name: designer.name,
+    imageUrl: designer.imageKey && publicUrl ? publicUrl(designer.imageKey) : null,
+  };
+}
+
+/**
+ * Структурная секция товара → публичный DTO (§9). Плоские поля (title/blockquot/
+ * body) резолвятся localizeField по оверлею секции; табы — структурно
+ * (localizeBlockTabs, deep-merge); картинка → URL (сырой ключ скрыт); автор
+ * цитаты → DesignerDto (кросс-линк). Без loc — базовые (ru) значения.
+ */
+export function toProductBlockDto(
+  block: ProductBlock,
+  opts: { loc?: LocalizeCtx; publicUrl?: PublicUrlResolver },
+): ProductBlockDto {
+  const loc = opts.loc;
+  const tr = block.translations ?? null;
+  const field = (base: string | null, key: string): string | null => {
+    if (!loc) {
+      return base ?? null;
+    }
+    return (localizeField(base, tr, loc.locale, key, loc.defaultLocale) as string | null) ?? null;
+  };
+  const tabs = loc
+    ? localizeBlockTabs(block.tabs, tr, loc.locale, loc.defaultLocale)
+    : block.tabs;
+  return {
+    type: block.type,
+    title: field(block.title, 'title'),
+    blockquot: field(block.blockquot, 'blockquot'),
+    body: field(block.body, 'body'),
+    imageUrl: block.imageKey && opts.publicUrl ? opts.publicUrl(block.imageKey) : null,
+    tabs: tabs.map((t) => ({ name: t.name, text: t.text })),
+    author: toDesignerDto(block.author, opts.publicUrl),
+  };
+}
+
+/**
+ * Полный дизайнер → публичный FullDesignerDto (для /designers). Внутренние поля
+ * (sort/is_active/даты/сырые ключи) скрыты; переводимые (name/description/country)
+ * резолвятся по ctx.locale (оверлей → база ru).
+ */
+export function toFullDesignerDto(designer: Designer, opts: SeoMapOpts): FullDesignerDto {
+  const publicUrl = opts.publicUrl ?? opts.seoCtx.publicUrl;
+  const d = localizeEntity(designer, DESIGNER_TR_FIELDS, opts.loc);
+  return {
+    slug: d.slug,
+    name: d.name,
+    imageUrl: d.imageKey ? publicUrl(d.imageKey) : null,
+    country: d.country,
+    description: d.description,
+    pageImageUrl: d.pageImageKey ? publicUrl(d.pageImageKey) : null,
+    videoUrl: d.videoUrl,
+    socials: d.socials,
+    workCount: d.workCount,
+    seoTitle: d.seoTitle,
+    seoDescription: d.seoDescription,
+    meta: entityMeta(d, opts.seoCtx),
   };
 }
 
@@ -238,28 +390,44 @@ export function toFullBrandDto(brand: Brand, opts: SeoMapOpts): FullBrandDto {
  */
 export function toCategoryDto(
   node: CategoryTreeNode | Category,
-  opts?: { seoCtx?: SeoCtx },
+  opts?: { seoCtx?: SeoCtx; loc?: LocalizeCtx; publicUrl?: PublicUrlResolver },
 ): CategoryDto {
+  const n = localizeEntity(node, CATEGORY_TR_FIELDS, opts?.loc);
   const children = 'children' in node && Array.isArray(node.children) ? node.children : [];
+  // Детям передаём loc + publicUrl (meta у вложенных не собирается, как и прежде,
+  // но картинку резолвим на каждом уровне).
+  const childOpts =
+    opts?.loc || opts?.publicUrl
+      ? { loc: opts?.loc, publicUrl: opts?.publicUrl }
+      : undefined;
   return {
-    slug: node.slug,
-    name: node.name,
-    description: node.description,
-    children: children.map((c) => toCategoryDto(c)),
-    ...(opts?.seoCtx ? { meta: entityMeta(node, opts.seoCtx) } : {}),
+    slug: n.slug,
+    name: n.name,
+    description: n.description,
+    imageUrl: n.imageKey && opts?.publicUrl ? opts.publicUrl(n.imageKey) : null,
+    children: children.map((c) => toCategoryDto(c, childOpts)),
+    ...(opts?.seoCtx ? { meta: entityMeta(n, opts.seoCtx) } : {}),
   };
 }
 
 /** Дерево категорий → DTO, скрывая неактивные ветви. */
-export function toCategoryTreeDto(tree: CategoryTreeNode[]): CategoryDto[] {
+export function toCategoryTreeDto(
+  tree: CategoryTreeNode[],
+  loc?: LocalizeCtx,
+  publicUrl?: PublicUrlResolver,
+): CategoryDto[] {
   return tree
     .filter((n) => n.isActive)
-    .map((n) => ({
-      slug: n.slug,
-      name: n.name,
-      description: n.description,
-      children: toCategoryTreeDto(n.children),
-    }));
+    .map((n) => {
+      const ln = localizeEntity(n, CATEGORY_TR_FIELDS, loc);
+      return {
+        slug: ln.slug,
+        name: ln.name,
+        description: ln.description,
+        imageUrl: ln.imageKey && publicUrl ? publicUrl(ln.imageKey) : null,
+        children: toCategoryTreeDto(n.children, loc, publicUrl),
+      };
+    });
 }
 
 /**
@@ -271,18 +439,22 @@ export function toCategoryTreeDto(tree: CategoryTreeNode[]): CategoryDto[] {
 export function toProductListItemDto(
   row: ProductListRow,
   publicUrl?: PublicUrlResolver,
+  loc?: LocalizeCtx,
 ): ProductListItemDto {
+  const r = localizeEntity(row, PRODUCT_LIST_TR_FIELDS, loc);
   return {
-    slug: row.slug,
-    name: row.name,
-    price: row.basePrice,
-    compareAtPrice: row.compareAtPrice,
-    discountPct: row.discountPct,
-    onSale: row.onSale,
-    isNew: row.effectiveIsNew,
-    isFeatured: row.isFeatured,
-    brand: toBrandDto(row.brand, publicUrl),
-    imageUrl: row.primaryMediaUrl,
+    slug: r.slug,
+    name: r.name,
+    price: r.basePrice,
+    compareAtPrice: r.compareAtPrice,
+    discountPct: r.discountPct,
+    onSale: r.onSale,
+    isNew: r.effectiveIsNew,
+    isFeatured: r.isFeatured,
+    // Бренд в списке остаётся на базовом языке (BrandRef без оверлея; локализация
+    // бренда — на эндпоинте /brands). Слаг/цена/остаток не переводимы.
+    brand: toBrandDto(r.brand, publicUrl),
+    imageUrl: r.primaryMediaUrl,
     // «В наличии» = есть доступное (quantity − reserved > 0), а не физический
     // остаток: зарезервированное под незавершённые заказы не показываем (оверселл).
     // Семантика совпадает с computeInStock карточки/детали.
@@ -379,24 +551,26 @@ export function effectiveVariantPrice(
 export function toVariantDto(
   variant: ProductVariant,
   product: ProductDetail,
+  loc?: LocalizeCtx,
 ): VariantDto {
-  const price = effectiveVariantPrice(variant, product.basePrice);
+  const v = localizeEntity(variant, VARIANT_TR_FIELDS, loc);
+  const price = effectiveVariantPrice(v, product.basePrice);
   const compareAt = effectiveCompareAt(
-    variant.compareAtPrice,
+    v.compareAtPrice,
     product.compareAtPrice,
   );
   const compareAtStr = compareAt !== null ? compareAt.toFixed(2) : null;
   return {
-    id: variant.id,
-    sku: variant.sku,
-    name: variant.name ?? '',
+    id: v.id,
+    sku: v.sku,
+    name: v.name ?? '',
     price,
     compareAtPrice: compareAtStr,
     discountPct: discountPercent(price, compareAtStr),
     onSale: isOnSale(price, compareAtStr),
-    attributes: variant.attributesCache ?? {},
-    inStock: computeInStock(product.inventory, variant.id, MAIN_WAREHOUSE),
-    availableQty: computeAvailableQty(product.inventory, variant.id, MAIN_WAREHOUSE),
+    attributes: v.attributesCache ?? {},
+    inStock: computeInStock(product.inventory, v.id, MAIN_WAREHOUSE),
+    availableQty: computeAvailableQty(product.inventory, v.id, MAIN_WAREHOUSE),
   };
 }
 
@@ -409,40 +583,56 @@ export function toVariantDto(
  */
 export function toProductDetailDto(
   product: ProductDetail,
-  opts: { effectiveIsNew: boolean; categorySlugs: string[]; seoCtx: SeoCtx },
+  opts: {
+    effectiveIsNew: boolean;
+    categorySlugs: string[];
+    seoCtx: SeoCtx;
+    loc?: LocalizeCtx;
+    /** Структурные секции карточки (§9); резолвятся по ctx.locale в toProductBlockDto. */
+    blocks?: ProductBlock[];
+  },
 ): ProductDetailDto {
+  // Локализуем переводимые поля товара (name/description/seo/og) по ctx.locale.
+  // Копия shallow — связи (variants/media/inventory) те же ссылки; переводимы
+  // отдельно (варианты — через toVariantDto). SEO-мета строится из локализованного p.
+  const p = localizeEntity(product, PRODUCT_TR_FIELDS, opts.loc);
   // При наличии активных вариантов наличие/доступное количество ТОВАРА считаем
   // ТОЛЬКО по вариантам: осиротевший product-level остаток (variant_id IS NULL)
   // не заказуем (заказ идёт по variantId) и завышал бы наличие — тот же инвариант,
   // что в listProducts (волна 14). Без вариантов остаток на уровне товара —
   // единственный и заказуется по productId.
-  const hasActiveVariants = product.variants.some((v) => v.isActive);
+  const hasActiveVariants = p.variants.some((v) => v.isActive);
   const orderableInventory = hasActiveVariants
-    ? product.inventory.filter((i) => (i.variantId ?? null) !== null)
-    : product.inventory;
+    ? p.inventory.filter((i) => (i.variantId ?? null) !== null)
+    : p.inventory;
   return {
-    id: product.id,
-    slug: product.slug,
-    sku: product.sku,
-    name: product.name,
-    description: product.description,
-    price: product.basePrice,
-    compareAtPrice: product.compareAtPrice,
-    discountPct: discountPercent(product.basePrice, product.compareAtPrice),
-    onSale: isOnSale(product.basePrice, product.compareAtPrice),
+    id: p.id,
+    slug: p.slug,
+    sku: p.sku,
+    name: p.name,
+    description: p.description,
+    price: p.basePrice,
+    compareAtPrice: p.compareAtPrice,
+    discountPct: discountPercent(p.basePrice, p.compareAtPrice),
+    onSale: isOnSale(p.basePrice, p.compareAtPrice),
     isNew: opts.effectiveIsNew,
-    isFeatured: product.isFeatured,
+    isFeatured: p.isFeatured,
     // Логотип бренда резолвится тем же storage.url, что и og:image (seoCtx.publicUrl).
-    brand: toBrandDto(product.brand, opts.seoCtx.publicUrl),
+    brand: toBrandDto(p.brand, opts.seoCtx.publicUrl),
+    // Кросс-линк на дизайнера (аватар — тем же storage.url).
+    designer: toDesignerDto(p.designer, opts.seoCtx.publicUrl),
     categories: opts.categorySlugs,
-    attributes: product.attributesCache ?? {},
-    variants: product.variants
+    attributes: p.attributesCache ?? {},
+    variants: p.variants
       .filter((v) => v.isActive)
-      .map((v) => toVariantDto(v, product)),
-    media: product.media.map(toMediaDto),
+      .map((v) => toVariantDto(v, product, opts.loc)),
+    media: p.media.map(toMediaDto),
+    blocks: (opts.blocks ?? []).map((b) =>
+      toProductBlockDto(b, { loc: opts.loc, publicUrl: opts.seoCtx.publicUrl }),
+    ),
     inStock: computeInStock(orderableInventory, undefined, MAIN_WAREHOUSE),
     // Уровень товара (для товара без вариантов — заказ по productId).
     availableQty: computeAvailableQty(orderableInventory, undefined, MAIN_WAREHOUSE),
-    meta: entityMeta(product, opts.seoCtx),
+    meta: entityMeta(p, opts.seoCtx),
   };
 }

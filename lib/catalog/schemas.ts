@@ -25,6 +25,7 @@ import {
   canonicalUrlSchema,
   noindexSchema,
 } from '@/lib/seo/schemas';
+import { translationsBlockSchema } from '@/lib/i18n';
 
 // -----------------------------------------------------------------------------
 // Переиспользуемые примитивы.
@@ -90,6 +91,26 @@ const seoTitle = z.string().max(255).optional();
 const seoDescription = z.string().max(1000).optional();
 
 /**
+ * Ключ S3-изображения категории (§9, ← c_catalog.image). Как ogImageKey — это
+ * КЛЮЧ объекта, URL собирает storage; наружу сырой ключ не утекает. nullish:
+ * пустое/отсутствует → не трогаем (update) / null (create). Форма шлёт
+ * '' → undefined (blankToUndefined), явный null очищает.
+ */
+const imageKeySchema = ogImageKeySchema;
+
+/**
+ * Внешний сайт бренда (§9, ← b_brands.url). Публичный URL (не S3-ключ):
+ * абсолютный http(s) до 2048 символов, либо null/пусто (без ссылки). nullish —
+ * поле опциональное; пустая строка формы → undefined в payload.
+ */
+const externalUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .url('Внешний сайт бренда — абсолютный URL (https://...)')
+  .nullish();
+
+/**
  * Вес/габариты для расчёта СДЭК (0018, docs/08 §3.2): целое ≥ 0, nullable.
  * null → берётся вышестоящий уровень (вариант→товар) или дефолт магазина
  * (CDEK_DEFAULT_*). Вес — в граммах, габариты — в сантиметрах.
@@ -132,6 +153,8 @@ export const CategoryCreateSchema = z.object({
   description: z.string().max(5000).optional().default(''),
   sort: z.number().int().min(0).optional().default(0),
   isActive: z.boolean().optional().default(true),
+  /** Ключ S3-картинки категории (§9); опц. при создании. */
+  imageKey: imageKeySchema,
   seoTitle,
   seoDescription,
 });
@@ -140,6 +163,9 @@ export type CategoryCreateInput = z.infer<typeof CategoryCreateSchema>;
 export const CategoryUpdateSchema = CategoryCreateSchema.partial().extend({
   id: uuidSchema,
   ...seoEntityFields,
+  // Оверлей переводов (ADR-i18n, инкремент 2b): { [locale]: { [field]: string } }.
+  // Тонкая фильтрация whitelist/языков — в handler (resolveTranslationsUpdate).
+  translations: translationsBlockSchema,
 });
 export type CategoryUpdateInput = z.infer<typeof CategoryUpdateSchema>;
 
@@ -174,6 +200,7 @@ export const ProductCreateSchema = z
     isFeatured: z.boolean().optional().default(false),
     isNew: z.boolean().nullish(), // троичная логика: null=вычисляемо, true/false=override
     brandId: uuidSchema.nullish(),
+    designerId: uuidSchema.nullish(),
     categoryIds: z.array(uuidSchema).optional().default([]),
     primaryCategoryId: uuidSchema.nullish(),
     seoTitle,
@@ -203,12 +230,15 @@ export const ProductUpdateSchema = z.object({
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().nullish(),
   brandId: uuidSchema.nullish(),
+  designerId: uuidSchema.nullish(),
   categoryIds: z.array(uuidSchema).optional(),
   primaryCategoryId: uuidSchema.nullish(),
   seoTitle,
   seoDescription,
   ...seoEntityFields,
   ...dimensionFields,
+  // Оверлей переводов (ADR-i18n, инкремент 2b): { [locale]: { [field]: string } }.
+  translations: translationsBlockSchema,
 })
   // Зеркало refine из ProductCreateSchema: основная категория обязана входить в
   // список категорий товара (иначе syncProductCategories не пометит ни одну строку
@@ -302,6 +332,8 @@ export const BrandCreateSchema = z.object({
   description: z.string().max(5000).optional().default(''),
   isActive: z.boolean().optional().default(true),
   sort: z.number().int().min(0).optional().default(0),
+  /** Внешний сайт бренда (§9); опц. при создании. */
+  externalUrl: externalUrlSchema,
   seoTitle,
   seoDescription,
 });
@@ -314,9 +346,13 @@ export const BrandUpdateSchema = z.object({
   description: z.string().max(5000).optional(),
   isActive: z.boolean().optional(),
   sort: z.number().int().min(0).optional(),
+  /** Внешний сайт бренда (§9); undefined → не трогаем, null → очистить. */
+  externalUrl: externalUrlSchema,
   seoTitle,
   seoDescription,
   ...seoEntityFields,
+  // Оверлей переводов (ADR-i18n, инкремент 2b): { [locale]: { [field]: string } }.
+  translations: translationsBlockSchema,
 });
 export type BrandUpdateInput = z.infer<typeof BrandUpdateSchema>;
 

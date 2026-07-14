@@ -7,11 +7,13 @@
 
 import { runStorefront, jsonData, jsonError, handlePreflight } from '@/lib/storefront/response';
 import { getProductById } from '@/lib/catalog/repository';
+import { listBlocksByProduct } from '@/lib/product-blocks';
 import {
   getActiveProductIdBySlug,
   getProductCategorySlugs,
 } from '@/lib/storefront/queries';
 import { toProductDetailDto } from '@/lib/storefront/dto';
+import { localizeCtxFrom } from '@/lib/storefront/locale';
 import { buildEntitySeoCtx } from '@/lib/storefront/seo-ctx';
 import { resolveIsNew } from '@/lib/catalog/pricing';
 import { getEffectiveSettings } from '@/lib/config/settings';
@@ -23,7 +25,9 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
-  return runStorefront(req, async ({ cors }) => {
+  return runStorefront(req, async (sfCtx) => {
+    const { cors } = sfCtx;
+    const loc = localizeCtxFrom(sfCtx);
     const { slug } = await ctx.params;
 
     const id = await getActiveProductIdBySlug(slug);
@@ -36,7 +40,10 @@ export async function GET(
       return jsonError('not_found', 'Товар не найден.', cors);
     }
 
-    const categorySlugs = await getProductCategorySlugs(id);
+    const [categorySlugs, blocks] = await Promise.all([
+      getProductCategorySlugs(id),
+      listBlocksByProduct(id),
+    ]);
     // «Новизна» — из эффективных настроек (env ⊕ БД), docs/11 §5.4.4.
     const settings = await getEffectiveSettings();
     const newProductDays = settings.catalog.newProductDays;
@@ -50,7 +57,7 @@ export async function GET(
     const storage = getStorage();
     const seoCtx = buildEntitySeoCtx(settings, (k) => storage.url(k), 'product');
 
-    const dto = toProductDetailDto(product, { effectiveIsNew, categorySlugs, seoCtx });
+    const dto = toProductDetailDto(product, { effectiveIsNew, categorySlugs, seoCtx, loc, blocks });
     return jsonData(dto, {}, cors);
   });
 }

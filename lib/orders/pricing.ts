@@ -566,6 +566,60 @@ export function combineDiscountsMinor(
 }
 
 // -----------------------------------------------------------------------------
+// Подарочный сертификат — ПОСТ-шаг поверх итога (docs/24 §5, §11). Чистая функция.
+// -----------------------------------------------------------------------------
+
+/** Разбивка применения подарочного сертификата к рассчитанному итогу. */
+export interface GiftAppliedResult {
+  /** Списано сертификатом на заказ = min(остаток, нетто-товары после промо). */
+  giftDiscount: MoneyString;
+  /** Итог к оплате ПОСЛЕ сертификата (grandTotal − giftDiscount); ≥ deliveryCost ≥ 0. */
+  grandTotal: MoneyString;
+  /** Сумма, к которой применим сертификат = itemsTotal − promoDiscount (доставку НЕ покрывает). */
+  amountDue: MoneyString;
+}
+
+/**
+ * Применяет подарочный сертификат КАК ОТДЕЛЬНЫЙ ПОСТ-ШАГ поверх `calculateQuote`
+ * (docs/24 §5, §11; ASSUMED-порядок стекования promo→gift — процентный/фикс promo
+ * СНАЧАЛА, сертификат к ОСТАТКУ):
+ *  - `amountDue` (сумма, покрываемая сертификатом) = itemsTotal − promoDiscount
+ *    (нетто-товары; ДОСТАВКУ сертификат НЕ покрывает — семантика carre
+ *    Cart::promoCodeSumValue);
+ *  - `giftDiscount` = min(остаток сертификата, amountDue) — считает СЕРВЕР
+ *    (anti-tamper: клиент не диктует размер скидки);
+ *  - итог к оплате = grandTotal − giftDiscount. Т.к. giftDiscount ≤ amountDue =
+ *    itemsTotal − promoDiscount, а grandTotal = itemsTotal − promoDiscount +
+ *    deliveryCost, итог ≥ deliveryCost ≥ 0 (доставка всегда остаётся к оплате).
+ *
+ * `giftRemaining` = null → сертификат не применяется (giftDiscount=0, итог не меняется).
+ * Всё в целых копейках (money-инвариант) — точность/сравнения без float-ошибок.
+ */
+export function applyGiftCertificate(
+  quote: QuoteResult,
+  giftRemaining: MoneyString | null,
+): GiftAppliedResult {
+  const itemsMinor = toMinor(quote.itemsTotal);
+  const discountMinor = toMinor(quote.discount);
+  // Нетто-товары после промо (доставку сертификат не покрывает).
+  const amountDueMinor = Math.max(0, itemsMinor - discountMinor);
+  const remainingMinor =
+    giftRemaining != null && Number.isFinite(Number(giftRemaining))
+      ? Math.max(0, toMinor(giftRemaining))
+      : 0;
+  const giftMinor = Math.min(remainingMinor, amountDueMinor);
+  const grandMinor = toMinor(quote.grandTotal) - giftMinor;
+  if (grandMinor < 0) {
+    throw new Error('Ошибка расчёта: итог заказа после сертификата отрицателен.');
+  }
+  return {
+    giftDiscount: fromMinor(giftMinor),
+    grandTotal: fromMinor(grandMinor),
+    amountDue: fromMinor(amountDueMinor),
+  };
+}
+
+// -----------------------------------------------------------------------------
 // Доставка и порог бесплатной доставки (§3.3). Чистая функция.
 // -----------------------------------------------------------------------------
 

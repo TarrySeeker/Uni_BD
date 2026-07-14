@@ -17,6 +17,8 @@ import {
 import { normalizeClientIp } from '@/lib/server/request-ip';
 import { authorizeStorefront, extractApiKey } from './auth';
 import type { AuthorizeResult } from './auth';
+import { resolveStorefrontLocale } from './locale';
+import type { Locale, LocaleConfig } from '@/lib/i18n';
 import {
   STOREFRONT_METHODS,
   buildCorsHeaders,
@@ -80,6 +82,14 @@ export interface StorefrontContext {
   cors: Record<string, string>;
   /** Нормализованный origin (если был). */
   origin?: string;
+  /**
+   * Эффективный язык запроса (ADR-i18n, docs/24 §1): ?locale= → Accept-Language →
+   * default(ru). Всегда валиден (член localeConfig.locales). Мапперы DTO резолвят
+   * по нему переводимые поля — форма DTO не меняется.
+   */
+  locale: Locale;
+  /** Конфигурация языков магазина (defaultLocale + набор), из shop_settings.i18n. */
+  localeConfig: LocaleConfig;
 }
 
 /**
@@ -122,6 +132,14 @@ export interface StorefrontOptions {
   module?: ModuleName | null;
   /** CORS Access-Control-Allow-Methods (по умолчанию 'GET, OPTIONS'). */
   methods?: string;
+  /**
+   * Роут работает с учётными данными покупателя (cookie/Bearer-сессия) — account/*.
+   * Тогда Access-Control-Allow-Credentials:true выдаётся ТОЛЬКО доверенному
+   * (сконфигурированному в STOREFRONT_ALLOWED_ORIGINS) origin: в mock/дефолт-режиме
+   * сторонний сайт не получит credentialed CORS и не прочитает ответ авторизованного
+   * покупателя (7a security-medium). Публичные роуты флаг не ставят (default false).
+   */
+  credentialed?: boolean;
 }
 
 /**
@@ -131,18 +149,23 @@ export interface StorefrontOptions {
 export function handlePreflight(
   req: Request,
   methods: string = STOREFRONT_METHODS,
+  credentialed = false,
 ): NextResponse {
   const auth = authorizeStorefront(req.headers);
+  // credentialed account/*: credentials лишь для доверенного (сконфигурированного)
+  // origin; иначе не отражаем credentials стороннему сайту (7a security-medium).
+  const credentials = credentialed ? auth.originAllowed : true;
+  const corsOpts = { methods, credentials };
   if (isPreflight(req.method, req.headers)) {
     return new NextResponse(null, {
       status: 204,
-      headers: buildPreflightHeaders(auth.ok ? auth.origin : null, methods),
+      headers: buildPreflightHeaders(auth.ok ? auth.origin : null, corsOpts),
     });
   }
   // Обычный OPTIONS без preflight-заголовков.
   return new NextResponse(null, {
     status: 204,
-    headers: buildCorsHeaders(auth.ok ? auth.origin : null, methods),
+    headers: buildCorsHeaders(auth.ok ? auth.origin : null, corsOpts),
   });
 }
 
@@ -181,7 +204,13 @@ export async function runStorefront(
   const moduleName = options.module === null ? null : options.module ?? 'catalog';
   const methods = options.methods ?? STOREFRONT_METHODS;
   const auth = authorizeStorefront(req.headers);
-  const cors = buildCorsHeaders(auth.ok ? auth.origin : null, methods);
+  // credentialed account/*: Allow-Credentials лишь для доверенного (явно
+  // сконфигурированного) origin; иначе сторонний сайт не читает ответ покупателя.
+  const credentials = options.credentialed ? auth.originAllowed : true;
+  const cors = buildCorsHeaders(auth.ok ? auth.origin : null, { methods, credentials });
+  // i18n: ответ зависит от Accept-Language (когда ?locale= не задан) — сообщаем
+  // кешам через Vary, чтобы en/fr/ru не смешивались в общем кэше (docs/24 §1).
+  cors.Vary = cors.Vary ? `${cors.Vary}, Accept-Language` : 'Accept-Language';
 
   // 1) Требуемый модуль (catalog для каталога, orders для заказов, §4.2).
   //    Для core-always-on (moduleName === null) проверка пропускается.
@@ -222,5 +251,14 @@ export async function runStorefront(
   // Каждый запрос — +1 к счётчику окна (fixed-window лимит на витрину/ip).
   await registerStorefrontHit(key);
 
-  return handler({ cors, origin: auth.ok ? auth.origin : undefined });
+  // Эффективный язык запроса (fail-safe: не бросает, всегда валиден). Резолвится
+  // ПОСЛЕ auth/rate-limit — чтобы не читать конфиг магазина на путях ошибок.
+  const { locale, config } = await resolveStorefrontLocale(req);
+
+  return handler({
+    cors,
+    origin: auth.ok ? auth.origin : undefined,
+    locale,
+    localeConfig: config,
+  });
 }

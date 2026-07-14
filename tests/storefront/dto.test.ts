@@ -50,6 +50,7 @@ function fullBrand(over: Partial<Brand> = {}): Brand {
     logoKey: 'brands/bosch.png',
     isActive: true,
     sort: 5,
+    externalUrl: null,
     seoTitle: 't',
     seoDescription: 'd',
     ogTitle: null,
@@ -248,7 +249,7 @@ describe('storefront/dto — карточка товара', () => {
   const product: ProductDetail = {
     id: 'p1', sku: 'SKU1', slug: 'coat', name: 'Coat', description: 'nice',
     status: 'active', basePrice: '1000.00', compareAtPrice: '1500.00',
-    isFeatured: false, isNew: null, brandId: 'b1',
+    isFeatured: false, isNew: null, brandId: 'b1', designerId: null,
     attributesCache: { color: 'white' }, seoTitle: null, seoDescription: null,
     ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,
     weightG: null, lengthCm: null, widthCm: null, heightCm: null,
@@ -265,6 +266,7 @@ describe('storefront/dto — карточка товара', () => {
       { id: 'i1', productId: 'p1', variantId: 'v1', warehouseCode: 'main', quantity: 2, reserved: 0, updatedAt: D },
     ],
     brand: brandRef,
+    designer: null,
   };
 
   it('маппит цену/скидку, бренд, категории-slug, медиа без storageKey', () => {
@@ -369,19 +371,19 @@ describe('storefront/dto — дерево категорий', () => {
   const tree: CategoryTreeNode[] = [
     {
       id: 'c1', parentId: null, slug: 'men', name: 'Men', description: '',
-      sort: 0, isActive: true, seoTitle: null, seoDescription: null,
+      sort: 0, isActive: true, imageKey: null, seoTitle: null, seoDescription: null,
       ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,
       createdAt: D, updatedAt: D,
       children: [
         {
           id: 'c2', parentId: 'c1', slug: 'coats', name: 'Coats', description: 'd',
-          sort: 0, isActive: true, seoTitle: null, seoDescription: null,
+          sort: 0, isActive: true, imageKey: null, seoTitle: null, seoDescription: null,
           ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,
           createdAt: D, updatedAt: D, children: [],
         },
         {
           id: 'c3', parentId: 'c1', slug: 'hidden', name: 'Hidden', description: '',
-          sort: 1, isActive: false, seoTitle: null, seoDescription: null,
+          sort: 1, isActive: false, imageKey: null, seoTitle: null, seoDescription: null,
           ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,
           createdAt: D, updatedAt: D, children: [],
         },

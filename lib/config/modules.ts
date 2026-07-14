@@ -8,15 +8,33 @@
  * Пример: ADMIK_MODULES=catalog,orders,cdek
  */
 
-export type ModuleName = 'catalog' | 'orders' | 'cdek' | 'cms' | 'payments';
+export type ModuleName =
+  | 'catalog'
+  | 'orders'
+  | 'cdek'
+  | 'cms'
+  | 'payments'
+  | 'news'
+  | 'reviews'
+  | 'account';
 
-/** Все известные платформе модули. */
+/**
+ * Все известные платформе модули.
+ *
+ * `news` (шаг 5), `reviews` (шаг 6) и `account` (шаг 7a — «Покупатели») имеют
+ * admin-страницы и пункты навигации (см. lib/admin/nav.ts), поэтому включённый
+ * модуль не даёт битой ссылки (404); для конкретного магазина без этих фич их
+ * выключают через shop_settings.module_overrides / ADMIK_MODULES.
+ */
 export const ALL_MODULES: readonly ModuleName[] = [
   'catalog',
   'orders',
   'cdek',
   'cms',
   'payments',
+  'news',
+  'reviews',
+  'account',
 ] as const;
 
 function isModuleName(value: string): value is ModuleName {

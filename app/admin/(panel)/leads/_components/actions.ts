@@ -29,3 +29,10 @@ export async function deleteLeadAction(
 ): Promise<ActionResult<{ id: string }>> {
   return prod.deleteLead(raw);
 }
+
+/** Ответ оператора на заявку (§9): пишет leads.answer (право orders.write). */
+export async function answerLeadAction(
+  raw: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  return prod.answerLead(raw);
+}

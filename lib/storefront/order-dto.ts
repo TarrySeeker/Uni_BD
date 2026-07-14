@@ -18,6 +18,9 @@ import { createHmac } from 'node:crypto';
 
 import type { Order, OrderItem, PromoCode, PromoApplyScope, PromoKind } from '@/lib/orders/types';
 import type { QuoteResult } from '@/lib/orders/pricing';
+import { toMinor, fromMinor } from '@/lib/orders/money';
+import type { GiftQuoteInfo } from '@/lib/orders/repository';
+import { toGiftQuoteDto, type GiftQuoteDto } from '@/lib/storefront/gift-dto';
 import {
   orderStatusLabel,
   paymentStatusLabel,
@@ -158,6 +161,8 @@ export interface OrderPublicDto {
 
   itemsTotal: string;
   discountTotal: string;
+  /** Списано подарочным сертификатом (снимок, ≥ 0). */
+  giftDiscountTotal: string;
   deliveryTotal: string;
   grandTotal: string;
   currency: string;
@@ -167,6 +172,8 @@ export interface OrderPublicDto {
 
   delivery: {
     type: Order['deliveryType'];
+    /** Постамат (§9): подвид ПВЗ с автовыдачей; true → показать метку «постамат». */
+    isPostamat: boolean;
     city: string | null;
     /** Трек-номер СДЭК (если присвоен, Этап 4). */
     track: string | null;
@@ -183,6 +190,8 @@ export interface OrderCreatedDto {
   status: Order['status'];
   paymentStatus: Order['paymentStatus'];
   grandTotal: string;
+  /** Списано подарочным сертификатом на этот заказ (снимок, ≥ 0). */
+  giftDiscountTotal: string;
   currency: string;
   /** Токен для GET /orders/:number (ЛК витрины), не хранится в БД. */
   accessToken: string;
@@ -222,6 +231,7 @@ export function toOrderPublicDto(order: Order, items: OrderItem[]): OrderPublicD
 
     itemsTotal: order.itemsTotal,
     discountTotal: order.discountTotal,
+    giftDiscountTotal: order.giftDiscountTotal,
     deliveryTotal: order.deliveryTotal,
     grandTotal: order.grandTotal,
     currency: order.currency,
@@ -231,6 +241,7 @@ export function toOrderPublicDto(order: Order, items: OrderItem[]): OrderPublicD
 
     delivery: {
       type: order.deliveryType,
+      isPostamat: order.isPostamat,
       city: order.deliveryCity,
       track: order.cdekTrack,
     },
@@ -251,6 +262,7 @@ export function toOrderCreatedDto(
     status: order.status,
     paymentStatus: order.paymentStatus,
     grandTotal: order.grandTotal,
+    giftDiscountTotal: order.giftDiscountTotal,
     currency: order.currency,
     accessToken: orderAccessToken(order.id, env),
   };
@@ -350,7 +362,10 @@ export interface QuoteLineDto {
 export interface QuoteDto {
   itemsTotal: string;
   discountTotal: string;
+  /** Списано подарочным сертификатом (СЕРВЕР; уменьшает сумму к оплате). */
+  giftDiscountTotal: string;
   deliveryTotal: string;
+  /** Итог к оплате ПОСЛЕ промокода И сертификата (grandTotal − giftDiscount). */
   grandTotal: string;
   currency: string;
   lines: QuoteLineDto[];
@@ -361,6 +376,8 @@ export interface QuoteDto {
     /** Машиночитаемая причина отказа промокода (если не применён). */
     reason: string | null;
   };
+  /** Подарочный сертификат (если код передан): applied/appliedAmount/остаток. null — не передан. */
+  gift: GiftQuoteDto | null;
   delivery: {
     free: boolean;
     freeThresholdMet: boolean;
@@ -387,16 +404,24 @@ export function toQuoteDto(input: {
   currency: string;
   fulfillable: boolean;
   promoReason?: string | null;
+  /** Результат применения подарочного сертификата (SOFT-резолв quoteCart); null — код не передан. */
+  gift?: GiftQuoteInfo | null;
   issues: Array<{ index: number; code: string }>;
   /** Удалось ли рассчитать доставку (см. QuoteDto.delivery.available). По умолч. true. */
   deliveryResolved?: boolean;
 }): QuoteDto {
   const { quote } = input;
+  const gift = input.gift ?? null;
+  // Итог к оплате уменьшается на списание сертификата (СЕРВЕР, anti-tamper).
+  const giftDiscountMinor = gift?.applied ? toMinor(gift.appliedAmount) : 0;
+  const giftDiscountTotal = fromMinor(giftDiscountMinor);
+  const grandTotal = fromMinor(Math.max(0, toMinor(quote.grandTotal) - giftDiscountMinor));
   return {
     itemsTotal: quote.itemsTotal,
     discountTotal: quote.discount,
+    giftDiscountTotal,
     deliveryTotal: quote.deliveryCost,
-    grandTotal: quote.grandTotal,
+    grandTotal,
     currency: input.currency,
     lines: quote.lines.map((l) => ({
       name: l.name,
@@ -413,6 +438,7 @@ export function toQuoteDto(input: {
       discount: quote.promo.discount,
       reason: input.promoReason ?? null,
     },
+    gift: toGiftQuoteDto(gift),
     delivery: {
       free: quote.delivery.free,
       freeThresholdMet: quote.delivery.freeThresholdMet,

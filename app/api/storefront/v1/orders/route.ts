@@ -23,6 +23,8 @@ import { CreateOrderSchema } from '@/lib/orders/schemas';
 import { createOrder } from '@/lib/orders/repository';
 import { toOrderCreatedDto, assertOrderTokenConfigured } from '@/lib/storefront/order-dto';
 import { normalizeClientIp } from '@/lib/server/request-ip';
+import { extractCustomerSessionToken } from '@/lib/customer-auth/cookies';
+import { getMe } from '@/lib/customer-auth/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,9 +78,18 @@ export async function POST(req: Request): Promise<Response> {
       // коммита → заказ-сирота в БД + 500 без accessToken. Проверяем заранее тем же env.
       assertOrderTokenConfigured();
 
+      // Привязка заказа к аккаунту (docs/24 §6, 7b): customer_id берём ТОЛЬКО из
+      // ВАЛИДНОЙ серверной сессии покупателя (cookie/Bearer → getMe), НИКОГДА из
+      // тела запроса — иначе можно подставить чужой customer_id и присвоить чужие
+      // заказы. Гость (нет/невалидна сессия) → null → orders.customer_id = NULL,
+      // как раньше (гостевой чекаут не ломается). Тело customer_id не читается —
+      // CreateOrderSchema его не содержит.
+      const customer = await getMe(extractCustomerSessionToken(req));
+
       const result = await createOrder(parsed.data, {
         source: 'storefront',
         ip: clientIp(req),
+        customerId: customer?.id ?? null,
       });
 
       if (!result.ok) {
@@ -93,10 +104,13 @@ export async function POST(req: Request): Promise<Response> {
       // Повтор с тем же idempotency-ключом → 200 (заказ существует), иначе 201.
       return jsonData(dto, {}, cors, { status: result.reused ? 200 : 201 });
     },
-    { module: 'orders', methods: STOREFRONT_WRITE_METHODS },
+    // credentialed: заказ может нести сессию покупателя (cookie/Bearer) для привязки
+    // customer_id (7b). Allow-Credentials выдаётся ЛИШЬ доверенному origin; гостевой
+    // чекаут не использует credentials, поэтому не ломается (см. buildCorsHeaders).
+    { module: 'orders', methods: STOREFRONT_WRITE_METHODS, credentialed: true },
   );
 }
 
 export async function OPTIONS(req: Request): Promise<Response> {
-  return handlePreflight(req, STOREFRONT_WRITE_METHODS);
+  return handlePreflight(req, STOREFRONT_WRITE_METHODS, true);
 }

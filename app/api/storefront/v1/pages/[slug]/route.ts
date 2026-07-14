@@ -11,6 +11,7 @@
 import { runStorefront, jsonData, jsonError, handlePreflight } from '@/lib/storefront/response';
 import { getPublishedCmsPageBySlug } from '@/lib/cms/repository';
 import { toPublicPageDto } from '@/lib/storefront/cms-dto';
+import { localizeCtxFrom } from '@/lib/storefront/locale';
 import { buildEntitySeoCtx } from '@/lib/storefront/seo-ctx';
 import { getEffectiveSettings } from '@/lib/config/settings';
 import { getStorage } from '@/lib/storage';
@@ -23,7 +24,9 @@ export async function GET(
 ): Promise<Response> {
   return runStorefront(
     req,
-    async ({ cors }) => {
+    async (sfCtx) => {
+      const { cors } = sfCtx;
+      const loc = localizeCtxFrom(sfCtx);
       const { slug } = await ctx.params;
 
       const page = await getPublishedCmsPageBySlug(slug);
@@ -39,7 +42,7 @@ export async function GET(
 
       // publicUrl передаётся явно: секции hero/banner/gallery отдают imageUrl
       // (публичный URL), а НЕ сырой ключ хранилища (инвариант, зеркаль каталог-медиа).
-      return jsonData(toPublicPageDto(page, seoCtx, publicUrl), {}, cors);
+      return jsonData(toPublicPageDto(page, seoCtx, publicUrl, loc), {}, cors);
     },
     { module: 'cms' },
   );

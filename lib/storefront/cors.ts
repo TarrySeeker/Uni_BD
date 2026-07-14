@@ -24,6 +24,24 @@ export const STOREFRONT_ALLOWED_HEADERS =
 /** Сколько секунд браузер может кешировать preflight-ответ. */
 export const STOREFRONT_PREFLIGHT_MAX_AGE = 600;
 
+/** Опции построения CORS-заголовков. */
+export interface CorsOptions {
+  /** Access-Control-Allow-Methods (по умолчанию STOREFRONT_METHODS). */
+  methods?: string;
+  /**
+   * Разрешать ли Access-Control-Allow-Credentials:true при конкретном origin.
+   *
+   * По умолчанию true — публичные read-роуты отдают credentials, чтобы
+   * navigator.sendBeacon (credentials:include) не резался браузером; данные там
+   * публичны, cookie-авторизации нет. Для credentialed account/*-роутов вызывающий
+   * ПЕРЕДАЁТ false, если origin не сконфигурирован явно (originAllowed=false):
+   * тогда сторонний сайт не сможет прочитать ответ авторизованного покупателя
+   * (7a security-medium). Спека CORS всё равно запрещает «*»+credentials, поэтому
+   * при origin='*' флаг не ставится независимо от этой опции.
+   */
+  credentials?: boolean;
+}
+
 /**
  * Строит CORS-заголовки ответа.
  *
@@ -31,26 +49,29 @@ export const STOREFRONT_PREFLIGHT_MAX_AGE = 600;
  *   эхо-ответ Access-Control-Allow-Origin: <origin> + Vary: Origin. Если null/
  *   undefined (mock без Origin, либо запрос не из браузера) — отдаём «*»
  *   (без credentials, публичный read-каталог).
+ * @param opts methods + флаг credentials (см. CorsOptions).
  */
 export function buildCorsHeaders(
   origin?: string | null,
-  methods: string = STOREFRONT_METHODS,
+  opts: CorsOptions = {},
 ): Record<string, string> {
+  const methods = opts.methods ?? STOREFRONT_METHODS;
+  const credentials = opts.credentials ?? true;
   const allowOrigin = origin && origin.trim() ? origin : '*';
   const headers: Record<string, string> = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': methods,
     'Access-Control-Allow-Headers': STOREFRONT_ALLOWED_HEADERS,
   };
-  // При конкретном origin сообщаем кешам, что ответ зависит от Origin, и
-  // разрешаем credentials: navigator.sendBeacon (beacon посещений) всегда шлёт
-  // запрос в режиме credentials:include, и браузер режет его на preflight, если
-  // нет Access-Control-Allow-Credentials:true. С конкретным (не «*») origin это
-  // безопасно — спека CORS запрещает пару «*»+credentials, поэтому при «*» флаг
-  // НЕ ставим (публичный read-каталог и так без cookie-авторизации).
+  // При конкретном origin сообщаем кешам, что ответ зависит от Origin. Спека CORS
+  // запрещает пару «*»+credentials, поэтому при «*» флаг НЕ ставим. При конкретном
+  // origin флаг ставим, только если вызывающий это разрешил (credentials !== false):
+  // публичные роуты — да (beacon), account/* — лишь для доверенного origin.
   if (allowOrigin !== '*') {
     headers.Vary = 'Origin';
-    headers['Access-Control-Allow-Credentials'] = 'true';
+    if (credentials) {
+      headers['Access-Control-Allow-Credentials'] = 'true';
+    }
   }
   return headers;
 }
@@ -58,10 +79,10 @@ export function buildCorsHeaders(
 /** Заголовки именно для preflight-ответа (добавляет Max-Age к CORS). */
 export function buildPreflightHeaders(
   origin?: string | null,
-  methods: string = STOREFRONT_METHODS,
+  opts: CorsOptions = {},
 ): Record<string, string> {
   return {
-    ...buildCorsHeaders(origin, methods),
+    ...buildCorsHeaders(origin, opts),
     'Access-Control-Max-Age': String(STOREFRONT_PREFLIGHT_MAX_AGE),
   };
 }

@@ -46,6 +46,14 @@ export interface AuthorizeResult {
   ok: boolean;
   /** Нормализованный Origin запроса (если был и распознан) — для CORS-ответа. */
   origin?: string;
+  /**
+   * Origin ЯВНО присутствует в STOREFRONT_ALLOWED_ORIGINS. Отличается от `ok`:
+   * доступ может быть выдан по API-ключу или mock-режиму, тогда origin —
+   * недоверенный (отражённый). Credentialed CORS (Allow-Credentials:true) для
+   * account/* выдаётся ТОЛЬКО при originAllowed=true, иначе сторонний сайт мог бы
+   * читать ответ авторизованного покупателя (7a security-medium).
+   */
+  originAllowed: boolean;
   /** Сработал mock-режим (конфигурация пуста). */
   mock?: boolean;
   /** Как авторизовались: ключ, origin или mock (для диагностики/логов). */
@@ -95,10 +103,15 @@ export function authorizeStorefront(
 
   const { apiKeys, allowedOrigins } = config;
 
-  // MOCK-режим: ничего не настроено → разрешаем (demo).
+  // Origin ЯВНО сконфигурирован? Единственное условие, при котором origin
+  // считается доверенным для credentialed-ответов (см. AuthorizeResult.originAllowed).
+  const originAllowed = origin != null && allowedOrigins.includes(origin);
+
+  // MOCK-режим: ничего не настроено → разрешаем (demo). originAllowed=false —
+  // отражённый origin недоверенный, credentialed CORS для account/* не выдаётся.
   if (apiKeys.length === 0 && allowedOrigins.length === 0) {
     warnMockOnce();
-    return { ok: true, origin, mock: true, via: 'mock' };
+    return { ok: true, origin, originAllowed, mock: true, via: 'mock' };
   }
 
   // 1) Проверка API-ключа (constant-time, m9). Перебираем ВСЕ ключи без раннего
@@ -112,15 +125,15 @@ export function authorizeStorefront(
         if (constantTimeEqual(k.key, provided)) matched = true;
       }
       if (matched) {
-        return { ok: true, origin, via: 'key' };
+        return { ok: true, origin, originAllowed, via: 'key' };
       }
     }
   }
 
   // 2) Проверка Origin.
   if (origin && allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
-    return { ok: true, origin, via: 'origin' };
+    return { ok: true, origin, originAllowed: true, via: 'origin' };
   }
 
-  return { ok: false, origin };
+  return { ok: false, origin, originAllowed };
 }

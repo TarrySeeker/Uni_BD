@@ -48,6 +48,7 @@ function makeRepoDeps() {
   return {
     getLeadStatus: vi.fn(async (_id: string) => 'new' as string | null),
     updateLeadStatus: vi.fn(async () => true),
+    updateLeadAnswer: vi.fn(async () => true),
     deleteLead: vi.fn(async () => true),
   };
 }
@@ -109,6 +110,39 @@ describe('setLeadStatus — guard orders.write', () => {
     const { actions } = build(makeUser([], true));
     const res = await actions.setLeadStatus({ id: VALID_ID, status: 'done' });
     expect(res.ok).toBe(true);
+  });
+});
+
+describe('answerLead (§9) — ответ оператора', () => {
+  it('без права orders.write → forbidden, ответ не пишется', async () => {
+    const { actions, repo } = build(makeUser([]));
+    const res = await actions.answerLead({ id: VALID_ID, answer: 'Ответ' });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('forbidden');
+    expect(repo.updateLeadAnswer).not.toHaveBeenCalled();
+  });
+
+  it('orders.write → пишет ответ, audit lead.answer, revalidate', async () => {
+    const { actions, repo, writeAudit, revalidate } = build(makeUser(['orders.write']));
+    const res = await actions.answerLead({ id: VALID_ID, answer: 'Мы свяжемся' });
+    expect(res.ok).toBe(true);
+    expect(repo.updateLeadAnswer).toHaveBeenCalledWith(VALID_ID, 'Мы свяжемся');
+    expect(revalidate).toHaveBeenCalledWith('/admin/leads');
+    const auditArg = writeAudit.mock.calls[0]![0] as { action: string; entityType: string };
+    expect(auditArg.action).toBe('lead.answer');
+    expect(auditArg.entityType).toBe('lead');
+  });
+
+  it('заявка не найдена → validation, ответ не пишется', async () => {
+    const repo = makeRepoDeps();
+    repo.getLeadStatus.mockResolvedValue(null);
+    const { actions } = build(makeUser(['orders.write']), repo);
+    const res = await actions.answerLead({ id: VALID_ID, answer: 'x' });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+    expect(repo.updateLeadAnswer).not.toHaveBeenCalled();
   });
 });
 

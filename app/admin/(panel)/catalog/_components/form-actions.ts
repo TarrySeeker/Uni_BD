@@ -21,10 +21,24 @@ import {
   deleteBrand,
   uploadBrandLogo,
   createCategory,
+  // designers ниже отдельным импортом (другой модуль lib/designers)
   updateCategory,
   moveCategory,
   deleteCategory,
 } from '@/lib/catalog/actions';
+import {
+  createDesigner,
+  updateDesigner,
+  deleteDesigner,
+  setDesignerActive,
+  uploadDesignerImage,
+} from '@/lib/designers/actions';
+import {
+  upsertProductBlock,
+  reorderProductBlocks,
+  deleteProductBlock,
+  uploadProductBlockImage,
+} from '@/lib/product-blocks/actions';
 import type { ActionResult } from '@/lib/server/action';
 
 /**
@@ -150,6 +164,61 @@ export async function uploadBrandLogoAction(
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   return uploadBrandLogo({ brandId, filename: file.name, bytes });
+}
+
+// --- Дизайнеры (§9, ADR §4.4) ----------------------------------------------
+
+export async function createDesignerAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  return createDesigner(input);
+}
+export async function updateDesignerAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  return updateDesigner(input);
+}
+export async function deleteDesignerAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  return deleteDesigner(input);
+}
+export async function setDesignerActiveAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  return setDesignerActive(input);
+}
+
+/** Загрузка аватара дизайнера из FormData (поле `file`). */
+export async function uploadDesignerImageAction(
+  designerId: string,
+  formData: FormData,
+): Promise<ActionResult<{ id: string; url: string; key: string }>> {
+  const file = formData.get('file');
+  if (!(file instanceof File)) {
+    return { ok: false, error: 'validation', fieldErrors: { file: ['Файл не выбран.'] } };
+  }
+  const bytes = Buffer.from(await file.arrayBuffer());
+  return uploadDesignerImage({ designerId, filename: file.name, bytes });
+}
+
+// --- Структурные секции товара (§9, product_blocks) -------------------------
+
+export async function upsertProductBlockAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  return upsertProductBlock(input);
+}
+export async function reorderProductBlocksAction(
+  input: unknown,
+): Promise<ActionResult<{ productId: string }>> {
+  return reorderProductBlocks(input);
+}
+export async function deleteProductBlockAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+  return deleteProductBlock(input);
+}
+
+/** Загрузка картинки секции из FormData (поле `file`). */
+export async function uploadProductBlockImageAction(
+  blockId: string,
+  formData: FormData,
+): Promise<ActionResult<{ id: string; url: string; key: string }>> {
+  const file = formData.get('file');
+  if (!(file instanceof File)) {
+    return { ok: false, error: 'validation', fieldErrors: { file: ['Файл не выбран.'] } };
+  }
+  const bytes = Buffer.from(await file.arrayBuffer());
+  return uploadProductBlockImage({ blockId, filename: file.name, bytes });
 }
 
 // --- Категории --------------------------------------------------------------

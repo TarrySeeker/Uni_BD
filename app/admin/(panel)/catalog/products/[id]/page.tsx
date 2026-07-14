@@ -7,12 +7,17 @@ import {
   listAttributes,
   listAttributeValuesByAttribute,
 } from '@/lib/catalog/repository';
+import { listDesigners } from '@/lib/designers/repository';
+import { listBlocksByProduct } from '@/lib/product-blocks';
 import { can } from '@/lib/auth/rbac';
+import { getLocaleConfig } from '@/lib/i18n';
+import { getStorage } from '@/lib/storage';
 
 import { Forbidden } from '../../../_components/Forbidden';
 import { PageHeader } from '../../../_components/PageHeader';
 import { guardCatalog } from '../../_components/guard';
 import { ProductForm } from '../../_components/ProductForm';
+import { ProductBlocksEditor } from '../../_components/ProductBlocksEditor';
 
 /**
  * Карточка товара (docs/05 §5.3, П4.2). Чтение — catalog.read; правки —
@@ -38,19 +43,29 @@ export default async function ProductDetailPage({
   }
 
   const { id } = await params;
-  const [product, brands, categoryTree, attributes, attributeValues] = await Promise.all([
-    getProductById(id),
-    listBrands(),
-    getCategoryTree(),
-    listAttributes(),
-    listAttributeValuesByAttribute(),
-  ]);
+  const [product, brands, designers, categoryTree, attributes, attributeValues, localeConfig, blocks] =
+    await Promise.all([
+      getProductById(id),
+      listBrands(),
+      listDesigners(),
+      getCategoryTree(),
+      listAttributes(),
+      listAttributeValuesByAttribute(),
+      getLocaleConfig(),
+      listBlocksByProduct(id),
+    ]);
 
   if (!product) {
     notFound();
   }
 
   const canWrite = can(guard.user, 'catalog.write');
+  const storage = getStorage();
+  const editorBlocks = blocks.map((b) => ({
+    ...b,
+    imageUrl: b.imageKey ? storage.url(b.imageKey) : null,
+  }));
+  const authors = designers.map((d) => ({ id: d.id, name: d.name }));
 
   return (
     <div>
@@ -75,9 +90,20 @@ export default async function ProductDetailPage({
         <ProductForm
           product={product}
           brands={brands}
+          designers={designers}
           categoryTree={categoryTree}
           attributes={attributes}
           attributeValues={attributeValues}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
+        />
+
+        <ProductBlocksEditor
+          productId={product.id}
+          blocks={editorBlocks}
+          authors={authors}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
         />
       </div>
     </div>

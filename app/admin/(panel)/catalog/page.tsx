@@ -127,6 +127,10 @@ export default async function CatalogPage({
           Бренды
         </Link>
         <span className="text-gray-300">·</span>
+        <Link href="/admin/catalog/designers" className="text-blue-700 hover:underline">
+          Дизайнеры
+        </Link>
+        <span className="text-gray-300">·</span>
         <Link href="/admin/catalog/attributes" className="text-blue-700 hover:underline">
           Характеристики
         </Link>

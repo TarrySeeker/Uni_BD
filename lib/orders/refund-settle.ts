@@ -1,6 +1,7 @@
 import type { TransactionSql } from 'postgres';
 
 import { releaseReservation } from './repository';
+import { releaseGiftTx } from '@/lib/gift-certificates/repository';
 import type { OrderStatus } from './types';
 
 /**
@@ -77,6 +78,13 @@ export async function settleRefundEffectsTx(
       `;
     }
   }
+
+  // (b2) Возврат баланса подарочного сертификата (§5, ADR-P1-3). ОРТОГОНАЛЬНО
+  // платёжному провайдеру: заказ мог быть частично покрыт сертификатом + оплачен
+  // шлюзом (tbank/paykeeper), либо полностью покрыт сертификатом (provider=manual).
+  // releaseGiftTx возвращает spent_total по активным списаниям заказа и метит
+  // reversed_at; идемпотентно (повтор/заказ без сертификата → no-op).
+  await releaseGiftTx(tx, { orderId });
 
   // (c) order.status → refunded (guarded по from) + история заказа.
   await tx`

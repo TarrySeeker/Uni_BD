@@ -27,9 +27,11 @@ import {
 } from './repository';
 import { canTransition, paymentStatusOnSettle } from './status';
 import { settleRefundEffectsTx } from './refund-settle';
+import { releaseGiftTx } from '@/lib/gift-certificates/repository';
 import { OrderError } from './errors';
 import type { Order, OrderItem, PromoCode } from './types';
-import { PaymentService, toKopecks } from '@/lib/payments/tbank';
+import { toKopecks } from '@/lib/payments/tbank';
+import { dispatchRefund } from '@/lib/payments/dispatch';
 
 /**
  * Server Actions админки модуля orders (docs/07 §4.1).
@@ -264,6 +266,15 @@ async function applyOrderStatusTransition(args: {
       await revertPromoUsage(tx, args.id, promoCodeId);
     }
 
+    // (c2) Возврат баланса подарочного сертификата при отмене/возврате (§5).
+    // Этот путь (admin refund/cancel) НЕ проходит через settleRefundEffectsTx, но
+    // резерв/промо/статус сеттлит здесь же — сертификат восстанавливаем симметрично.
+    // releaseGiftTx идемпотентна (reversed_at) и no-op для заказа без сертификата,
+    // поэтому двойного возврата с webhook-путём (settleRefundEffectsTx) не будет.
+    if (revertPromo) {
+      await releaseGiftTx(tx, { orderId: args.id });
+    }
+
     // (d) История статуса заказа.
     await tx`
       INSERT INTO order_status_history
@@ -422,13 +433,14 @@ export const refundOrder = defineAction({
       );
     }
 
-    // ШЛЮЗОВОЙ ВОЗВРАТ (Фича #15): возвращаем деньги через Т-Банк (Cancel) ДО смены
-    // статуса. refundPayment ТОЛЬКО дёргает шлюз и пишет аудит-лог — payment_status
-    // он НЕ меняет (внутренний сетл делает applyOrderStatusTransition ниже → двойного
-    // сетла нет). Суммы — СЕРВЕРНЫЕ (копейки из grand_total, anti-tamper). Для
-    // COD/manual (provider!=='tbank') вернёт skipped, и внутренний сетл всё равно
-    // отработает.
-    const refundRes = await new PaymentService().refundPayment({
+    // ШЛЮЗОВОЙ ВОЗВРАТ (Фича #15 + ADR-P1-3): возвращаем деньги ДО смены статуса,
+    // МАРШРУТИЗИРУЯ по order.payment_provider через dispatchRefund (tbank/paykeeper/
+    // manual/gift; неизвестный НЕ-null → безопасная ошибка, НЕ дефолт-tbank). refund
+    // ТОЛЬКО дёргает шлюз/пишет аудит-лог — payment_status он НЕ меняет (внутренний
+    // сетл делает applyOrderStatusTransition ниже → двойного сетла нет). Суммы —
+    // СЕРВЕРНЫЕ (копейки из grand_total, anti-tamper). Для COD/manual/gift вернёт
+    // skipped, и внутренний сетл всё равно отработает.
+    const refundRes = await dispatchRefund({
       orderId: cur.order.id,
       orderNumber: cur.order.number,
       paymentStatus: cur.order.paymentStatus,

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getCategoryTree } from '@/lib/catalog/repository';
 import type { CategoryTreeNode } from '@/lib/catalog/types';
+import { getLocaleConfig } from '@/lib/i18n';
 
 import { Forbidden } from '../../../_components/Forbidden';
 import { guardCatalog } from '../../_components/guard';
@@ -42,7 +43,7 @@ export default async function CategoryDetailPage({
   }
 
   const { id } = await params;
-  const tree = await getCategoryTree();
+  const [tree, localeConfig] = await Promise.all([getCategoryTree(), getLocaleConfig()]);
   const node = findNode(tree, id);
   if (!node) {
     notFound();
@@ -59,7 +60,11 @@ export default async function CategoryDetailPage({
       <h1 className="mt-2 text-2xl font-semibold text-gray-900">{node.name}</h1>
 
       <div className="mt-6">
-        <CategoryForm category={node} />
+        <CategoryForm
+          category={node}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
+        />
       </div>
     </div>
   );

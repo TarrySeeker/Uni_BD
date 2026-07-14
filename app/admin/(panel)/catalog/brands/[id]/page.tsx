@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getBrandById } from '@/lib/catalog/repository';
 import { getStorage } from '@/lib/storage';
+import { getLocaleConfig } from '@/lib/i18n';
 
 import { Forbidden } from '../../../_components/Forbidden';
 import { guardCatalog } from '../../_components/guard';
@@ -30,7 +31,7 @@ export default async function BrandDetailPage({
   }
 
   const { id } = await params;
-  const brand = await getBrandById(id);
+  const [brand, localeConfig] = await Promise.all([getBrandById(id), getLocaleConfig()]);
   if (!brand) {
     notFound();
   }
@@ -52,7 +53,11 @@ export default async function BrandDetailPage({
       <h1 className="mt-2 text-2xl font-semibold text-gray-900">{brand.name}</h1>
 
       <div className="mt-6">
-        <BrandForm brand={brandView} />
+        <BrandForm
+          brand={brandView}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
+        />
       </div>
     </div>
   );

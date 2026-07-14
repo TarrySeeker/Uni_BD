@@ -47,6 +47,16 @@ describe('auth/permissions — каталог', () => {
         'cdek.manage',
         'cms.read',
         'cms.write',
+        'news.read',
+        'news.write',
+        'reviews.read',
+        'reviews.write',
+        'gift.read',
+        'gift.write',
+        'customers.read',
+        'customers.write',
+        'i18n.read',
+        'i18n.manage',
       ]),
     );
   });

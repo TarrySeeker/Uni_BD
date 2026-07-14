@@ -12,6 +12,7 @@ import { listProducts } from '@/lib/catalog/repository';
 import type { ProductListFilter } from '@/lib/catalog/repository';
 import { getActiveCategoryIdBySlug } from '@/lib/storefront/queries';
 import { toProductListItemDto } from '@/lib/storefront/dto';
+import { localizeCtxFrom } from '@/lib/storefront/locale';
 import { getStorage } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,9 @@ function parseIntOr(v: string | null, def: number): number {
 }
 
 export async function GET(req: Request): Promise<Response> {
-  return runStorefront(req, async ({ cors }) => {
+  return runStorefront(req, async (ctx) => {
+    const { cors } = ctx;
+    const loc = localizeCtxFrom(ctx);
     const url = new URL(req.url);
     const q = url.searchParams;
 
@@ -93,7 +96,7 @@ export async function GET(req: Request): Promise<Response> {
     const { rows, total } = await listProducts(filter);
     // Логотип бренда: ключ → публичный URL через storage.url (как og:image/медиа).
     const storage = getStorage();
-    const data = rows.map((r) => toProductListItemDto(r, (k) => storage.url(k)));
+    const data = rows.map((r) => toProductListItemDto(r, (k) => storage.url(k), loc));
 
     return jsonData(
       data,

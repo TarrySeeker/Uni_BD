@@ -10,6 +10,7 @@
 
 import { sql } from '@/lib/db/client';
 import { escapeLike } from '@/lib/db/like';
+import type { TranslationsMap } from '@/lib/i18n';
 import type {
   CmsPage,
   CmsPageListRow,
@@ -31,6 +32,15 @@ function asDate(v: any): Date {
 function asNullableDate(v: any): Date | null {
   if (v === null || v === undefined) return null;
   return asDate(v);
+}
+
+/**
+ * Сырой jsonb-оверлей переводов → TranslationsMap (locale→{field→value|structural}).
+ * Не-объект/массив/NULL → {}. Резолв — в DTO по ctx.locale (localizeStructured/Row).
+ */
+function asTranslations(v: any): TranslationsMap {
+  const obj = asContent(v);
+  return obj as TranslationsMap;
 }
 
 function asContent(v: any): Record<string, unknown> {
@@ -70,6 +80,7 @@ export function mapCmsPage(row: any): CmsPage {
         ? null
         : Number(row.sitemap_priority),
     sitemapChangefreq: (row.sitemap_changefreq ?? null) as SitemapChangefreq | null,
+    translations: asTranslations(row.translations),
     createdBy: row.created_by ?? null,
     updatedBy: row.updated_by ?? null,
     createdAt: asDate(row.created_at),
@@ -85,6 +96,7 @@ export function mapCmsSection(row: any): CmsSection {
     sectionKey: row.section_key,
     type: row.type as CmsSectionType,
     content: asContent(row.content),
+    translations: asTranslations(row.translations),
     displayOrder:
       row.display_order === null || row.display_order === undefined
         ? 0
@@ -161,14 +173,14 @@ export async function getCmsPageById(
     SELECT id, slug, title, status, published_at,
            seo_title, seo_description, og_title, og_description,
            og_image_url, canonical_url, noindex,
-           sitemap_priority, sitemap_changefreq,
+           sitemap_priority, sitemap_changefreq, translations,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages WHERE id = ${id} LIMIT 1
   `;
   if (pageRows.length === 0) return null;
 
   const sectionRows = await sql<Record<string, unknown>[]>`
-    SELECT id, page_id, section_key, type, content, display_order, enabled,
+    SELECT id, page_id, section_key, type, content, translations, display_order, enabled,
            created_at, updated_at
     FROM cms_page_sections
     WHERE page_id = ${id}
@@ -191,7 +203,7 @@ export async function listPublishedCmsPages(): Promise<CmsPage[]> {
     SELECT id, slug, title, status, published_at,
            seo_title, seo_description, og_title, og_description,
            og_image_url, canonical_url, noindex,
-           sitemap_priority, sitemap_changefreq,
+           sitemap_priority, sitemap_changefreq, translations,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages
     WHERE status = 'published'
@@ -211,7 +223,7 @@ export async function getPublishedCmsPageBySlug(
     SELECT id, slug, title, status, published_at,
            seo_title, seo_description, og_title, og_description,
            og_image_url, canonical_url, noindex,
-           sitemap_priority, sitemap_changefreq,
+           sitemap_priority, sitemap_changefreq, translations,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages
     WHERE slug = ${slug} AND status = 'published'
@@ -221,7 +233,7 @@ export async function getPublishedCmsPageBySlug(
 
   const pageId = (pageRows[0] as any).id as string;
   const sectionRows = await sql<Record<string, unknown>[]>`
-    SELECT id, page_id, section_key, type, content, display_order, enabled,
+    SELECT id, page_id, section_key, type, content, translations, display_order, enabled,
            created_at, updated_at
     FROM cms_page_sections
     WHERE page_id = ${pageId} AND enabled = true

@@ -36,6 +36,11 @@ export async function POST(req: Request): Promise<Response> {
           contact: parsed.data.contact,
           message: parsed.data.message,
           source: 'contact_form',
+          // Доп. поля формы (§9) — опциональны; пустые → null (обратная
+          // совместимость: старая форма их не шлёт → undefined → null).
+          company: parsed.data.company || null,
+          city: parsed.data.city || null,
+          subject: parsed.data.subject || null,
         });
         return jsonData({ id }, {}, cors);
       } catch (err) {

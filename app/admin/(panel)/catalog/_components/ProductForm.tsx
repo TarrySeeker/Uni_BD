@@ -8,6 +8,7 @@ import type {
   CategoryTreeNode,
   ProductDetail,
 } from '@/lib/catalog/types';
+import type { Designer } from '@/lib/designers/types';
 import { PRODUCT_STATUSES, type ProductStatus } from '@/lib/catalog/types';
 import { normalizeMoney } from '@/lib/catalog/schemas';
 import { isPubliclyVisible } from '@/lib/catalog/visibility';
@@ -29,6 +30,13 @@ import {
   SeoFieldset,
   type SeoFieldsetValue,
 } from '../../_components/SeoFieldset';
+import {
+  LocaleTabs,
+  CATALOG_ENTITY_TR_FIELD_DEFS,
+  toTranslationsState,
+  translationsPayload,
+  type TranslationsState,
+} from '../../_components/LocaleTabs';
 
 /**
  * Форма товара (docs/05 §5.3, П4.2). Секции-вкладки:
@@ -64,22 +72,33 @@ type FailResult = Extract<ActionResult<unknown>, { ok: false }>;
 export function ProductForm({
   product,
   brands,
+  designers = [],
   categoryTree,
   attributes,
   attributeValues = {},
+  locales = ['ru'],
+  defaultLocale = 'ru',
 }: {
   /** null → режим создания. */
   product: ProductDetail | null;
   brands: Brand[];
+  designers?: Designer[];
   categoryTree: CategoryTreeNode[];
   attributes: Attribute[];
   /** Значения словарей характеристик по attribute_id — для select-атрибутов. */
   attributeValues?: Record<string, AttributeValue[]>;
+  /** Включённые языки магазина (shop_settings.i18n.locales). */
+  locales?: readonly string[];
+  /** Язык по умолчанию (база = обычные колонки). */
+  defaultLocale?: string;
 }) {
   const router = useRouter();
   const isEdit = product !== null;
 
   const [section, setSection] = useState<Section>('main');
+  const [translations, setTranslations] = useState<TranslationsState>(
+    toTranslationsState(product?.translations),
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<FailResult | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -93,6 +112,7 @@ export function ProductForm({
   const [basePrice, setBasePrice] = useState(product?.basePrice ?? '0');
   const [compareAtPrice, setCompareAtPrice] = useState(product?.compareAtPrice ?? '');
   const [brandId, setBrandId] = useState(product?.brandId ?? '');
+  const [designerId, setDesignerId] = useState(product?.designerId ?? '');
   // Вес/габариты для СДЭК (0018): пустая строка = null (дефолт магазина).
   const numToStr = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v));
   const [weightG, setWeightG] = useState(numToStr(product?.weightG));
@@ -163,6 +183,7 @@ export function ProductForm({
       isFeatured,
       isNew,
       brandId: brandId || null,
+      designerId: designerId || null,
       categoryIds,
       primaryCategoryId: primaryCategoryId || null,
       seoTitle: seo.seoTitle.trim() || undefined,
@@ -184,7 +205,12 @@ export function ProductForm({
 
     try {
       const result = isEdit
-        ? await updateProductAction({ id: product!.id, ...payload, ...seoExtra })
+        ? await updateProductAction({
+            id: product!.id,
+            ...payload,
+            ...seoExtra,
+            translations: translationsPayload(translations),
+          })
         : await createProductAction(payload);
 
       if (result.ok) {
@@ -326,6 +352,16 @@ export function ProductForm({
         )
       ) : null}
 
+      <LocaleTabs
+        locales={locales}
+        defaultLocale={defaultLocale}
+        fields={CATALOG_ENTITY_TR_FIELD_DEFS}
+        value={translations}
+        onChange={setTranslations}
+        enabled={isEdit}
+        pending={pending}
+        onSave={onSubmit}
+      >
       <div role="tablist" aria-label="Секции товара" className="flex flex-wrap gap-1 border-b border-gray-200">
         {tabs
           .filter((t) => isEdit || !t.editOnly)
@@ -526,6 +562,25 @@ export function ProductForm({
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <label htmlFor="p-designer" className="block text-sm font-medium text-gray-700">
+                    Дизайнер
+                  </label>
+                  <select
+                    id="p-designer"
+                    value={designerId}
+                    onChange={(e) => setDesignerId(e.target.value)}
+                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="">— без дизайнера —</option>
+                    {designers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <fieldset className="mt-4 flex flex-col gap-2">
@@ -701,6 +756,7 @@ export function ProductForm({
 
       {isEdit && section === 'variants' ? null : null}
       {isEdit ? <InventorySectionPlaceholder section={section} product={product!} /> : null}
+      </LocaleTabs>
     </div>
   );
 }
