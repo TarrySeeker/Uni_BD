@@ -1,6 +1,6 @@
 ---
 name: gate
-description: Прогнать полный код-гейт admik перед коммитом — typecheck, lint, vitest, проверка миграций, security-review, опционально e2e. Это «первая из двух обязательных проверок» (кодом). Применять после любой правки бизнес-логики и ВСЕГДА перед коммитом.
+description: Прогнать полный код-гейт admik перед коммитом — typecheck, lint, vitest, прод-сборку (next build), проверка миграций, security-review, опционально e2e. Это «первая из двух обязательных проверок» (кодом). Применять после любой правки бизнес-логики и ВСЕГДА перед коммитом.
 ---
 
 # Код-гейт admik
@@ -13,8 +13,9 @@ description: Прогнать полный код-гейт admik перед ко
 1. **Типы:** `pnpm typecheck` (= `tsc --noEmit`) — ожидаем exit 0.
 2. **Линт:** `pnpm lint` (= `eslint .`).
 3. **Юнит/интеграция:** `pnpm test` (= `vitest run`) — падений быть не должно.
-4. **Миграции** (если трогал `db/migrations/*` или схему): `./scripts/check-migrations.sh` — аддитивны и идемпотентны.
-5. **Безопасность** (если трогал оплату, RBAC-гвард, токены заказа, webhook, `.env`, S3): вызови встроенный скилл `security-review`.
+4. **Прод-сборка:** `pnpm build` (= `next build`) — exit 0. Ловит то, что typecheck/lint/vitest НЕ видят и что ломает деплой: не-async экспорты в `'use server'`-модулях («Server Actions must be async») и утечку серверного кода (`postgres`, `node:net/tls/fs`) в клиентский бандл через barrel-импорты. `next dev` такое терпит — поэтому обязателен именно build. Та же команда, что в Dockerfile (`RUN pnpm build`).
+5. **Миграции** (если трогал `db/migrations/*` или схему): `./scripts/check-migrations.sh` — аддитивны и идемпотентны.
+6. **Безопасность** (если трогал оплату, RBAC-гвард, токены заказа, webhook, `.env`, S3): вызови встроенный скилл `security-review`.
 
 ## Опционально
 - E2E витрины/админки: `pnpm test:e2e` (Playwright). Браузеры в `~/.cache/ms-playwright`.
@@ -26,5 +27,5 @@ description: Прогнать полный код-гейт admik перед ко
 - Красный шаг = стоп, не коммить, чини и перезапускай гейт с шага 1.
 
 ## Итог
-Сводка: `typecheck/lint/test/migrations/security` = OK/FAIL + числа тестов.
+Сводка: `typecheck/lint/test/build/migrations/security` = OK/FAIL + числа тестов.
 Напомни: коммит только после ВТОРОЙ проверки (живой прогон — `deploy-stand` или `verify`).
