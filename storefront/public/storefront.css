@@ -1,0 +1,241 @@
+/*
+ * Дополняющие стили витрины (поверх собранного app.css carre). Только для
+ * композиций главной, которых нет в оригинальном шаблоне (hero, сетка категорий).
+ * Токены согласованы с carre: шрифт FuturaPT (наследуется от body), чёрный текст,
+ * серые рамки #e9e9e9 / фон #f5f5f5, заглавные заголовки.
+ */
+
+.sf-home {
+  color: #000;
+}
+
+/* ---- Hero ---------------------------------------------------------------- */
+.sf-hero {
+  text-align: center;
+  padding: 40px 20px 70px;
+  border-bottom: 1px solid #e9e9e9;
+  margin-bottom: 40px;
+}
+.sf-hero__title {
+  font-weight: 400;
+  font-size: 45px;
+  line-height: 110%;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 18px;
+}
+.sf-hero__subtitle {
+  font-size: 18px;
+  line-height: 140%;
+  color: #636363;
+  max-width: 640px;
+  margin: 0 auto 26px;
+}
+.sf-hero__cta {
+  display: inline-block;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #000;
+  text-decoration: none;
+  border-bottom: 1px solid #000;
+  padding-bottom: 4px;
+}
+.sf-hero__cta:hover {
+  opacity: 0.6;
+}
+
+/* ---- Секции -------------------------------------------------------------- */
+.sf-section {
+  margin-bottom: 60px;
+}
+.mainpage--new.sf-section {
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+
+/* ---- Сетка категорий ----------------------------------------------------- */
+.sf-cat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.sf-cat-card {
+  width: 25%;
+  padding: 10px;
+  text-decoration: none;
+  color: #000;
+  box-sizing: border-box;
+}
+.sf-cat-card__image {
+  width: 100%;
+  height: 16vw;
+  min-height: 160px;
+  background-color: #f5f5f5;
+  background-size: cover;
+  background-position: 50%;
+  background-repeat: no-repeat;
+}
+.sf-cat-card__name {
+  display: block;
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 120%;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.sf-cat-card:hover .sf-cat-card__name {
+  opacity: 0.6;
+}
+
+/* ---- Карточка категории (порт __category-card.twig) ----------------------
+ * a.category > div.category__image[background-image] + span.category__name.
+ * Классов нет в собранном app.css carre — определяем здесь, токены как у карточек
+ * выше. Раскладывается в любом flex-контейнере (.sf-cat-grid). */
+.category {
+  display: block;
+  width: 25%;
+  padding: 10px;
+  box-sizing: border-box;
+  text-decoration: none;
+  color: #000;
+}
+.category__image {
+  width: 100%;
+  height: 16vw;
+  min-height: 160px;
+  background-color: #f5f5f5;
+  background-size: cover;
+  background-position: 50%;
+  background-repeat: no-repeat;
+}
+.category__name {
+  display: block;
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 120%;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.category:hover .category__name {
+  opacity: 0.6;
+}
+
+/* Подкатегории карточками на лендинге родителя (внутри works-catalog-list). */
+.sf-subcats {
+  margin-bottom: 30px;
+}
+
+/* ---- Полное дерево в выезжающем меню: вложенные аккордеоны (3 уровня) ------
+ * app.css задаёт аккордеон только на 1 уровень (menu-block > menu-block-links).
+ * Здесь добавляем вложенный уровень: держим внутренние подсписки свёрнутыми, пока
+ * не открыт их собственный menu-block, и снимаем ограничение высоты, чтобы 3 уровня
+ * не обрезались. Селекторы с child-комбинатором перекрывают descendant-правила
+ * app.css (та же/выше специфичность + позднее в каскаде). */
+.page-menu-top-main .menu-block-links .menu-block {
+  padding-left: 12px;
+}
+.page-menu-top-main .menu-block-links .menu-block .menu-block-head {
+  margin: 8px 0 6px;
+}
+.page-menu-top-main .menu-block-links .menu-block .menu-block-head a {
+  font-size: 14px;
+}
+/* Вложенные подсписки по умолчанию закрыты, даже когда открыт родитель. */
+.page-menu-top .menu-block .menu-block .menu-block-links {
+  max-height: 0;
+}
+/* Разворачиваем только собственный подсписок открытого блока; большой запас
+ * высоты, чтобы 3 уровня не обрезались. */
+.page-menu-top .menu-block.open > .menu-block-links,
+.page-menu-top .menu-block .menu-block.open > .menu-block-links {
+  max-height: 2000px;
+}
+
+.sf-empty {
+  text-align: center;
+  color: #636363;
+  padding: 40px 0;
+}
+
+/* ---- Галерея товара: превью (slick заменён кликабельными миниатюрами) ------ */
+.sf-gallery-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.sf-gallery-thumb {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid #e9e9e9;
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.sf-gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sf-gallery-thumb.is-active {
+  border-color: #000;
+}
+
+/* ---- Описание товара (accordion оригинала заменён видимым блоком) ---------- */
+.sf-product-descr {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #c1c1c1;
+}
+.sf-product-descr__title {
+  font-size: 18px;
+  line-height: 120%;
+  margin-bottom: 10px;
+}
+.sf-product-descr__body {
+  font-size: 16px;
+  line-height: 140%;
+  color: #636363;
+  white-space: pre-wrap;
+}
+
+/* ---- Старая цена (скидка) ------------------------------------------------- */
+.sf-price-old {
+  color: #9a9a9a;
+  text-decoration: line-through;
+  margin-right: 10px;
+}
+
+/* ---- Счётчик корзины в шапке ---------------------------------------------- */
+.page-head-icons a {
+  position: relative;
+}
+.sf-cart-count {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #000;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+@media (max-width: 991.98px) {
+  .sf-cat-card { width: 33.333%; }
+  .sf-cat-card__image { height: 22vw; }
+  .sf-hero__title { font-size: 32px; }
+}
+@media (max-width: 767.98px) {
+  .sf-cat-card { width: 50%; }
+  .sf-cat-card__image { height: 34vw; }
+}
