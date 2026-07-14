@@ -207,6 +207,13 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 -- migrator ведёт журнал; app только читает (диагностика).
 GRANT SELECT, INSERT, UPDATE ON schema_migrations TO admik_migrator;
 GRANT SELECT                 ON schema_migrations TO admik_app;
+
+-- Least-privilege (ADR-002/006): admik_migrator НЕ должен быть членом суперроли.
+-- Убираем возможный ручной dev-костыль `GRANT postgres TO admik_migrator`, который
+-- маскировал утечку владения таблицами (FK REFERENCES проходил лишь потому, что
+-- migrator временно наследовал права суперпользователя). REVOKE несуществующего
+-- членства — безвредный no-op (NOTICE «is not a member … skipping»).
+REVOKE postgres FROM admik_migrator;
 SQL
 then
   fail "Ошибка bootstrap БД (создание ролей/расширений суперпользователем)."
@@ -253,8 +260,62 @@ else
         fail "Ошибка при применении миграции ${name} (под ${run_label})."
         exit 1
       fi
+
+      # Нормализация владения (least-privilege, ADR-002/006). Superuser-роутнутая
+      # миграция (CREATE EXTENSION / CREATE ROLE) выполняется целиком под
+      # СУПЕРПОЛЬЗОВАТЕЛЕМ, поэтому любые CREATE TABLE/SEQUENCE/VIEW в том же файле
+      # создают объекты во владении СУПЕРПОЛЬЗОВАТЕЛЯ. Инвариант же — всеми
+      # объектами схемы владеет admik_migrator; иначе следующая migrator-миграция
+      # не сможет сослаться на такую таблицу (FK REFERENCES) и упадёт с
+      # permission denied. Поэтому сразу переназначаем на admik_migrator все
+      # public-объекты, оставшиеся во владении суперпользователя. Шаг идемпотентен
+      # (ALTER ... OWNER — no-op, если владелец уже migrator; выборка по
+      # tableowner=current_user под суперпользователем при повторе пуста) и
+      # выполняется ТОЛЬКО для superuser-роутнутых файлов (для migrator-роутнутых
+      # утечки нет по построению). Расширения остаются во владении суперпользователя
+      # намеренно (bootstrap-концерн, USAGE публичен) — pg_tables их не отбирает.
+      # ВНИМАНИЕ: условие завязано на выбор роли выше (run_label=superuser); при
+      # изменении логики выбора роли держать это условие синхронным с ним.
+      if [ "${run_label}" = "superuser" ]; then
+        if ! PGUSER="${POSTGRES_USER}" PGPASSWORD="${POSTGRES_PASSWORD}" \
+             psql -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT format('ALTER TABLE %I.%I OWNER TO admik_migrator', schemaname, tablename) AS cmd
+      FROM pg_tables    WHERE schemaname='public' AND tableowner    = current_user
+    UNION ALL
+    SELECT format('ALTER SEQUENCE %I.%I OWNER TO admik_migrator', schemaname, sequencename)
+      FROM pg_sequences WHERE schemaname='public' AND sequenceowner = current_user
+    UNION ALL
+    SELECT format('ALTER VIEW %I.%I OWNER TO admik_migrator', schemaname, viewname)
+      FROM pg_views     WHERE schemaname='public' AND viewowner     = current_user
+    UNION ALL
+    SELECT format('ALTER MATERIALIZED VIEW %I.%I OWNER TO admik_migrator', schemaname, matviewname)
+      FROM pg_matviews  WHERE schemaname='public' AND matviewowner  = current_user
+  LOOP EXECUTE r.cmd; END LOOP;
+END $$;
+SQL
+        then
+          fail "Ошибка нормализации владения после superuser-миграции ${name}."
+          exit 1
+        fi
+      fi
     done
     ok "Миграции применены (${#MIGRATION_FILES[@]} шт.; DDL — под admik_migrator)"
+
+    # Санити-инвариант least-privilege (ADR-002/006): после наката НИ ОДНА
+    # public-таблица не должна принадлежать суперпользователю — иначе нормализация
+    # владения выше не сработала и будущая FK-миграция снова упадёт с
+    # permission denied. current_user под PGUSER=POSTGRES_USER = имя суперпользователя.
+    leaked="$(PGUSER="${POSTGRES_USER}" PGPASSWORD="${POSTGRES_PASSWORD}" \
+      psql -tAq -c "SELECT string_agg(tablename, ', ' ORDER BY tablename) FROM pg_tables WHERE schemaname='public' AND tableowner = current_user")"
+    if [ -n "${leaked}" ]; then
+      fail "Санити: public-таблицы во владении суперпользователя (нарушение least-privilege): ${leaked}"
+      exit 1
+    fi
+    ok "Санити: ни одна public-таблица не принадлежит суперпользователю"
   fi
 fi
 
