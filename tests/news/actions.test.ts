@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createNewsActions, type NewsActionDeps } from '@/lib/news/actions';
+import { createNewsActions, type NewsActionDeps } from '@/lib/news/action-factory';
 import type { ActionDeps } from '@/lib/server/action';
 import type { AuthUser } from '@/lib/auth/rbac';
 import type { PermissionCode } from '@/lib/auth/permissions';

@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import type { ProductBlock, ProductBlockType, ProductBlockTab } from '@/lib/product-blocks';
-import { PRODUCT_BLOCK_TYPES } from '@/lib/product-blocks';
+import type { ProductBlock, ProductBlockType, ProductBlockTab } from '@/lib/product-blocks/types';
+import { PRODUCT_BLOCK_TYPES } from '@/lib/product-blocks/types';
 import type { ActionResult } from '@/lib/server/action';
 
 import {

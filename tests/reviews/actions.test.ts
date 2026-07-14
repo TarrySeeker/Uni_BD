@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createReviewActions, type ReviewActionDeps } from '@/lib/reviews/actions';
+import { createReviewActions, type ReviewActionDeps } from '@/lib/reviews/action-factory';
 import type { ActionDeps } from '@/lib/server/action';
 import type { AuthUser } from '@/lib/auth/rbac';
 import type { PermissionCode } from '@/lib/auth/permissions';

@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { moneySchema } from '@/lib/orders/schemas';
 import { toMinor } from '@/lib/orders/money';
-import { translationsBlockSchema } from '@/lib/i18n';
+import { translationsBlockSchema } from '@/lib/i18n/write';
 
 import { GIFT_CERTIFICATE_STATUSES } from './types';
 

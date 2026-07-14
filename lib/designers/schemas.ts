@@ -14,7 +14,7 @@ import {
   canonicalUrlSchema,
   noindexSchema,
 } from '@/lib/seo/schemas';
-import { translationsBlockSchema } from '@/lib/i18n';
+import { translationsBlockSchema } from '@/lib/i18n/write';
 
 /** UUID-идентификатор. */
 export const uuidSchema = z.string().uuid();
