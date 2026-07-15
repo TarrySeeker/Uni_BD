@@ -75,6 +75,9 @@ vi.mock('@/lib/orders/delivery-cost', () => ({
     source: 'stub' as const,
     provider: 'stub',
   }),
+  // resolveDeliveryZone используется repository для выбора зоны/порога (ТЗ_1);
+  // в этом тесте зон нет → возвращаем undefined (обычный расчёт, без зоны).
+  resolveDeliveryZone: () => undefined,
 }));
 
 // resolveCartLine резолвит позицию из «каталога» (anti-tamper) — подменяем, чтобы

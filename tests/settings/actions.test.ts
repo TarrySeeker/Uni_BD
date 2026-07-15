@@ -226,6 +226,53 @@ describe('settings/actions — updateCatalogOrdersSettings (деньги)', () =
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
   });
+
+  // ТЗ_1: зоны доставки вводятся в РУБЛЯХ в UI → хранятся в КОПЕЙКАХ (toMinor),
+  // как freeDeliveryThreshold. id-slug генерируется из label, если строка новая.
+  it('зоны: цены рубли → копейки (toMinor), id генерится из label', async () => {
+    const actionDeps = makeActionDeps(makeUser(['settings.manage']));
+    const deps = makeSettingsDeps(actionDeps);
+    const { updateCatalogOrdersSettings } = createSettingsActions(deps);
+    const res = await updateCatalogOrdersSettings({
+      delivery: {
+        freeDeliveryThreshold: '3000.00',
+        zones: [
+          { label: 'В пределах МКАД', price: '300.00' },
+          { id: 'mkad_out', label: 'За МКАД + область', price: '500.00', freeThreshold: '10000.00' },
+        ],
+      },
+    });
+    expect(res.ok).toBe(true);
+    const deliveryCall = (deps.upsertSetting as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c) => c[0] === 'delivery',
+    );
+    expect(deliveryCall).toBeDefined();
+    const value = deliveryCall![1] as {
+      freeDeliveryThreshold: number;
+      zones: Array<{ id: string; label: string; price: number; freeThreshold?: number }>;
+    };
+    expect(value.freeDeliveryThreshold).toBe(300000);
+    // 300 руб → 30000 коп; id сгенерирован из label (slugify, транслит кириллицы).
+    expect(value.zones[0]).toEqual({ id: 'v-predelah-mkad', label: 'В пределах МКАД', price: 30000 });
+    // явный id сохраняется; freeThreshold 10000 руб → 1000000 коп.
+    expect(value.zones[1]).toEqual({
+      id: 'mkad_out',
+      label: 'За МКАД + область',
+      price: 50000,
+      freeThreshold: 1000000,
+    });
+    expect(Number.isInteger(value.zones[0]!.price)).toBe(true);
+  });
+
+  it('зоны: отрицательная цена → validation', async () => {
+    const actionDeps = makeActionDeps(makeUser(['settings.manage']));
+    const deps = makeSettingsDeps(actionDeps);
+    const { updateCatalogOrdersSettings } = createSettingsActions(deps);
+    const res = await updateCatalogOrdersSettings({
+      delivery: { zones: [{ label: 'Зона', price: '-5' }] },
+    });
+    expect(res.ok).toBe(false);
+  });
 });
 
 // =============================================================================

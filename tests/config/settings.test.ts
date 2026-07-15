@@ -295,6 +295,34 @@ describe('config/settings — деньги (копейки, без float)', () =
 });
 
 // =============================================================================
+// (а) ЮНИТ — зоны доставки (ТЗ_1): default [] при отсутствии, passthrough из БД.
+// =============================================================================
+describe('config/settings — зоны доставки (mergeSettings)', () => {
+  it('нет оверрайда delivery → zones по умолчанию []', () => {
+    const eff = mergeSettings(envWith(), []);
+    expect(eff.delivery.zones).toEqual([]);
+  });
+
+  it('зоны из БД (копейки) прокидываются как есть', () => {
+    const eff = mergeSettings(envWith(), [
+      {
+        setting_key: 'delivery',
+        value: {
+          freeDeliveryThreshold: 300000,
+          zones: [
+            { id: 'z1', label: 'Зона 1', price: 30000 },
+            { id: 'z2', label: 'Зона 2', price: 50000, freeThreshold: 1000000 },
+          ],
+        },
+      },
+    ]);
+    expect(eff.delivery.zones).toHaveLength(2);
+    expect(eff.delivery.zones[0]).toEqual({ id: 'z1', label: 'Зона 1', price: 30000 });
+    expect(eff.delivery.zones[1]?.freeThreshold).toBe(1000000);
+  });
+});
+
+// =============================================================================
 // (б) ИНТЕГРАЦИЯ — идемпотентность миграций 0019/0020.
 //     Юнит-часть (файлы на диске) проходит ВСЕГДА; накат в БД — skipIf.
 // =============================================================================

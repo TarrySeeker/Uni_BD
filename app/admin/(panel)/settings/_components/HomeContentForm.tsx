@@ -76,6 +76,22 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
   const [philText, setPhilText] = useState(home.philosophy.text ?? '');
   const [philLinkLabel, setPhilLinkLabel] = useState(home.philosophy.linkLabel ?? '');
   const [philLinkHref, setPhilLinkHref] = useState(home.philosophy.linkHref ?? '');
+  // looks (ТЗ_2) — «Образы»: показ + заголовок + репитер категорий (фото/заголовок/текст).
+  const [looksEnabled, setLooksEnabled] = useState(home.looks.enabled);
+  const [looksTitle, setLooksTitle] = useState(home.looks.title ?? '');
+  const [looksCategories, setLooksCategories] = useState<
+    { title: string; text: string; imageKey: string }[]
+  >(() => (home.looks.categories ?? []).map((c) => ({ ...c })));
+
+  function setLookCategory(i: number, field: 'title' | 'text' | 'imageKey', value: string) {
+    setLooksCategories((prev) => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
+  }
+  function addLookCategory() {
+    setLooksCategories((prev) => [...prev, { title: '', text: '', imageKey: '' }]);
+  }
+  function removeLookCategory(i: number) {
+    setLooksCategories((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
   function s(v: string): string | undefined {
     const t = v.trim();
@@ -118,6 +134,15 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
           text: s(philText),
           linkLabel: s(philLinkLabel),
           linkHref: s(philLinkHref),
+        },
+        looks: {
+          enabled: looksEnabled,
+          title: s(looksTitle),
+          // Только полностью заполненные категории (все три поля) — неполные строки
+          // отбрасываем, как pairsToArr для delivery/valuesStrip (иначе Zod-отказ).
+          categories: looksCategories
+            .map((c) => ({ title: c.title.trim(), text: c.text.trim(), imageKey: c.imageKey.trim() }))
+            .filter((c) => c.title && c.text && c.imageKey),
         },
       },
     });
@@ -294,6 +319,70 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
               <input id="home-phil-link-href" value={philLinkHref} onChange={(e) => setPhilLinkHref(e.target.value)}
                 placeholder="/#about" className={inputCls} />
             </div>
+          </div>
+        </div>
+      </fieldset>
+
+      {/* Образы (lookbook, ТЗ_2) */}
+      <fieldset className="mb-6 rounded border border-gray-200 p-4">
+        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Образы»</legend>
+        <div className="grid grid-cols-1 gap-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={looksEnabled}
+              onChange={(e) => setLooksEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Показывать «Образы» на главной
+          </label>
+          <div>
+            <label htmlFor="home-looks-title" className={labelCls}>Заголовок блока (необязательно)</label>
+            <input id="home-looks-title" value={looksTitle} onChange={(e) => setLooksTitle(e.target.value)}
+              placeholder="Образы" className={inputCls} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {looksCategories.map((cat, i) => (
+              <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-600">Категория {i + 1}</span>
+                  <button type="button" onClick={() => removeLookCategory(i)}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                    Удалить
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label htmlFor={`home-looks-title-${i}`} className={labelCls}>Заголовок</label>
+                    <input id={`home-looks-title-${i}`} value={cat.title}
+                      onChange={(e) => setLookCategory(i, 'title', e.target.value)}
+                      placeholder="Название образа" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-looks-text-${i}`} className={labelCls}>Текст</label>
+                    <textarea id={`home-looks-text-${i}`} value={cat.text}
+                      onChange={(e) => setLookCategory(i, 'text', e.target.value)}
+                      rows={3} className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-looks-img-${i}`} className={labelCls}>Фото</label>
+                    <input id={`home-looks-img-${i}`} value={cat.imageKey}
+                      onChange={(e) => setLookCategory(i, 'imageKey', e.target.value)}
+                      placeholder="home/looks/1.webp" className={inputCls} />
+                    <ImageUploadButton label="Загрузить фото образа" onUploaded={(key) => setLookCategory(i, 'imageKey', key)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <button type="button" onClick={addLookCategory}
+              className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+              + Добавить категорию
+            </button>
+            <p className={hintCls}>Каждая категория — фото, заголовок и текст. Неполные категории не сохраняются.</p>
           </div>
         </div>
       </fieldset>

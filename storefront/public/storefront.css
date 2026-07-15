@@ -158,6 +158,39 @@
   padding: 40px 0;
 }
 
+/* ---- Образы (lookbook, ТЗ_2) --------------------------------------------- */
+.sf-looks-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.sf-look-card {
+  width: 33.3333%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.sf-look-card__image {
+  display: block;
+  width: 100%;
+  height: 22vw;
+  min-height: 220px;
+  object-fit: cover;
+  background-color: #f5f5f5;
+}
+.sf-look-card__title {
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 120%;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.sf-look-card__text {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 150%;
+  color: #636363;
+}
+
 /* ---- Галерея товара: превью (slick заменён кликабельными миниатюрами) ------ */
 .sf-gallery-thumbs {
   display: flex;

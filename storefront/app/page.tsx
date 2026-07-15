@@ -32,6 +32,11 @@ export default async function HomePage() {
   const ctaLabel = settings?.home.hero.ctaLabel ?? 'Смотреть коллекцию';
   const ctaHref = settings?.home.hero.ctaHref ?? '/catalog';
 
+  // ТЗ_2 — «Образы» (lookbook): показываем только если магазин включил блок и
+  // добавил хотя бы одну категорию (иначе секции нет — универсальный opt-in).
+  const looks = settings?.home.looks;
+  const looksCategories = looks?.categories ?? [];
+
   return (
     <div className="mainpage sf-home">
       {/* Hero */}
@@ -42,6 +47,26 @@ export default async function HomePage() {
           {ctaLabel} →
         </a>
       </section>
+
+      {/* Образы (lookbook) */}
+      {looks?.enabled && looksCategories.length > 0 && (
+        <section className="sf-section sf-looks">
+          <div className="page-title">
+            <h1>{looks.title}</h1>
+          </div>
+          <div className="sf-looks-grid">
+            {looksCategories.map((category, i) => (
+              <article className="sf-look-card" key={`${category.title}-${i}`}>
+                {category.imageUrl ? (
+                  <img className="sf-look-card__image" src={category.imageUrl} alt={category.title} />
+                ) : null}
+                <h2 className="sf-look-card__title">{category.title}</h2>
+                <p className="sf-look-card__text">{category.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Категории */}
       {cats.length > 0 && (

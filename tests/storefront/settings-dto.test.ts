@@ -42,7 +42,13 @@ function makeEffective(): EffectiveSettings {
       bankDetails: 'р/с 40702810000000000000, БИК 044525225',
     },
     catalog: { newProductDays: 30 },
-    delivery: { freeDeliveryThreshold: 300000 },
+    delivery: {
+      freeDeliveryThreshold: 300000,
+      zones: [
+        { id: 'zone_a', label: 'Зона A', price: 30000 },
+        { id: 'zone_b', label: 'Зона B', price: 50000, freeThreshold: 1000000 },
+      ],
+    },
     orders: { orderPrefix: 'GA' },
     seo: {
       site_name: 'Gang Auto',
@@ -93,6 +99,23 @@ describe('storefront/settings-dto — toPublicSettingsDto', () => {
     expect(dto.delivery.freeDeliveryThreshold).toBe(300000);
     expect(dto.seo.titleTemplate).toBe('%s — Gang Auto');
     expect(dto.seo.siteUrl).toBe('https://gangauto.ru');
+  });
+
+  // ТЗ_1: витрине отдаём зоны доставки (id/label/price/freeThreshold), чтобы
+  // рендерить селектор зон. Деньги — в копейках; отсутствующий порог → null.
+  it('содержит зоны доставки (id/label/price/freeThreshold)', () => {
+    const dto = toPublicSettingsDto(makeEffective());
+    expect(dto.delivery.zones).toEqual([
+      { id: 'zone_a', label: 'Зона A', price: 30000, freeThreshold: null },
+      { id: 'zone_b', label: 'Зона B', price: 50000, freeThreshold: 1000000 },
+    ]);
+  });
+
+  it('нет зон → delivery.zones = []', () => {
+    const eff = makeEffective();
+    eff.delivery = { freeDeliveryThreshold: 0, zones: [] };
+    const dto = toPublicSettingsDto(eff);
+    expect(dto.delivery.zones).toEqual([]);
   });
 
   it('пустые контакты/реквизиты → null/[] (без undefined-полей)', () => {

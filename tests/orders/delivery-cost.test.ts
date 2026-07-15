@@ -443,3 +443,129 @@ describe('orders/delivery-cost — тариф по режиму (курьер≠
     expect(captured.tariffCode).toBe(482);
   });
 });
+
+/**
+ * ТЗ_1 — зональная цена доставки (редактируется из админки, хранится в настройках).
+ *
+ * Когда вход несёт zoneId И в эффективных настройках есть зона с таким id, цена
+ * доставки берётся из ЗОНЫ (анти-tamper: цена из настроек, не из запроса) и СДЭК
+ * НЕ вызывается. Неизвестный zoneId → обычное поведение (СДЭК/stub), не падение.
+ * Без zoneId → поведение не меняется. Зоны — универсальны (любой магазин задаёт
+ * свои), без хардкода конкретного города.
+ */
+describe('orders/delivery-cost — зональная цена (zoneDeliveryProvider)', () => {
+  const ORIG = process.env.ADMIK_MODULES;
+  const ZONES = [
+    { id: 'zone_a', label: 'Зона A', price: 30000 },
+    { id: 'zone_b', label: 'Зона B', price: 50000, freeThreshold: 1000000 },
+  ];
+
+  beforeEach(() => {
+    delete process.env.CDEK_ACCOUNT;
+    delete process.env.CDEK_SECRET;
+  });
+  afterEach(() => {
+    process.env.ADMIK_MODULES = ORIG;
+    vi.resetModules();
+    vi.doUnmock('@/lib/cdek/services/calculator');
+    vi.doUnmock('@/lib/cdek/manager');
+  });
+
+  it('resolveDeliveryZone — чистый выбор зоны по id', async () => {
+    const { resolveDeliveryZone } = await load();
+    expect(resolveDeliveryZone({ zoneId: 'zone_a', zones: ZONES })?.price).toBe(30000);
+    // неизвестный id → undefined (фолбэк на СДЭК/stub, не падение)
+    expect(resolveDeliveryZone({ zoneId: 'nope', zones: ZONES })).toBeUndefined();
+    // нет zoneId → undefined
+    expect(resolveDeliveryZone({ zones: ZONES })).toBeUndefined();
+    // нет зон → undefined
+    expect(resolveDeliveryZone({ zoneId: 'zone_a', zones: [] })).toBeUndefined();
+    expect(resolveDeliveryZone({ zoneId: 'zone_a' })).toBeUndefined();
+  });
+
+  it('zoneId совпал с зоной → цена зоны, source zone, СДЭК не вызывается', async () => {
+    process.env.ADMIK_MODULES = 'orders,cdek';
+    // Мокаем СДЭК так, чтобы calculate БРОСАЛ: если зона не перехватит — тест упадёт.
+    vi.resetModules();
+    vi.doMock('@/lib/cdek/services/calculator', () => ({
+      Calculator: class {
+        async calculate() {
+          throw new Error('CDEK must NOT be called when a zone matches');
+        }
+      },
+    }));
+    vi.doMock('@/lib/cdek/manager', () => ({ getCdekManager: () => ({ isMock: true }) }));
+    const { computeDeliveryCost } = await import('@/lib/orders/delivery-cost');
+    const res = await computeDeliveryCost({
+      deliveryType: 'courier',
+      lines: [{ qty: 1, weightG: 500 }],
+      destination: { cityName: 'Москва', zoneId: 'zone_a' },
+      zones: ZONES,
+    });
+    expect(res.source).toBe('zone');
+    expect(res.cost).toBe('300.00'); // 30000 копеек → 300.00
+    expect(res.resolved).toBe(true);
+  });
+
+  it('неизвестный zoneId → фолбэк на СДЭК-расчёт (не падение)', async () => {
+    process.env.ADMIK_MODULES = 'orders,cdek';
+    const { computeDeliveryCost } = await load();
+    const res = await computeDeliveryCost({
+      deliveryType: 'courier',
+      lines: [{ qty: 1, weightG: 500 }],
+      destination: { cityCode: 44, zoneId: 'unknown_zone' },
+      zones: ZONES,
+    });
+    expect(res.source).toBe('cdek_mock');
+    expect(Number(res.cost)).toBeGreaterThan(0);
+  });
+
+  it('без zoneId — поведение не меняется (СДЭК как раньше)', async () => {
+    process.env.ADMIK_MODULES = 'orders,cdek';
+    const { computeDeliveryCost } = await load();
+    const res = await computeDeliveryCost({
+      deliveryType: 'courier',
+      lines: [{ qty: 1, weightG: 500 }],
+      destination: { cityCode: 44 },
+      zones: ZONES,
+    });
+    expect(res.source).toBe('cdek_mock');
+  });
+
+  it('pickup + zoneId → 0.00 stub (самовывоз бесплатен, зона не применяется)', async () => {
+    process.env.ADMIK_MODULES = 'orders,cdek';
+    const { computeDeliveryCost } = await load();
+    const res = await computeDeliveryCost({
+      deliveryType: 'pickup',
+      lines: [{ qty: 1 }],
+      destination: { zoneId: 'zone_a' },
+      zones: ZONES,
+    });
+    expect(res.cost).toBe('0.00');
+    expect(res.source).toBe('stub');
+  });
+
+  // Композиция как в repository (resolveDeliveryCost → calculateQuote): порог
+  // бесплатной доставки применяется ПОВЕРХ зональной цены (resolveDelivery из
+  // pricing). Ниже порога — платим цену зоны; на/выше порога — доставка бесплатна.
+  it('порог бесплатной доставки применяется поверх зональной цены', async () => {
+    process.env.ADMIK_MODULES = 'orders';
+    const { computeDeliveryCost } = await load();
+    const { resolveDelivery } = await import('@/lib/orders/pricing');
+    const zoneCost = await computeDeliveryCost({
+      deliveryType: 'courier',
+      lines: [{ qty: 1 }],
+      destination: { cityName: 'Москва', zoneId: 'zone_a' },
+      zones: ZONES,
+    });
+    expect(zoneCost.cost).toBe('300.00');
+    // Ниже порога (5000 руб): платим цену зоны.
+    const below = resolveDelivery({ cost: zoneCost.cost, freeThreshold: 5000 }, 400000, null);
+    expect(below.costMinor).toBe(30000);
+    expect(below.free).toBe(false);
+    // На/выше порога: доставка бесплатна, несмотря на зональную цену.
+    const above = resolveDelivery({ cost: zoneCost.cost, freeThreshold: 5000 }, 500000, null);
+    expect(above.costMinor).toBe(0);
+    expect(above.free).toBe(true);
+  });
+});

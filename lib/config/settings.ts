@@ -41,6 +41,17 @@ import { getAllSettings, type SettingRow } from '@/lib/settings/repository';
 // Контракт эффективных настроек.
 // -----------------------------------------------------------------------------
 
+/**
+ * Зона доставки в эффективных настройках (ТЗ_1). Деньги — в КОПЕЙКАХ.
+ * freeThreshold — опциональный порог бесплатной доставки для этой зоны.
+ */
+export interface EffectiveDeliveryZone {
+  id: string;
+  label: string;
+  price: number;
+  freeThreshold?: number;
+}
+
 /** Эффективные настройки магазина (env ⊕ БД). Деньги — в копейках. */
 export interface EffectiveSettings {
   branding: {
@@ -75,6 +86,12 @@ export interface EffectiveSettings {
   delivery: {
     /** Порог бесплатной доставки — в КОПЕЙКАХ (0 = выключено). */
     freeDeliveryThreshold: number;
+    /**
+     * Зоны доставки (ТЗ_1, мультитенант): цена доставки по зоне, редактируется в
+     * админке. Деньги — в КОПЕЙКАХ. Пустой массив = зоны не заданы (зональной
+     * цены нет → обычный расчёт СДЭК/stub). Никакого хардкода города/магазина.
+     */
+    zones: EffectiveDeliveryZone[];
   };
   orders: {
     orderPrefix: string;
@@ -204,6 +221,21 @@ function mergeHome(db: HomeSettings): HomeContent {
           linkHref: db.philosophy.linkHref ?? HOME_DEFAULTS.philosophy.linkHref,
         }
       : HOME_DEFAULTS.philosophy,
+    looks: db.looks
+      ? {
+          // enabled по умолчанию false (блок opt-in): отсутствие флага в оверрайде
+          // не включает «Образы» молча. title/categories добиваются дефолтом.
+          enabled: db.looks.enabled ?? HOME_DEFAULTS.looks.enabled,
+          title: db.looks.title ?? HOME_DEFAULTS.looks.title,
+          categories: db.looks.categories
+            ? db.looks.categories.map((c) => ({
+                title: c.title,
+                text: c.text,
+                imageKey: c.imageKey,
+              }))
+            : HOME_DEFAULTS.looks.categories,
+        }
+      : HOME_DEFAULTS.looks,
   };
 }
 
@@ -278,6 +310,14 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
       // БД-значение уже в копейках (int) → берём как есть.
       freeDeliveryThreshold:
         delivery.freeDeliveryThreshold ?? toMinor(env.SHOP_FREE_DELIVERY_THRESHOLD),
+      // Зоны доставки — только из БД (env-дефолта нет: это сид-данные магазина).
+      // Отсутствие → [] (зональной цены нет). Деньги уже в копейках (JSONB-слой).
+      zones: (delivery.zones ?? []).map((z) => ({
+        id: z.id,
+        label: z.label,
+        price: z.price,
+        ...(z.freeThreshold !== undefined ? { freeThreshold: z.freeThreshold } : {}),
+      })),
     },
     orders: {
       orderPrefix: orders.orderPrefix ?? env.SHOP_ORDER_PREFIX,

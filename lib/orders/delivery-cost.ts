@@ -23,10 +23,23 @@
  */
 
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
+import { fromMinor } from './money';
 import { DeliveryCalculationError } from './errors';
 import type { DeliveryType } from './types';
 
 export { DeliveryCalculationError } from './errors';
+
+/**
+ * Конфигурация зоны доставки (ТЗ_1) для расчёта стоимости. Деньги — в КОПЕЙКАХ.
+ * Источник — эффективные настройки магазина (env ⊕ БД), НЕ тело запроса
+ * (anti-tamper: цену зоны задаёт магазин, покупатель шлёт лишь id зоны).
+ */
+export interface DeliveryZoneConfig {
+  id: string;
+  label: string;
+  price: number;
+  freeThreshold?: number;
+}
 
 /** Позиция корзины с (опц.) габаритами товара/варианта (миграция 0018, §3.3). */
 export interface DeliveryCostLine {
@@ -43,6 +56,11 @@ export interface DeliveryDestination {
   postalCode?: string;
   pvzCode?: string;
   cityName?: string;
+  /**
+   * Выбранная покупателем зона доставки (ТЗ_1). Из тела доверяем только id;
+   * цена берётся из настроек магазина по этому id (см. zones ниже, anti-tamper).
+   */
+  zoneId?: string;
 }
 
 /** Вход расчёта стоимости доставки. */
@@ -53,16 +71,22 @@ export interface DeliveryCostInput {
   destination: DeliveryDestination;
   /** Явный код тарифа; иначе — дефолт магазина (CDEK_DEFAULT_TARIFF). */
   tariffCode?: number;
+  /**
+   * Зоны доставки из эффективных настроек (ТЗ_1). Если задан destination.zoneId
+   * и в этом списке есть зона с таким id — цена берётся из зоны (СДЭК не зовётся).
+   */
+  zones?: readonly DeliveryZoneConfig[];
 }
 
 /**
  * Источник расчёта (для прозрачности/аудита).
  *   • stub        — by-design 0.00 (самовывоз / cdek выключен / нет назначения);
+ *   • zone        — зональная цена из настроек магазина (ТЗ_1, СДЭК не зовётся);
  *   • cdek/cdek_mock — успешный расчёт СДЭК (реальный/mock);
  *   • unavailable — расчёт БЫЛ нужен, но УПАЛ (только при softFail в quote;
  *     cost здесь НЕ доверять — витрина показывает «уточняется»).
  */
-export type DeliveryCostSource = 'stub' | 'cdek' | 'cdek_mock' | 'unavailable';
+export type DeliveryCostSource = 'stub' | 'zone' | 'cdek' | 'cdek_mock' | 'unavailable';
 
 /** Результат расчёта стоимости доставки. */
 export interface DeliveryCostResult {
@@ -118,6 +142,43 @@ export const stubDeliveryProvider: DeliveryCostProvider = {
   },
 };
 
+/**
+ * Провайдер зональной цены (ТЗ_1). Цена берётся из настроек магазина (зона),
+ * КОПЕЙКИ → строка NUMERIC(14,2). СДЭК не участвует. resolved:true (цена
+ * авторитетна — задана магазином). Порог бесплатной доставки применяется ПОВЕРХ
+ * (calculateQuote), как и для СДЭК-цены.
+ */
+export function zoneDeliveryProvider(zone: DeliveryZoneConfig): DeliveryCostProvider {
+  return {
+    async quote(): Promise<DeliveryCostResult> {
+      return {
+        cost: fromMinor(zone.price),
+        resolved: true,
+        etaDays: null,
+        periodMin: null,
+        periodMax: null,
+        tariffCode: null,
+        source: 'zone',
+        provider: 'zone',
+      };
+    },
+  };
+}
+
+/**
+ * ЧИСТЫЙ выбор зоны доставки: возвращает зону из настроек по её id, если id задан
+ * и зона существует, иначе undefined (→ обычный расчёт СДЭК/stub, не падение).
+ * Anti-tamper: зоны — из настроек магазина, из запроса приходит только zoneId.
+ */
+export function resolveDeliveryZone(args: {
+  zoneId?: string;
+  zones?: readonly DeliveryZoneConfig[];
+}): DeliveryZoneConfig | undefined {
+  const { zoneId, zones } = args;
+  if (!zoneId || !zones || zones.length === 0) return undefined;
+  return zones.find((z) => z.id === zoneId);
+}
+
 /** Есть ли в назначении хоть один признак для расчёта СДЭК. */
 function hasDestination(d: DeliveryDestination): boolean {
   return (
@@ -161,6 +222,16 @@ export async function computeDeliveryCost(
   input: DeliveryCostInput,
   options: ComputeDeliveryCostOptions = {},
 ): Promise<DeliveryCostResult> {
+  // ТЗ_1: зональная цена имеет приоритет над СДЭК (цена задана магазином в
+  // настройках). Исключение — pickup: самовывоз бесплатен всегда, зона к нему не
+  // применяется (иначе за самовывоз бы списали цену зоны — undercharge наоборот).
+  if (input.deliveryType !== 'pickup') {
+    const zone = resolveDeliveryZone({ zoneId: input.destination.zoneId, zones: input.zones });
+    if (zone) {
+      return zoneDeliveryProvider(zone).quote(input);
+    }
+  }
+
   const useCdek = needsCdekProvider({
     cdekEnabled: await isModuleEffectivelyEnabled('cdek'),
     deliveryType: input.deliveryType,

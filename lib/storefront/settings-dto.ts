@@ -25,6 +25,14 @@ export interface PublicSocialDto {
   url: string;
 }
 
+/** Публичная зона доставки (ТЗ_1). Деньги — в КОПЕЙКАХ; freeThreshold null, если не задан. */
+export interface PublicDeliveryZoneDto {
+  id: string;
+  label: string;
+  price: number;
+  freeThreshold: number | null;
+}
+
 /** Резолвер ключа объекта хранилища → публичный URL (инъекция storage.url). */
 export type PublicUrlResolver = (key: string) => string;
 
@@ -54,6 +62,15 @@ export interface PublicHomeDto {
     text: string;
     linkLabel: string;
     linkHref: string;
+  };
+  /**
+   * ТЗ_2 — «Образы» (lookbook): показ + опц. заголовок + категории. Каждая
+   * категория несёт imageUrl (НЕ imageKey) — сырой S3-ключ наружу не раскрываем.
+   */
+  looks: {
+    enabled: boolean;
+    title: string;
+    categories: { title: string; text: string; imageUrl: string }[];
   };
 }
 
@@ -100,6 +117,11 @@ export interface PublicSettingsDto {
   delivery: {
     /** Порог бесплатной доставки — в КОПЕЙКАХ (0 = выключено). */
     freeDeliveryThreshold: number;
+    /**
+     * Зоны доставки (ТЗ_1): витрина рендерит селектор зон. Деньги — в КОПЕЙКАХ.
+     * freeThreshold — порог бесплатной доставки для зоны (null, если не задан).
+     */
+    zones: PublicDeliveryZoneDto[];
   };
   seo: {
     siteName: string | null;
@@ -167,6 +189,12 @@ export function toPublicSettingsDto(
     },
     delivery: {
       freeDeliveryThreshold: eff.delivery.freeDeliveryThreshold,
+      zones: eff.delivery.zones.map((z) => ({
+        id: z.id,
+        label: z.label,
+        price: z.price,
+        freeThreshold: z.freeThreshold ?? null,
+      })),
     },
     seo: {
       siteName: eff.seo.site_name ?? null,
@@ -198,6 +226,15 @@ export function toPublicSettingsDto(
         items: eff.home.valuesStrip.items.map((i) => ({ ...i })),
       },
       philosophy: { ...eff.home.philosophy },
+      looks: {
+        enabled: eff.home.looks.enabled,
+        title: eff.home.looks.title,
+        categories: eff.home.looks.categories.map((c) => ({
+          title: c.title,
+          text: c.text,
+          imageUrl: publicUrl(c.imageKey),
+        })),
+      },
     },
     navigation: {
       header: eff.navigation.header.map((i) => ({ label: i.label, href: i.href })),

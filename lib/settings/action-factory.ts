@@ -29,6 +29,7 @@ import {
 import { sql } from '@/lib/db/client';
 import { ALL_MODULES } from '@/lib/config/modules';
 import { toMinor } from '@/lib/orders/money';
+import { slugify } from '@/lib/catalog/slug';
 import {
   brandingSchema,
   currencySchema,
@@ -73,10 +74,37 @@ const moneyRubles = z
     }
   }, 'Ожидается неотрицательная сумма в рублях (до 2 знаков после точки)');
 
-/** delivery на ВХОДЕ: порог в рублях (конвертируется в копейки в handler). */
-const deliveryInputSchema = z
-  .object({ freeDeliveryThreshold: moneyRubles.optional() })
+/**
+ * Зона доставки на ВХОДЕ (ТЗ_1): цены в РУБЛЯХ (конвертируются в копейки в
+ * handler, как freeDeliveryThreshold). id опционален — если не задан/пуст, будет
+ * сгенерирован из label (slugify) в handler. label обязателен.
+ */
+const deliveryZoneInputSchema = z
+  .object({
+    id: z.string().trim().optional(),
+    label: z.string().trim().min(1, 'Укажите название зоны'),
+    price: moneyRubles,
+    freeThreshold: moneyRubles.optional(),
+  })
   .strip();
+
+/** delivery на ВХОДЕ: порог и цены зон в рублях (конвертируются в копейки в handler). */
+const deliveryInputSchema = z
+  .object({
+    freeDeliveryThreshold: moneyRubles.optional(),
+    zones: z.array(deliveryZoneInputSchema).optional(),
+  })
+  .strip();
+
+/**
+ * Форма хранимого value ключа `delivery` (КОПЕЙКИ) — что уходит в upsertSetting.
+ * `type` (не `interface`): нужен неявный индекс-сигнатурный контракт с
+ * Record<string, unknown> параметра upsertSetting.
+ */
+type DeliveryStoredValue = {
+  freeDeliveryThreshold?: number;
+  zones?: Array<{ id: string; label: string; price: number; freeThreshold?: number }>;
+};
 
 export const BrandingInputSchema = z.object({ branding: brandingSchema });
 export const CurrencyUnitsInputSchema = z.object({
@@ -328,10 +356,27 @@ export function createSettingsActions(deps: SettingsActionDeps) {
         orders: (await deps.getSetting('orders'))?.value,
       };
       if (data.catalog) await deps.upsertSetting('catalog', data.catalog, ctx.user.id);
-      // freeDeliveryThreshold: рубли (ввод) → копейки (хранение).
-      let deliveryValue: { freeDeliveryThreshold?: number } | undefined;
-      if (data.delivery && data.delivery.freeDeliveryThreshold !== undefined) {
-        deliveryValue = { freeDeliveryThreshold: toMinor(data.delivery.freeDeliveryThreshold) };
+      // delivery: деньги вводятся в РУБЛЯХ (порог и цены зон) → хранятся в КОПЕЙКАХ
+      // (toMinor). value ключа записывается ЦЕЛИКОМ (JSONB-оверрайд): собираем и
+      // порог, и зоны в одном объекте, чтобы правка одного не затирала другое.
+      let deliveryValue: DeliveryStoredValue | undefined;
+      if (data.delivery && (data.delivery.freeDeliveryThreshold !== undefined || data.delivery.zones !== undefined)) {
+        deliveryValue = {};
+        if (data.delivery.freeDeliveryThreshold !== undefined) {
+          deliveryValue.freeDeliveryThreshold = toMinor(data.delivery.freeDeliveryThreshold);
+        }
+        if (data.delivery.zones !== undefined) {
+          deliveryValue.zones = data.delivery.zones.map((z) => {
+            const id = z.id && z.id.trim() ? z.id.trim() : slugify(z.label);
+            return {
+              id,
+              label: z.label,
+              price: toMinor(z.price),
+              // freeThreshold опционален: включаем ключ, только если задан.
+              ...(z.freeThreshold !== undefined ? { freeThreshold: toMinor(z.freeThreshold) } : {}),
+            };
+          });
+        }
         await deps.upsertSetting('delivery', deliveryValue, ctx.user.id);
       }
       if (data.orders) await deps.upsertSetting('orders', data.orders, ctx.user.id);

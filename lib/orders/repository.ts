@@ -43,9 +43,11 @@ import { GiftCertificateError } from '@/lib/gift-certificates/errors';
 import type { GiftCertificate } from '@/lib/gift-certificates/types';
 import {
   computeDeliveryCost,
+  resolveDeliveryZone,
   DeliveryCalculationError,
   type DeliveryDestination,
   type DeliveryCostLine,
+  type DeliveryZoneConfig,
 } from './delivery-cost';
 import type { DeliveryType, Order, OrderItem, PaymentMethod, PromoCode } from './types';
 import type { CartQuoteInput, CreateOrderInput } from './schemas';
@@ -530,6 +532,14 @@ async function resolveDeliveryCost(args: {
   cityCode?: number;
   pvzCode?: string;
   /**
+   * Зона доставки (ТЗ_1): id выбранной зоны из тела запроса. Цена берётся из
+   * `zones` (настройки магазина) по этому id — anti-tamper (из запроса цену не
+   * принимаем). Если зона найдена → её цена вместо СДЭК (см. computeDeliveryCost).
+   */
+  zoneId?: string;
+  /** Зоны доставки из эффективных настроек (авторитетный источник цен зон). */
+  zones?: readonly DeliveryZoneConfig[];
+  /**
    * Мягкий сбой расчёта: true для quote (превью не должно падать → resolved:false),
    * false/undefined для createOrder (сбой нужного расчёта БРОСАЕТ
    * DeliveryCalculationError — anti-undercharge, нулевая доставка недопустима).
@@ -537,13 +547,14 @@ async function resolveDeliveryCost(args: {
   softFail?: boolean;
 }): Promise<{ cost: string; resolved: boolean }> {
   const deliveryType: DeliveryType = args.deliveryType ?? 'courier';
-  // Назначение: код города (если витрина его знает) + имя города + код ПВЗ.
+  // Назначение: код города (если витрина его знает) + имя города + код ПВЗ + зона.
   // cityName КРИТИЧЕН для курьера (BUG #3): курьерская доставка часто несёт
   // только имя города — без него расчёт деградировал к stub 0.00.
   const destination: DeliveryDestination = {
     cityCode: args.cityCode,
     cityName: args.city,
     pvzCode: args.pvzCode,
+    zoneId: args.zoneId,
   };
   // BUG A: пробрасываем РЕАЛЬНЫЕ вес/габариты из каталога (resolveLineDims) в
   // расчёт доставки — иначе aggregatePackage подставит дефолт магазина и магазин
@@ -556,7 +567,7 @@ async function resolveDeliveryCost(args: {
     heightCm: l.heightCm ?? null,
   }));
   const res = await computeDeliveryCost(
-    { deliveryType, lines, destination },
+    { deliveryType, lines, destination, zones: args.zones },
     { softFail: args.softFail },
   );
   return { cost: res.cost, resolved: res.resolved };
@@ -660,7 +671,15 @@ export async function quoteCart(
   // EffectiveSettings хранит порог в КОПЕЙКАХ; calculateQuote ожидает РУБЛИ —
   // конвертируем на границе legacy-расчёта через fromMinor (money-инвариант §7).
   const eff = await getEffectiveSettings();
-  const freeThreshold = Number(fromMinor(eff.delivery.freeDeliveryThreshold));
+  // Порог бесплатной доставки: зона (ТЗ_1) может задать СВОЙ порог — тогда он
+  // перекрывает общий порог магазина для заказов в эту зону; иначе — общий порог.
+  const deliveryZone = resolveDeliveryZone({
+    zoneId: input.delivery?.zoneId,
+    zones: eff.delivery.zones,
+  });
+  const freeThreshold = Number(
+    fromMinor(deliveryZone?.freeThreshold ?? eff.delivery.freeDeliveryThreshold),
+  );
 
   const issues: QuoteCartResult['issues'] = [];
   // BUG A: тип ResolvedLine (а не PricedLine) — чтобы вес/габариты позиции были
@@ -741,6 +760,8 @@ export async function quoteCart(
     city: input.delivery?.city,
     cityCode: input.delivery?.cityCode,
     pvzCode: input.delivery?.pvzCode,
+    zoneId: input.delivery?.zoneId,
+    zones: eff.delivery.zones,
     softFail: true,
   });
 
@@ -968,7 +989,15 @@ export async function createOrder(
   // Порог бесплатной доставки — из эффективных настроек (env ⊕ БД), docs/11 §5.4.4.
   // Копейки → рубли (fromMinor) на границе legacy-расчёта (money-инвариант §7).
   const eff = await getEffectiveSettings();
-  const freeThreshold = Number(fromMinor(eff.delivery.freeDeliveryThreshold));
+  // Порог бесплатной доставки: зона (ТЗ_1) может задать СВОЙ порог (перекрывает
+  // общий порог магазина для этой зоны); иначе — общий порог магазина.
+  const deliveryZone = resolveDeliveryZone({
+    zoneId: input.delivery?.zoneId,
+    zones: eff.delivery.zones,
+  });
+  const freeThreshold = Number(
+    fromMinor(deliveryZone?.freeThreshold ?? eff.delivery.freeDeliveryThreshold),
+  );
 
   // Идемпотентность: если такой ключ уже есть — вернуть существующий заказ.
   if (input.idempotencyKey) {
@@ -1038,6 +1067,8 @@ export async function createOrder(
         city: input.delivery.city,
         cityCode: input.delivery.cityCode,
         pvzCode: input.delivery.pvzCode,
+        zoneId: input.delivery.zoneId,
+        zones: eff.delivery.zones,
       })
     ).cost;
   } catch (e) {

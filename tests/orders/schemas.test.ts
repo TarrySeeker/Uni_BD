@@ -124,6 +124,29 @@ describe('orders/schemas — CartQuoteSchema (POST /cart/quote)', () => {
       }).success,
     ).toBe(false);
   });
+
+  // ТЗ_1: витрина может выбрать зону доставки — схема принимает опц. zoneId
+  // (строка-slug). Цена зоны берётся из настроек на сервере (anti-tamper): из
+  // тела доверяем только идентификатору зоны, но НЕ её цене.
+  it('доставка принимает опц. zoneId (зональная цена, ТЗ_1)', () => {
+    const res = CartQuoteSchema.safeParse({
+      items: [{ variantId: UUID, qty: 1 }],
+      delivery: { type: 'courier', city: 'Москва', zoneId: 'mkad_in' },
+    });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.delivery?.zoneId).toBe('mkad_in');
+    }
+  });
+
+  it('пустой zoneId отклоняется (min 1 после трима)', () => {
+    expect(
+      CartQuoteSchema.safeParse({
+        items: [{ variantId: UUID, qty: 1 }],
+        delivery: { type: 'courier', zoneId: '   ' },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('orders/schemas — CreateOrderSchema (POST /orders)', () => {

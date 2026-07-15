@@ -182,10 +182,29 @@ export const catalogSettingsSchema = z
   })
   .strip();
 
-/** delivery — оверрайд SHOP_FREE_DELIVERY_THRESHOLD (в КОПЕЙКАХ). */
+/**
+ * Зона доставки (ТЗ_1) — универсальная, задаётся магазином в админке.
+ *  - id: стабильный slug (напр. "mkad_in") — генерируется из label при создании;
+ *  - label: человекочитаемое имя зоны («В пределах МКАД»);
+ *  - price: цена доставки в зоне, КОПЕЙКИ (int ≥ 0), как freeDeliveryThreshold;
+ *  - freeThreshold: опц. порог бесплатной доставки ИМЕННО для этой зоны (копейки);
+ *    задан → перекрывает общий порог магазина для заказов в эту зону.
+ * `.strip()` — анти-tamper JSONB. Никакого хардкода конкретного города/магазина.
+ */
+export const deliveryZoneSchema = z
+  .object({
+    id: nonEmpty,
+    label: nonEmpty,
+    price: minorMoney,
+    freeThreshold: minorMoney.optional(),
+  })
+  .strip();
+
+/** delivery — оверрайд SHOP_FREE_DELIVERY_THRESHOLD (в КОПЕЙКАХ) + зоны доставки. */
 export const deliverySettingsSchema = z
   .object({
     freeDeliveryThreshold: minorMoney.optional(),
+    zones: z.array(deliveryZoneSchema).optional(),
   })
   .strip();
 
@@ -306,6 +325,28 @@ export const homeSchema = z
       })
       .strip()
       .optional(),
+    // ТЗ_2 — «Образы» (lookbook): опц. заголовок + список категорий, каждая =
+    // фото (imageKey S3, ADR-012 — DTO резолвит в URL) + заголовок + абзац. По
+    // умолчанию (нет оверрайда) блок скрыт и пуст; магазин наполняет его в админке
+    // без правки кода. Универсальный блок — никакого хардкода под нишу магазина.
+    looks: z
+      .object({
+        enabled: z.boolean().optional(),
+        title: z.string().trim().min(1).optional(),
+        categories: z
+          .array(
+            z
+              .object({
+                title: nonEmpty,
+                text: nonEmpty,
+                imageKey: z.string().trim().min(1),
+              })
+              .strip(),
+          )
+          .optional(),
+      })
+      .strip()
+      .optional(),
   })
   .strip();
 
@@ -395,6 +436,7 @@ export type ContactsSettings = z.infer<typeof contactsSchema>;
 export type LegalEntitySettings = z.infer<typeof legalEntitySchema>;
 export type CatalogSettings = z.infer<typeof catalogSettingsSchema>;
 export type DeliverySettings = z.infer<typeof deliverySettingsSchema>;
+export type DeliveryZoneSetting = z.infer<typeof deliveryZoneSchema>;
 export type OrdersSettings = z.infer<typeof ordersSettingsSchema>;
 export type ModuleOverrides = z.infer<typeof moduleOverridesSchema>;
 export type SeoSettings = z.infer<typeof seoSettingsSchema>;

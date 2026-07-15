@@ -152,6 +152,12 @@ export interface PublicSettingsDto {
       ctaHref: string | null;
     };
     about: { title: string; paragraphs: string[]; imageUrls: string[]; values: string[] };
+    /** ТЗ_2 — «Образы» (lookbook): категории с фото (imageUrl) + заголовок/текст. */
+    looks: {
+      enabled: boolean;
+      title: string;
+      categories: { title: string; text: string; imageUrl: string }[];
+    };
   };
   navigation: {
     header: { label: string; href: string }[];

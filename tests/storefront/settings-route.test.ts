@@ -33,7 +33,7 @@ function fakeEffective(): EffectiveSettings {
     contacts: {},
     legalEntity: { bankDetails: 'SECRET-BANK-DETAILS' },
     catalog: { newProductDays: 30 },
-    delivery: { freeDeliveryThreshold: 0 },
+    delivery: { freeDeliveryThreshold: 0, zones: [] },
     orders: { orderPrefix: '' },
     seo: {
       title_template: '%s',
