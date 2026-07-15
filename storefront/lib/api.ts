@@ -18,6 +18,7 @@
 
 import type {
   CategoryDto,
+  FullDesignerDto,
   PageDto,
   ProductDetailDto,
   ProductListItemDto,
@@ -98,6 +99,8 @@ export interface ProductQuery {
   limit?: number;
   offset?: number;
   category?: string;
+  /** Slug дизайнера — товары одной персоны для страницы /designers/{slug} (M4.1). */
+  designer?: string;
   featured?: boolean;
   isNew?: boolean;
   sale?: boolean;
@@ -115,6 +118,7 @@ export async function getProducts(
   if (query.limit != null) params.set('limit', String(query.limit));
   if (query.offset != null) params.set('offset', String(query.offset));
   if (query.category) params.set('category', query.category);
+  if (query.designer) params.set('designer', query.designer);
   if (query.featured) params.set('featured', '1');
   if (query.isNew) params.set('new', '1');
   if (query.sale) params.set('sale', '1');
@@ -129,6 +133,17 @@ export async function getProducts(
 export async function getProduct(slug: string): Promise<ProductDetailDto | null> {
   const body = await apiGet<{ data: ProductDetailDto }>(
     `/products/${encodeURIComponent(slug)}`,
+  );
+  return body?.data ?? null;
+}
+
+/**
+ * Публичная страница дизайнера по slug (или null: не найден/не активен/сбой сети).
+ * Возвращает FullDesignerDto (имя, био, фото, соцсети, workCount, SEO-мета).
+ */
+export async function getDesigner(slug: string): Promise<FullDesignerDto | null> {
+  const body = await apiGet<{ data: FullDesignerDto }>(
+    `/designers/${encodeURIComponent(slug)}`,
   );
   return body?.data ?? null;
 }

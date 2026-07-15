@@ -67,6 +67,42 @@ export interface HomeContent {
     title: string;
     categories: { title: string; text: string; imageKey: string }[];
   };
+  /**
+   * Блок «Плитки категорий» (adaptive tiles, .dop-links--adaptive): список
+   * плиток title + ссылка + фото (imageKey S3, не URL). По умолчанию СКРЫТ и
+   * пуст — магазин наполняет его в админке без кода (универсально, без ниши).
+   */
+  tiles: {
+    enabled: boolean;
+    items: { title: string; href: string; imageKey: string }[];
+  };
+  /**
+   * Блок «Видео» (embed, .mainpage--video): один https-URL для iframe (Vimeo/
+   * YouTube-embed и т.п.). По умолчанию СКРЫТ и пуст. Только https (анти-XSS:
+   * src iframe не должен принять javascript:/data: — валидируется схемой).
+   */
+  video: {
+    enabled: boolean;
+    embedUrl: string;
+  };
+  /**
+   * Блок «Дизайнеры» (showcase, .mainpage--designers): опц. заголовок + список
+   * дизайнеров, каждый = имя + ссылка + аватар/работа (ключи S3, не URL) + два
+   * коэффициента вертикального позиционирования фото (0..100). По умолчанию
+   * СКРЫТ и пуст — магазин наполняет его в админке без кода.
+   */
+  designers: {
+    enabled: boolean;
+    title: string;
+    items: {
+      name: string;
+      href: string;
+      avatarImageKey: string;
+      workImageKey: string;
+      avatarTop: number;
+      workTop: number;
+    }[];
+  };
 }
 
 /**
@@ -148,5 +184,25 @@ export const HOME_DEFAULTS: HomeContent = {
     enabled: false,
     title: 'Образы',
     categories: [],
+  },
+  // «Плитки категорий» по умолчанию СКРЫТЫ и без плиток (opt-in): магазин
+  // добавляет заголовки/ссылки/фото в админке. Никакого контента магазина.
+  tiles: {
+    enabled: false,
+    items: [],
+  },
+  // «Видео» по умолчанию СКРЫТО и пусто (opt-in): магазин задаёт https-embed в
+  // админке. Пустая строка = ролик не задан (витрина блок не рендерит).
+  video: {
+    enabled: false,
+    embedUrl: '',
+  },
+  // «Дизайнеры» по умолчанию СКРЫТЫ и без записей (opt-in). Заголовок —
+  // нейтральный RU-лейбл, переопределяется без кода. Позиции фото по умолчанию
+  // центрируются (50) при merge, если магазин не задал их явно.
+  designers: {
+    enabled: false,
+    title: 'Дизайнеры',
+    items: [],
   },
 };

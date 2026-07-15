@@ -72,6 +72,23 @@ export interface DesignerDto {
   imageUrl: string | null;
 }
 
+/**
+ * Полный дизайнер для публичной страницы /designers/[slug]. Зеркалит 1:1
+ * Admik `FullDesignerDto` (lib/storefront/dto.ts → toFullDesignerDto): внутренние
+ * поля скрыты, imageUrl/pageImageUrl — уже публичные URL (не S3-ключи).
+ */
+export interface FullDesignerDto extends DesignerDto {
+  country: string | null;
+  description: string;
+  pageImageUrl: string | null;
+  videoUrl: string | null;
+  socials: Record<string, string>;
+  workCount: number;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  meta: SeoMetaDto;
+}
+
 export interface SeoMetaDto {
   title: string | null;
   description: string | null;
@@ -211,6 +228,26 @@ export interface PublicSettingsDto {
       enabled: boolean;
       title: string;
       categories: { title: string; text: string; imageUrl: string }[];
+    };
+    /** M4 — «Плитки категорий» (.dop-links--adaptive): показ + плитки (imageUrl — публичный URL). */
+    tiles: {
+      enabled: boolean;
+      items: { title: string; href: string; imageUrl: string }[];
+    };
+    /** M4 — «Видео» (.mainpage--video): показ + embedUrl (уже готовый публичный URL). */
+    video: { enabled: boolean; embedUrl: string };
+    /** M4 — «Витрина дизайнеров» (.mainpage--designers): avatarUrl/workUrl — публичные URL, *Top — inline top в %. */
+    designers: {
+      enabled: boolean;
+      title: string;
+      items: {
+        name: string;
+        href: string;
+        avatarUrl: string;
+        workUrl: string;
+        avatarTop: number;
+        workTop: number;
+      }[];
     };
   };
   navigation: {

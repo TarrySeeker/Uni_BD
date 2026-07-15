@@ -236,6 +236,44 @@ function mergeHome(db: HomeSettings): HomeContent {
             : HOME_DEFAULTS.looks.categories,
         }
       : HOME_DEFAULTS.looks,
+    tiles: db.tiles
+      ? {
+          // opt-in: отсутствие флага не включает плитки молча; items добиваются дефолтом.
+          enabled: db.tiles.enabled ?? HOME_DEFAULTS.tiles.enabled,
+          items: db.tiles.items
+            ? db.tiles.items.map((t) => ({
+                title: t.title,
+                href: t.href,
+                imageKey: t.imageKey,
+              }))
+            : HOME_DEFAULTS.tiles.items,
+        }
+      : HOME_DEFAULTS.tiles,
+    video: db.video
+      ? {
+          // opt-in: без флага блок скрыт; embedUrl отсутствует → пустая строка.
+          enabled: db.video.enabled ?? HOME_DEFAULTS.video.enabled,
+          embedUrl: db.video.embedUrl ?? HOME_DEFAULTS.video.embedUrl,
+        }
+      : HOME_DEFAULTS.video,
+    designers: db.designers
+      ? {
+          // opt-in: без флага блок скрыт; title/items добиваются дефолтом.
+          enabled: db.designers.enabled ?? HOME_DEFAULTS.designers.enabled,
+          title: db.designers.title ?? HOME_DEFAULTS.designers.title,
+          items: db.designers.items
+            ? db.designers.items.map((d) => ({
+                name: d.name,
+                href: d.href,
+                avatarImageKey: d.avatarImageKey,
+                workImageKey: d.workImageKey,
+                // Позиции фото опциональны в схеме → центрируем (50), если не заданы.
+                avatarTop: d.avatarTop ?? 50,
+                workTop: d.workTop ?? 50,
+              }))
+            : HOME_DEFAULTS.designers.items,
+        }
+      : HOME_DEFAULTS.designers,
   };
 }
 

@@ -72,6 +72,35 @@ export interface PublicHomeDto {
     title: string;
     categories: { title: string; text: string; imageUrl: string }[];
   };
+  /**
+   * M4 — «Плитки категорий»: показ + плитки. Каждая плитка несёт imageUrl (НЕ
+   * imageKey) — сырой S3-ключ наружу не раскрываем (инвариант looks/media).
+   */
+  tiles: {
+    enabled: boolean;
+    items: { title: string; href: string; imageUrl: string }[];
+  };
+  /** M4 — «Видео»: показ + embedUrl (уже URL, отдаём как есть). */
+  video: {
+    enabled: boolean;
+    embedUrl: string;
+  };
+  /**
+   * M4 — «Дизайнеры»: показ + опц. заголовок + записи. Каждая запись несёт
+   * avatarUrl/workUrl (НЕ ключи) + avatarTop/workTop; сырые S3-ключи не наружу.
+   */
+  designers: {
+    enabled: boolean;
+    title: string;
+    items: {
+      name: string;
+      href: string;
+      avatarUrl: string;
+      workUrl: string;
+      avatarTop: number;
+      workTop: number;
+    }[];
+  };
 }
 
 /** Публичный DTO настроек магазина (наружу витрине). */
@@ -233,6 +262,31 @@ export function toPublicSettingsDto(
           title: c.title,
           text: c.text,
           imageUrl: publicUrl(c.imageKey),
+        })),
+      },
+      tiles: {
+        enabled: eff.home.tiles.enabled,
+        items: eff.home.tiles.items.map((t) => ({
+          title: t.title,
+          href: t.href,
+          imageUrl: publicUrl(t.imageKey),
+        })),
+      },
+      // embedUrl уже публичный https-URL (провалидирован схемой) — проброс как есть.
+      video: {
+        enabled: eff.home.video.enabled,
+        embedUrl: eff.home.video.embedUrl,
+      },
+      designers: {
+        enabled: eff.home.designers.enabled,
+        title: eff.home.designers.title,
+        items: eff.home.designers.items.map((d) => ({
+          name: d.name,
+          href: d.href,
+          avatarUrl: publicUrl(d.avatarImageKey),
+          workUrl: publicUrl(d.workImageKey),
+          avatarTop: d.avatarTop,
+          workTop: d.workTop,
         })),
       },
     },

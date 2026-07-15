@@ -28,6 +28,7 @@ const listProducts = vi.fn(
   async (filter: {
     brandId?: string;
     categoryId?: string;
+    designerId?: string;
     page?: number;
     pageSize?: number;
     offset?: number;
@@ -37,11 +38,21 @@ const listProducts = vi.fn(
     const isUuid = (v: string | undefined): boolean =>
       v === undefined ||
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-    if (!isUuid(filter.brandId) || !isUuid(filter.categoryId)) {
+    if (
+      !isUuid(filter.brandId) ||
+      !isUuid(filter.categoryId) ||
+      !isUuid(filter.designerId)
+    ) {
       throw new FakePgUuidCastError('invalid input syntax for type uuid');
     }
     return { rows: [], total: 0 };
   },
+);
+
+// Резолвер slug дизайнера → id активного дизайнера. Управляется по-тестово
+// (mockResolvedValueOnce), по умолчанию — null (неизвестный/неактивный дизайнер).
+const getActiveDesignerIdBySlug = vi.fn(
+  async (_slug: string): Promise<string | null> => null,
 );
 
 vi.mock('@/lib/catalog/repository', () => ({
@@ -50,6 +61,7 @@ vi.mock('@/lib/catalog/repository', () => ({
 
 vi.mock('@/lib/storefront/queries', () => ({
   getActiveCategoryIdBySlug: vi.fn(async () => null),
+  getActiveDesignerIdBySlug,
 }));
 
 vi.mock('@/lib/storefront/dto', () => ({
@@ -248,5 +260,63 @@ describe('storefront/products — сортировка (?sort)', () => {
     const r = await get('?limit=5');
     expect(r.status).toBe(200);
     expect(listProducts.mock.calls[0]![0]!.sort).toBeUndefined();
+  });
+});
+
+/**
+ * Фильтр по дизайнеру (M4.1): ?designer=<slug> → страница дизайнера показывает его
+ * товары. Роут резолвит slug активного дизайнера → id (getActiveDesignerIdBySlug),
+ * кладёт designerId в фильтр listProducts. Семантика зеркалит категорию:
+ *  - известный активный дизайнер → его uuid;
+ *  - неизвестный/неактивный → nil-uuid (валиден для ::uuid-каста, не матчит ничего)
+ *    → пустой список, а НЕ ошибка;
+ *  - пустой/отсутствующий ?designer → фильтр не применяется (резолвер не дёргаем).
+ */
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
+describe('storefront/products — фильтр по дизайнеру (?designer=slug)', () => {
+  beforeEach(() => {
+    setEnv();
+    listProducts.mockClear();
+    getActiveDesignerIdBySlug.mockReset();
+    getActiveDesignerIdBySlug.mockResolvedValue(null);
+  });
+  afterEach(() => {
+    process.env = { ...ORIGINAL };
+    vi.resetModules();
+  });
+
+  it('известный дизайнер → резолв slug→id, filter.designerId проброшен, 200', async () => {
+    const id = '22222222-2222-4222-8222-222222222222';
+    getActiveDesignerIdBySlug.mockResolvedValueOnce(id);
+    const r = await get('?designer=jane-doe');
+    expect(r.status).toBe(200);
+    expect(getActiveDesignerIdBySlug).toHaveBeenCalledWith('jane-doe');
+    expect(listProducts).toHaveBeenCalledTimes(1);
+    expect(listProducts.mock.calls[0]![0]).toMatchObject({ designerId: id });
+  });
+
+  it('неизвестный дизайнер → nil-uuid → пустой список (не ошибка), 200', async () => {
+    getActiveDesignerIdBySlug.mockResolvedValueOnce(null);
+    const r = await get('?designer=does-not-exist');
+    expect(r.status).toBe(200);
+    expect(getActiveDesignerIdBySlug).toHaveBeenCalledWith('does-not-exist');
+    expect(listProducts).toHaveBeenCalledTimes(1);
+    expect(listProducts.mock.calls[0]![0]!.designerId).toBe(NIL_UUID);
+    expect(r.body?.data).toEqual([]);
+  });
+
+  it('без ?designer → designerId undefined, резолвер не вызывается', async () => {
+    const r = await get('?limit=5');
+    expect(r.status).toBe(200);
+    expect(getActiveDesignerIdBySlug).not.toHaveBeenCalled();
+    expect(listProducts.mock.calls[0]![0]!.designerId).toBeUndefined();
+  });
+
+  it('пустой ?designer= → трактуется как отсутствие (резолвер не вызывается)', async () => {
+    const r = await get('?designer=');
+    expect(r.status).toBe(200);
+    expect(getActiveDesignerIdBySlug).not.toHaveBeenCalled();
+    expect(listProducts.mock.calls[0]![0]!.designerId).toBeUndefined();
   });
 });

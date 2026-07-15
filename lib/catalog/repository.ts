@@ -372,6 +372,8 @@ export interface ProductListFilter {
   categoryId?: string;
   /** Фасет по бренду (docs/06 §3.3). */
   brandId?: string;
+  /** Фасет по дизайнеру (M4.1): товары одной персоны для страницы /designers/{slug}. */
+  designerId?: string;
   /** Подборка «Хиты» — только is_featured. */
   isFeatured?: boolean;
   /** Подборка «Новинки» — только с явным флагом is_new = true (override). */
@@ -452,6 +454,7 @@ export async function listProducts(
     WHERE (${searchTerm}::text IS NULL OR p.name ILIKE ${searchTerm} OR p.sku ILIKE ${searchTerm})
       AND (${f.status ?? null}::text IS NULL OR p.status = ${f.status ?? null})
       AND (${f.brandId ?? null}::uuid IS NULL OR p.brand_id = ${f.brandId ?? null})
+      AND (${f.designerId ?? null}::uuid IS NULL OR p.designer_id = ${f.designerId ?? null})
       AND (${f.isFeatured ?? null}::boolean IS NULL OR p.is_featured = ${f.isFeatured ?? null})
       AND (${f.isNew ?? null}::boolean IS NULL
            OR ${f.isNew ?? null} = COALESCE(p.is_new, p.created_at >= ${newThreshold}))

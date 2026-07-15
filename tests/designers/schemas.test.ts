@@ -43,6 +43,23 @@ describe('designers/schemas', () => {
     expect(bad.success).toBe(false);
   });
 
+  // Анти-XSS: videoUrl попадает в <iframe src>, socials — в <a href> публичной
+  // страницы дизайнера. Пускаем ТОЛЬКО https:// (или пусто); javascript:/data:/
+  // http:// отвергаются (зеркалит гвард home video.embedUrl).
+  it('DesignerCreateSchema: videoUrl — только https (анти-XSS iframe)', () => {
+    expect(DesignerCreateSchema.safeParse({ name: 'X', videoUrl: 'https://player.vimeo.com/video/1' }).success).toBe(true);
+    expect(DesignerCreateSchema.safeParse({ name: 'X', videoUrl: '' }).success).toBe(true); // пусто = не задано
+    expect(DesignerCreateSchema.safeParse({ name: 'X', videoUrl: 'javascript:alert(1)' }).success).toBe(false);
+    expect(DesignerCreateSchema.safeParse({ name: 'X', videoUrl: 'http://insecure/1' }).success).toBe(false);
+    expect(DesignerCreateSchema.safeParse({ name: 'X', videoUrl: 'data:text/html,<script>x</script>' }).success).toBe(false);
+  });
+
+  it('DesignerCreateSchema: socials — значение только https (анти-XSS href)', () => {
+    expect(DesignerCreateSchema.safeParse({ name: 'X', socials: { ig: 'javascript:alert(document.cookie)' } }).success).toBe(false);
+    expect(DesignerCreateSchema.safeParse({ name: 'X', socials: { ig: 'http://insecure' } }).success).toBe(false);
+    expect(DesignerCreateSchema.safeParse({ name: 'X', socials: { ig: 'https://instagram.com/x', vk: '' } }).success).toBe(true);
+  });
+
   it('DesignerUpdateSchema: id обязателен; translations принимаются', () => {
     const noId = DesignerUpdateSchema.safeParse({ name: 'X' });
     expect(noId.success).toBe(false);

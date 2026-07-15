@@ -41,6 +41,23 @@ export async function getActiveCategoryIdBySlug(
   return rows[0]?.id ?? null;
 }
 
+/**
+ * Находит id активного дизайнера по slug (для фильтра товаров по дизайнеру:
+ * страница /designers/{slug} знает slug, но listProducts фильтрует по designerId).
+ * Возвращает null, если дизайнера нет или он неактивен (витрина скрывает неактивных,
+ * зеркально getActiveCategoryIdBySlug).
+ */
+export async function getActiveDesignerIdBySlug(
+  slug: string,
+): Promise<string | null> {
+  const rows = await sql<{ id: string }[]>`
+    SELECT id FROM designers
+    WHERE slug = ${slug} AND is_active = true
+    LIMIT 1
+  `;
+  return rows[0]?.id ?? null;
+}
+
 /** Slug-и категорий товара (для публичной карточки), только активные категории. */
 export async function getProductCategorySlugs(
   productId: string,

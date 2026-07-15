@@ -10,7 +10,10 @@ import { z } from 'zod';
 import { runStorefront, jsonData, jsonError, handlePreflight } from '@/lib/storefront/response';
 import { listProducts } from '@/lib/catalog/repository';
 import type { ProductListFilter, ProductSort } from '@/lib/catalog/repository';
-import { getActiveCategoryIdBySlug } from '@/lib/storefront/queries';
+import {
+  getActiveCategoryIdBySlug,
+  getActiveDesignerIdBySlug,
+} from '@/lib/storefront/queries';
 import { toProductListItemDto } from '@/lib/storefront/dto';
 import { localizeCtxFrom } from '@/lib/storefront/locale';
 import { getStorage } from '@/lib/storage';
@@ -106,12 +109,26 @@ export async function GET(req: Request): Promise<Response> {
         '00000000-0000-0000-0000-000000000000';
     }
 
+    // Дизайнер приходит slug-ом (?designer=<slug>) — страница /designers/{slug}
+    // знает slug, а listProducts фильтрует по designerId. Резолвим slug активного
+    // дизайнера → id (зеркально категории). Неизвестный/неактивный дизайнер →
+    // nil-uuid (валиден для ::uuid-каста, не матчит ничего) → пустой список, НЕ 404.
+    // Пустая строка (`designer=`) → фильтр не применяется (резолвер не дёргаем).
+    const designerSlug = q.get('designer')?.trim();
+    let designerId: string | undefined;
+    if (designerSlug) {
+      designerId =
+        (await getActiveDesignerIdBySlug(designerSlug)) ??
+        '00000000-0000-0000-0000-000000000000';
+    }
+
     const filter: ProductListFilter = {
       search: q.get('q') ?? undefined,
       // Витрине отдаём только опубликованные товары.
       status: 'active',
       brandId: brandIdRaw ?? undefined,
       categoryId,
+      designerId,
       isFeatured: parseBool(q.get('featured')),
       isNew: parseBool(q.get('new')),
       onSale: parseBool(q.get('sale')),

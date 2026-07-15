@@ -347,6 +347,61 @@ export const homeSchema = z
       })
       .strip()
       .optional(),
+    // M4 — «Плитки категорий» (.dop-links--adaptive): список плиток title +
+    // ссылка (hrefSchema — не 404) + фото (imageKey S3, DTO резолвит в URL). По
+    // умолчанию скрыт и пуст; наполняется в админке без кода (мультитенант).
+    tiles: z
+      .object({
+        enabled: z.boolean().optional(),
+        items: z
+          .array(
+            z
+              .object({
+                title: nonEmpty,
+                href: hrefSchema,
+                imageKey: z.string().trim().min(1),
+              })
+              .strip(),
+          )
+          .optional(),
+      })
+      .strip()
+      .optional(),
+    // M4 — «Видео» (.mainpage--video): один embed-URL для iframe. ОБЯЗАТЕЛЬНО
+    // https (анти-XSS: src iframe не должен принять javascript:/data: — Zod
+    // отвергает не-https). Пусто → блок не рендерится.
+    video: z
+      .object({
+        enabled: z.boolean().optional(),
+        embedUrl: z.string().trim().url().startsWith('https://').optional(),
+      })
+      .strip()
+      .optional(),
+    // M4 — «Дизайнеры» (.mainpage--designers): опц. заголовок + список записей,
+    // каждая = имя + ссылка (hrefSchema) + аватар/работа (ключи S3, DTO резолвит
+    // в URL) + avatarTop/workTop (0..100, вертикальное позиционирование фото;
+    // опц. → merge добивает 50). По умолчанию скрыт и пуст; без хардкода ниши.
+    designers: z
+      .object({
+        enabled: z.boolean().optional(),
+        title: z.string().trim().min(1).optional(),
+        items: z
+          .array(
+            z
+              .object({
+                name: nonEmpty,
+                href: hrefSchema,
+                avatarImageKey: z.string().trim().min(1),
+                workImageKey: z.string().trim().min(1),
+                avatarTop: z.number().int().min(0).max(100).optional(),
+                workTop: z.number().int().min(0).max(100).optional(),
+              })
+              .strip(),
+          )
+          .optional(),
+      })
+      .strip()
+      .optional(),
   })
   .strip();
 

@@ -41,10 +41,19 @@ const seoEntityFields = {
   noindex: noindexSchema,
 } as const;
 
-/** Соцсети: словарь ссылок { fb, inst, ... }. Пустой словарь допустим. */
-export const socialsSchema = z.record(z.string(), z.string().max(500)).optional();
+/**
+ * Значение-URL пользовательского контента, попадающего на публичную страницу в
+ * `<iframe src>` / `<a href>`: ТОЛЬКО `https://` (анти-XSS — блокирует
+ * `javascript:`/`data:`; зеркалит гвард home `video.embedUrl`). Пустая строка =
+ * «не задано» (форма шлёт `''`/`undefined` при пустом поле).
+ */
+const httpsUrlValue = (max: number) =>
+  z.union([z.literal(''), z.string().trim().url().startsWith('https://').max(max)]);
 
-const videoUrlSchema = z.string().max(1000).optional();
+/** Соцсети: словарь ссылок { fb, inst, ... }. Значения — только https. Пустой словарь допустим. */
+export const socialsSchema = z.record(z.string(), httpsUrlValue(500)).optional();
+
+const videoUrlSchema = httpsUrlValue(1000).optional();
 const countrySchema = z.string().max(255).optional();
 
 export const DesignerCreateSchema = z.object({
