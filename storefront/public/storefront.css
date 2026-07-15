@@ -263,6 +263,71 @@
   box-sizing: border-box;
 }
 
+/* ---- CMS-страницы (about/delivery/… — рендерятся из Storefront API) -------- */
+/* Ограничиваем ширину контента статики (у каталога своя сетка). */
+.sf-cms-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.sf-cms-page .page-title {
+  margin-bottom: 30px;
+}
+.sf-cms-sections > * + * {
+  margin-top: 40px;
+}
+
+/* Rich-text контент секций text/hero/cta. Типографику p наследуем от carre
+ * (.about__text p), остальное (заголовки/списки/ссылки/таблицы) — задаём здесь. */
+.sf-cms h2 { font-size: 24px; line-height: 130%; margin: 32px 0 14px; }
+.sf-cms h3 { font-size: 20px; line-height: 130%; margin: 26px 0 12px; }
+.sf-cms h4 { font-size: 18px; line-height: 130%; margin: 22px 0 10px; }
+.sf-cms p { font-size: 18px; line-height: 140%; margin: 0 0 16px; }
+.sf-cms ul,
+.sf-cms ol { font-size: 18px; line-height: 140%; margin: 0 0 16px; padding-left: 22px; }
+.sf-cms li { margin-bottom: 8px; }
+.sf-cms a { color: #000; text-decoration: underline; }
+.sf-cms a:hover { text-decoration: none; }
+.sf-cms img { max-width: 100%; height: auto; }
+.sf-cms table { width: 100%; border-collapse: collapse; margin: 0 0 16px; }
+.sf-cms th,
+.sf-cms td { padding: 10px 12px; border: 1px solid #c1c1c1; text-align: left; }
+.sf-cms > *:last-child { margin-bottom: 0; }
+
+/* Hero */
+.sf-cms-hero__image { display: block; width: 100%; height: auto; margin-bottom: 24px; }
+.sf-cms-hero__title { font-size: 28px; line-height: 120%; margin: 0 0 12px; }
+.sf-cms-hero__subtitle { font-size: 18px; line-height: 140%; color: #555; margin: 0 0 16px; }
+
+/* Баннер */
+.sf-cms-banner__image { display: block; width: 100%; height: auto; }
+
+/* Галерея */
+.sf-cms-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.sf-cms-gallery__item { margin: 0; }
+.sf-cms-gallery__item img { display: block; width: 100%; height: auto; }
+
+/* FAQ — carre-аккордеон на нативном <details> (без JS). Переопределяем
+ * display:none у .accordion__body при открытом <details>. */
+.sf-cms-faq .sf-faq-item { border: 0; }
+.sf-faq-item > .accordion__title { list-style: none; }
+.sf-faq-item > .accordion__title::-webkit-details-marker { display: none; }
+.sf-faq-item > .accordion__title::after {
+  content: '+';
+  font-size: 22px;
+  line-height: 1;
+  margin-left: 16px;
+}
+.sf-faq-item[open] > .accordion__title::after { content: '−'; }
+.sf-faq-item[open] > .accordion__body { display: block; }
+
+/* CTA */
+.sf-cms-cta { text-align: center; padding: 20px 0; }
+.sf-cms-cta__title { font-size: 24px; line-height: 130%; margin: 0 0 16px; }
+
 @media (max-width: 991.98px) {
   .sf-cat-card { width: 33.333%; }
   .sf-cat-card__image { height: 22vw; }
@@ -271,4 +336,8 @@
 @media (max-width: 767.98px) {
   .sf-cat-card { width: 50%; }
   .sf-cat-card__image { height: 34vw; }
+  .sf-cms-gallery { grid-template-columns: repeat(2, 1fr); }
+  .sf-cms p,
+  .sf-cms ul,
+  .sf-cms ol { font-size: 16px; }
 }

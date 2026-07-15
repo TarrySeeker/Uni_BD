@@ -110,6 +110,60 @@ export interface PublicSocialDto {
   url: string;
 }
 
+// -----------------------------------------------------------------------------
+// CMS-страницы (docs/11 §5.1.4, ADR-012). Форма сверена 1:1 с публичным DTO
+// Admik (lib/storefront/cms-dto.ts → toPublicPageDto) и Zod-схемами секций
+// (lib/cms/schemas.ts). Секция — { type, content }, где content дискриминирован
+// полем type. Сырые ключи хранилища уже заменены публичными URL на стороне API
+// (imageKey → imageUrl), поэтому здесь только *Url-поля.
+// -----------------------------------------------------------------------------
+
+/** Карта content по типу секции (после резолва медиа imageKey → imageUrl). */
+export interface SectionContentByType {
+  /** Rich-text: сервер-санитизированный HTML (admin-authored). */
+  text: { html: string };
+  hero: {
+    title: string;
+    subtitle?: string;
+    html?: string;
+    imageUrl?: string;
+    ctaLabel?: string;
+    ctaHref?: string;
+  };
+  banner: { imageUrl?: string; href?: string; alt?: string };
+  gallery: { images: { imageUrl?: string; alt?: string }[] };
+  faq: { items: { q: string; a: string }[] };
+  /**
+   * Подборка товаров по slug-фильтру (БЕЗ FK на каталог — витрина дотягивает
+   * товары через существующий /products; инвариант 5.1). limit — из схемы (деф. 12).
+   */
+  products_grid: {
+    mode: 'slugs' | 'category' | 'brand';
+    slugs?: string[];
+    categorySlug?: string;
+    brandSlug?: string;
+    limit?: number;
+    title?: string;
+  };
+  cta: { title: string; html?: string; buttonLabel: string; buttonHref: string };
+}
+
+/** Тип секции CMS (дискриминатор). */
+export type CmsSectionType = keyof SectionContentByType;
+
+/** Публичная секция страницы — дискриминированный union по `type`. */
+export type PageSection = {
+  [K in CmsSectionType]: { type: K; content: SectionContentByType[K] };
+}[CmsSectionType];
+
+/** Публичная CMS-страница (детальная, для /pages/[slug]). */
+export interface PageDto {
+  slug: string;
+  title: string;
+  meta: SeoMetaDto;
+  sections: PageSection[];
+}
+
 export interface PublicSettingsDto {
   branding: {
     shopName: string;
