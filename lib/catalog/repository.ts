@@ -463,14 +463,18 @@ export async function listProducts(
           ))
   `;
 
+  // Вторичный ключ p.id — детерминированный tie-break: без него строки с равным
+  // primary-ключом (одинаковая цена/имя, а при массовом ETL — и одинаковый
+  // created_at у сотен товаров) могут дублироваться/пропадать между страницами
+  // (нестабильный ORDER BY + LIMIT/OFFSET). p.id уникален → строгий полный порядок.
   const orderBy =
     f.sort === 'name_asc'
-      ? sql`ORDER BY p.name ASC`
+      ? sql`ORDER BY p.name ASC, p.id ASC`
       : f.sort === 'price_asc'
-        ? sql`ORDER BY p.base_price ASC`
+        ? sql`ORDER BY p.base_price ASC, p.id ASC`
         : f.sort === 'price_desc'
-          ? sql`ORDER BY p.base_price DESC`
-          : sql`ORDER BY p.created_at DESC`;
+          ? sql`ORDER BY p.base_price DESC, p.id ASC`
+          : sql`ORDER BY p.created_at DESC, p.id ASC`;
 
   const rows = await sql<Record<string, unknown>[]>`
     SELECT

@@ -5,6 +5,7 @@
 
 import type { ProductListItemDto } from '@/lib/types';
 import { formatPrice } from '@/lib/format';
+import FavoriteButton from './FavoriteButton';
 
 interface Props {
   product: ProductListItemDto;
@@ -29,7 +30,17 @@ export default function ProductCard({ product, currencyCode, currencySymbol }: P
         <div className="work-item__price">
           {product.inStock ? formatPrice(product.price, currencyCode, currencySymbol) : ' '}
         </div>
-        <div className="work-item__heart" />
+        <FavoriteButton
+          item={{
+            slug: product.slug,
+            name: product.name,
+            price: product.price,
+            compareAtPrice: product.compareAtPrice,
+            imageUrl: product.imageUrl,
+            brandName: product.brand?.name ?? null,
+            url: `/product/${product.slug}`,
+          }}
+        />
       </a>
     </div>
   );

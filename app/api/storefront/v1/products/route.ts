@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import { runStorefront, jsonData, jsonError, handlePreflight } from '@/lib/storefront/response';
 import { listProducts } from '@/lib/catalog/repository';
-import type { ProductListFilter } from '@/lib/catalog/repository';
+import type { ProductListFilter, ProductSort } from '@/lib/catalog/repository';
 import { getActiveCategoryIdBySlug } from '@/lib/storefront/queries';
 import { toProductListItemDto } from '@/lib/storefront/dto';
 import { localizeCtxFrom } from '@/lib/storefront/locale';
@@ -33,6 +33,34 @@ function parseIntOr(v: string | null, def: number): number {
   if (v === null) return def;
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) ? n : def;
+}
+
+// Сортировка каталога. Принимаем как соглашение витрины (carre: asc/desc/name/new),
+// так и сырые значения enum ProductSort (устойчивость к прямому вызову API).
+// Неизвестное/отсутствует → undefined (репозиторий по умолчанию сортирует по created_desc).
+const SORT_ENUM: readonly ProductSort[] = [
+  'created_desc',
+  'name_asc',
+  'price_asc',
+  'price_desc',
+];
+function parseSort(v: string | null): ProductSort | undefined {
+  if (v === null) return undefined;
+  const s = v.trim().toLowerCase();
+  switch (s) {
+    case 'asc':
+      return 'price_asc';
+    case 'desc':
+      return 'price_desc';
+    case 'name':
+      return 'name_asc';
+    case 'new':
+      return 'created_desc';
+    default:
+      return (SORT_ENUM as readonly string[]).includes(s)
+        ? (s as ProductSort)
+        : undefined;
+  }
 }
 
 export async function GET(req: Request): Promise<Response> {
@@ -87,6 +115,7 @@ export async function GET(req: Request): Promise<Response> {
       isFeatured: parseBool(q.get('featured')),
       isNew: parseBool(q.get('new')),
       onSale: parseBool(q.get('sale')),
+      sort: parseSort(q.get('sort')),
       page,
       // Явный offset (приоритет над page в listProducts) — точная пагинация.
       offset,

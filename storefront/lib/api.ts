@@ -101,6 +101,10 @@ export interface ProductQuery {
   featured?: boolean;
   isNew?: boolean;
   sale?: boolean;
+  /** Сортировка каталога (carre: asc/desc/name/new или сырой ProductSort). */
+  sort?: string;
+  /** Полнотекстовый поиск (ILIKE по name/sku на стороне API, параметр ?q). */
+  search?: string;
 }
 
 /** Список товаров с пагинацией/фильтрами. */
@@ -114,6 +118,8 @@ export async function getProducts(
   if (query.featured) params.set('featured', '1');
   if (query.isNew) params.set('new', '1');
   if (query.sale) params.set('sale', '1');
+  if (query.sort) params.set('sort', query.sort);
+  if (query.search) params.set('q', query.search);
   const qs = params.toString();
   const body = await apiGet<ProductsResponse>(`/products${qs ? `?${qs}` : ''}`);
   return body ?? { data: [], pagination: { total: 0, limit: 0, offset: 0, count: 0 } };

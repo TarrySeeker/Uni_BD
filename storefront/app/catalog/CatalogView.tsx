@@ -22,9 +22,19 @@ interface Props {
   activeSlug?: string;
   /** Текущая страница (1-based). */
   page: number;
+  /** Сортировка каталога (carre: asc/desc); пробрасывается в API и подсветку. */
+  sort?: string;
 }
 
-export default async function CatalogView({ activeSlug, page }: Props) {
+/** URL текущей категории/страницы с заданной сортировкой (carre setFilterQuery). */
+function sortHref(basePath: string, page: number, sort: string): string {
+  const params = new URLSearchParams();
+  if (page > 1) params.set('page', String(page));
+  params.set('sort', sort);
+  return `${basePath}?${params.toString()}`;
+}
+
+export default async function CatalogView({ activeSlug, page, sort }: Props) {
   const currentPage = Math.max(1, Number.isFinite(page) ? page : 1);
   const [categories, settings] = await Promise.all([getCategories(), getSettings()]);
   const roots = rootCategories(categories);
@@ -36,6 +46,7 @@ export default async function CatalogView({ activeSlug, page }: Props) {
   // Товары выбранной категории (или все) с пагинацией.
   const res = await getProducts({
     category: activeSlug || undefined,
+    sort: sort || undefined,
     limit: PAGE_SIZE,
     offset: (currentPage - 1) * PAGE_SIZE,
   });
@@ -77,6 +88,24 @@ export default async function CatalogView({ activeSlug, page }: Props) {
         />
 
         <div className="works-catalog-list works-catalog-list--works">
+          {showProducts && (
+            <div className="works-catalog-list--sort">
+              <span>Сортировка по:</span>
+              <a
+                href={sortHref(basePath, currentPage, 'asc')}
+                className={sort === 'asc' ? 'active' : undefined}
+              >
+                возрастанию цены
+              </a>
+              <a
+                href={sortHref(basePath, currentPage, 'desc')}
+                className={sort === 'desc' ? 'active' : undefined}
+              >
+                убыванию цены
+              </a>
+            </div>
+          )}
+
           <div className="w-100">
             {isParentLanding && (
               <div className="sf-cat-grid sf-subcats">
@@ -107,6 +136,7 @@ export default async function CatalogView({ activeSlug, page }: Props) {
                   page={currentPage}
                   pageCount={pageCount}
                   basePath={basePath}
+                  sort={sort || undefined}
                 />
               </>
             )}

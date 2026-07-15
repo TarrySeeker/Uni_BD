@@ -18,11 +18,16 @@ function parsePage(v: string | string[] | undefined): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
 }
 
+function firstParam(v: string | string[] | undefined): string | undefined {
+  const raw = Array.isArray(v) ? v[0] : v;
+  return raw || undefined;
+}
+
 export default async function CatalogIndexPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; sort?: string | string[] }>;
 }) {
   const sp = await searchParams;
-  return <CatalogView page={parsePage(sp.page)} />;
+  return <CatalogView page={parsePage(sp.page)} sort={firstParam(sp.sort)} />;
 }

@@ -11,6 +11,7 @@ import { useState } from 'react';
 import type { CategoryDto, PublicSettingsDto } from '@/lib/types';
 import { currencySymbol } from '@/lib/format';
 import { useCart } from '@/lib/cart';
+import { useFavorites } from '@/lib/favorites';
 
 interface Props {
   categories: CategoryDto[];
@@ -71,6 +72,7 @@ function MenuNode({ node }: { node: CategoryDto }) {
 
 export default function SiteHeader({ categories, settings }: Props) {
   const { count, mounted } = useCart();
+  const { count: favCount, mounted: favMounted } = useFavorites();
 
   const setBodyMenu = (on: boolean) => {
     if (typeof document !== 'undefined') {
@@ -115,7 +117,10 @@ export default function SiteHeader({ categories, settings }: Props) {
         </div>
         <div className="page-head-icons">
           <a href="/search"><img src="/images/search.svg" alt="" /></a>
-          <a href="/favorite"><img src="/images/heart.svg" alt="" /></a>
+          <a href="/favorite">
+            <img src="/images/heart.svg" alt="" />
+            {favMounted && favCount > 0 && <span className="sf-cart-count">{favCount}</span>}
+          </a>
           <a href="/cart">
             <img src="/images/bag.svg" alt="" />
             {mounted && count > 0 && <span className="sf-cart-count">{count}</span>}

@@ -17,6 +17,11 @@ function parsePage(v: string | string[] | undefined): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
 }
 
+function firstParam(v: string | string[] | undefined): string | undefined {
+  const raw = Array.isArray(v) ? v[0] : v;
+  return raw || undefined;
+}
+
 function lastSlug(slug: string[]): string {
   return slug[slug.length - 1] ?? '';
 }
@@ -37,8 +42,14 @@ export default async function CategoryPage({
   searchParams,
 }: {
   params: Promise<{ slug: string[] }>;
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; sort?: string | string[] }>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  return <CatalogView activeSlug={lastSlug(slug)} page={parsePage(sp.page)} />;
+  return (
+    <CatalogView
+      activeSlug={lastSlug(slug)}
+      page={parsePage(sp.page)}
+      sort={firstParam(sp.sort)}
+    />
+  );
 }

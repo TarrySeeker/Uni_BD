@@ -31,6 +31,7 @@ const listProducts = vi.fn(
     page?: number;
     pageSize?: number;
     offset?: number;
+    sort?: string;
   }) => {
     // Воспроизводим прод-поведение: ::uuid-каст падает на не-UUID значении.
     const isUuid = (v: string | undefined): boolean =>
@@ -187,5 +188,65 @@ describe('storefront/products — пагинация: свободный offset 
     const filter = listProducts.mock.calls[0]![0];
     expect(filter.offset).toBe(0);
     expect(r.body?.pagination?.offset).toBe(0);
+  });
+});
+
+/**
+ * Сортировка каталога: параметр ?sort пробрасывается в listProducts как
+ * ProductSort. Витрина шлёт соглашение carre (asc/desc/name/new); принимаем и
+ * сырые значения enum (price_asc/...). Неизвестное/отсутствует → sort undefined
+ * (репозиторий сортирует по created_desc по умолчанию).
+ */
+describe('storefront/products — сортировка (?sort)', () => {
+  beforeEach(() => {
+    setEnv();
+    listProducts.mockClear();
+  });
+  afterEach(() => {
+    process.env = { ...ORIGINAL };
+    vi.resetModules();
+  });
+
+  it('?sort=asc → filter.sort=price_asc (цена по возрастанию)', async () => {
+    const r = await get('?sort=asc');
+    expect(r.status).toBe(200);
+    expect(listProducts).toHaveBeenCalledTimes(1);
+    expect(listProducts.mock.calls[0]![0]).toMatchObject({ sort: 'price_asc' });
+  });
+
+  it('?sort=desc → filter.sort=price_desc (цена по убыванию)', async () => {
+    const r = await get('?sort=desc');
+    expect(r.status).toBe(200);
+    expect(listProducts.mock.calls[0]![0]).toMatchObject({ sort: 'price_desc' });
+  });
+
+  it('?sort=name → filter.sort=name_asc', async () => {
+    const r = await get('?sort=name');
+    expect(r.status).toBe(200);
+    expect(listProducts.mock.calls[0]![0]).toMatchObject({ sort: 'name_asc' });
+  });
+
+  it('?sort=new → filter.sort=created_desc', async () => {
+    const r = await get('?sort=new');
+    expect(r.status).toBe(200);
+    expect(listProducts.mock.calls[0]![0]).toMatchObject({ sort: 'created_desc' });
+  });
+
+  it('сырое значение enum ?sort=price_desc принимается как есть', async () => {
+    const r = await get('?sort=price_desc');
+    expect(r.status).toBe(200);
+    expect(listProducts.mock.calls[0]![0]).toMatchObject({ sort: 'price_desc' });
+  });
+
+  it('неизвестное ?sort=whatever → sort undefined (дефолт репозитория)', async () => {
+    const r = await get('?sort=whatever');
+    expect(r.status).toBe(200);
+    expect(listProducts.mock.calls[0]![0]!.sort).toBeUndefined();
+  });
+
+  it('без ?sort → sort undefined', async () => {
+    const r = await get('?limit=5');
+    expect(r.status).toBe(200);
+    expect(listProducts.mock.calls[0]![0]!.sort).toBeUndefined();
   });
 });
