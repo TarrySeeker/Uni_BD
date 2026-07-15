@@ -156,3 +156,17 @@ export async function getHomeProducts(limit = 12): Promise<ProductListItemDto[]>
   const latest = await getProducts({ limit });
   return latest.data;
 }
+
+/**
+ * Товары блока «Новинки» главной (carre `.mainpage--new`): сперва помеченные
+ * `is_new` (?new=1), при пустом результате — общий список (fallback), чтобы блок
+ * всегда показывал реальные товары, даже если магазин не проставил флаг новинки.
+ */
+export async function getNewProducts(limit = 12): Promise<ProductListItemDto[]> {
+  const fresh = await getProducts({ isNew: true, limit });
+  if (fresh.data.length > 0) {
+    return fresh.data;
+  }
+  const latest = await getProducts({ limit });
+  return latest.data;
+}

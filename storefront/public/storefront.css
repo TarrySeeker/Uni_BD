@@ -54,6 +54,16 @@
   padding-bottom: 40px;
 }
 
+/* Новинки: в carre .work-sticky раскладывает slick-карусель (JS). Без slick
+ * даём тот же ряд, что и каталог, чтобы .work-box (width:25%) встали сеткой. */
+.mainpage--new-groups_view .work-sticky {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  width: 100%;
+}
+
 /* ---- Сетка категорий ----------------------------------------------------- */
 .sf-cat-grid {
   display: flex;
