@@ -229,9 +229,38 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true' || v === '1'),
 
+  // ---------------------------------------------------------------------------
+  // АЛЬФА-БАНК ИНТЕРНЕТ-ЭКВАЙРИНГ (REST, платформа RBS). ВСЕ переменные опциональны:
+  // при пустых ALFABANK_USERNAME/ALFABANK_PASSWORD модуль работает в MOCK-режиме
+  // (см. lib/payments/alfabank/config.ts isAlfabankMock) — demo/CI без боевого
+  // мерчанта. Аутентификация запросов — userName/password (form-параметры на каждый
+  // запрос, НЕ подпись Token). Опц. секрет ALFABANK_CALLBACK_SECRET — HMAC symmetric
+  // key колбэка (если задан в ЛК Альфа-Банка): при наличии checksum верифицируется.
+  // ---------------------------------------------------------------------------
+  // Базовый URL шлюза RBS. Тестовый (не боевой): https://alfa.rbsuat.com,
+  // боевой: https://payment.alfabank.ru. По умолчанию — ТЕСТОВЫЙ контур (безопасно).
+  ALFABANK_GATEWAY: z.string().url().default('https://alfa.rbsuat.com'),
+  // Логин/пароль API-мерчанта Альфа-Банка (userName/password). ПУСТО → mock.
+  ALFABANK_USERNAME: z.string().optional(),
+  ALFABANK_PASSWORD: z.string().optional(),
+  // Секретный ключ HMAC колбэка (симметричный, из ЛК). Пусто → checksum не проверяется.
+  ALFABANK_CALLBACK_SECRET: z.string().optional(),
+  // Описание заказа, уходящее в register.do (description). Пусто → `Заказ <number>`.
+  ALFABANK_DESCRIPTION: z.string().optional(),
+  // URL возврата покупателя при успехе/неуспехе (register.do returnUrl/failUrl).
+  ALFABANK_RETURN_URL: optionalUrl,
+  ALFABANK_FAIL_URL: optionalUrl,
+  // Доп. IP/CIDR whitelist колбэка (csv); главная защита — checksum (если задан). Пусто допустимо.
+  ALFABANK_WEBHOOK_IPS: z.string().optional(),
+  // Доверять прокси-заголовку IP (за Caddy).
+  ALFABANK_WEBHOOK_TRUST_PROXY: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+
   // Активный платёжный провайдер витрины (выбор эквайера по конфигу магазина).
   // Один активный online-эквайер на магазин (docs/24 §2). Дефолт — tbank.
-  PAYMENTS_PROVIDER: z.enum(['tbank', 'paykeeper', 'manual']).default('tbank'),
+  PAYMENTS_PROVIDER: z.enum(['tbank', 'paykeeper', 'alfabank', 'manual']).default('tbank'),
 });
 
 export type Env = z.infer<typeof envSchema>;

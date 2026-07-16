@@ -33,6 +33,7 @@
 
 import { PaymentService as TbankPaymentService } from '@/lib/payments/tbank';
 import { PaymentService as PaykeeperPaymentService } from '@/lib/payments/paykeeper';
+import { PaymentService as AlfabankPaymentService } from '@/lib/payments/alfabank';
 import { OrderError } from '@/lib/orders/errors';
 
 /** Вход шлюзового возврата (единый контракт tbank/paykeeper `refundPayment`). */
@@ -63,10 +64,16 @@ export interface RefundDispatchResult {
  * (`tbank`|`paykeeper`|`manual`) + forward-compat `gift` (ADR-P1-3, шаг 4). NB: не
  * равно реестру `PAYMENT_PROVIDERS` (там нет `gift`) — `gift` здесь заглушка.
  */
-type RefundProvider = 'tbank' | 'paykeeper' | 'manual' | 'gift';
+type RefundProvider = 'tbank' | 'paykeeper' | 'alfabank' | 'manual' | 'gift';
 
 function isRefundProvider(v: string): v is RefundProvider {
-  return v === 'tbank' || v === 'paykeeper' || v === 'manual' || v === 'gift';
+  return (
+    v === 'tbank' ||
+    v === 'paykeeper' ||
+    v === 'alfabank' ||
+    v === 'manual' ||
+    v === 'gift'
+  );
 }
 
 /** Внутренний (без шлюза) возврат: реальный возврат делает сетл в вызывающем экшене. */
@@ -117,6 +124,8 @@ export async function dispatchRefund(
       return new TbankPaymentService().refundPayment(input);
     case 'paykeeper':
       return new PaykeeperPaymentService().refundPayment(input);
+    case 'alfabank':
+      return new AlfabankPaymentService().refundPayment(input);
     case 'manual':
       // Ручной/офлайн-платёж: шлюзового reverse нет — внутренний сетл вернёт деньги.
       return internalRefund('manual');

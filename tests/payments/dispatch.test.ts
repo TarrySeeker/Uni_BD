@@ -22,6 +22,12 @@ const paykeeperRefundMock = vi.fn(async (..._a: unknown[]) => ({
   skipped: true,
   reason: 'manual',
 }));
+const alfabankRefundMock = vi.fn(async (..._a: unknown[]) => ({
+  ok: true,
+  status: '0',
+  isMock: true,
+  skipped: false,
+}));
 
 vi.mock('@/lib/payments/tbank', () => ({
   PaymentService: class {
@@ -34,6 +40,13 @@ vi.mock('@/lib/payments/paykeeper', () => ({
   PaymentService: class {
     refundPayment(...a: unknown[]) {
       return paykeeperRefundMock(...(a as []));
+    }
+  },
+}));
+vi.mock('@/lib/payments/alfabank', () => ({
+  PaymentService: class {
+    refundPayment(...a: unknown[]) {
+      return alfabankRefundMock(...(a as []));
     }
   },
 }));
@@ -56,6 +69,7 @@ function input(over: Partial<RefundDispatchInput> = {}): RefundDispatchInput {
 beforeEach(() => {
   tbankRefundMock.mockClear();
   paykeeperRefundMock.mockClear();
+  alfabankRefundMock.mockClear();
 });
 
 describe('dispatchRefund — маршрутизация по payment_provider', () => {
@@ -77,6 +91,18 @@ describe('dispatchRefund — маршрутизация по payment_provider', 
     expect(paykeeperRefundMock).toHaveBeenCalledTimes(1);
     expect(tbankRefundMock).not.toHaveBeenCalled();
     expect(res).toMatchObject({ ok: true, skipped: true, reason: 'manual' });
+  });
+
+  it('alfabank → alfabank.refundPayment (tbank/paykeeper НЕ вызваны)', async () => {
+    const res = await dispatchRefund(input({ paymentProvider: 'alfabank', paymentRef: 'alfa-9' }));
+    expect(alfabankRefundMock).toHaveBeenCalledTimes(1);
+    expect(tbankRefundMock).not.toHaveBeenCalled();
+    expect(paykeeperRefundMock).not.toHaveBeenCalled();
+    expect(alfabankRefundMock.mock.calls[0]![0]).toMatchObject({
+      paymentProvider: 'alfabank',
+      paymentRef: 'alfa-9',
+    });
+    expect(res).toMatchObject({ ok: true, status: '0' });
   });
 
   it('manual → внутренний skipped БЕЗ внешнего вызова', async () => {

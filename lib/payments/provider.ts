@@ -16,13 +16,13 @@
 import { getEnv } from '@/lib/config/env';
 
 /** Множество известных платёжных провайдеров (== orders_payment_provider_chk). */
-export const PAYMENT_PROVIDERS = ['tbank', 'paykeeper', 'manual'] as const;
+export const PAYMENT_PROVIDERS = ['tbank', 'paykeeper', 'alfabank', 'manual'] as const;
 
 /** Платёжный провайдер заказа (orders.payment_provider). */
 export type PaymentProvider = (typeof PAYMENT_PROVIDERS)[number];
 
 /** Провайдеры с онлайн-инициацией оплаты (у `manual` витрина оплату не инициирует). */
-export const ONLINE_PAYMENT_PROVIDERS = ['tbank', 'paykeeper'] as const;
+export const ONLINE_PAYMENT_PROVIDERS = ['tbank', 'paykeeper', 'alfabank'] as const;
 export type OnlinePaymentProvider = (typeof ONLINE_PAYMENT_PROVIDERS)[number];
 
 /** true, если провайдер — известный платёжный провайдер Admik. */
