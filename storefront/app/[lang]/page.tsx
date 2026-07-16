@@ -8,34 +8,80 @@
  *   4. Видео                 .mainpage--video         ← settings.home.video      (M4)
  *   5. Новинки               .mainpage--new           ← /products?new=1
  *   6. Витрина дизайнеров    .mainpage--designers     ← settings.home.designers  (M4)
- *   7. Lookbook              .lookbook                ← settings.home.looks
+ *   7. Промо-слайдер         .mainpage--slider        ← settings.home.slider     (M5)
+ *   8. Корп./сертификаты     .dop-links--vertical     ← settings.home.corpCert   (M5)
+ *   9. Lookbook              .lookbook                ← settings.home.looks
  *
- * ⚠️ Placeholder `.dop-links--vertical` (захардкоженные «Корпоративным клиентам»/
- * «Подарочные сертификаты») УДАЛЁН — на живой главной его нет; заменён на
- * управляемые из настроек плитки `.dop-links--adaptive`.
+ * ⚠️ Ранее `.dop-links--vertical` был захардкоженным плейсхолдером и удалялся; в
+ * M5 он восстановлен как УПРАВЛЯЕМЫЙ из настроек блок (settings.home.corpCert) —
+ * плитки/ссылки/фото приходят из shop_settings, а не из кода (мультитенант).
  */
 
+import type { Metadata } from 'next';
 import { getNewProducts, getSettings } from '@/lib/api';
+import { localizedHref, toLocale, LOCALES, localePrefix } from '@/lib/i18n';
+import { getDictionary } from '@/lib/dictionaries';
 import ProductCard from './components/ProductCard';
+import { PromoSlider } from './components/PromoSlider';
 
 // Всегда рендерим по запросу: при `next build` (docker) API app:3000 ещё не
 // поднят — статическая генерация не должна ходить в сеть.
 export const dynamic = 'force-dynamic';
 
-export default async function HomePage() {
-  const [settings, products] = await Promise.all([getSettings(), getNewProducts(12)]);
+/**
+ * Defense-in-depth для href из настроек (slider/corpCert): рендерим ссылку/onclick
+ * ТОЛЬКО если href — относительный путь от «/» ИЛИ https-URL. Схема M5
+ * (internalHrefSchema) уже это гарантирует на входе, но повторная проверка на
+ * рендере защищает от «протухших» значений в БД и любого обхода валидации
+ * (анти-XSS/анти-open-redirect, как designer.href/video.embedUrl в M4).
+ */
+function isSafeHref(href: string): boolean {
+  // `/path` (но НЕ `//host` — protocol-relative open-redirect) ИЛИ https://-URL.
+  return (href.startsWith('/') && !href.startsWith('//')) || /^https:\/\//i.test(href);
+}
 
-  const currencyCode = settings?.currency.code ?? 'RUB';
-  const currencySymbol = settings?.currency.symbol ?? null;
+export function generateStaticParams() {
+  return LOCALES.map((lang) => ({ lang }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = toLocale((await params).lang);
+  return { alternates: { canonical: localePrefix(locale) || '/' } };
+}
+
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}) {
+  const locale = toLocale((await params).lang);
+  const dict = getDictionary(locale);
+  const [settings, products] = await Promise.all([
+    getSettings(locale),
+    getNewProducts(12, locale),
+  ]);
 
   const hero = settings?.home.hero;
   const tiles = settings?.home.tiles;
   const about = settings?.home.about;
   const video = settings?.home.video;
   const designers = settings?.home.designers;
+  const slider = settings?.home.slider;
+  const corpCert = settings?.home.corpCert;
   const looks = settings?.home.looks;
 
-  const heroHref = hero?.ctaHref ?? '/catalog';
+  // Рендерим только безопасные href (defense-in-depth поверх схемной валидации).
+  const sliderSlides = (slider?.slides ?? []).filter((s) => isSafeHref(s.href));
+  const corpCertTiles = (corpCert?.tiles ?? []).filter((t) => isSafeHref(t.href));
+
+  // Href из настроек магазина оставляем как есть (управляемый контент, может быть
+  // внешним/абсолютным); фиксированные внутренние ссылки локализуем через href().
+  const href = (path: string) => localizedHref(path, locale);
+  const heroHref = hero?.ctaHref ?? href('/catalog');
   const looksCategories = looks?.categories ?? [];
   const lb0 = looksCategories[0];
   const lb1 = looksCategories[1];
@@ -81,7 +127,7 @@ export default async function HomePage() {
                 {p}
               </div>
             ))}
-            <a href="/about">Наша история</a>
+            <a href={href('/about')}>{dict.home.ourStory}</a>
           </div>
         </div>
       )}
@@ -105,17 +151,12 @@ export default async function HomePage() {
       {/* 5. Новинки (.mainpage--new) — живой каталог, /products?new=1 */}
       {products.length > 0 && (
         <div className="mainpage--new">
-          <h1>Новинки</h1>
+          <h1>{dict.home.newProducts}</h1>
           <div className="mainpage--new-groups_view">
             <div className="active">
               <div className="work-sticky">
                 {products.map((p) => (
-                  <ProductCard
-                    key={p.slug}
-                    product={p}
-                    currencyCode={currencyCode}
-                    currencySymbol={currencySymbol}
-                  />
+                  <ProductCard key={p.slug} product={p} locale={locale} />
                 ))}
               </div>
             </div>
@@ -153,7 +194,26 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* 7. Lookbook (.lookbook) — settings.home.looks */}
+      {/* 7. Промо-слайдер (.mainpage--slider) — settings.home.slider */}
+      {slider?.enabled && sliderSlides.length > 0 && (
+        <PromoSlider slides={sliderSlides} />
+      )}
+
+      {/* 8. Корпоративным / сертификаты (.dop-links--vertical) — settings.home.corpCert */}
+      {corpCert?.enabled && corpCertTiles.length > 0 && (
+        <div className="dop-links dop-links--vertical ">
+          {corpCertTiles.map((t, i) => (
+            <div className="dop-links__box" key={`${t.href}-${i}`}>
+              <a href={t.href}>
+                <img src={t.imageUrl} alt="" className="lazy" />
+                <div className="dop-links__box-name">{t.title} →</div>
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 9. Lookbook (.lookbook) — settings.home.looks */}
       {looks?.enabled && looksCategories.length > 0 && (
         <div className="lookbook">
           <h2 className="lookbook__title">{looks.title}</h2>

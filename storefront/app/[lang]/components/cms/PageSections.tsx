@@ -13,6 +13,7 @@
  */
 
 import { getProduct, getProducts } from '@/lib/api';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 import type {
   PageSection,
   ProductDetailDto,
@@ -25,6 +26,8 @@ interface Props {
   sections: PageSection[];
   currencyCode: string;
   currencySymbol: string | null;
+  /** Текущая локаль — для локализации товаров грид-секций и ссылок карточек. */
+  locale?: Locale;
 }
 
 /** ProductDetailDto (из getProduct по slug) → форма карточки списка. */
@@ -58,17 +61,18 @@ function detailToListItem(p: ProductDetailDto): ProductListItemDto {
  */
 async function resolveGridProducts(
   content: SectionContentByType['products_grid'],
+  locale: Locale,
 ): Promise<ProductListItemDto[]> {
   const limit = content.limit ?? 12;
 
   if (content.mode === 'category' && content.categorySlug) {
-    const res = await getProducts({ category: content.categorySlug, limit });
+    const res = await getProducts({ category: content.categorySlug, limit }, locale);
     return res.data;
   }
 
   if (content.mode === 'slugs' && content.slugs?.length) {
     const found = await Promise.all(
-      content.slugs.slice(0, limit).map((slug) => getProduct(slug)),
+      content.slugs.slice(0, limit).map((slug) => getProduct(slug, locale)),
     );
     return found
       .filter((p): p is ProductDetailDto => p !== null)
@@ -85,11 +89,13 @@ function Section({
   products,
   currencyCode,
   currencySymbol,
+  locale,
 }: {
   section: PageSection;
   products: ProductListItemDto[] | null;
   currencyCode: string;
   currencySymbol: string | null;
+  locale: Locale;
 }) {
   switch (section.type) {
     case 'text':
@@ -184,6 +190,7 @@ function Section({
                 <ProductCard
                   key={p.slug}
                   product={p}
+                  locale={locale}
                   currencyCode={currencyCode}
                   currencySymbol={currencySymbol}
                 />
@@ -222,12 +229,13 @@ export default async function PageSections({
   sections,
   currencyCode,
   currencySymbol,
+  locale = DEFAULT_LOCALE,
 }: Props) {
   // Предрезолв товаров для products_grid-секций (индексы совпадают с sections).
   const gridProducts = await Promise.all(
     sections.map((s) =>
       s.type === 'products_grid'
-        ? resolveGridProducts(s.content)
+        ? resolveGridProducts(s.content, locale)
         : Promise.resolve(null),
     ),
   );
@@ -241,6 +249,7 @@ export default async function PageSections({
           products={gridProducts[i]}
           currencyCode={currencyCode}
           currencySymbol={currencySymbol}
+          locale={locale}
         />
       ))}
     </div>

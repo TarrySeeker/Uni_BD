@@ -53,6 +53,16 @@ export interface MediaDto {
   isPrimary: boolean;
 }
 
+/**
+ * Дисплейный цвето-свотч товара (легаси-блок carre `.wv__colors`). Зеркалит
+ * Admik `ProductColorDto`: `hex` красит кружок, `name` (ru) — его title.
+ * НЕ покупаемый вариант.
+ */
+export interface ProductColorDto {
+  hex: string;
+  name: string;
+}
+
 export interface VariantDto {
   id: string;
   sku: string;
@@ -115,6 +125,11 @@ export interface ProductDetailDto {
   designer: DesignerDto | null;
   categories: string[];
   attributes: Record<string, unknown>;
+  /**
+   * Дисплейные цвето-свотчи (легаси carre `.wv__colors`); [] → блок не рендерится.
+   * Поле опционально для устойчивости к старым ответам API без него.
+   */
+  colors?: ProductColorDto[];
   variants: VariantDto[];
   media: MediaDto[];
   inStock: boolean;
@@ -125,6 +140,194 @@ export interface ProductDetailDto {
 export interface PublicSocialDto {
   type: string;
   url: string;
+}
+
+// -----------------------------------------------------------------------------
+// Оформление заказа (чекаут). Формы входа сверены ДОСЛОВНО с Zod-схемами Admik
+// (Uni_BD/lib/orders/schemas.ts: CartQuoteSchema, CreateOrderSchema,
+// deliverySelectionSchema, cartLineSchema) и публичными DTO ответов
+// (lib/storefront/order-dto.ts: QuoteDto, OrderCreatedDto, OrderPublicDto),
+// а также роутами delivery/cdek/* и payments/paykeeper/init.
+// Anti-tamper (ADR-010): в телах запроса НЕТ полей цены — сумму считает сервер.
+// -----------------------------------------------------------------------------
+
+/** Позиция корзины на входе quote/orders — variantId ИЛИ productId + qty. */
+export interface CartLineInput {
+  variantId?: string;
+  productId?: string;
+  qty: number;
+}
+
+/** Способ доставки (orders.delivery_type). */
+export type CheckoutDeliveryType = 'courier' | 'pvz' | 'pickup';
+
+/** Способ оплаты (orders.payment_method). Онлайн-эквайринг (PayKeeper) = 'card'. */
+export type CheckoutPaymentMethod =
+  | 'unset'
+  | 'cod'
+  | 'card'
+  | 'sbp'
+  | 'cdek_pay'
+  | 'invoice';
+
+/** Выбор доставки на входе (стоимость считает сервер — её здесь нет). */
+export interface DeliverySelectionInput {
+  type: CheckoutDeliveryType;
+  city?: string;
+  /** Числовой код города СДЭК (из /cdek/cities) — точнее строкового city. */
+  cityCode?: number;
+  address?: string;
+  pvzCode?: string;
+  /** id зоны доставки из настроек (ТЗ_1) — цену берёт сервер по этому id. */
+  zoneId?: string;
+  /** Постамат — подвид ПВЗ с автовыдачей (флаг поверх type='pvz'). */
+  isPostamat?: boolean;
+}
+
+/** Тело POST /cart/quote (CartQuoteSchema). */
+export interface CartQuoteRequest {
+  items: CartLineInput[];
+  promoCode?: string;
+  delivery?: DeliverySelectionInput;
+}
+
+/** Контакты покупателя (customerContactSchema). */
+export interface CustomerContactInput {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+/** Тело POST /orders (CreateOrderSchema). */
+export interface CreateOrderRequest {
+  items: CartLineInput[];
+  customer: CustomerContactInput;
+  delivery: DeliverySelectionInput;
+  paymentMethod: CheckoutPaymentMethod;
+  promoCode?: string;
+  comment?: string;
+  idempotencyKey?: string;
+}
+
+/** Позиция расчёта корзины (QuoteLineDto). */
+export interface QuoteLineDto {
+  name: string;
+  sku: string;
+  unitPrice: string;
+  compareAtPrice: string | null;
+  qty: number;
+  lineTotal: string;
+  isGift: boolean;
+}
+
+/** Ответ POST /cart/quote (QuoteDto). Все суммы — строки NUMERIC в рублях. */
+export interface QuoteDto {
+  itemsTotal: string;
+  discountTotal: string;
+  giftDiscountTotal: string;
+  deliveryTotal: string;
+  grandTotal: string;
+  currency: string;
+  lines: QuoteLineDto[];
+  promo: {
+    applied: boolean;
+    code: string | null;
+    discount: string;
+    reason: string | null;
+  };
+  gift: unknown | null;
+  delivery: {
+    free: boolean;
+    freeThresholdMet: boolean;
+    cost: string;
+    /** false → расчёт СДЭК был нужен, но упал; cost не доверять, не оформлять. */
+    available: boolean;
+  };
+  fulfillable: boolean;
+  issues: Array<{ index: number; code: string }>;
+}
+
+/** Ответ POST /orders (OrderCreatedDto). */
+export interface OrderCreatedDto {
+  number: string;
+  status: string;
+  paymentStatus: string;
+  grandTotal: string;
+  giftDiscountTotal: string;
+  currency: string;
+  /** Токен для GET /orders/:number (трекинг/страница успеха). */
+  accessToken: string;
+}
+
+/** Ответ POST /payments/paykeeper/init. */
+export interface PaykeeperInitDto {
+  /** invoice_url PayKeeper — редирект сюда (в mock — demo-URL). */
+  paymentUrl: string;
+  invoiceId: string;
+  status: string;
+  isMock: boolean;
+}
+
+/** Город СДЭК (GET /cdek/cities). */
+export interface CdekCityDto {
+  code: number;
+  name: string;
+  region: string;
+}
+
+/** ПВЗ/постамат СДЭК (GET /cdek/pvz). */
+export interface CdekPvzDto {
+  code: string;
+  name: string;
+  address: string;
+  type: string;
+  location: { latitude: number; longitude: number } | null;
+  workTime: string | null;
+}
+
+/** Позиция заказа для трекинга (OrderItemDto). */
+export interface OrderItemDto {
+  name: string;
+  sku: string;
+  attributes: Record<string, unknown>;
+  unitPrice: string;
+  compareAtPrice: string | null;
+  qty: number;
+  lineTotal: string;
+  isGift: boolean;
+}
+
+/** Публичный статус заказа (GET /orders/:number → OrderPublicDto). */
+export interface OrderPublicDto {
+  number: string;
+  status: string;
+  paymentStatus: string;
+  deliveryStatus: string;
+  statusLabel: string;
+  paymentStatusLabel: string;
+  deliveryStatusLabel: string;
+  itemsTotal: string;
+  discountTotal: string;
+  giftDiscountTotal: string;
+  deliveryTotal: string;
+  grandTotal: string;
+  currency: string;
+  promoCode: string | null;
+  paymentMethod: string;
+  delivery: {
+    type: string;
+    isPostamat: boolean;
+    city: string | null;
+    track: string | null;
+  };
+  items: OrderItemDto[];
+  createdAt: string;
+}
+
+/** Форма ошибки Storefront API: { error: { code, message } }. */
+export interface StorefrontApiError {
+  code: string;
+  message: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -199,6 +402,18 @@ export interface PublicSettingsDto {
     symbol: string | null;
     locale: string | null;
     fractionDigits: number;
+    /**
+     * Доп.валюты ОТОБРАЖЕНИЯ (мультивалюта, ₽/€). Базовая — code выше; эти —
+     * переключаемые в шапке для показа по курсу (rate = единиц базовой за 1 единицу
+     * этой; цена_€ = цена_₽ / rate). Пустой/отсутствует → показ только базовой (₽),
+     * как раньше. Опционально для устойчивости к старым ответам API без поля.
+     */
+    displayCurrencies?: {
+      code: string;
+      symbol: string;
+      rate: number;
+      fractionDigits: number;
+    }[];
   };
   contacts: {
     phone: string | null;
@@ -206,6 +421,19 @@ export interface PublicSettingsDto {
     address: string | null;
     workingHours: string | null;
     socials: PublicSocialDto[];
+  };
+  /**
+   * Доставка (ТЗ_1): порог бесплатной доставки + зоны (Москва в МКАД / за МКАД).
+   * Деньги — в КОПЕЙКАХ. Опционально для устойчивости к старым ответам API.
+   */
+  delivery?: {
+    freeDeliveryThreshold: number;
+    zones: Array<{
+      id: string;
+      label: string;
+      price: number;
+      freeThreshold: number | null;
+    }>;
   };
   seo: {
     siteName: string | null;
@@ -248,6 +476,16 @@ export interface PublicSettingsDto {
         avatarTop: number;
         workTop: number;
       }[];
+    };
+    /** M5 — «Промо-слайдер» (.mainpage--slider): показ + слайды (imageUrl — публичный URL; name/caption — подписи). */
+    slider: {
+      enabled: boolean;
+      slides: { imageUrl: string; href: string; name: string; caption: string }[];
+    };
+    /** M5 — «Корпоративным / сертификаты» (.dop-links--vertical): показ + плитки-ссылки (imageUrl — публичный URL). */
+    corpCert: {
+      enabled: boolean;
+      tiles: { imageUrl: string; href: string; title: string }[];
     };
   };
   navigation: {

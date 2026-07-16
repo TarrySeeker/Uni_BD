@@ -8,8 +8,12 @@
  */
 
 import { useEffect } from 'react';
-import { formatPrice } from '@/lib/format';
+import { useParams } from 'next/navigation';
+import { formatDisplayPrice } from '@/lib/format';
 import { useFavorites } from '@/lib/favorites';
+import { useCurrency } from '@/lib/currency';
+import { localizedHref, toLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/dictionaries';
 import FavoriteButton from '../components/FavoriteButton';
 
 export default function FavoritePage() {
@@ -20,10 +24,13 @@ export default function FavoritePage() {
   }, []);
 
   const { items, mounted } = useFavorites();
+  const { selected } = useCurrency();
+  const locale = toLocale(useParams().lang);
+  const dict = getDictionary(locale);
 
   const title = (
     <div className="page-title">
-      <h1>Избранное</h1>
+      <h1>{dict.favorite.title}</h1>
     </div>
   );
 
@@ -36,7 +43,8 @@ export default function FavoritePage() {
       <>
         {title}
         <div className="sf-empty">
-          В избранном пока пусто. <a href="/catalog">Перейти в каталог →</a>
+          {dict.favorite.empty}{' '}
+          <a href={localizedHref('/catalog', locale)}>{dict.common.goToCatalog}</a>
         </div>
       </>
     );
@@ -62,9 +70,11 @@ export default function FavoritePage() {
                 <div className="work-item__description">{item.name}</div>
                 <div className="work-item__price">
                   {item.compareAtPrice && (
-                    <span className="sf-price-old">{formatPrice(item.compareAtPrice)}</span>
+                    <span className="sf-price-old">
+                      {formatDisplayPrice(item.compareAtPrice, selected)}
+                    </span>
                   )}
-                  {formatPrice(item.price)}
+                  {formatDisplayPrice(item.price, selected)}
                 </div>
                 <FavoriteButton item={item} />
               </a>

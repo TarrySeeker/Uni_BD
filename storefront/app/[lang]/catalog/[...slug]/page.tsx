@@ -1,12 +1,15 @@
 /**
- * Страница категории carre (/catalog/<slug> и вложенные) — сетка товаров категории
- * с сайдбаром и пагинацией. Catch-all: активной считается ПОСЛЕДНИЙ сегмент пути
- * (slug'и категорий уникальны в API); неизвестный slug → 404 (CatalogView).
+ * Страница категории carre (/catalog/<slug> и вложенные, с локалью /en//fr/) —
+ * сетка товаров категории с сайдбаром и пагинацией. Catch-all: активной считается
+ * ПОСЛЕДНИЙ сегмент пути (slug'и категорий уникальны в API); неизвестный slug → 404
+ * (CatalogView).
  */
 
 import type { Metadata } from 'next';
 import { getCategories } from '@/lib/api';
 import { rootCategories, findCategory } from '@/lib/tree';
+import { toLocale, alternatesFor } from '@/lib/i18n';
+import { getDictionary } from '@/lib/dictionaries';
 import CatalogView from '../CatalogView';
 
 export const dynamic = 'force-dynamic';
@@ -29,27 +32,33 @@ function lastSlug(slug: string[]): string {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ lang: string; slug: string[] }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
-  const categories = await getCategories();
+  const { lang, slug } = await params;
+  const locale = toLocale(lang);
+  const dict = getDictionary(locale);
+  const categories = await getCategories(locale);
   const cat = findCategory(rootCategories(categories), lastSlug(slug));
-  return { title: cat ? `${cat.name} — carre` : 'Каталог — carre' };
+  return {
+    title: cat ? `${cat.name} — carre` : `${dict.catalog.title} — carre`,
+    alternates: alternatesFor(`/catalog/${slug.join('/')}`, locale),
+  };
 }
 
 export default async function CategoryPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ lang: string; slug: string[] }>;
   searchParams: Promise<{ page?: string | string[]; sort?: string | string[] }>;
 }) {
-  const [{ slug }, sp] = await Promise.all([params, searchParams]);
+  const [{ lang, slug }, sp] = await Promise.all([params, searchParams]);
   return (
     <CatalogView
       activeSlug={lastSlug(slug)}
       page={parsePage(sp.page)}
       sort={firstParam(sp.sort)}
+      locale={toLocale(lang)}
     />
   );
 }

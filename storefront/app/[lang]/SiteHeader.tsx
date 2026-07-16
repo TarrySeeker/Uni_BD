@@ -5,21 +5,38 @@
  * page_head.twig). Бургер тогглит класс `page-menu-open` на <body> (как в
  * оригинальном app.js); подменю раскрываются классом `.menu-block.open`.
  * Категории и контакты — из Storefront API (реальные данные).
+ *
+ * i18n: получает текущую `locale` и словарь `dict`. ВСЕ внутренние ссылки строятся
+ * через localizedHref(path, locale) — сохраняют текущую локаль. Переключатель языка
+ * (Рус/Eng/Fra) ведёт на ТОТ ЖЕ путь с новым префиксом локали (usePathname +
+ * switchLocalePath). Есть два места переключения: выпадашка в .page-head-settings
+ * (рядом с валютой) и блок .mm-langs внизу меню — оба активны.
  */
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import type { CategoryDto, PublicSettingsDto } from '@/lib/types';
-import { currencySymbol } from '@/lib/format';
 import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
+import { useCurrency } from '@/lib/currency';
+import {
+  LOCALES,
+  LOCALE_LABELS,
+  localizedHref,
+  switchLocalePath,
+  type Locale,
+} from '@/lib/i18n';
+import { fillTemplate, type Dictionary } from '@/lib/dictionaries';
 
 interface Props {
   categories: CategoryDto[];
   settings: PublicSettingsDto | null;
+  locale: Locale;
+  dict: Dictionary;
 }
 
 /** URL категории: корень `catalog` ведёт на индекс /catalog. */
-function categoryHref(slug: string): string {
+function categoryPath(slug: string): string {
   return slug === 'catalog' ? '/catalog' : `/catalog/${slug}`;
 }
 
@@ -27,8 +44,17 @@ function categoryHref(slug: string): string {
  * Рекурсивный пункт выезжающего меню (порт menu-block из page_head.twig). Узел с
  * детьми — аккордеон (.menu-block.open) с внутренним списком: «Все» + дети, где
  * дети со своими детьми разворачиваются такими же вложенными menu-block.
+ * Все ссылки локализованы через href(path).
  */
-function MenuNode({ node }: { node: CategoryDto }) {
+function MenuNode({
+  node,
+  href,
+  allLabel,
+}: {
+  node: CategoryDto;
+  href: (path: string) => string;
+  allLabel: string;
+}) {
   const [open, setOpen] = useState(false);
   const hasChildren = node.children.length > 0;
 
@@ -36,7 +62,7 @@ function MenuNode({ node }: { node: CategoryDto }) {
     return (
       <div className="menu-block">
         <div className="menu-block-head">
-          <a href={categoryHref(node.slug)}>{node.name}</a>
+          <a href={href(categoryPath(node.slug))}>{node.name}</a>
         </div>
       </div>
     );
@@ -48,19 +74,19 @@ function MenuNode({ node }: { node: CategoryDto }) {
         className="menu-block-head js-toggle-open"
         onClick={() => setOpen((o) => !o)}
       >
-        <a href={categoryHref(node.slug)} onClick={(e) => e.stopPropagation()}>
+        <a href={href(categoryPath(node.slug))} onClick={(e) => e.stopPropagation()}>
           {node.name}
         </a>
         <span className="menu-block-head--plus">+</span>
         <span className="menu-block-head--minus">—</span>
       </div>
       <div className="menu-block-links">
-        <a href={categoryHref(node.slug)}>Все</a>
+        <a href={href(categoryPath(node.slug))}>{allLabel}</a>
         {node.children.map((child) =>
           child.children.length > 0 ? (
-            <MenuNode key={child.slug} node={child} />
+            <MenuNode key={child.slug} node={child} href={href} allLabel={allLabel} />
           ) : (
-            <a key={child.slug} href={categoryHref(child.slug)}>
+            <a key={child.slug} href={href(categoryPath(child.slug))}>
               {child.name}
             </a>
           ),
@@ -70,9 +96,16 @@ function MenuNode({ node }: { node: CategoryDto }) {
   );
 }
 
-export default function SiteHeader({ categories, settings }: Props) {
+export default function SiteHeader({ categories, settings, locale, dict }: Props) {
   const { count, mounted } = useCart();
   const { count: favCount, mounted: favMounted } = useFavorites();
+  const { currencies, selected, setCurrency } = useCurrency();
+  const pathname = usePathname() || '/';
+
+  // Локализованная внутренняя ссылка (сохраняет текущую локаль).
+  const href = (path: string) => localizedHref(path, locale);
+  // Ссылка «тот же путь на другом языке» (для переключателя).
+  const langHref = (target: Locale) => switchLocalePath(pathname, target);
 
   const setBodyMenu = (on: boolean) => {
     if (typeof document !== 'undefined') {
@@ -82,7 +115,10 @@ export default function SiteHeader({ categories, settings }: Props) {
 
   const email = settings?.contacts.email ?? settings?.branding.supportEmail ?? '';
   const phone = settings?.contacts.phone ?? settings?.branding.supportPhone ?? '';
-  const sign = currencySymbol(settings?.currency.code, settings?.currency.symbol);
+  // Знак валюты в шапке = выбранная валюта отображения (до маунта — базовая ₽).
+  const sign = selected.symbol;
+  // Переключатель валют показываем, только если есть доп.валюты (иначе — статичный ₽).
+  const hasMultiCurrency = currencies.length > 1;
 
   return (
     <>
@@ -92,36 +128,65 @@ export default function SiteHeader({ categories, settings }: Props) {
           <div />
         </div>
         <div className="page-head-logo">
-          <a href="/">
+          <a href={href('/')}>
             <img src="/images/logo.svg" alt={settings?.branding.shopName ?? 'carre'} />
           </a>
         </div>
         <div className="page-head-settings">
+          {hasMultiCurrency ? (
+            <div className="page-head-settings__item">
+              <div className="page-head-settings__dd">
+                {currencies.map((c) => (
+                  <div
+                    key={c.code}
+                    className={`page-head-settings__dd-item${
+                      c.code === selected.code ? ' is-active' : ''
+                    }`}
+                    data-label={c.symbol}
+                    role="button"
+                    aria-label={fillTemplate(dict.header.currencyAria, { code: c.code })}
+                    onClick={() => setCurrency(c.code)}
+                  >
+                    {c.code}
+                  </div>
+                ))}
+              </div>
+              <span className="page-head-label">{sign || '₽'}</span>
+              <span className="page-head-chevron">⌄</span>
+            </div>
+          ) : (
+            <div className="page-head-settings__item">
+              <span className="page-head-label">{sign || '₽'}</span>
+            </div>
+          )}
+          {/* Переключатель языка — ведёт на тот же путь с новым префиксом локали. */}
           <div className="page-head-settings__item">
             <div className="page-head-settings__dd">
-              <div className="page-head-settings__dd-item" data-label="₽">Рубли</div>
-              <div className="page-head-settings__dd-item" data-label="€">Euro</div>
+              {LOCALES.map((l) => (
+                <a
+                  key={l}
+                  href={langHref(l)}
+                  className={`page-head-settings__dd-item${
+                    l === locale ? ' is-active' : ''
+                  }`}
+                  data-label={LOCALE_LABELS[l]}
+                  aria-label={fillTemplate(dict.header.langAria, { code: LOCALE_LABELS[l] })}
+                >
+                  {LOCALE_LABELS[l]}
+                </a>
+              ))}
             </div>
-            <span className="page-head-label">{sign || '₽'}</span>
-            <span className="page-head-chevron">⌄</span>
-          </div>
-          <div className="page-head-settings__item">
-            <div className="page-head-settings__dd">
-              <div className="page-head-settings__dd-item" data-label="Рус">Русский</div>
-              <div className="page-head-settings__dd-item" data-label="Eng">English</div>
-              <div className="page-head-settings__dd-item" data-label="Fra">Français</div>
-            </div>
-            Рус
+            {LOCALE_LABELS[locale]}
             <span className="page-head-chevron">⌄</span>
           </div>
         </div>
         <div className="page-head-icons">
-          <a href="/search"><img src="/images/search.svg" alt="" /></a>
-          <a href="/favorite">
+          <a href={href('/search')}><img src="/images/search.svg" alt="" /></a>
+          <a href={href('/favorite')}>
             <img src="/images/heart.svg" alt="" />
             {favMounted && favCount > 0 && <span className="sf-cart-count">{favCount}</span>}
           </a>
-          <a href="/cart">
+          <a href={href('/cart')}>
             <img src="/images/bag.svg" alt="" />
             {mounted && count > 0 && <span className="sf-cart-count">{count}</span>}
           </a>
@@ -137,34 +202,39 @@ export default function SiteHeader({ categories, settings }: Props) {
           <div className="page-menu-top-main">
             <div className="menu-block form-search">
               <img src="/images/search.svg" alt="" />
-              <form action="/search">
-                <input type="text" name="q" placeholder="Что вы ищете?" />
+              <form action={href('/search')}>
+                <input type="text" name="q" placeholder={dict.header.searchPlaceholder} />
               </form>
             </div>
             {categories.map((cat) => (
-              <MenuNode key={cat.slug} node={cat} />
+              <MenuNode
+                key={cat.slug}
+                node={cat}
+                href={href}
+                allLabel={dict.common.all}
+              />
             ))}
             <div className="menu-block">
               <div className="menu-block-head">
-                <a href="/about">О нас</a>
+                <a href={href('/about')}>{dict.header.aboutUs}</a>
               </div>
             </div>
             <div className="menu-block" />
           </div>
           <div className="page-menu-top-links">
-            <a href="/corporate">Корпоративным клиентам</a>
-            <a href="/certificates">Подарочные сертификаты</a>
+            <a href={href('/corporate')}>{dict.header.corporate}</a>
+            <a href={href('/certificates')}>{dict.header.certificates}</a>
           </div>
           <div className="page-menu-top-links">
-            <a href="/favorite">Избранное</a>
-            <a href="/cart">Корзина</a>
-            <a href="/contacts">Контакты</a>
+            <a href={href('/favorite')}>{dict.header.favorites}</a>
+            <a href={href('/cart')}>{dict.header.cart}</a>
+            <a href={href('/contacts')}>{dict.header.contacts}</a>
           </div>
         </div>
         <div className="page-menu-footer">
           {email && (
             <div className="page-menu-footer-item">
-              <div className="page-menu-footer-item--name">Для покупателей</div>
+              <div className="page-menu-footer-item--name">{dict.header.forCustomers}</div>
               <div className="page-menu-footer-item--info">
                 <a href={`mailto:${email}`}>{email}</a>
               </div>
@@ -172,7 +242,7 @@ export default function SiteHeader({ categories, settings }: Props) {
           )}
           {phone && (
             <div className="page-menu-footer-item">
-              <div className="page-menu-footer-item--name">Тел. / Whatsapp</div>
+              <div className="page-menu-footer-item--name">{dict.header.phoneWhatsapp}</div>
               <div className="page-menu-footer-item--info">
                 <a href={`tel:${phone}`}>{phone}</a>
               </div>
@@ -181,9 +251,17 @@ export default function SiteHeader({ categories, settings }: Props) {
           <div className="page-menu-footer-item">
             <div className="mm-row">
               <div className="mm-langs">
-                <span className="mm-langs__item mm-langs__item--active">Ru</span>
-                <span className="mm-langs__item">Eng</span>
-                <span className="mm-langs__item">Fra</span>
+                {LOCALES.map((l) => (
+                  <a
+                    key={l}
+                    href={langHref(l)}
+                    className={`mm-langs__item${
+                      l === locale ? ' mm-langs__item--active' : ''
+                    }`}
+                  >
+                    {LOCALE_LABELS[l]}
+                  </a>
+                ))}
               </div>
             </div>
           </div>

@@ -3,18 +3,26 @@
  *   a.category > div.category__image[background-image] + span.category__name
  * Фото берётся из /categories (CategoryDto.imageUrl, резолвится админкой из
  * image_key). Классы .category/.category__image/.category__name — в storefront.css.
+ * i18n: ссылка локализуется через localizedHref (сохраняет текущую локаль).
  */
 
 import type { CategoryDto } from '@/lib/types';
+import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
 /** URL категории: корень `catalog` ведёт на индекс /catalog, остальные — на slug. */
-function categoryHref(slug: string): string {
+function categoryPath(slug: string): string {
   return slug === 'catalog' ? '/catalog' : `/catalog/${slug}`;
 }
 
-export default function CategoryCard({ category }: { category: CategoryDto }) {
+export default function CategoryCard({
+  category,
+  locale = DEFAULT_LOCALE,
+}: {
+  category: CategoryDto;
+  locale?: Locale;
+}) {
   return (
-    <a href={categoryHref(category.slug)} className="category">
+    <a href={localizedHref(categoryPath(category.slug), locale)} className="category">
       <div
         className="category__image"
         style={

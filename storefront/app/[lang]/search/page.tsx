@@ -1,15 +1,15 @@
 /**
- * Поиск по каталогу carre (/search?q=...) — серверный компонент. Читает строку
- * запроса из searchParams (Promise в этой версии Next), дергает Storefront API
- * (getProducts({ search })) и рендерит результаты той же сеткой .works-catalog /
- * .works-catalog-list--blocks, что и каталог. Пустой q → приглашение к поиску;
- * ноль результатов → «Ничего не найдено». Классы works-catalog-* и
- * work-box/work-item сохранены 1:1 (app.css carre). Рендер по запросу (API поднят
- * только в рантайме, не на build — см. lib/api).
+ * Поиск по каталогу carre (/search?q=..., /en/search, /fr/search) — серверный
+ * компонент. Читает строку запроса из searchParams (Promise в этой версии Next),
+ * дергает Storefront API (getProducts({ search }, locale)) и рендерит результаты той
+ * же сеткой .works-catalog / .works-catalog-list--blocks, что и каталог. Пустой q →
+ * приглашение к поиску; ноль результатов → «Ничего не найдено». Рендер по запросу.
  */
 
 import type { Metadata } from 'next';
-import { getProducts, getSettings } from '@/lib/api';
+import { getProducts } from '@/lib/api';
+import { localizedHref, toLocale, alternatesFor } from '@/lib/i18n';
+import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 import ProductCard from '../components/ProductCard';
 import CatalogBodyClass from './CatalogBodyClass';
 
@@ -24,20 +24,35 @@ function searchQuery(v: string | string[] | undefined): string {
 }
 
 export async function generateMetadata({
+  params,
   searchParams,
 }: {
+  params: Promise<{ lang: string }>;
   searchParams: Promise<{ q?: string | string[] }>;
 }): Promise<Metadata> {
-  const q = searchQuery((await searchParams).q);
-  return { title: q ? `Поиск: «${q}» — carre` : 'Поиск — carre' };
+  const [{ lang }, sp] = await Promise.all([params, searchParams]);
+  const locale = toLocale(lang);
+  const dict = getDictionary(locale);
+  const q = searchQuery(sp.q);
+  return {
+    title: q
+      ? `${fillTemplate(dict.search.resultsFor, { q })} — carre`
+      : `${dict.search.title} — carre`,
+    alternates: alternatesFor('/search', locale),
+  };
 }
 
 export default async function SearchPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ lang: string }>;
   searchParams: Promise<{ q?: string | string[] }>;
 }) {
-  const q = searchQuery((await searchParams).q);
+  const [{ lang }, sp] = await Promise.all([params, searchParams]);
+  const locale = toLocale(lang);
+  const dict = getDictionary(locale);
+  const q = searchQuery(sp.q);
 
   // Пустой запрос — приглашение к поиску (без обращения к API).
   if (!q) {
@@ -45,45 +60,35 @@ export default async function SearchPage({
       <>
         <CatalogBodyClass />
         <div className="page-title">
-          <h1>Поиск</h1>
+          <h1>{dict.search.title}</h1>
         </div>
         <div className="sf-empty">
-          Введите запрос в поле поиска, чтобы найти товары.{' '}
-          <a href="/catalog">Перейти в каталог →</a>
+          {dict.search.prompt}{' '}
+          <a href={localizedHref('/catalog', locale)}>{dict.common.goToCatalog}</a>
         </div>
       </>
     );
   }
 
-  const [res, settings] = await Promise.all([
-    getProducts({ search: q, limit: SEARCH_LIMIT }),
-    getSettings(),
-  ]);
+  const res = await getProducts({ search: q, limit: SEARCH_LIMIT }, locale);
   const products = res.data;
-  const currencyCode = settings?.currency.code ?? 'RUB';
-  const currencySym = settings?.currency.symbol ?? null;
 
   return (
     <>
       <CatalogBodyClass />
 
       <div className="page-title">
-        <h1>Поиск: «{q}»</h1>
+        <h1>{fillTemplate(dict.search.resultsFor, { q })}</h1>
       </div>
 
       <div className="works-catalog sf-search">
         <div className="works-catalog-list works-catalog-list--blocks js-pagination-content-block">
           {products.length > 0 ? (
             products.map((p) => (
-              <ProductCard
-                key={p.slug}
-                product={p}
-                currencyCode={currencyCode}
-                currencySymbol={currencySym}
-              />
+              <ProductCard key={p.slug} product={p} locale={locale} />
             ))
           ) : (
-            <h2>Ничего не найдено</h2>
+            <h2>{dict.common.nothingFound}</h2>
           )}
         </div>
       </div>

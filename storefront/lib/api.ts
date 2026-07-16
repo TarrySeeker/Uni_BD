@@ -24,6 +24,15 @@ import type {
   ProductListItemDto,
   ProductsResponse,
   PublicSettingsDto,
+  CartQuoteRequest,
+  CreateOrderRequest,
+  QuoteDto,
+  OrderCreatedDto,
+  OrderPublicDto,
+  PaykeeperInitDto,
+  CdekCityDto,
+  CdekPvzDto,
+  StorefrontApiError,
 } from './types';
 
 const SERVER_BASE = process.env.ADMIK_API_URL ?? 'http://app:3000';
@@ -46,6 +55,17 @@ function apiBase(): string {
     return SERVER_BASE.replace(/\/$/, '');
   }
   return PUBLIC_BASE.replace(/\/$/, '');
+}
+
+/**
+ * Дописывает `?locale=<code>` (или `&locale=`) к пути. Пустая локаль — не трогаем
+ * (сервер применит дефолтную локаль магазина). Сервер локализует title/SEO/контент
+ * секций и переводы каталога/CMS; `?locale` приоритетнее Accept-Language (docs/21).
+ */
+function withLocale(path: string, locale?: string): string {
+  if (!locale) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}locale=${encodeURIComponent(locale)}`;
 }
 
 function buildHeaders(): HeadersInit {
@@ -83,15 +103,15 @@ async function apiGet<T>(path: string): Promise<T | null> {
   }
 }
 
-/** Настройки/брендинг магазина (core — доступно всегда). */
-export async function getSettings(): Promise<PublicSettingsDto | null> {
-  const body = await apiGet<{ data: PublicSettingsDto }>('/settings');
+/** Настройки/брендинг магазина (core — доступно всегда). Локализует home-контент/SEO. */
+export async function getSettings(locale?: string): Promise<PublicSettingsDto | null> {
+  const body = await apiGet<{ data: PublicSettingsDto }>(withLocale('/settings', locale));
   return body?.data ?? null;
 }
 
-/** Дерево категорий (только активные). */
-export async function getCategories(): Promise<CategoryDto[]> {
-  const body = await apiGet<{ data: CategoryDto[] }>('/categories');
+/** Дерево категорий (только активные). `locale` → локализованные названия категорий. */
+export async function getCategories(locale?: string): Promise<CategoryDto[]> {
+  const body = await apiGet<{ data: CategoryDto[] }>(withLocale('/categories', locale));
   return body?.data ?? [];
 }
 
@@ -110,9 +130,10 @@ export interface ProductQuery {
   search?: string;
 }
 
-/** Список товаров с пагинацией/фильтрами. */
+/** Список товаров с пагинацией/фильтрами. `locale` → локализованные name/brand. */
 export async function getProducts(
   query: ProductQuery = {},
+  locale?: string,
 ): Promise<ProductsResponse> {
   const params = new URLSearchParams();
   if (query.limit != null) params.set('limit', String(query.limit));
@@ -124,15 +145,19 @@ export async function getProducts(
   if (query.sale) params.set('sale', '1');
   if (query.sort) params.set('sort', query.sort);
   if (query.search) params.set('q', query.search);
+  if (locale) params.set('locale', locale);
   const qs = params.toString();
   const body = await apiGet<ProductsResponse>(`/products${qs ? `?${qs}` : ''}`);
   return body ?? { data: [], pagination: { total: 0, limit: 0, offset: 0, count: 0 } };
 }
 
 /** Карточка товара по slug (или null, если не найдено/не активно/сбой сети). */
-export async function getProduct(slug: string): Promise<ProductDetailDto | null> {
+export async function getProduct(
+  slug: string,
+  locale?: string,
+): Promise<ProductDetailDto | null> {
   const body = await apiGet<{ data: ProductDetailDto }>(
-    `/products/${encodeURIComponent(slug)}`,
+    withLocale(`/products/${encodeURIComponent(slug)}`, locale),
   );
   return body?.data ?? null;
 }
@@ -140,10 +165,14 @@ export async function getProduct(slug: string): Promise<ProductDetailDto | null>
 /**
  * Публичная страница дизайнера по slug (или null: не найден/не активен/сбой сети).
  * Возвращает FullDesignerDto (имя, био, фото, соцсети, workCount, SEO-мета).
+ * `locale` → локализованные био/страна/SEO-мета дизайнера.
  */
-export async function getDesigner(slug: string): Promise<FullDesignerDto | null> {
+export async function getDesigner(
+  slug: string,
+  locale?: string,
+): Promise<FullDesignerDto | null> {
   const body = await apiGet<{ data: FullDesignerDto }>(
-    `/designers/${encodeURIComponent(slug)}`,
+    withLocale(`/designers/${encodeURIComponent(slug)}`, locale),
   );
   return body?.data ?? null;
 }
@@ -169,12 +198,15 @@ export async function getPage(
  * Товары для «избранной» сетки главной: сперва featured, при пустом результате —
  * общий список (fallback), чтобы витрина всегда показывала реальные товары.
  */
-export async function getHomeProducts(limit = 12): Promise<ProductListItemDto[]> {
-  const featured = await getProducts({ featured: true, limit });
+export async function getHomeProducts(
+  limit = 12,
+  locale?: string,
+): Promise<ProductListItemDto[]> {
+  const featured = await getProducts({ featured: true, limit }, locale);
   if (featured.data.length > 0) {
     return featured.data;
   }
-  const latest = await getProducts({ limit });
+  const latest = await getProducts({ limit }, locale);
   return latest.data;
 }
 
@@ -183,11 +215,189 @@ export async function getHomeProducts(limit = 12): Promise<ProductListItemDto[]>
  * `is_new` (?new=1), при пустом результате — общий список (fallback), чтобы блок
  * всегда показывал реальные товары, даже если магазин не проставил флаг новинки.
  */
-export async function getNewProducts(limit = 12): Promise<ProductListItemDto[]> {
-  const fresh = await getProducts({ isNew: true, limit });
+export async function getNewProducts(
+  limit = 12,
+  locale?: string,
+): Promise<ProductListItemDto[]> {
+  const fresh = await getProducts({ isNew: true, limit }, locale);
   if (fresh.data.length > 0) {
     return fresh.data;
   }
-  const latest = await getProducts({ limit });
+  const latest = await getProducts({ limit }, locale);
   return latest.data;
+}
+
+// -----------------------------------------------------------------------------
+// Чекаут (/cart/order): quote / создание заказа / инициация оплаты / СДЭК.
+//
+// В ОТЛИЧИЕ от apiGet (деградирует в null), эти методы БРОСАЮТ ApiError с кодом
+// и сообщением из тела { error: { code, message } } — форма чекаута показывает
+// покупателю понятное сообщение и различает out_of_stock/invalid_promo/…
+// Вызываются из клиентских компонентов (браузер) — Origin ставит движок сам,
+// buildHeaders на клиенте его не добавляет (см. выше).
+// -----------------------------------------------------------------------------
+
+/** Ошибка Storefront API с машиночитаемым кодом (для веток UI чекаута). */
+export class ApiError extends Error {
+  readonly code: string;
+  readonly status: number;
+  constructor(status: number, err: StorefrontApiError) {
+    super(err.message || 'Ошибка запроса.');
+    this.name = 'ApiError';
+    this.code = err.code || 'error';
+    this.status = status;
+  }
+}
+
+/** POST к Storefront API с { data } в ответе; бросает ApiError на !ok. */
+async function apiPost<T>(
+  path: string,
+  body: unknown,
+  extraHeaders: Record<string, string> = {},
+): Promise<T> {
+  const url = `${apiBase()}/api/storefront/v1${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...buildHeaders(),
+        'Content-Type': 'application/json',
+        ...extraHeaders,
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+  } catch (err) {
+    throw new ApiError(0, {
+      code: 'network',
+      message: `Сеть недоступна: ${(err as Error).message}`,
+    });
+  }
+  let parsed: unknown = null;
+  try {
+    parsed = await res.json();
+  } catch {
+    /* пустое/невалидное тело — обработаем ниже по res.ok */
+  }
+  if (!res.ok) {
+    const errBody = (parsed as { error?: StorefrontApiError } | null)?.error;
+    throw new ApiError(res.status, errBody ?? { code: 'error', message: 'Ошибка запроса.' });
+  }
+  return (parsed as { data: T }).data;
+}
+
+/** GET к Storefront API с { data }; бросает ApiError на !ok (для чекаута). */
+async function apiGetOrThrow<T>(path: string): Promise<T> {
+  const url = `${apiBase()}/api/storefront/v1${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: buildHeaders(), cache: 'no-store' });
+  } catch (err) {
+    throw new ApiError(0, {
+      code: 'network',
+      message: `Сеть недоступна: ${(err as Error).message}`,
+    });
+  }
+  let parsed: unknown = null;
+  try {
+    parsed = await res.json();
+  } catch {
+    /* пустое тело */
+  }
+  if (!res.ok) {
+    const errBody = (parsed as { error?: StorefrontApiError } | null)?.error;
+    throw new ApiError(res.status, errBody ?? { code: 'error', message: 'Ошибка запроса.' });
+  }
+  return (parsed as { data: T }).data;
+}
+
+/**
+ * Серверный расчёт корзины (итог + доставка + промокод). Ничего не резервирует.
+ * `locale` пробрасывается для локализованных подписей (напр. причины промокода),
+ * не влияя на суммы (цены/эквайринг рублёвые — anti-tamper на сервере).
+ */
+export async function quoteCart(
+  payload: CartQuoteRequest,
+  locale?: string,
+): Promise<QuoteDto> {
+  return apiPost<QuoteDto>(withLocale('/cart/quote', locale), payload);
+}
+
+/**
+ * Создание заказа. Idempotency-Key — в заголовке И в теле (заголовок приоритетен
+ * на сервере). Повтор с тем же ключом не создаёт дубль (200 вместо 201).
+ */
+export async function createOrder(
+  payload: CreateOrderRequest,
+  idempotencyKey: string,
+  locale?: string,
+): Promise<OrderCreatedDto> {
+  return apiPost<OrderCreatedDto>(
+    withLocale('/orders', locale),
+    { ...payload, idempotencyKey },
+    { 'Idempotency-Key': idempotencyKey },
+  );
+}
+
+/**
+ * Инициация онлайн-оплаты PayKeeper. Сумма считается сервером из заказа
+ * (anti-tamper). Доступ подтверждается токеном заказа (из createOrder).
+ * Возвращает paymentUrl (invoice_url) — редирект туда.
+ */
+export async function initPaykeeperPayment(args: {
+  orderNumber: string;
+  accessToken: string;
+  returnUrl?: string;
+}): Promise<PaykeeperInitDto> {
+  return apiPost<PaykeeperInitDto>('/payments/paykeeper/init', {
+    orderNumber: args.orderNumber,
+    accessToken: args.accessToken,
+    ...(args.returnUrl ? { returnUrl: args.returnUrl } : {}),
+  });
+}
+
+/** Поиск городов СДЭК для автокомплита (q ≥ 2 символов). Пустой список на сбой. */
+export async function cdekCities(q: string, limit = 10): Promise<CdekCityDto[]> {
+  if (q.trim().length < 2) return [];
+  const params = new URLSearchParams({ q: q.trim(), limit: String(limit) });
+  try {
+    return await apiGetOrThrow<CdekCityDto[]>(`/delivery/cdek/cities?${params.toString()}`);
+  } catch {
+    return [];
+  }
+}
+
+/** Список ПВЗ/постаматов СДЭК в городе (по числовому коду города). */
+export async function cdekPvz(
+  cityCode: number,
+  type?: 'PVZ' | 'POSTAMAT',
+): Promise<CdekPvzDto[]> {
+  const params = new URLSearchParams({ city_code: String(cityCode) });
+  if (type) params.set('type', type);
+  try {
+    return await apiGetOrThrow<CdekPvzDto[]>(`/delivery/cdek/pvz?${params.toString()}`);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Публичный статус заказа по номеру + токену доступа (страница успеха/трекинг).
+ * `locale` → локализованные подписи статуса заказа/оплаты.
+ */
+export async function getOrder(
+  number: string,
+  accessToken: string,
+  locale?: string,
+): Promise<OrderPublicDto | null> {
+  const params = new URLSearchParams({ token: accessToken });
+  if (locale) params.set('locale', locale);
+  try {
+    return await apiGetOrThrow<OrderPublicDto>(
+      `/orders/${encodeURIComponent(number)}?${params.toString()}`,
+    );
+  } catch {
+    return null;
+  }
 }

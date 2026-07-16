@@ -20,6 +20,14 @@ export interface CartItem {
   qty: number;
   /** Максимум к заказу (остаток на складе); 0 → без явного лимита. */
   maxQty: number;
+  /**
+   * UUID товара в каталоге Admik. Нужен для серверного расчёта корзины
+   * (/cart/quote) и создания заказа (/orders) — API принимает variantId/productId,
+   * а не slug (anti-tamper: цену считает сервер по этому id). Опционален для
+   * обратной совместимости со старыми записями корзины в localStorage; при
+   * оформлении такие позиции отфильтровываются (нельзя оформить без id).
+   */
+  productId?: string;
 }
 
 const KEY = 'sf_cart_v1';
@@ -71,6 +79,8 @@ export function addToCart(item: Omit<CartItem, 'qty'>, qty = 1): void {
     existing.price = item.price;
     existing.name = item.name;
     existing.image = item.image;
+    // Дополняем productId, если старая запись корзины его ещё не содержала.
+    if (item.productId) existing.productId = item.productId;
   } else {
     items.push({ ...item, qty: clampQty(qty, item.maxQty) });
   }

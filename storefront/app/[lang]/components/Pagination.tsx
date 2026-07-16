@@ -4,28 +4,49 @@
  * Страницы — через query `?page=N` (N ≥ 1); page=1 отдаётся без параметра.
  * Активная сортировка (`sort`) СОХРАНЯЕТСЯ во всех ссылках пагинации — иначе смена
  * страницы молча сбрасывала бы порядок к дефолту (created_at DESC).
+ * i18n: basePath (`/catalog/...`) локализуется через localizedHref; подпись «Показать
+ * еще» — из словаря.
  */
+
+import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
 interface Props {
   /** Текущая страница, 1-based. */
   page: number;
   /** Всего страниц. */
   pageCount: number;
-  /** Базовый путь без query, напр. `/catalog/twilly`. */
+  /** Базовый путь без query, напр. `/catalog/twilly` (бесхитростный, без локали). */
   basePath: string;
   /** Активная сортировка (carre: asc/desc); переносится в ссылки страниц. */
   sort?: string;
+  /** Текущая локаль — навешивается на basePath. */
+  locale?: Locale;
+  /** Подпись «Показать еще» из словаря. */
+  moreLabel?: string;
 }
 
-function pageHref(basePath: string, n: number, sort?: string): string {
+function pageHref(
+  basePath: string,
+  n: number,
+  locale: Locale,
+  sort?: string,
+): string {
   const params = new URLSearchParams();
   if (n > 1) params.set('page', String(n));
   if (sort) params.set('sort', sort);
   const qs = params.toString();
-  return qs ? `${basePath}?${qs}` : basePath;
+  const path = qs ? `${basePath}?${qs}` : basePath;
+  return localizedHref(path, locale);
 }
 
-export default function Pagination({ page, pageCount, basePath, sort }: Props) {
+export default function Pagination({
+  page,
+  pageCount,
+  basePath,
+  sort,
+  locale = DEFAULT_LOCALE,
+  moreLabel = 'Показать еще',
+}: Props) {
   if (pageCount <= 1) return null;
   const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
   return (
@@ -35,7 +56,7 @@ export default function Pagination({ page, pageCount, basePath, sort }: Props) {
           {pages.map((n) => (
             <a
               key={n}
-              href={pageHref(basePath, n, sort)}
+              href={pageHref(basePath, n, locale, sort)}
               className={`pagination__page${
                 n === page ? ' pagination__page--active' : ''
               }`}
@@ -48,10 +69,10 @@ export default function Pagination({ page, pageCount, basePath, sort }: Props) {
       <div className="pagination__nav--more">
         {page < pageCount && (
           <a
-            href={pageHref(basePath, page + 1, sort)}
+            href={pageHref(basePath, page + 1, locale, sort)}
             className="js-catalog-page js-catalog-page--more"
           >
-            Показать еще
+            {moreLabel}
           </a>
         )}
       </div>

@@ -1,16 +1,28 @@
 /**
- * Индекс каталога carre (/catalog) — все товары + сайдбар верхнего уровня.
- * Тонкая обёртка над общим CatalogView. Рендер по запросу (API поднят только в
- * рантайме, не на build — см. lib/api).
+ * Индекс каталога carre (/catalog, /en/catalog, /fr/catalog) — все товары + сайдбар
+ * верхнего уровня. Тонкая обёртка над общим CatalogView. Рендер по запросу (API
+ * поднят только в рантайме, не на build — см. lib/api).
  */
 
+import type { Metadata } from 'next';
+import { toLocale, alternatesFor } from '@/lib/i18n';
+import { getDictionary } from '@/lib/dictionaries';
 import CatalogView from './CatalogView';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = {
-  title: 'Каталог — carre',
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = toLocale((await params).lang);
+  const dict = getDictionary(locale);
+  return {
+    title: `${dict.catalog.title} — carre`,
+    alternates: alternatesFor('/catalog', locale),
+  };
+}
 
 function parsePage(v: string | string[] | undefined): number {
   const raw = Array.isArray(v) ? v[0] : v;
@@ -24,10 +36,18 @@ function firstParam(v: string | string[] | undefined): string | undefined {
 }
 
 export default async function CatalogIndexPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ lang: string }>;
   searchParams: Promise<{ page?: string | string[]; sort?: string | string[] }>;
 }) {
-  const sp = await searchParams;
-  return <CatalogView page={parsePage(sp.page)} sort={firstParam(sp.sort)} />;
+  const [{ lang }, sp] = await Promise.all([params, searchParams]);
+  return (
+    <CatalogView
+      page={parsePage(sp.page)}
+      sort={firstParam(sp.sort)}
+      locale={toLocale(lang)}
+    />
+  );
 }

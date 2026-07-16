@@ -2,12 +2,16 @@
  * Общий вид каталога carre (порт frontend/views/catalog/list.twig) — используется
  * и индексом /catalog (без slug → все товары), и страницей категории
  * /catalog/[...slug]. Слева сайдбар категорий, справа сетка товаров с пагинацией.
- * Данные — Storefront API (getProducts с фильтром category, пагинация limit/offset).
+ * Данные — Storefront API (getProducts с фильтром category, пагинация limit/offset),
+ * локализованные по текущей локали. Все внутренние ссылки строятся через
+ * localizedHref (сохраняют локаль); подписи — из словаря.
  */
 
 import { notFound } from 'next/navigation';
-import { getCategories, getProducts, getSettings } from '@/lib/api';
+import { getCategories, getProducts } from '@/lib/api';
 import { rootCategories, findCategoryPath } from '@/lib/tree';
+import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/dictionaries';
 import type { CategoryDto } from '@/lib/types';
 import ProductCard from '../components/ProductCard';
 import CategoryCard from '../components/CategoryCard';
@@ -24,19 +28,35 @@ interface Props {
   page: number;
   /** Сортировка каталога (carre: asc/desc); пробрасывается в API и подсветку. */
   sort?: string;
+  /** Текущая локаль витрины. */
+  locale?: Locale;
 }
 
-/** URL текущей категории/страницы с заданной сортировкой (carre setFilterQuery). */
-function sortHref(basePath: string, page: number, sort: string): string {
+/**
+ * URL текущей категории/страницы с заданной сортировкой (carre setFilterQuery).
+ * basePath — бесхитростный (без локали); локаль навешивается здесь.
+ */
+function sortHref(
+  basePath: string,
+  page: number,
+  sort: string,
+  locale: Locale,
+): string {
   const params = new URLSearchParams();
   if (page > 1) params.set('page', String(page));
   params.set('sort', sort);
-  return `${basePath}?${params.toString()}`;
+  return localizedHref(`${basePath}?${params.toString()}`, locale);
 }
 
-export default async function CatalogView({ activeSlug, page, sort }: Props) {
+export default async function CatalogView({
+  activeSlug,
+  page,
+  sort,
+  locale = DEFAULT_LOCALE,
+}: Props) {
+  const dict = getDictionary(locale);
   const currentPage = Math.max(1, Number.isFinite(page) ? page : 1);
-  const [categories, settings] = await Promise.all([getCategories(), getSettings()]);
+  const categories = await getCategories(locale);
   const roots = rootCategories(categories);
 
   const path = activeSlug ? findCategoryPath(roots, activeSlug) : [];
@@ -44,18 +64,18 @@ export default async function CatalogView({ activeSlug, page, sort }: Props) {
   if (activeSlug && !active) notFound();
 
   // Товары выбранной категории (или все) с пагинацией.
-  const res = await getProducts({
-    category: activeSlug || undefined,
-    sort: sort || undefined,
-    limit: PAGE_SIZE,
-    offset: (currentPage - 1) * PAGE_SIZE,
-  });
+  const res = await getProducts(
+    {
+      category: activeSlug || undefined,
+      sort: sort || undefined,
+      limit: PAGE_SIZE,
+      offset: (currentPage - 1) * PAGE_SIZE,
+    },
+    locale,
+  );
   const products = res.data;
   const total = res.pagination.total || products.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const currencyCode = settings?.currency.code ?? 'RUB';
-  const currencySym = settings?.currency.symbol ?? null;
 
   // Лендинг родительской категории: показываем её подкатегории карточками.
   const subCategories: CategoryDto[] = active ? active.children : [];
@@ -63,18 +83,18 @@ export default async function CatalogView({ activeSlug, page, sort }: Props) {
   // На лендинге-родителе без прямых товаров сетку товаров прячем (только карточки).
   const showProducts = !isParentLanding || products.length > 0;
 
-  const crumbs: Crumb[] = [{ label: 'Каталог', href: '/catalog' }];
+  const crumbs: Crumb[] = [{ label: dict.common.catalog, href: '/catalog' }];
   for (const node of path) {
     if (node.slug === 'catalog') continue; // корень каталога == сам /catalog
     crumbs.push({ label: node.name, href: `/catalog/${node.slug}` });
   }
 
-  const title = active?.name ?? 'Каталог';
+  const title = active?.name ?? dict.catalog.title;
   const basePath = active ? `/catalog/${active.slug}` : '/catalog';
 
   return (
     <>
-      <Breadcrumbs items={crumbs} />
+      <Breadcrumbs items={crumbs} locale={locale} homeLabel={dict.common.home} />
 
       <div className="page-title">
         <h1>{title}</h1>
@@ -85,23 +105,25 @@ export default async function CatalogView({ activeSlug, page, sort }: Props) {
           tree={roots}
           activeSlug={activeSlug}
           clearHref="/catalog"
+          locale={locale}
+          dict={dict}
         />
 
         <div className="works-catalog-list works-catalog-list--works">
           {showProducts && (
             <div className="works-catalog-list--sort">
-              <span>Сортировка по:</span>
+              <span>{dict.catalog.sortBy}</span>
               <a
-                href={sortHref(basePath, currentPage, 'asc')}
+                href={sortHref(basePath, currentPage, 'asc', locale)}
                 className={sort === 'asc' ? 'active' : undefined}
               >
-                возрастанию цены
+                {dict.catalog.priceAsc}
               </a>
               <a
-                href={sortHref(basePath, currentPage, 'desc')}
+                href={sortHref(basePath, currentPage, 'desc', locale)}
                 className={sort === 'desc' ? 'active' : undefined}
               >
-                убыванию цены
+                {dict.catalog.priceDesc}
               </a>
             </div>
           )}
@@ -110,7 +132,7 @@ export default async function CatalogView({ activeSlug, page, sort }: Props) {
             {isParentLanding && (
               <div className="sf-cat-grid sf-subcats">
                 {subCategories.map((c) => (
-                  <CategoryCard key={c.slug} category={c} />
+                  <CategoryCard key={c.slug} category={c} locale={locale} />
                 ))}
               </div>
             )}
@@ -120,15 +142,10 @@ export default async function CatalogView({ activeSlug, page, sort }: Props) {
                 <div className="works-catalog-list works-catalog-list--blocks js-pagination-content-block">
                   {products.length > 0 ? (
                     products.map((p) => (
-                      <ProductCard
-                        key={p.slug}
-                        product={p}
-                        currencyCode={currencyCode}
-                        currencySymbol={currencySym}
-                      />
+                      <ProductCard key={p.slug} product={p} locale={locale} />
                     ))
                   ) : (
-                    <h2>Ничего не найдено</h2>
+                    <h2>{dict.common.nothingFound}</h2>
                   )}
                 </div>
 
@@ -137,6 +154,8 @@ export default async function CatalogView({ activeSlug, page, sort }: Props) {
                   pageCount={pageCount}
                   basePath={basePath}
                   sort={sort || undefined}
+                  locale={locale}
+                  moreLabel={dict.common.showMore}
                 />
               </>
             )}

@@ -7,15 +7,29 @@
  * Оформление ведёт на /cart/order (шаг чекаута — вне этой задачи).
  */
 
+import { useParams } from 'next/navigation';
 import { useCart } from '@/lib/cart';
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatDisplayPrice } from '@/lib/format';
+import { useCurrency } from '@/lib/currency';
+import { localizedHref, toLocale } from '@/lib/i18n';
+import { getDictionary } from '@/lib/dictionaries';
 
 export default function CartPage() {
   const { items, subtotal, mounted, setItemQty, remove } = useCart();
+  const { selected } = useCurrency();
+  const locale = toLocale(useParams().lang);
+  const dict = getDictionary(locale);
+  const href = (path: string) => localizedHref(path, locale);
+  // Позиции показываем в ВЫБРАННОЙ валюте (мультивалюта). Цены в корзине — рубли.
+  const showPrice = (rub: number) => formatDisplayPrice(rub, selected);
+  // ИТОГ к оплате — ВСЕГДА в рублях (эквайринг рублёвый). formatPrice → «N ₽».
+  const payTotal = formatPrice(subtotal);
+  // Если выбрана НЕ базовая валюта — показываем итог в ней справочно.
+  const isBase = selected.rate === 1;
 
   const title = (
     <div className="page-title">
-      <h1>Корзина</h1>
+      <h1>{dict.cart.title}</h1>
     </div>
   );
 
@@ -27,7 +41,7 @@ export default function CartPage() {
     return (
       <>
         {title}
-        <h3 className="text-center">Ваша корзина пуста :(</h3>
+        <h3 className="text-center">{dict.cart.empty}</h3>
       </>
     );
   }
@@ -37,10 +51,10 @@ export default function CartPage() {
       {title}
       <div className="cart">
         <div className="cart-head">
-          <div className="cart-head--info">Товар</div>
-          <div className="cart-head--price">Стоимость</div>
-          <div className="cart-head--cnt">Количество</div>
-          <div className="cart-head--fullprice">Итого</div>
+          <div className="cart-head--info">{dict.cart.colProduct}</div>
+          <div className="cart-head--price">{dict.cart.colPrice}</div>
+          <div className="cart-head--cnt">{dict.cart.colQty}</div>
+          <div className="cart-head--fullprice">{dict.cart.colTotal}</div>
         </div>
 
         {items.map((item) => {
@@ -54,16 +68,16 @@ export default function CartPage() {
               key={item.slug}
             >
               <div className="cart-body--info">
-                <a href={`/product/${item.slug}`} className="cart-body--info-img">
+                <a href={href(`/product/${item.slug}`)} className="cart-body--info-img">
                   {item.image && <img src={item.image} alt="" />}
                 </a>
                 <div className="cart-body--info-work">
-                  <a href={`/product/${item.slug}`} className="info-work--name">
+                  <a href={href(`/product/${item.slug}`)} className="info-work--name">
                     {item.name}
                   </a>
                 </div>
               </div>
-              <div className="cart-body--price">{formatPrice(item.price)}</div>
+              <div className="cart-body--price">{showPrice(item.price)}</div>
               <div className="cart-body--cnt">
                 <div
                   className={`minus product-counter__minus${
@@ -85,7 +99,7 @@ export default function CartPage() {
               </div>
               <div className="cart-body--fullprice">
                 <span className="cart-list-item__sum">
-                  {formatPrice(item.price * item.qty)}
+                  {showPrice(item.price * item.qty)}
                 </span>
               </div>
               <div className="cart-body--del">
@@ -93,7 +107,7 @@ export default function CartPage() {
                   className="del"
                   onClick={() => remove(item.slug)}
                   role="button"
-                  aria-label="Удалить"
+                  aria-label={dict.cart.remove}
                 />
               </div>
             </div>
@@ -101,22 +115,29 @@ export default function CartPage() {
         })}
 
         <div className="cart-foot" id="cart-footer">
-          <a href="/cart/order" className="cart-foot--buy">
-            Оформить заказ →
+          <a href={href('/cart/order')} className="cart-foot--buy">
+            {dict.cart.checkout}
           </a>
           <div className="cart-foot--fullprice">
-            <span className="cart-list__total">{formatPrice(subtotal)}</span>
+            {/* ИТОГ к оплате — всегда в рублях (эквайринг рублёвый). */}
+            <span className="cart-list__total">{payTotal}</span>
+            {!isBase && (
+              <span className="cart-list__total-hint"> ≈ {showPrice(subtotal)}</span>
+            )}
           </div>
           <div className="cart-foot--itogo-sm">
-            <div className="itogo-sm--name">Итого</div>
+            <div className="itogo-sm--name">{dict.cart.grandTotal}</div>
             <div className="itogo-sm--fullprice">
-              <span className="cart-list__total">{formatPrice(subtotal)}</span>
+              <span className="cart-list__total">{payTotal}</span>
+              {!isBase && (
+                <span className="cart-list__total-hint"> ≈ {showPrice(subtotal)}</span>
+              )}
             </div>
           </div>
         </div>
 
-        <a href="/cart/order" className="cart--button-buy">
-          Оформить заказ →
+        <a href={href('/cart/order')} className="cart--button-buy">
+          {dict.cart.checkout}
         </a>
       </div>
     </>

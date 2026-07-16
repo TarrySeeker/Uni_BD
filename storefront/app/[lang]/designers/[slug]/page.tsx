@@ -1,18 +1,19 @@
 /**
- * Публичная страница дизайнера carre (/designers/<slug>) — минимальный порт
- * персональной страницы. Данные — Storefront API `getDesigner` (FullDesignerDto:
- * имя, страна, био, фото, соцсети, видео, workCount, SEO-мета).
+ * Публичная страница дизайнера carre (/designers/<slug>, /en/…, /fr/…) — минимальный
+ * порт персональной страницы. Данные — Storefront API `getDesigner` (FullDesignerDto:
+ * имя, страна, био, фото, соцсети, видео, workCount, SEO-мета), локализованные.
  *
  * Сетка «работ» дизайнера (M4.1): товары грузятся из Storefront API
- * `getProducts({ designer: slug })` — фильтр `?designer=<slug>` резолвит slug
- * активного дизайнера → его товары. Пусто (у дизайнера нет работ / сбой сети) →
- * аккуратный `.sf-empty`; есть товары → грид ProductCard.
+ * `getProducts({ designer: slug })`. Пусто → аккуратный `.sf-empty`; есть товары →
+ * грид ProductCard.
  */
 
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ProductListItemDto } from '@/lib/types';
 import { getDesigner, getProducts, getSettings } from '@/lib/api';
+import { toLocale, alternatesFor } from '@/lib/i18n';
+import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../../components/Breadcrumbs';
 import ProductCard from '../../components/ProductCard';
 
@@ -21,15 +22,17 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ lang: string; slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
-  const designer = await getDesigner(slug);
+  const { lang, slug } = await params;
+  const locale = toLocale(lang);
+  const designer = await getDesigner(slug, locale);
   if (!designer) return { title: 'Дизайнер не найден — carre' };
   return {
     title: designer.meta.title ?? designer.seoTitle ?? `${designer.name} — carre`,
     description:
       designer.meta.description ?? designer.seoDescription ?? undefined,
+    alternates: alternatesFor(`/designers/${slug}`, locale),
     robots: designer.meta.noindex ? { index: false, follow: false } : undefined,
   };
 }
@@ -37,18 +40,17 @@ export async function generateMetadata({
 export default async function DesignerPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ lang: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { lang, slug } = await params;
+  const locale = toLocale(lang);
+  const dict = getDictionary(locale);
   const [designer, settings, worksRes] = await Promise.all([
-    getDesigner(slug),
-    getSettings(),
-    getProducts({ designer: slug, limit: 48 }),
+    getDesigner(slug, locale),
+    getSettings(locale),
+    getProducts({ designer: slug, limit: 48 }, locale),
   ]);
   if (!designer) notFound();
-
-  const currencyCode = settings?.currency.code ?? 'RUB';
-  const currencySym = settings?.currency.symbol ?? null;
 
   const image = designer.pageImageUrl ?? designer.imageUrl ?? null;
   // Анти-XSS (defense-in-depth к https-гварду схемы): в src iframe / href пускаем
@@ -61,18 +63,16 @@ export default async function DesignerPage({
   );
 
   const crumbs: Crumb[] = [
-    { label: 'Каталог', href: '/catalog' },
+    { label: dict.common.catalog, href: '/catalog' },
     { label: designer.name },
   ];
 
   // Работы дизайнера — товары, отфильтрованные по его slug (Storefront API).
-  // Пусто (нет работ / сбой сети → getProducts деградирует в пустой список) →
-  // ниже отрисуется .sf-empty.
   const works: ProductListItemDto[] = worksRes.data;
 
   return (
     <div className="work">
-      <Breadcrumbs items={crumbs} />
+      <Breadcrumbs items={crumbs} locale={locale} homeLabel={dict.common.home} />
 
       <div className="work__head">
         {image && (
@@ -94,14 +94,14 @@ export default async function DesignerPage({
             <h1 className="work-head__title">{designer.name}</h1>
             {designer.workCount > 0 && (
               <div className="work-head__about">
-                <div>Работ: {designer.workCount}</div>
+                <div>{fillTemplate(dict.product.worksCount, { n: designer.workCount })}</div>
               </div>
             )}
           </div>
 
           {designer.description && (
             <div className="sf-product-descr">
-              <div className="sf-product-descr__title">О дизайнере</div>
+              <div className="sf-product-descr__title">{dict.product.aboutDesigner}</div>
               <div className="sf-product-descr__body">{designer.description}</div>
             </div>
           )}
@@ -135,22 +135,15 @@ export default async function DesignerPage({
 
       <div className="work__other-sticky">
         <div className="work__other-sticky--head">
-          <div className="work__other-sticky--head-title">Работы</div>
+          <div className="work__other-sticky--head-title">{dict.product.works}</div>
           {works.length > 0 ? (
             <div className="works-catalog-list works-catalog-list--blocks">
               {works.map((p) => (
-                <ProductCard
-                  key={p.slug}
-                  product={p}
-                  currencyCode={currencyCode}
-                  currencySymbol={currencySym}
-                />
+                <ProductCard key={p.slug} product={p} locale={locale} />
               ))}
             </div>
           ) : (
-            <div className="sf-empty">
-              У этого дизайнера пока нет опубликованных работ.
-            </div>
+            <div className="sf-empty">{dict.product.designerNoWorks}</div>
           )}
         </div>
       </div>
