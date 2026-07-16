@@ -33,6 +33,7 @@ import { slugify } from '@/lib/catalog/slug';
 import {
   brandingSchema,
   currencySchema,
+  exchangeSchema,
   unitsSchema,
   contactsSchema,
   legalEntitySchema,
@@ -107,8 +108,15 @@ type DeliveryStoredValue = {
 };
 
 export const BrandingInputSchema = z.object({ branding: brandingSchema });
+/**
+ * Валюта/единицы/мультивалюта на входе действия. `exchange` — доп.валюты
+ * ОТОБРАЖЕНИЯ (₽/€): базовая остаётся в currency.code (RUB). rateUpdatedAt в
+ * теле НЕ принимаем — action сам ставит его при сохранении (метка «когда курс
+ * обновлён вручную»). rate валидируется exchangeSchema (positive → 0/отриц. → validation).
+ */
 export const CurrencyUnitsInputSchema = z.object({
   currency: currencySchema.optional(),
+  exchange: exchangeSchema.omit({ rateUpdatedAt: true }).optional(),
   units: unitsSchema.optional(),
 });
 export const LegalContactsInputSchema = z.object({
@@ -298,21 +306,30 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     handler: async (data, ctx: ActionCtx) => {
       const before = {
         currency: (await deps.getSetting('currency'))?.value,
+        exchange: (await deps.getSetting('exchange'))?.value,
         units: (await deps.getSetting('units'))?.value,
       };
       if (data.currency) await deps.upsertSetting('currency', data.currency, ctx.user.id);
+      // exchange (доп.валюты отображения): ручное сохранение фиксирует rateUpdatedAt
+      // = «когда курс задан вручную» (тем же полем крон отмечает авто-обновление).
+      // value записывается ЦЕЛИКОМ (JSONB-оверрайд ключа).
+      let exchangeValue: Record<string, unknown> | undefined;
+      if (data.exchange) {
+        exchangeValue = { ...data.exchange, rateUpdatedAt: new Date().toISOString() };
+        await deps.upsertSetting('exchange', exchangeValue, ctx.user.id);
+      }
       if (data.units) await deps.upsertSetting('units', data.units, ctx.user.id);
       deps.invalidateCache();
       return {
-        result: { keys: ['currency', 'units'] as const },
-        // Форматирование цен зависит от валюты → инвалидируем витрину.
+        result: { keys: ['currency', 'exchange', 'units'] as const },
+        // Форматирование/пересчёт цен зависит от валюты и курса → инвалидируем витрину.
         revalidate: ['/admin', SETTINGS_PATH, ...STOREFRONT_PATHS],
         audit: {
           action: 'settings.currency_units.update',
           entityType: 'shop_settings',
-          entityId: 'currency,units',
+          entityId: 'currency,exchange,units',
           before,
-          after: { currency: data.currency, units: data.units },
+          after: { currency: data.currency, exchange: exchangeValue, units: data.units },
         },
       };
     },

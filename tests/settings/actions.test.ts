@@ -171,6 +171,43 @@ describe('settings/actions — currency/units и legal/contacts', () => {
     expect(keys).toContain('units');
   });
 
+  it('updateCurrencyAndUnits: апсертит exchange (доп.валюты отображения) с rateUpdatedAt', async () => {
+    const actionDeps = makeActionDeps(makeUser(['settings.manage']));
+    const deps = makeSettingsDeps(actionDeps);
+    const { updateCurrencyAndUnits } = createSettingsActions(deps);
+    const res = await updateCurrencyAndUnits({
+      currency: { code: 'RUB', symbol: '₽' },
+      exchange: {
+        autoRate: true,
+        displayCurrencies: [{ code: 'EUR', symbol: '€', rate: 100, fractionDigits: 2 }],
+      },
+    });
+    expect(res.ok).toBe(true);
+    const calls = (deps.upsertSetting as ReturnType<typeof vi.fn>).mock.calls;
+    const keys = calls.map((c) => c[0]);
+    expect(keys).toContain('exchange');
+    const exchangeCall = calls.find((c) => c[0] === 'exchange');
+    const stored = exchangeCall?.[1] as Record<string, unknown>;
+    expect(stored.autoRate).toBe(true);
+    expect(stored.displayCurrencies).toEqual([
+      { code: 'EUR', symbol: '€', rate: 100, fractionDigits: 2 },
+    ]);
+    // Ручное сохранение курса ставит rateUpdatedAt (метка «когда обновлён»).
+    expect(typeof stored.rateUpdatedAt).toBe('string');
+  });
+
+  it('updateCurrencyAndUnits: rate ≤ 0 в доп.валюте → validation', async () => {
+    const actionDeps = makeActionDeps(makeUser(['settings.manage']));
+    const deps = makeSettingsDeps(actionDeps);
+    const { updateCurrencyAndUnits } = createSettingsActions(deps);
+    const res = await updateCurrencyAndUnits({
+      exchange: { displayCurrencies: [{ code: 'EUR', symbol: '€', rate: 0 }] },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+  });
+
   it('updateLegalAndContacts: невалидный ИНН → validation', async () => {
     const actionDeps = makeActionDeps(makeUser(['settings.manage']));
     const deps = makeSettingsDeps(actionDeps);

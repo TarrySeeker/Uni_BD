@@ -9,14 +9,24 @@ import type { EffectiveSettings } from '@/lib/config/settings';
 import { updateCurrencyUnitsAction } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
 
-/** Форма валюты и единиц измерения (docs/11 §5.4.5). */
+/** Форма валюты, курсов доп.валют (мультивалюта) и единиц измерения (docs/11 §5.4.5). */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
+
+/** Строка редактора доп.валюты отображения (локальное состояние формы, строки для input). */
+interface DisplayCurrencyRow {
+  code: string;
+  symbol: string;
+  rate: string;
+  fractionDigits: string;
+}
 
 export function CurrencyUnitsForm({
   currency,
+  exchange,
   units,
 }: {
   currency: EffectiveSettings['currency'];
+  exchange: EffectiveSettings['exchange'];
   units: EffectiveSettings['units'];
 }) {
   const router = useRouter();
@@ -31,10 +41,40 @@ export function CurrencyUnitsForm({
   const [weight, setWeight] = useState(units.weight);
   const [dimension, setDimension] = useState(units.dimension);
 
+  // Мультивалюта: доп.валюты отображения (₽/€) + авто-курс с ЦБ РФ.
+  const [autoRate, setAutoRate] = useState(exchange.autoRate);
+  const [rows, setRows] = useState<DisplayCurrencyRow[]>(
+    exchange.displayCurrencies.map((d) => ({
+      code: d.code,
+      symbol: d.symbol,
+      rate: String(d.rate),
+      fractionDigits: String(d.fractionDigits),
+    })),
+  );
+
+  function setRow(i: number, patch: Partial<DisplayCurrencyRow>) {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+  function addRow() {
+    setRows((prev) => [...prev, { code: 'EUR', symbol: '€', rate: '', fractionDigits: '2' }]);
+  }
+  function removeRow(i: number) {
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
   async function save() {
     setPending(true);
     setError(null);
     setSuccess(null);
+    // Собираем доп.валюты: только заполненные строки (code+rate). Пустые пропускаем.
+    const displayCurrencies = rows
+      .filter((r) => r.code.trim() && r.rate.trim())
+      .map((r) => ({
+        code: r.code.trim().toUpperCase(),
+        symbol: r.symbol.trim(),
+        rate: Number(r.rate),
+        fractionDigits: r.fractionDigits.trim() ? Number(r.fractionDigits) : undefined,
+      }));
     const result = await updateCurrencyUnitsAction({
       currency: {
         code: code.trim() || undefined,
@@ -42,11 +82,12 @@ export function CurrencyUnitsForm({
         locale: locale.trim() || undefined,
         fractionDigits: fractionDigits.trim() ? Number(fractionDigits) : undefined,
       },
+      exchange: { autoRate, displayCurrencies },
       units: { weight, dimension, system: 'metric' },
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Валюта и единицы сохранены.');
+      setSuccess('Валюта, курсы и единицы сохранены.');
       router.refresh();
     } else {
       setError(result);
@@ -70,10 +111,10 @@ export function CurrencyUnitsForm({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="c-code" className="block text-sm font-medium text-gray-700">Код валюты</label>
+          <label htmlFor="c-code" className="block text-sm font-medium text-gray-700">Код базовой валюты</label>
           <input id="c-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={3} placeholder="RUB" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
-          <p className="mt-1 text-xs text-gray-500">3 латинские буквы: RUB — рубль, USD — доллар, EUR — евро.</p>
+          <p className="mt-1 text-xs text-gray-500">Валюта хранения и оплаты. 3 латинские буквы: RUB — рубль, USD — доллар, EUR — евро.</p>
           {fe('currency.code') ? <p className="mt-1 text-xs text-red-600">{fe('currency.code')}</p> : null}
         </div>
         <div>
@@ -109,6 +150,57 @@ export function CurrencyUnitsForm({
             <option value="mm">миллиметры (mm)</option>
           </select>
         </div>
+      </div>
+
+      {/* Мультивалюта: доп.валюты отображения по курсу. */}
+      <div className="mt-6 border-t border-gray-200 pt-4">
+        <h3 className="text-sm font-semibold text-gray-900">Дополнительные валюты (только показ по курсу)</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          Цены хранятся и оплата идёт в базовой валюте. Здесь — валюты для переключателя на витрине.
+          Курс — сколько единиц базовой за 1 единицу этой валюты (например 100 → 1&nbsp;€&nbsp;=&nbsp;100&nbsp;₽; цена показывается как цена&nbsp;₽&nbsp;/&nbsp;курс).
+        </p>
+
+        <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={autoRate} onChange={(e) => setAutoRate(e.target.checked)} />
+          Обновлять курс автоматически с ЦБ РФ (иначе используется курс, введённый вручную ниже)
+        </label>
+        {exchange.rateUpdatedAt ? (
+          <p className="mt-1 text-xs text-gray-500">
+            Курс обновлён: {new Date(exchange.rateUpdatedAt).toLocaleString('ru-RU')}
+          </p>
+        ) : null}
+
+        <div className="mt-3 space-y-3">
+          {rows.map((r, i) => (
+            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+              <input value={r.code} onChange={(e) => setRow(i, { code: e.target.value.toUpperCase() })}
+                maxLength={3} placeholder="EUR" aria-label="Код валюты"
+                className="rounded border border-gray-300 px-3 py-2 text-sm" />
+              <input value={r.symbol} onChange={(e) => setRow(i, { symbol: e.target.value })}
+                placeholder="€" aria-label="Символ"
+                className="rounded border border-gray-300 px-3 py-2 text-sm" />
+              <input type="number" min={0} step="0.0001" value={r.rate}
+                onChange={(e) => setRow(i, { rate: e.target.value })}
+                placeholder="Курс (100)" aria-label="Курс"
+                className="rounded border border-gray-300 px-3 py-2 text-sm" />
+              <input type="number" min={0} max={4} value={r.fractionDigits}
+                onChange={(e) => setRow(i, { fractionDigits: e.target.value })}
+                placeholder="Знаков (2)" aria-label="Знаков после запятой"
+                className="rounded border border-gray-300 px-3 py-2 text-sm" />
+              <button type="button" onClick={() => removeRow(i)}
+                className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
+                Удалить
+              </button>
+            </div>
+          ))}
+        </div>
+        {fe('exchange.displayCurrencies') ? (
+          <p className="mt-1 text-xs text-red-600">{fe('exchange.displayCurrencies')}</p>
+        ) : null}
+        <button type="button" onClick={addRow}
+          className="mt-3 rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+          + Добавить валюту
+        </button>
       </div>
 
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">

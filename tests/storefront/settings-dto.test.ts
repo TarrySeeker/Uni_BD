@@ -25,6 +25,11 @@ function makeEffective(): EffectiveSettings {
       supportPhone: '+7 999 000-00-00',
     },
     currency: { code: 'RUB', symbol: '₽', locale: 'ru-RU', fractionDigits: 2 },
+    exchange: {
+      displayCurrencies: [{ code: 'EUR', symbol: '€', rate: 100, fractionDigits: 2 }],
+      autoRate: true,
+      rateUpdatedAt: '2026-07-16T10:00:00.000Z',
+    },
     units: { weight: 'kg', dimension: 'cm', system: 'metric' },
     contacts: {
       phone: '+7 495 000-00-00',
@@ -109,6 +114,30 @@ describe('storefront/settings-dto — toPublicSettingsDto', () => {
       { id: 'zone_a', label: 'Зона A', price: 30000, freeThreshold: null },
       { id: 'zone_b', label: 'Зона B', price: 50000, freeThreshold: 1000000 },
     ]);
+  });
+
+  // Мультивалюта: витрине отдаём базовую валюту (currency) + доп.валюты
+  // отображения (displayCurrencies) с курсом. rateUpdatedAt наружу НЕ отдаём
+  // (внутренняя диагностика). Витрина сама пересчитывает цену_₽ / rate для показа.
+  it('содержит displayCurrencies (code/symbol/rate/fractionDigits) для показа', () => {
+    const dto = toPublicSettingsDto(makeEffective());
+    expect(dto.currency.displayCurrencies).toEqual([
+      { code: 'EUR', symbol: '€', rate: 100, fractionDigits: 2 },
+    ]);
+  });
+
+  it('rateUpdatedAt/autoRate наружу НЕ отдаём (внутренние поля)', () => {
+    const json = JSON.stringify(toPublicSettingsDto(makeEffective()));
+    expect(json).not.toContain('rateUpdatedAt');
+    expect(json).not.toContain('autoRate');
+    expect(json).not.toContain('2026-07-16');
+  });
+
+  it('нет доп.валют → displayCurrencies = [] (анти-регресс: показ только базовой ₽)', () => {
+    const eff = makeEffective();
+    eff.exchange = { displayCurrencies: [], autoRate: false, rateUpdatedAt: null };
+    const dto = toPublicSettingsDto(eff);
+    expect(dto.currency.displayCurrencies).toEqual([]);
   });
 
   it('нет зон → delivery.zones = []', () => {

@@ -29,6 +29,7 @@ function fakeEffective(): EffectiveSettings {
       supportPhone: null,
     },
     currency: { code: 'RUB', symbol: null, locale: null, fractionDigits: 2 },
+    exchange: { displayCurrencies: [], autoRate: false, rateUpdatedAt: null },
     units: { weight: 'g', dimension: 'cm', system: 'metric' },
     contacts: {},
     legalEntity: { bankDetails: 'SECRET-BANK-DETAILS' },

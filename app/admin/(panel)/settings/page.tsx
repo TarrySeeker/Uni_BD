@@ -94,10 +94,15 @@ export default async function SettingsPage() {
           </Section>
 
           <Section id="currency" title="Валюта и единицы измерения">
-            <CurrencyUnitsForm currency={eff.currency} units={eff.units} />
+            <CurrencyUnitsForm
+              currency={eff.currency}
+              exchange={eff.exchange}
+              units={eff.units}
+            />
             <ResetRow
               keys={[
                 { key: 'currency', label: 'Сбросить валюту' },
+                { key: 'exchange', label: 'Сбросить курсы валют' },
                 { key: 'units', label: 'Сбросить единицы' },
               ]}
             />
