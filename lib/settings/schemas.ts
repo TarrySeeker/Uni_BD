@@ -66,6 +66,26 @@ const hrefSchema = z
     'Укажите путь от «/» (например /catalog или /#delivery) либо полный URL https://…',
   );
 
+/**
+ * Ссылка-маршрут ВНУТРЕННЕЙ навигации витрины (M5 — slider/corpCert). СТРОЖЕ, чем
+ * hrefSchema: допускает ТОЛЬКО относительный путь от «/» ИЛИ полный https://-URL.
+ * Отсекает http:// (открытый редирект/mixed-content), mailto:/tel:, javascript:,
+ * data: и опечатки без «/». Зеркалит https-only гвард video.embedUrl из M4 и
+ * defense-in-depth designer.href: применяется к href слайдов промо-слайдера и
+ * плиток corp/cert (onclick=window.location.href / <a href>), где значение может
+ * прийти из настроек магазина — анти-XSS/анти-open-redirect.
+ */
+const internalHrefSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(
+    // `/path` (но НЕ `//host` — protocol-relative = скрытый open-redirect на чужой
+    // хост) ИЛИ полный https://-URL.
+    (v) => (v.startsWith('/') && !v.startsWith('//')) || /^https:\/\/\S+$/i.test(v),
+    'Укажите путь от «/» (например /search?q=…) либо полный URL https://…',
+  );
+
 /** HEX-цвет вида #rgb / #rrggbb (для темы брендинга). */
 const hexColor = z
   .string()
@@ -119,6 +139,45 @@ export const currencySchema = z
     symbol: z.string().trim().min(1).optional(),
     locale: z.string().trim().min(1).optional(),
     fractionDigits: z.number().int().min(0).max(4).optional(),
+  })
+  .strip();
+
+/**
+ * exchange — мультивалюта ОТОБРАЖЕНИЯ (₽/€ и т.п.). Базовая валюта магазина
+ * остаётся в `currency` (RUB): цены товаров хранятся и списываются В РУБЛЯХ.
+ * Здесь — только доп.валюты для ПОКАЗА на витрине по курсу (реальные деньги в €
+ * не участвуют; эквайринг рублёвый).
+ *
+ * Модель:
+ *  - displayCurrencies[] — валюты отображения. Для каждой:
+ *      code   — ISO 4217 (EUR);
+ *      symbol — знак (€);
+ *      rate   — единиц БАЗОВОЙ валюты за 1 единицу отображаемой
+ *               (EUR rate=100 → 1€=100₽ → цена_€ = цена_₽ / rate);
+ *      fractionDigits — знаков после запятой при показе (опц.; € обычно 2).
+ *  - autoRate — обновлять ли rate кроном автоматически с ЦБ РФ (fallback —
+ *    ручной rate из этой же настройки, если ЦБ недоступен).
+ *  - rateUpdatedAt — ISO-метка последнего успешного обновления курса (диагностика/UI).
+ *
+ * Все поля опциональны, `.strip()` (анти-tamper JSONB). Отсутствие ключа/пустой
+ * объект → доп.валют нет → витрина показывает только базовую (₽) как раньше.
+ */
+export const displayCurrencySchema = z
+  .object({
+    code: currencyCode,
+    symbol: z.string().trim().min(1),
+    // rate > 0: цена_отображаемой = цена_базовой / rate — деление на 0/отрицательный
+    // курс недопустимо. positive() отсекает 0 и отрицательные.
+    rate: z.number().positive('Курс должен быть больше нуля'),
+    fractionDigits: z.number().int().min(0).max(4).optional(),
+  })
+  .strip();
+
+export const exchangeSchema = z
+  .object({
+    autoRate: z.boolean().optional(),
+    rateUpdatedAt: z.string().trim().min(1).optional(),
+    displayCurrencies: z.array(displayCurrencySchema).optional(),
   })
   .strip();
 
@@ -402,6 +461,50 @@ export const homeSchema = z
       })
       .strip()
       .optional(),
+    // M5 — «Промо-слайдер» (.mainpage--slider): opt-in массив слайдов. Каждый =
+    // фон (imageKey S3, DTO резолвит в URL) + ссылка (internalHrefSchema: только
+    // относительный путь или https — анти-XSS/анти-open-redirect для onclick=
+    // window.location.href) + name/caption (оба опциональны: у живого carre name
+    // пуст, caption «Всем по икре»). По умолчанию скрыт и пуст; без хардкода ниши.
+    slider: z
+      .object({
+        enabled: z.boolean().optional(),
+        slides: z
+          .array(
+            z
+              .object({
+                imageKey: z.string().trim().min(1),
+                href: internalHrefSchema,
+                name: z.string().trim().min(1).optional(),
+                caption: z.string().trim().min(1).optional(),
+              })
+              .strip(),
+          )
+          .optional(),
+      })
+      .strip()
+      .optional(),
+    // M5 — «Корпоративным / сертификаты» (.dop-links--vertical): opt-in массив
+    // плиток-ссылок. Каждая = фото (imageKey S3, DTO резолвит в URL) + ссылка
+    // (internalHrefSchema — только относит. путь или https) + заголовок. По
+    // умолчанию скрыт и пуст; наполняется в админке без кода (мультитенант).
+    corpCert: z
+      .object({
+        enabled: z.boolean().optional(),
+        tiles: z
+          .array(
+            z
+              .object({
+                imageKey: z.string().trim().min(1),
+                href: internalHrefSchema,
+                title: nonEmpty,
+              })
+              .strip(),
+          )
+          .optional(),
+      })
+      .strip()
+      .optional(),
   })
   .strip();
 
@@ -451,6 +554,7 @@ export const accessSchema = z
 export const SETTING_KEYS = [
   'branding',
   'currency',
+  'exchange',
   'units',
   'contacts',
   'legal_entity',
@@ -470,6 +574,7 @@ export type SettingKey = (typeof SETTING_KEYS)[number];
 export const SETTING_SCHEMAS = {
   branding: brandingSchema,
   currency: currencySchema,
+  exchange: exchangeSchema,
   units: unitsSchema,
   contacts: contactsSchema,
   legal_entity: legalEntitySchema,
@@ -486,6 +591,8 @@ export const SETTING_SCHEMAS = {
 // Типы значений по ключам (выводятся из схем).
 export type BrandingSettings = z.infer<typeof brandingSchema>;
 export type CurrencySettings = z.infer<typeof currencySchema>;
+export type DisplayCurrencySetting = z.infer<typeof displayCurrencySchema>;
+export type ExchangeSettings = z.infer<typeof exchangeSchema>;
 export type UnitsSettings = z.infer<typeof unitsSchema>;
 export type ContactsSettings = z.infer<typeof contactsSchema>;
 export type LegalEntitySettings = z.infer<typeof legalEntitySchema>;

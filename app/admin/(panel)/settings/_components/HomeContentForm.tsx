@@ -155,6 +155,42 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
     setDesignersItems((prev) => prev.filter((_, idx) => idx !== i));
   }
 
+  // slider (M5) — «Промо-слайдер»: показ + репитер слайдов (фон/ссылка/имя/подпись).
+  const [sliderEnabled, setSliderEnabled] = useState(home.slider.enabled);
+  const [sliderSlides, setSliderSlides] = useState<
+    { imageKey: string; href: string; name: string; caption: string }[]
+  >(() => (home.slider.slides ?? []).map((sl) => ({ ...sl })));
+
+  function setSlide(
+    i: number,
+    field: 'imageKey' | 'href' | 'name' | 'caption',
+    value: string,
+  ) {
+    setSliderSlides((prev) => prev.map((sl, idx) => (idx === i ? { ...sl, [field]: value } : sl)));
+  }
+  function addSlide() {
+    setSliderSlides((prev) => [...prev, { imageKey: '', href: '', name: '', caption: '' }]);
+  }
+  function removeSlide(i: number) {
+    setSliderSlides((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  // corpCert (M5) — «Корпоративным / сертификаты»: показ + репитер плиток (фото/ссылка/заголовок).
+  const [corpCertEnabled, setCorpCertEnabled] = useState(home.corpCert.enabled);
+  const [corpCertTiles, setCorpCertTiles] = useState<
+    { imageKey: string; href: string; title: string }[]
+  >(() => (home.corpCert.tiles ?? []).map((t) => ({ ...t })));
+
+  function setCorpCertTile(i: number, field: 'imageKey' | 'href' | 'title', value: string) {
+    setCorpCertTiles((prev) => prev.map((t, idx) => (idx === i ? { ...t, [field]: value } : t)));
+  }
+  function addCorpCertTile() {
+    setCorpCertTiles((prev) => [...prev, { imageKey: '', href: '', title: '' }]);
+  }
+  function removeCorpCertTile(i: number) {
+    setCorpCertTiles((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
   function s(v: string): string | undefined {
     const t = v.trim();
     return t.length > 0 ? t : undefined;
@@ -255,6 +291,33 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
               return item;
             })
             .filter((d) => d.name && d.href && d.avatarImageKey && d.workImageKey),
+        },
+        slider: {
+          enabled: sliderEnabled,
+          // Обязательны фон и ссылка; name/caption опциональны (пусто → опускаем,
+          // merge добьёт ''). Слайды без фото/ссылки отбрасываем (иначе Zod-отказ).
+          slides: sliderSlides
+            .map((sl) => {
+              const slide: {
+                imageKey: string;
+                href: string;
+                name?: string;
+                caption?: string;
+              } = { imageKey: sl.imageKey.trim(), href: sl.href.trim() };
+              const nm = sl.name.trim();
+              const cap = sl.caption.trim();
+              if (nm) slide.name = nm;
+              if (cap) slide.caption = cap;
+              return slide;
+            })
+            .filter((sl) => sl.imageKey && sl.href),
+        },
+        corpCert: {
+          enabled: corpCertEnabled,
+          // Только полностью заполненные плитки (фото/ссылка/заголовок) — как looks/tiles.
+          tiles: corpCertTiles
+            .map((t) => ({ imageKey: t.imageKey.trim(), href: t.href.trim(), title: t.title.trim() }))
+            .filter((t) => t.imageKey && t.href && t.title),
         },
       },
     });
@@ -666,6 +729,135 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
             <p className={hintCls}>
               Каждая запись — имя, ссылка и два фото (аватар и работа). Позиции фото (0–100) — по вертикали,
               пусто — по центру. Неполные записи не сохраняются.
+            </p>
+          </div>
+        </div>
+      </fieldset>
+
+      {/* Промо-слайдер (M5) */}
+      <fieldset className="mb-6 rounded border border-gray-200 p-4">
+        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Промо-слайдер»</legend>
+        <div className="grid grid-cols-1 gap-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={sliderEnabled}
+              onChange={(e) => setSliderEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Показывать «Промо-слайдер» на главной
+          </label>
+
+          <div className="grid grid-cols-1 gap-4">
+            {sliderSlides.map((sl, i) => (
+              <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-600">Слайд {i + 1}</span>
+                  <button type="button" onClick={() => removeSlide(i)}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                    Удалить
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label htmlFor={`home-slider-img-${i}`} className={labelCls}>Фон слайда</label>
+                    <input id={`home-slider-img-${i}`} value={sl.imageKey}
+                      onChange={(e) => setSlide(i, 'imageKey', e.target.value)}
+                      placeholder="home/slider/1.webp" className={inputCls} />
+                    <ImageUploadButton label="Загрузить фон слайда" onUploaded={(key) => setSlide(i, 'imageKey', key)} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-slider-href-${i}`} className={labelCls}>Ссылка</label>
+                    <input id={`home-slider-href-${i}`} value={sl.href}
+                      onChange={(e) => setSlide(i, 'href', e.target.value)}
+                      placeholder="/search?q=caviar" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-slider-name-${i}`} className={labelCls}>Название (необязательно)</label>
+                    <input id={`home-slider-name-${i}`} value={sl.name}
+                      onChange={(e) => setSlide(i, 'name', e.target.value)}
+                      placeholder="" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-slider-caption-${i}`} className={labelCls}>Подпись (необязательно)</label>
+                    <input id={`home-slider-caption-${i}`} value={sl.caption}
+                      onChange={(e) => setSlide(i, 'caption', e.target.value)}
+                      placeholder="Всем по икре" className={inputCls} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <button type="button" onClick={addSlide}
+              className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+              + Добавить слайд
+            </button>
+            <p className={hintCls}>
+              Каждый слайд — фон и ссылка (путь от «/» или https://…), плюс необязательные название и подпись.
+              Слайды без фона или ссылки не сохраняются.
+            </p>
+          </div>
+        </div>
+      </fieldset>
+
+      {/* Корпоративным / сертификаты (M5) */}
+      <fieldset className="mb-6 rounded border border-gray-200 p-4">
+        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Корпоративным / сертификаты»</legend>
+        <div className="grid grid-cols-1 gap-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={corpCertEnabled}
+              onChange={(e) => setCorpCertEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Показывать блок «Корпоративным / сертификаты» на главной
+          </label>
+
+          <div className="grid grid-cols-1 gap-4">
+            {corpCertTiles.map((t, i) => (
+              <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-600">Плитка {i + 1}</span>
+                  <button type="button" onClick={() => removeCorpCertTile(i)}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                    Удалить
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label htmlFor={`home-corpcert-title-${i}`} className={labelCls}>Заголовок</label>
+                    <input id={`home-corpcert-title-${i}`} value={t.title}
+                      onChange={(e) => setCorpCertTile(i, 'title', e.target.value)}
+                      placeholder="Корпоративным клиентам" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-corpcert-href-${i}`} className={labelCls}>Ссылка</label>
+                    <input id={`home-corpcert-href-${i}`} value={t.href}
+                      onChange={(e) => setCorpCertTile(i, 'href', e.target.value)}
+                      placeholder="/corporate" className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-corpcert-img-${i}`} className={labelCls}>Фото</label>
+                    <input id={`home-corpcert-img-${i}`} value={t.imageKey}
+                      onChange={(e) => setCorpCertTile(i, 'imageKey', e.target.value)}
+                      placeholder="home/corpcert/1.webp" className={inputCls} />
+                    <ImageUploadButton label="Загрузить фото плитки" onUploaded={(key) => setCorpCertTile(i, 'imageKey', key)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <button type="button" onClick={addCorpCertTile}
+              className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+              + Добавить плитку
+            </button>
+            <p className={hintCls}>
+              Каждая плитка — фото, заголовок и ссылка (путь от «/» или https://…). Неполные плитки не сохраняются.
             </p>
           </div>
         </div>

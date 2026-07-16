@@ -25,6 +25,7 @@ import {
   type ModuleOverrides,
   type BrandingSettings,
   type CurrencySettings,
+  type ExchangeSettings,
   type UnitsSettings,
   type ContactsSettings,
   type LegalEntitySettings,
@@ -52,6 +53,18 @@ export interface EffectiveDeliveryZone {
   freeThreshold?: number;
 }
 
+/**
+ * Валюта ОТОБРАЖЕНИЯ в эффективных настройках (мультивалюта витрины). rate —
+ * единиц базовой валюты за 1 единицу этой (EUR rate=100 → цена_€ = цена_₽ / 100).
+ * fractionDigits — знаков после запятой при показе (гарантированно задан).
+ */
+export interface EffectiveDisplayCurrency {
+  code: string;
+  symbol: string;
+  rate: number;
+  fractionDigits: number;
+}
+
 /** Эффективные настройки магазина (env ⊕ БД). Деньги — в копейках. */
 export interface EffectiveSettings {
   branding: {
@@ -71,6 +84,19 @@ export interface EffectiveSettings {
     symbol: string | null;
     locale: string | null;
     fractionDigits: number;
+  };
+  /**
+   * Мультивалюта ОТОБРАЖЕНИЯ (₽/€ и т.п.). Базовая валюта — currency.code (RUB):
+   * цены хранятся/списываются в рублях. Здесь — доп.валюты только для показа по
+   * курсу. Пустой список = доп.валют нет (витрина показывает только базовую).
+   *  - displayCurrencies — валюты отображения (code/symbol/rate/fractionDigits);
+   *  - autoRate — включено ли авто-обновление курса кроном с ЦБ РФ;
+   *  - rateUpdatedAt — ISO-метка последнего успешного обновления (null, если нет).
+   */
+  exchange: {
+    displayCurrencies: EffectiveDisplayCurrency[];
+    autoRate: boolean;
+    rateUpdatedAt: string | null;
   };
   units: {
     weight: 'g' | 'kg';
@@ -274,6 +300,35 @@ function mergeHome(db: HomeSettings): HomeContent {
             : HOME_DEFAULTS.designers.items,
         }
       : HOME_DEFAULTS.designers,
+    slider: db.slider
+      ? {
+          // opt-in: без флага блок скрыт; slides добиваются дефолтом (пусто).
+          enabled: db.slider.enabled ?? HOME_DEFAULTS.slider.enabled,
+          slides: db.slider.slides
+            ? db.slider.slides.map((sl) => ({
+                imageKey: sl.imageKey,
+                href: sl.href,
+                // name/caption опциональны в схеме → пустая строка, если не заданы
+                // (у живого carre name пуст, caption «Всем по икре»).
+                name: sl.name ?? '',
+                caption: sl.caption ?? '',
+              }))
+            : HOME_DEFAULTS.slider.slides,
+        }
+      : HOME_DEFAULTS.slider,
+    corpCert: db.corpCert
+      ? {
+          // opt-in: без флага блок скрыт; tiles добиваются дефолтом (пусто).
+          enabled: db.corpCert.enabled ?? HOME_DEFAULTS.corpCert.enabled,
+          tiles: db.corpCert.tiles
+            ? db.corpCert.tiles.map((t) => ({
+                imageKey: t.imageKey,
+                href: t.href,
+                title: t.title,
+              }))
+            : HOME_DEFAULTS.corpCert.tiles,
+        }
+      : HOME_DEFAULTS.corpCert,
   };
 }
 
@@ -298,6 +353,7 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
 
   const branding: BrandingSettings = parseSettingValue('branding', rows.get('branding')) ?? {};
   const currency: CurrencySettings = parseSettingValue('currency', rows.get('currency')) ?? {};
+  const exchange: ExchangeSettings = parseSettingValue('exchange', rows.get('exchange')) ?? {};
   const units: UnitsSettings = parseSettingValue('units', rows.get('units')) ?? {};
   const contacts: ContactsSettings = parseSettingValue('contacts', rows.get('contacts')) ?? {};
   const legalEntity: LegalEntitySettings =
@@ -332,6 +388,19 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
       symbol: currency.symbol ?? null,
       locale: currency.locale ?? null,
       fractionDigits: currency.fractionDigits ?? 2,
+    },
+    exchange: {
+      // Доп.валюты отображения — только из БД (env-дефолта нет: это данные магазина).
+      // Отсутствие → [] (доп.валют нет, показываем только базовую ₽ как раньше).
+      // fractionDigits опционален в схеме → добиваем дефолтом 2 (€/$ обычно 2 знака).
+      displayCurrencies: (exchange.displayCurrencies ?? []).map((d) => ({
+        code: d.code,
+        symbol: d.symbol,
+        rate: d.rate,
+        fractionDigits: d.fractionDigits ?? 2,
+      })),
+      autoRate: exchange.autoRate ?? false,
+      rateUpdatedAt: exchange.rateUpdatedAt ?? null,
     },
     units: {
       weight: units.weight ?? 'g',

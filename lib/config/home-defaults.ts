@@ -103,6 +103,24 @@ export interface HomeContent {
       workTop: number;
     }[];
   };
+  /**
+   * Блок «Промо-слайдер» (.mainpage--slider): список слайдов, каждый = фон
+   * (imageKey S3, не URL) + ссылка + имя + подпись (name/caption могут быть
+   * пустыми). По умолчанию СКРЫТ и пуст — магазин наполняет его в админке без кода.
+   */
+  slider: {
+    enabled: boolean;
+    slides: { imageKey: string; href: string; name: string; caption: string }[];
+  };
+  /**
+   * Блок «Корпоративным / сертификаты» (.dop-links--vertical): список плиток-
+   * ссылок, каждая = фото (imageKey S3, не URL) + ссылка + заголовок. По умолчанию
+   * СКРЫТ и пуст — магазин наполняет его в админке без кода (универсально, без ниши).
+   */
+  corpCert: {
+    enabled: boolean;
+    tiles: { imageKey: string; href: string; title: string }[];
+  };
 }
 
 /**
@@ -204,5 +222,17 @@ export const HOME_DEFAULTS: HomeContent = {
     enabled: false,
     title: 'Дизайнеры',
     items: [],
+  },
+  // «Промо-слайдер» по умолчанию СКРЫТ и без слайдов (opt-in): магазин добавляет
+  // фон/ссылку/подпись в админке. Никакого контента конкретного магазина.
+  slider: {
+    enabled: false,
+    slides: [],
+  },
+  // «Корпоративным / сертификаты» по умолчанию СКРЫТ и без плиток (opt-in):
+  // магазин добавляет заголовки/ссылки/фото в админке. Никакого контента магазина.
+  corpCert: {
+    enabled: false,
+    tiles: [],
   },
 };

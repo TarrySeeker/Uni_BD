@@ -37,6 +37,18 @@ export interface PublicDeliveryZoneDto {
 export type PublicUrlResolver = (key: string) => string;
 
 /**
+ * Публичная валюта ОТОБРАЖЕНИЯ (мультивалюта витрины). rate — единиц базовой
+ * валюты за 1 единицу этой (EUR rate=100 → цена_€ = цена_₽ / 100). Витрина сама
+ * пересчитывает и форматирует. Никаких реальных денег в этой валюте — только показ.
+ */
+export interface PublicDisplayCurrencyDto {
+  code: string;
+  symbol: string;
+  rate: number;
+  fractionDigits: number;
+}
+
+/**
  * Публичный контент главной (ADR-018). Весь home публичен (редактируемый
  * витринный контент, без приватных полей). Изображения отдаём как ПУБЛИЧНЫЕ URL
  * (imageUrl/imageUrls) — сырые S3-ключи наружу НЕ раскрываем (инвариант, зеркально
@@ -101,6 +113,22 @@ export interface PublicHomeDto {
       workTop: number;
     }[];
   };
+  /**
+   * M5 — «Промо-слайдер»: показ + слайды. Каждый слайд несёт imageUrl (НЕ
+   * imageKey) — сырой S3-ключ наружу не раскрываем (инвариант looks/tiles/media).
+   */
+  slider: {
+    enabled: boolean;
+    slides: { imageUrl: string; href: string; name: string; caption: string }[];
+  };
+  /**
+   * M5 — «Корпоративным / сертификаты»: показ + плитки. Каждая плитка несёт
+   * imageUrl (НЕ imageKey) — сырой S3-ключ наружу не раскрываем.
+   */
+  corpCert: {
+    enabled: boolean;
+    tiles: { imageUrl: string; href: string; title: string }[];
+  };
 }
 
 /** Публичный DTO настроек магазина (наружу витрине). */
@@ -122,6 +150,13 @@ export interface PublicSettingsDto {
     symbol: string | null;
     locale: string | null;
     fractionDigits: number;
+    /**
+     * Доп.валюты ОТОБРАЖЕНИЯ (мультивалюта, ₽/€): базовая — code выше, эти —
+     * переключаемые на витрине для показа по курсу. Пустой список = только базовая
+     * (анти-регресс: старый рублёвый показ без выбора). rate/fractionDigits — для
+     * пересчёта и формата на стороне витрины. Реальные деньги — всегда в базовой.
+     */
+    displayCurrencies: PublicDisplayCurrencyDto[];
   };
   units: {
     weight: 'g' | 'kg';
@@ -195,6 +230,14 @@ export function toPublicSettingsDto(
       symbol: eff.currency.symbol,
       locale: eff.currency.locale,
       fractionDigits: eff.currency.fractionDigits,
+      // Доп.валюты отображения (₽/€): rate/symbol/fractionDigits наружу — витрина
+      // пересчитывает цену_₽ / rate сама. autoRate/rateUpdatedAt НЕ отдаём (внутренние).
+      displayCurrencies: eff.exchange.displayCurrencies.map((d) => ({
+        code: d.code,
+        symbol: d.symbol,
+        rate: d.rate,
+        fractionDigits: d.fractionDigits,
+      })),
     },
     units: {
       weight: eff.units.weight,
@@ -287,6 +330,23 @@ export function toPublicSettingsDto(
           workUrl: publicUrl(d.workImageKey),
           avatarTop: d.avatarTop,
           workTop: d.workTop,
+        })),
+      },
+      slider: {
+        enabled: eff.home.slider.enabled,
+        slides: eff.home.slider.slides.map((sl) => ({
+          imageUrl: publicUrl(sl.imageKey),
+          href: sl.href,
+          name: sl.name,
+          caption: sl.caption,
+        })),
+      },
+      corpCert: {
+        enabled: eff.home.corpCert.enabled,
+        tiles: eff.home.corpCert.tiles.map((t) => ({
+          imageUrl: publicUrl(t.imageKey),
+          href: t.href,
+          title: t.title,
         })),
       },
     },
