@@ -39,6 +39,18 @@ export const MEDIA_TYPES: readonly MediaType[] = [
   'document',
 ] as const;
 
+/**
+ * Дисплейный цвето-свотч товара (products.colors, миграция 0050) — кружочек цвета
+ * на карточке (легаси-блок carre `.wv__colors`). Это НЕ покупаемый вариант/SKU и
+ * НЕ фасетный атрибут: чисто презентационные данные товара.
+ *   • hex  — цвет кружка '#rrggbb' (рендерится как background);
+ *   • name — русское имя (title кружка, из словаря b_master_colors); может быть ''.
+ */
+export interface ProductColor {
+  hex: string;
+  name: string;
+}
+
 // -----------------------------------------------------------------------------
 // Сущности.
 // -----------------------------------------------------------------------------
@@ -99,6 +111,12 @@ export interface Product {
   designerId: string | null;
   /** Денормализованная проекция характеристик (ADR-007). */
   attributesCache: Record<string, unknown>;
+  /**
+   * Дисплейные цвето-свотчи (products.colors, миграция 0050) — легаси-блок carre
+   * `.wv__colors`. Массив [{hex,name}] в порядке отображения (первый — основной
+   * цвет). Пустой массив → у товара нет цветов (блок не рендерится). НЕ варианты.
+   */
+  colors: ProductColor[];
   seoTitle: string | null;
   seoDescription: string | null;
   ogTitle: string | null;

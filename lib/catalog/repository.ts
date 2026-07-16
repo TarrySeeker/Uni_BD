@@ -22,6 +22,7 @@ import type {
   InventoryItem,
   Product,
   ProductAttribute,
+  ProductColor,
   ProductDetail,
   ProductListRow,
   ProductMedia,
@@ -49,6 +50,34 @@ function asJson(v: any): Record<string, unknown> {
     }
   }
   return {};
+}
+/**
+ * Сырой jsonb products.colors (0050) → ProductColor[] (дисплейные свотчи carre
+ * `.wv__colors`). Принимает массив-объект (postgres.js) или JSON-строку; отбирает
+ * только валидные записи {hex: string, name?: string} — мусор/не-массив → []. hex
+ * обязателен (без него нечего красить); name по умолчанию '' (title может быть пуст).
+ */
+function asColors(v: any): ProductColor[] {
+  let arr: unknown = v;
+  if (typeof v === 'string') {
+    try {
+      arr = JSON.parse(v);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(arr)) return [];
+  const out: ProductColor[] = [];
+  for (const item of arr) {
+    if (item && typeof item === 'object' && typeof (item as any).hex === 'string') {
+      const rawName = (item as any).name;
+      out.push({
+        hex: (item as any).hex,
+        name: typeof rawName === 'string' ? rawName : '',
+      });
+    }
+  }
+  return out;
 }
 /**
  * Сырой jsonb-оверлей переводов → TranslationsMap (locale→{field→value}).
@@ -146,6 +175,7 @@ export function mapProduct(row: any): Product {
     brandId: row.brand_id ?? null,
     designerId: row.designer_id ?? null,
     attributesCache: asJson(row.attributes_cache),
+    colors: asColors(row.colors),
     seoTitle: row.seo_title ?? null,
     seoDescription: row.seo_description ?? null,
     ...mapSeoFields(row),
@@ -557,7 +587,7 @@ export async function getProductById(
   const prodRows = await sql<Record<string, unknown>[]>`
     SELECT p.id, p.sku, p.slug, p.name, p.description, p.status, p.base_price,
            p.compare_at_price, p.is_featured, p.is_new, p.brand_id, p.designer_id,
-           p.attributes_cache, p.seo_title, p.seo_description,
+           p.attributes_cache, p.colors, p.seo_title, p.seo_description,
            p.og_title, p.og_description, p.og_image_key, p.canonical_url, p.noindex,
            p.weight_g, p.length_cm, p.width_cm, p.height_cm, p.translations,
            p.created_at, p.updated_at,

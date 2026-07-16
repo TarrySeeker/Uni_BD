@@ -105,7 +105,7 @@ describe('storefront/dto — toProductDetailDto прокидывает блок�
     id: 'p1', sku: 'SKU1', slug: 'scarf', name: 'Scarf', description: 'nice',
     status: 'active', basePrice: '1000.00', compareAtPrice: null,
     isFeatured: false, isNew: null, brandId: null, designerId: null,
-    attributesCache: {}, seoTitle: null, seoDescription: null,
+    attributesCache: {}, colors: [], seoTitle: null, seoDescription: null,
     ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,
     weightG: null, lengthCm: null, widthCm: null, heightCm: null,
     createdAt: D, updatedAt: D,

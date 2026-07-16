@@ -150,6 +150,16 @@ export interface MediaDto {
   isPrimary: boolean;
 }
 
+/**
+ * Дисплейный цвето-свотч товара (легаси-блок carre `.wv__colors`). Публичное
+ * зеркало доменного ProductColor: `hex` красит кружок, `name` (ru) — его title.
+ * НЕ покупаемый вариант — витрина рендерит только визуальные кружки.
+ */
+export interface ProductColorDto {
+  hex: string;
+  name: string;
+}
+
 export interface VariantDto {
   id: string;
   sku: string;
@@ -210,6 +220,11 @@ export interface ProductDetailDto {
   designer: DesignerDto | null;
   categories: string[];
   attributes: Record<string, unknown>;
+  /**
+   * Дисплейные цвето-свотчи (легаси carre `.wv__colors`); [] → у товара нет
+   * цветов (блок на витрине не рендерится). Порядок = порядок показа.
+   */
+  colors: ProductColorDto[];
   variants: VariantDto[];
   media: MediaDto[];
   /** Структурные секции карточки (цитата/табы/текст/картинка), локализованы (§9). */
@@ -623,6 +638,10 @@ export function toProductDetailDto(
     designer: toDesignerDto(p.designer, opts.seoCtx.publicUrl),
     categories: opts.categorySlugs,
     attributes: p.attributesCache ?? {},
+    // Дисплейные свотчи carre `.wv__colors` — публичны как есть ({hex,name}); name
+    // уже на ru (из словаря b_master_colors). Копируем, чтобы наружу не утекала
+    // ссылка на доменный массив. Пустой → витрина блок не рендерит.
+    colors: (p.colors ?? []).map((c) => ({ hex: c.hex, name: c.name })),
     variants: p.variants
       .filter((v) => v.isActive)
       .map((v) => toVariantDto(v, product, opts.loc)),

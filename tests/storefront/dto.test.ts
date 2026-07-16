@@ -250,7 +250,7 @@ describe('storefront/dto — карточка товара', () => {
     id: 'p1', sku: 'SKU1', slug: 'coat', name: 'Coat', description: 'nice',
     status: 'active', basePrice: '1000.00', compareAtPrice: '1500.00',
     isFeatured: false, isNew: null, brandId: 'b1', designerId: null,
-    attributesCache: { color: 'white' }, seoTitle: null, seoDescription: null,
+    attributesCache: { color: 'white' }, colors: [], seoTitle: null, seoDescription: null,
     ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,
     weightG: null, lengthCm: null, widthCm: null, heightCm: null,
     createdAt: D, updatedAt: D,

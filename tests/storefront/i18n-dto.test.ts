@@ -59,6 +59,7 @@ function product(over: Partial<ProductDetail> = {}): ProductDetail {
     brandId: null,
     designerId: null,
     attributesCache: {},
+    colors: [],
     seoTitle: 'СЕО РУ',
     seoDescription: 'СЕО описание',
     ogTitle: null,
