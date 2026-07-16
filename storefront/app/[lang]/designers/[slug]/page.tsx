@@ -27,7 +27,7 @@ export async function generateMetadata({
   const { lang, slug } = await params;
   const locale = toLocale(lang);
   const designer = await getDesigner(slug, locale);
-  if (!designer) return { title: 'Дизайнер не найден — carre' };
+  if (!designer) return { title: getDictionary(locale).notFound.designerMetaTitle };
   return {
     title: designer.meta.title ?? designer.seoTitle ?? `${designer.name} — carre`,
     description:

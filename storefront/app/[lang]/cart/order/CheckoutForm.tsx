@@ -18,6 +18,7 @@ import type { FormEvent } from 'react';
 import { useCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/format';
 import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
+import { getDictionary, fillTemplate, type Dictionary } from '@/lib/dictionaries';
 import {
   ApiError,
   cdekCities,
@@ -52,42 +53,48 @@ interface Props {
 /** Способ доставки в UI. 'zone' — псевдо-тип (курьер по зоне Москвы). */
 type DeliveryChoice = 'courier' | 'pvz' | 'zone';
 
-/** Русские подписи причин проблем позиций (issues[].code из /cart/quote). */
-const ISSUE_LABELS: Record<string, string> = {
-  out_of_stock: 'нет в наличии в нужном количестве',
-  invalid_item: 'товар недоступен',
-  not_found: 'товар больше не найден в каталоге',
-  inactive: 'товар снят с продажи',
-};
+/** Подсекция словаря чекаута — все локализованные подписи формы. */
+type CheckoutDict = Dictionary['checkout'];
 
-/** Причины отказа промокода (promo.reason из /cart/quote). */
-const PROMO_REASONS: Record<string, string> = {
-  not_found: 'Промокод не найден.',
-  expired: 'Срок действия промокода истёк.',
-  not_started: 'Промокод ещё не активен.',
-  inactive: 'Промокод неактивен.',
-  usage_limit: 'Лимит использований промокода исчерпан.',
-  min_order: 'Заказ не достигает минимальной суммы для промокода.',
-  per_customer_limit: 'Вы уже использовали этот промокод.',
-};
+/** Подпись причины проблемы позиции (issues[].code из /cart/quote). */
+function issueLabel(t: CheckoutDict, code: string): string {
+  const map: Record<string, string> = {
+    out_of_stock: t.issueOutOfStock,
+    invalid_item: t.issueInvalidItem,
+    not_found: t.issueNotFound,
+    inactive: t.issueInactive,
+  };
+  return map[code] ?? code;
+}
 
-/** Ошибки создания заказа (code из /orders → CreateOrderResult). */
-const ORDER_ERROR_LABELS: Record<string, string> = {
-  out_of_stock: 'Часть товаров закончилась, пока вы оформляли заказ. Обновите корзину.',
-  invalid_item: 'Один из товаров стал недоступен. Уберите его из корзины.',
-  invalid_promo: 'Промокод недействителен. Уберите его и попробуйте снова.',
-  invalid_gift: 'Подарочный сертификат недействителен.',
-  delivery_unavailable:
-    'Не удалось рассчитать доставку в выбранное место. Измените способ или адрес доставки.',
-  payments_disabled:
-    'Онлайн-оплата временно недоступна. Свяжитесь с магазином для оформления.',
-};
+/** Подпись причины отказа промокода (promo.reason из /cart/quote). */
+function promoReasonLabel(t: CheckoutDict, reason: string): string {
+  const map: Record<string, string> = {
+    not_found: t.promoReasonNotFound,
+    expired: t.promoReasonExpired,
+    not_started: t.promoReasonNotStarted,
+    inactive: t.promoReasonInactive,
+    usage_limit: t.promoReasonUsageLimit,
+    min_order: t.promoReasonMinOrder,
+    per_customer_limit: t.promoReasonPerCustomerLimit,
+  };
+  return map[reason] ?? t.promoNotApplied;
+}
 
-function humanError(err: unknown): string {
+/** Человекочитаемая ошибка создания заказа (code из /orders → CreateOrderResult). */
+function humanError(t: CheckoutDict, err: unknown): string {
+  const map: Record<string, string> = {
+    out_of_stock: t.orderErrorOutOfStock,
+    invalid_item: t.orderErrorInvalidItem,
+    invalid_promo: t.orderErrorInvalidPromo,
+    invalid_gift: t.orderErrorInvalidGift,
+    delivery_unavailable: t.orderErrorDeliveryUnavailable,
+    payments_disabled: t.orderErrorPaymentsDisabled,
+  };
   if (err instanceof ApiError) {
-    return ORDER_ERROR_LABELS[err.code] ?? err.message;
+    return map[err.code] ?? err.message;
   }
-  return err instanceof Error ? err.message : 'Произошла ошибка. Попробуйте ещё раз.';
+  return err instanceof Error ? err.message : t.orderErrorGeneric;
 }
 
 /** Простейшая валидация телефона/email на клиенте (сервер валидирует строже). */
@@ -101,6 +108,8 @@ export default function CheckoutForm({
   zones,
   locale = DEFAULT_LOCALE,
 }: Props) {
+  const dict = getDictionary(locale);
+  const t = dict.checkout;
   const { items, mounted, clear } = useCart();
 
   // ---- Контакты покупателя ----
@@ -218,7 +227,7 @@ export default function CheckoutForm({
       .catch((err) => {
         if (!cancelled) {
           setQuote(null);
-          setQuoteError(humanError(err));
+          setQuoteError(humanError(t, err));
         }
       })
       .finally(() => {
@@ -348,22 +357,22 @@ export default function CheckoutForm({
       clear();
       window.location.href = payment.paymentUrl;
     } catch (err) {
-      setSubmitError(humanError(err));
+      setSubmitError(humanError(t, err));
       setSubmitting(false);
     }
   }
 
   if (!mounted) {
-    return <div className="sf-checkout__loading">Загрузка…</div>;
+    return <div className="sf-checkout__loading">{dict.common.loading}</div>;
   }
 
   if (items.length === 0) {
     return (
       <div className="sf-checkout">
-        <h3 className="text-center">Ваша корзина пуста :(</h3>
+        <h3 className="text-center">{t.emptyCart}</h3>
         <p className="text-center">
           <a href={localizedHref('/catalog', locale)} className="sf-checkout__link">
-            Перейти в каталог →
+            {dict.common.goToCatalog}
           </a>
         </p>
       </div>
@@ -380,17 +389,15 @@ export default function CheckoutForm({
         <div className="sf-checkout__main">
           {hasUnresolvableItems && (
             <div className="sf-checkout__notice sf-checkout__notice--warn">
-              Некоторые товары добавлены в корзину в старой версии сайта и не могут
-              быть оформлены. Пожалуйста, удалите их из корзины и добавьте заново со
-              страницы товара.
+              {t.unresolvableItems}
             </div>
           )}
 
           {/* --- Контакты --- */}
           <fieldset className="sf-checkout__section">
-            <legend className="sf-checkout__legend">Контактные данные</legend>
+            <legend className="sf-checkout__legend">{t.contacts}</legend>
             <label className="sf-field">
-              <span className="sf-field__label">Имя и фамилия</span>
+              <span className="sf-field__label">{t.nameLabel}</span>
               <input
                 className="sf-field__input"
                 type="text"
@@ -401,7 +408,7 @@ export default function CheckoutForm({
               />
             </label>
             <label className="sf-field">
-              <span className="sf-field__label">E-mail</span>
+              <span className="sf-field__label">{t.emailLabel}</span>
               <input
                 className="sf-field__input"
                 type="email"
@@ -411,18 +418,18 @@ export default function CheckoutForm({
                 required
               />
               {email.length > 0 && !isEmail(email) && (
-                <span className="sf-field__error">Введите корректный e-mail.</span>
+                <span className="sf-field__error">{t.emailInvalid}</span>
               )}
             </label>
             <label className="sf-field">
-              <span className="sf-field__label">Телефон</span>
+              <span className="sf-field__label">{t.phoneLabel}</span>
               <input
                 className="sf-field__input"
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 autoComplete="tel"
-                placeholder="+7 900 000-00-00"
+                placeholder={t.phonePlaceholder}
                 required
               />
             </label>
@@ -430,7 +437,7 @@ export default function CheckoutForm({
 
           {/* --- Доставка --- */}
           <fieldset className="sf-checkout__section">
-            <legend className="sf-checkout__legend">Доставка</legend>
+            <legend className="sf-checkout__legend">{t.delivery}</legend>
 
             <div className="sf-checkout__delivery-tabs">
               {zones.length > 0 && (
@@ -441,7 +448,7 @@ export default function CheckoutForm({
                     checked={deliveryChoice === 'zone'}
                     onChange={() => setDeliveryChoice('zone')}
                   />
-                  <span>Курьер по Москве</span>
+                  <span>{t.deliveryCourierMoscow}</span>
                 </label>
               )}
               <label className="sf-radio">
@@ -451,7 +458,7 @@ export default function CheckoutForm({
                   checked={deliveryChoice === 'courier'}
                   onChange={() => setDeliveryChoice('courier')}
                 />
-                <span>Курьер СДЭК</span>
+                <span>{t.deliveryCourierCdek}</span>
               </label>
               <label className="sf-radio">
                 <input
@@ -460,14 +467,14 @@ export default function CheckoutForm({
                   checked={deliveryChoice === 'pvz'}
                   onChange={() => setDeliveryChoice('pvz')}
                 />
-                <span>Пункт выдачи СДЭК</span>
+                <span>{t.deliveryPvz}</span>
               </label>
             </div>
 
             {/* Зоны Москвы */}
             {deliveryChoice === 'zone' && (
               <label className="sf-field">
-                <span className="sf-field__label">Зона доставки</span>
+                <span className="sf-field__label">{t.zoneLabel}</span>
                 <select
                   className="sf-field__input"
                   value={zoneId}
@@ -485,7 +492,7 @@ export default function CheckoutForm({
             {/* Город (курьер СДЭК / ПВЗ) — автокомплит */}
             {deliveryChoice !== 'zone' && (
               <div className="sf-field sf-field--autocomplete">
-                <span className="sf-field__label">Город</span>
+                <span className="sf-field__label">{t.cityLabel}</span>
                 <input
                   className="sf-field__input"
                   type="text"
@@ -494,7 +501,7 @@ export default function CheckoutForm({
                     setCityQuery(e.target.value);
                     setSelectedCity(null);
                   }}
-                  placeholder="Начните вводить город"
+                  placeholder={t.cityPlaceholder}
                   autoComplete="off"
                 />
                 {cityResults.length > 0 && (
@@ -519,13 +526,13 @@ export default function CheckoutForm({
             {/* Адрес (курьер) */}
             {deliveryChoice === 'courier' && (
               <label className="sf-field">
-                <span className="sf-field__label">Адрес доставки</span>
+                <span className="sf-field__label">{t.addressLabel}</span>
                 <input
                   className="sf-field__input"
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Улица, дом, квартира"
+                  placeholder={t.addressPlaceholder}
                   autoComplete="street-address"
                 />
               </label>
@@ -534,12 +541,12 @@ export default function CheckoutForm({
             {/* Пункт выдачи (ПВЗ) */}
             {deliveryChoice === 'pvz' && selectedCity && (
               <label className="sf-field">
-                <span className="sf-field__label">Пункт выдачи</span>
+                <span className="sf-field__label">{t.pvzLabel}</span>
                 {pvzLoading ? (
-                  <span className="sf-field__hint">Загрузка пунктов выдачи…</span>
+                  <span className="sf-field__hint">{t.pvzLoading}</span>
                 ) : pvzList.length === 0 ? (
                   <span className="sf-field__hint">
-                    В этом городе не найдено пунктов выдачи.
+                    {t.pvzEmpty}
                   </span>
                 ) : (
                   <select
@@ -547,7 +554,7 @@ export default function CheckoutForm({
                     value={pvzCode}
                     onChange={(e) => setPvzCode(e.target.value)}
                   >
-                    <option value="">— выберите пункт —</option>
+                    <option value="">{t.pvzSelect}</option>
                     {pvzList.map((p) => (
                       <option key={p.code} value={p.code}>
                         {p.address || p.name}
@@ -561,20 +568,20 @@ export default function CheckoutForm({
 
           {/* --- Промокод --- */}
           <fieldset className="sf-checkout__section">
-            <legend className="sf-checkout__legend">Промокод</legend>
+            <legend className="sf-checkout__legend">{t.promo}</legend>
             {appliedPromo ? (
               <div className="sf-promo-applied">
                 <span>
-                  Применён: <strong>{appliedPromo}</strong>
+                  {t.promoApplied} <strong>{appliedPromo}</strong>
                   {quote && !quote.promo.applied && (
                     <em className="sf-field__error">
                       {' '}
-                      — {PROMO_REASONS[quote.promo.reason ?? ''] ?? 'не применён'}
+                      — {promoReasonLabel(t, quote.promo.reason ?? '')}
                     </em>
                   )}
                 </span>
                 <button type="button" className="sf-btn-link" onClick={removePromo}>
-                  Убрать
+                  {t.promoRemove}
                 </button>
               </div>
             ) : (
@@ -584,7 +591,7 @@ export default function CheckoutForm({
                   type="text"
                   value={promoInput}
                   onChange={(e) => setPromoInput(e.target.value)}
-                  placeholder="Введите промокод"
+                  placeholder={t.promoPlaceholder}
                 />
                 <button
                   type="button"
@@ -592,7 +599,7 @@ export default function CheckoutForm({
                   onClick={applyPromo}
                   disabled={promoInput.trim().length === 0}
                 >
-                  Применить
+                  {t.promoApply}
                 </button>
               </div>
             )}
@@ -601,7 +608,7 @@ export default function CheckoutForm({
 
         {/* ------------------------------- Правая колонка: итог -------------- */}
         <aside className="sf-checkout__summary">
-          <h2 className="sf-checkout__summary-title">Ваш заказ</h2>
+          <h2 className="sf-checkout__summary-title">{t.yourOrder}</h2>
 
           <div className="sf-summary-lines">
             {items.map((it, idx) => {
@@ -614,7 +621,7 @@ export default function CheckoutForm({
                     {issue && (
                       <span className="sf-field__error">
                         {' '}
-                        ({ISSUE_LABELS[issue] ?? issue})
+                        ({issueLabel(t, issue)})
                       </span>
                     )}
                   </div>
@@ -628,41 +635,41 @@ export default function CheckoutForm({
 
           <div className="sf-summary-totals">
             <div className="sf-summary-row">
-              <span>Товары</span>
+              <span>{t.summaryItems}</span>
               <span>{quote ? fmt(quote.itemsTotal) : '—'}</span>
             </div>
             {quote && Number(quote.discountTotal) > 0 && (
               <div className="sf-summary-row">
-                <span>Скидка</span>
+                <span>{t.summaryDiscount}</span>
                 <span>−{fmt(quote.discountTotal)}</span>
               </div>
             )}
             {quote && Number(quote.giftDiscountTotal) > 0 && (
               <div className="sf-summary-row">
-                <span>Сертификат</span>
+                <span>{t.summaryGift}</span>
                 <span>−{fmt(quote.giftDiscountTotal)}</span>
               </div>
             )}
             <div className="sf-summary-row">
-              <span>Доставка</span>
+              <span>{t.summaryDelivery}</span>
               <span>
                 {!quote
                   ? '—'
                   : !quote.delivery.available
-                    ? 'уточняется'
+                    ? t.deliveryPending
                     : quote.delivery.free || Number(quote.deliveryTotal) === 0
-                      ? 'бесплатно'
+                      ? t.deliveryFree
                       : fmt(quote.deliveryTotal)}
               </span>
             </div>
             <div className="sf-summary-row sf-summary-row--total">
-              <span>Итого</span>
+              <span>{t.summaryTotal}</span>
               <span>{quote ? fmt(quote.grandTotal) : '—'}</span>
             </div>
           </div>
 
           {quoteLoading && (
-            <div className="sf-checkout__hint">Пересчёт заказа…</div>
+            <div className="sf-checkout__hint">{t.recalculating}</div>
           )}
           {quoteError && (
             <div className="sf-checkout__notice sf-checkout__notice--warn">
@@ -671,12 +678,12 @@ export default function CheckoutForm({
           )}
           {quote && !quote.fulfillable && (
             <div className="sf-checkout__notice sf-checkout__notice--warn">
-              Некоторые товары недоступны в нужном количестве — измените корзину.
+              {t.notFulfillable}
             </div>
           )}
           {quote && quote.fulfillable && !quote.delivery.available && (
             <div className="sf-checkout__notice sf-checkout__notice--warn">
-              Не удалось рассчитать доставку — измените способ или адрес доставки.
+              {t.deliveryUnavailable}
             </div>
           )}
           {submitError && (
@@ -690,13 +697,10 @@ export default function CheckoutForm({
             className="sf-checkout__submit"
             disabled={!canSubmit}
           >
-            {submitting ? 'Переход к оплате…' : 'Оплатить'}
+            {submitting ? t.submitting : t.submit}
           </button>
 
-          <p className="sf-checkout__legal">
-            Нажимая «Оплатить», вы соглашаетесь с условиями продажи. Оплата
-            производится онлайн через защищённую платёжную страницу.
-          </p>
+          <p className="sf-checkout__legal">{t.legal}</p>
         </aside>
       </div>
     </form>

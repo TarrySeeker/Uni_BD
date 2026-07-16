@@ -28,7 +28,7 @@ export async function generateMetadata({
   const { lang, slug } = await params;
   const locale = toLocale(lang);
   const product = await getProduct(slug, locale);
-  if (!product) return { title: 'Товар не найден — carre' };
+  if (!product) return { title: getDictionary(locale).notFound.productMetaTitle };
   return {
     title: product.meta.title ?? `${product.name} — carre`,
     description: product.meta.description ?? undefined,

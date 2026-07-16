@@ -14,12 +14,19 @@ import type { Metadata } from 'next';
 import { getOrder } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { localizedHref, toLocale } from '@/lib/i18n';
-import { getDictionary } from '@/lib/dictionaries';
+import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 
-export const metadata: Metadata = {
-  title: 'Заказ оформлен — carre',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = toLocale((await params).lang);
+  return {
+    title: getDictionary(locale).success.metaTitle,
+    robots: { index: false, follow: false },
+  };
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -44,34 +51,33 @@ export default async function SuccessPage({
 
       <div className="sf-success">
         {!number ? (
-          <p className="sf-success__text">Не удалось определить заказ.</p>
+          <p className="sf-success__text">{dict.success.noOrder}</p>
         ) : !order ? (
           <>
             <p className="sf-success__text">
-              Спасибо! Ваш заказ <strong>№{number}</strong> принят.
+              {fillTemplate(dict.success.thanks, { number })}
             </p>
             <p className="sf-success__text sf-field__hint">
-              Мы отправили детали на вашу почту. Если оплата ещё обрабатывается,
-              статус обновится автоматически.
+              {dict.success.emailNote}
             </p>
           </>
         ) : (
           <>
             <p className="sf-success__text">
-              Спасибо! Ваш заказ <strong>№{order.number}</strong> принят.
+              {fillTemplate(dict.success.thanks, { number: order.number })}
             </p>
 
             <div className="sf-success__status">
               <div className="sf-summary-row">
-                <span>Статус заказа</span>
+                <span>{dict.success.statusOrder}</span>
                 <span>{order.statusLabel}</span>
               </div>
               <div className="sf-summary-row">
-                <span>Оплата</span>
+                <span>{dict.success.statusPayment}</span>
                 <span>{order.paymentStatusLabel}</span>
               </div>
               <div className="sf-summary-row sf-summary-row--total">
-                <span>Сумма</span>
+                <span>{dict.success.statusTotal}</span>
                 <span>{formatPrice(order.grandTotal, order.currency)}</span>
               </div>
             </div>

@@ -28,7 +28,7 @@ export async function generateMetadata({
   const { lang, slug } = await params;
   const locale = toLocale(lang);
   const page = await getPage(slug, locale);
-  if (!page) return { title: 'Страница не найдена — carre' };
+  if (!page) return { title: getDictionary(locale).notFound.pageMetaTitle };
 
   const { meta } = page;
   return {
