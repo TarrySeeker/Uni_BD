@@ -40,7 +40,7 @@ export async function generateMetadata({
   const categories = await getCategories(locale);
   const cat = findCategory(rootCategories(categories), lastSlug(slug));
   return {
-    title: cat ? `${cat.name} — carre` : `${dict.catalog.title} — carre`,
+    title: cat ? cat.name : dict.catalog.title,
     alternates: alternatesFor(`/catalog/${slug.join('/')}`, locale),
   };
 }

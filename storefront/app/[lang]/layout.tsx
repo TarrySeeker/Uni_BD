@@ -16,23 +16,43 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { getCategories, getSettings } from '@/lib/api';
 import { rootCategories, topLevelCategories } from '@/lib/tree';
+import { siteTitle } from '@/lib/seo';
 import { CurrencyProvider } from '@/lib/currency';
 import { HTML_LANG, LOCALES, toLocale } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
 
-export const metadata: Metadata = {
-  title: 'carre — шёлковые платки и аксессуары',
-  description: 'Интернет-магазин шёлковых платков, твилли и аксессуаров.',
-  icons: {
-    icon: [
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-    ],
-    apple: '/apple-touch-icon.png',
-  },
-};
+/**
+ * Заголовок/описание — из админки (settings.seo), как на проде (thread.seo_title).
+ * `title.template` применяется к дочерним страницам, задающим свой title; `default`
+ * — фолбэк для страниц без него.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = toLocale((await params).lang);
+  const settings = await getSettings(locale);
+  const name = siteTitle(settings);
+  const template = settings?.seo.titleTemplate ?? '%s';
+
+  return {
+    title: {
+      default: name,
+      template: template.includes('%s') ? template : '%s',
+    },
+    description: settings?.seo.defaultDescription ?? undefined,
+    icons: {
+      icon: [
+        { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+        { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      ],
+      apple: '/apple-touch-icon.png',
+    },
+  };
+}
 
 /** Пререндер сегмента локали для всех трёх языков. */
 export function generateStaticParams() {
@@ -78,6 +98,7 @@ export default async function RootLayout({
 
           <SiteFooter
             categories={footerCats}
+            tree={menuRoots}
             settings={settings}
             locale={locale}
             dict={dict}

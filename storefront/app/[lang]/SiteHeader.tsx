@@ -27,17 +27,13 @@ import {
   type Locale,
 } from '@/lib/i18n';
 import { fillTemplate, type Dictionary } from '@/lib/dictionaries';
+import { categoryHref } from '@/lib/tree';
 
 interface Props {
   categories: CategoryDto[];
   settings: PublicSettingsDto | null;
   locale: Locale;
   dict: Dictionary;
-}
-
-/** URL категории: корень `catalog` ведёт на индекс /catalog. */
-function categoryPath(slug: string): string {
-  return slug === 'catalog' ? '/catalog' : `/catalog/${slug}`;
 }
 
 /**
@@ -48,10 +44,12 @@ function categoryPath(slug: string): string {
  */
 function MenuNode({
   node,
+  tree,
   href,
   allLabel,
 }: {
   node: CategoryDto;
+  tree: CategoryDto[];
   href: (path: string) => string;
   allLabel: string;
 }) {
@@ -62,7 +60,7 @@ function MenuNode({
     return (
       <div className="menu-block">
         <div className="menu-block-head">
-          <a href={href(categoryPath(node.slug))}>{node.name}</a>
+          <a href={href(categoryHref(tree, node.slug))}>{node.name}</a>
         </div>
       </div>
     );
@@ -74,19 +72,28 @@ function MenuNode({
         className="menu-block-head js-toggle-open"
         onClick={() => setOpen((o) => !o)}
       >
-        <a href={href(categoryPath(node.slug))} onClick={(e) => e.stopPropagation()}>
+        <a
+          href={href(categoryHref(tree, node.slug))}
+          onClick={(e) => e.stopPropagation()}
+        >
           {node.name}
         </a>
         <span className="menu-block-head--plus">+</span>
         <span className="menu-block-head--minus">—</span>
       </div>
       <div className="menu-block-links">
-        <a href={href(categoryPath(node.slug))}>{allLabel}</a>
+        <a href={href(categoryHref(tree, node.slug))}>{allLabel}</a>
         {node.children.map((child) =>
           child.children.length > 0 ? (
-            <MenuNode key={child.slug} node={child} href={href} allLabel={allLabel} />
+            <MenuNode
+              key={child.slug}
+              node={child}
+              tree={tree}
+              href={href}
+              allLabel={allLabel}
+            />
           ) : (
-            <a key={child.slug} href={href(categoryPath(child.slug))}>
+            <a key={child.slug} href={href(categoryHref(tree, child.slug))}>
               {child.name}
             </a>
           ),
@@ -210,6 +217,7 @@ export default function SiteHeader({ categories, settings, locale, dict }: Props
               <MenuNode
                 key={cat.slug}
                 node={cat}
+                tree={categories}
                 href={href}
                 allLabel={dict.common.all}
               />

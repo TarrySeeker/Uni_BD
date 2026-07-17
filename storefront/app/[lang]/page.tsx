@@ -82,10 +82,11 @@ export default async function HomePage({
   // внешним/абсолютным); фиксированные внутренние ссылки локализуем через href().
   const href = (path: string) => localizedHref(path, locale);
   const heroHref = hero?.ctaHref ?? href('/catalog');
+  // Lookbook (ТЗ_2 «Образы»): первый образ — крупный ряд (как на проде), остальные —
+  // в сетке второго ряда. БЕЗ жёсткого лимита в 3 — сколько задано в админке, столько
+  // и показываем (владелец добавляет образы без правки кода).
   const looksCategories = looks?.categories ?? [];
-  const lb0 = looksCategories[0];
-  const lb1 = looksCategories[1];
-  const lb2 = looksCategories[2];
+  const [looksFirst, ...looksRest] = looksCategories;
 
   return (
     <div className="mainpage">
@@ -218,37 +219,34 @@ export default async function HomePage({
         <div className="lookbook">
           <h2 className="lookbook__title">{looks.title}</h2>
           <div className="lookbook__rows">
-            {lb0 && (
+            {looksFirst && (
               <div className="lookbook__row lookbook__row--first">
                 <div className="lookbook__anons">
-                  <p>{lb0.text}</p>
+                  <p>{looksFirst.text}</p>
                 </div>
                 <div className="lookbook__item lookbook__item--first">
-                  {lb0.imageUrl && (
-                    <img src={lb0.imageUrl} alt="" className="lazy" />
+                  {looksFirst.imageUrl && (
+                    <img src={looksFirst.imageUrl} alt="" className="lazy" />
                   )}
-                  <p>{lb0.title}</p>
+                  <p>{looksFirst.title}</p>
                 </div>
               </div>
             )}
-            {(lb1 || lb2) && (
+            {looksRest.length > 0 && (
               <div className="lookbook__row lookbook__row--second">
-                {lb1 && (
-                  <div className="lookbook__item lookbook__item--second">
-                    {lb1.imageUrl && (
-                      <img src={lb1.imageUrl} alt="" className="lazy" />
+                {looksRest.map((lb, i) => (
+                  <div
+                    key={`${lb.title}-${i}`}
+                    className={`lookbook__item lookbook__item--${
+                      i === 0 ? 'second' : 'third'
+                    }`}
+                  >
+                    {lb.imageUrl && (
+                      <img src={lb.imageUrl} alt="" className="lazy" />
                     )}
-                    <p>{lb1.title}</p>
+                    <p>{lb.title}</p>
                   </div>
-                )}
-                {lb2 && (
-                  <div className="lookbook__item lookbook__item--third">
-                    {lb2.imageUrl && (
-                      <img src={lb2.imageUrl} alt="" className="lazy" />
-                    )}
-                    <p>{lb2.title}</p>
-                  </div>
-                )}
+                ))}
               </div>
             )}
           </div>

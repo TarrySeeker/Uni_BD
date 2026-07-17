@@ -9,7 +9,13 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProduct, getProducts, getCategories, getSettings } from '@/lib/api';
-import { topLevelCategories, findCategoryPath, findCategory } from '@/lib/tree';
+import {
+  topLevelCategories,
+  rootCategories,
+  findCategoryPath,
+  findCategory,
+  categoryHref,
+} from '@/lib/tree';
 import { localizedHref, toLocale, alternatesFor } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../../components/Breadcrumbs';
@@ -30,7 +36,7 @@ export async function generateMetadata({
   const product = await getProduct(slug, locale);
   if (!product) return { title: getDictionary(locale).notFound.productMetaTitle };
   return {
-    title: product.meta.title ?? `${product.name} — carre`,
+    title: product.meta.title ?? product.name,
     description: product.meta.description ?? undefined,
     alternates: alternatesFor(`/product/${slug}`, locale),
     robots: product.meta.noindex ? { index: false, follow: false } : undefined,
@@ -61,6 +67,8 @@ export default async function ProductPage({
   if (!product) notFound();
 
   const top = topLevelCategories(categories);
+  // Полные корни (с `catalog`) — по ним строятся вложенные URL как на проде.
+  const roots = rootCategories(categories);
 
   const firstCatSlug = product.categories[0] ?? null;
   const catNode = firstCatSlug ? findCategory(top, firstCatSlug) : null;
@@ -70,7 +78,7 @@ export default async function ProductPage({
   const crumbs: Crumb[] = [{ label: dict.common.catalog, href: '/catalog' }];
   if (firstCatSlug) {
     for (const node of findCategoryPath(top, firstCatSlug)) {
-      crumbs.push({ label: node.name, href: `/catalog/${node.slug}` });
+      crumbs.push({ label: node.name, href: categoryHref(roots, node.slug) });
     }
   }
   crumbs.push({ label: product.name });
@@ -184,7 +192,7 @@ export default async function ProductPage({
             </div>
             {firstCatSlug && (
               <div className="work__other-sticky--all">
-                <a href={localizedHref(`/catalog/${firstCatSlug}`, locale)}>
+                <a href={localizedHref(categoryHref(roots, firstCatSlug), locale)}>
                   {dict.common.seeAll}
                 </a>
               </div>

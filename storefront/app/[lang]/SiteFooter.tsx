@@ -1,23 +1,39 @@
 /**
- * Футер витрины carre (порт из frontend/views/misc_blocks/footer.twig).
- * Колонка «Каталог» — из реальных категорий API; соцсети — из settings.contacts.
+ * Футер витрины carre (порт из frontend/views/misc_blocks/footer_new.twig).
+ * Колонка «Каталог» — из реальных категорий API (вложенные URL через categoryHref);
+ * название магазина — из settings.branding.shopName; соцсети — из
+ * settings.contacts.socials, тип → SVG-иконка через socialIcon (неизвестный тип →
+ * текст-фолбэк). Ничего не захардкожено под carre — мультитенантно.
  * i18n: заголовки/ссылки из словаря + localizedHref(path, locale) (сохраняет локаль).
  */
 
 import type { CategoryDto, PublicSettingsDto } from '@/lib/types';
 import { localizedHref, type Locale } from '@/lib/i18n';
+import { categoryHref } from '@/lib/tree';
+import { socialIcon } from '@/lib/social';
 import type { Dictionary } from '@/lib/dictionaries';
 
 interface Props {
+  /** Категории, показываемые в колонке «Каталог» (группы верхнего уровня). */
   categories: CategoryDto[];
+  /** Полное дерево — источник вложенных путей (/catalog/parent/child), как на проде. */
+  tree: CategoryDto[];
   settings: PublicSettingsDto | null;
   locale: Locale;
   dict: Dictionary;
 }
 
-export default function SiteFooter({ categories, settings, locale, dict }: Props) {
+export default function SiteFooter({
+  categories,
+  tree,
+  settings,
+  locale,
+  dict,
+}: Props) {
   const socials = settings?.contacts.socials ?? [];
   const href = (path: string) => localizedHref(path, locale);
+  // Название магазина — из брендинга админки (мультитенантно), не хардкод.
+  const shopName = settings?.branding.shopName ?? '';
   const f = dict.footer;
   return (
     <footer className="footer">
@@ -29,7 +45,7 @@ export default function SiteFooter({ categories, settings, locale, dict }: Props
               <div className="footer__p" key={ct.slug}>
                 <a
                   className="link--lined link--lined-left"
-                  href={href(`/catalog/${ct.slug}`)}
+                  href={href(categoryHref(tree, ct.slug))}
                 >
                   {ct.name}
                 </a>
@@ -90,13 +106,26 @@ export default function SiteFooter({ categories, settings, locale, dict }: Props
           </div>
         </div>
         <div className="footer-foot">
-          <div>MANNER &amp; MATTER</div>
+          <div>{shopName}</div>
           <div className="footer-foot__soc">
-            {socials.map((s) => (
-              <a key={s.url} href={s.url} target="_blank" rel="noreferrer">
-                {s.type}
-              </a>
-            ))}
+            {socials.map((s) => {
+              const icon = socialIcon(s.type);
+              return (
+                <a
+                  key={s.url}
+                  href={s.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={s.type}
+                >
+                  {icon ? (
+                    <img src={icon} alt={s.type} width={24} height={24} />
+                  ) : (
+                    s.type
+                  )}
+                </a>
+              );
+            })}
           </div>
         </div>
       </div>

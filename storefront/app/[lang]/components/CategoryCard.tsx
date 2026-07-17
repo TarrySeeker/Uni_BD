@@ -8,21 +8,23 @@
 
 import type { CategoryDto } from '@/lib/types';
 import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
-
-/** URL категории: корень `catalog` ведёт на индекс /catalog, остальные — на slug. */
-function categoryPath(slug: string): string {
-  return slug === 'catalog' ? '/catalog' : `/catalog/${slug}`;
-}
+import { categoryHref } from '@/lib/tree';
 
 export default function CategoryCard({
   category,
+  tree,
   locale = DEFAULT_LOCALE,
 }: {
   category: CategoryDto;
+  /** Дерево категорий — нужно, чтобы построить вложенный путь как на проде. */
+  tree: CategoryDto[];
   locale?: Locale;
 }) {
   return (
-    <a href={localizedHref(categoryPath(category.slug), locale)} className="category">
+    <a
+      href={localizedHref(categoryHref(tree, category.slug), locale)}
+      className="category"
+    >
       <div
         className="category__image"
         style={

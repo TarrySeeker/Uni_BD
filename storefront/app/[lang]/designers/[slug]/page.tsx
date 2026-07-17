@@ -29,7 +29,7 @@ export async function generateMetadata({
   const designer = await getDesigner(slug, locale);
   if (!designer) return { title: getDictionary(locale).notFound.designerMetaTitle };
   return {
-    title: designer.meta.title ?? designer.seoTitle ?? `${designer.name} — carre`,
+    title: designer.meta.title ?? designer.seoTitle ?? designer.name,
     description:
       designer.meta.description ?? designer.seoDescription ?? undefined,
     alternates: alternatesFor(`/designers/${slug}`, locale),

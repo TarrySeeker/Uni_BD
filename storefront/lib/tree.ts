@@ -47,6 +47,23 @@ export function findCategoryPath(
   return [];
 }
 
+/**
+ * URL категории — вложенный путь из цепочки предков, как на боевом carrerusse.com
+ * (там `thread.url` денормализован через Thread::updateTree: /catalog/platki-i-sharfi/
+ * bandani). Корень `catalog` — индекс каталога /catalog, он же префикс для своих
+ * потомков; корни вне `catalog` (напр. `certificates`) в путь не попадают.
+ * Неизвестный slug → плоский /catalog/{slug} (фолбэк без падения).
+ */
+export function categoryHref(tree: CategoryDto[], slug: string): string {
+  if (slug === 'catalog') return '/catalog';
+  const path = findCategoryPath(tree, slug);
+  if (path.length === 0) return `/catalog/${slug}`;
+  const segments = path
+    .map((node) => node.slug)
+    .filter((s) => s !== 'catalog');
+  return `/catalog/${segments.join('/')}`;
+}
+
 /** Узел категории по slug (или null). */
 export function findCategory(
   tree: CategoryDto[],

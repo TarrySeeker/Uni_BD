@@ -9,7 +9,7 @@
 
 import { notFound } from 'next/navigation';
 import { getCategories, getProducts } from '@/lib/api';
-import { rootCategories, findCategoryPath } from '@/lib/tree';
+import { rootCategories, findCategoryPath, categoryHref } from '@/lib/tree';
 import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import type { CategoryDto } from '@/lib/types';
@@ -86,11 +86,11 @@ export default async function CatalogView({
   const crumbs: Crumb[] = [{ label: dict.common.catalog, href: '/catalog' }];
   for (const node of path) {
     if (node.slug === 'catalog') continue; // корень каталога == сам /catalog
-    crumbs.push({ label: node.name, href: `/catalog/${node.slug}` });
+    crumbs.push({ label: node.name, href: categoryHref(roots, node.slug) });
   }
 
   const title = active?.name ?? dict.catalog.title;
-  const basePath = active ? `/catalog/${active.slug}` : '/catalog';
+  const basePath = active ? categoryHref(roots, active.slug) : '/catalog';
 
   return (
     <>
@@ -132,7 +132,12 @@ export default async function CatalogView({
             {isParentLanding && (
               <div className="sf-cat-grid sf-subcats">
                 {subCategories.map((c) => (
-                  <CategoryCard key={c.slug} category={c} locale={locale} />
+                  <CategoryCard
+                    key={c.slug}
+                    category={c}
+                    tree={roots}
+                    locale={locale}
+                  />
                 ))}
               </div>
             )}

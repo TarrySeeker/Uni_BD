@@ -35,9 +35,7 @@ export async function generateMetadata({
   const dict = getDictionary(locale);
   const q = searchQuery(sp.q);
   return {
-    title: q
-      ? `${fillTemplate(dict.search.resultsFor, { q })} — carre`
-      : `${dict.search.title} — carre`,
+    title: q ? fillTemplate(dict.search.resultsFor, { q }) : dict.search.title,
     alternates: alternatesFor('/search', locale),
   };
 }

@@ -19,7 +19,7 @@ export async function generateMetadata({
   const locale = toLocale((await params).lang);
   const dict = getDictionary(locale);
   return {
-    title: `${dict.catalog.title} — carre`,
+    title: dict.catalog.title,
     alternates: alternatesFor('/catalog', locale),
   };
 }

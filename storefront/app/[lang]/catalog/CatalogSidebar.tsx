@@ -9,6 +9,7 @@
 import type { ReactElement } from 'react';
 import type { CategoryDto } from '@/lib/types';
 import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
+import { categoryHref } from '@/lib/tree';
 import type { Dictionary } from '@/lib/dictionaries';
 
 interface Props {
@@ -24,14 +25,10 @@ interface Props {
   dict?: Dictionary;
 }
 
-/** URL категории: корень `catalog` ведёт на индекс /catalog. */
-function categoryPath(slug: string): string {
-  return slug === 'catalog' ? '/catalog' : `/catalog/${slug}`;
-}
-
 /** Рекурсивно разворачивает дерево в плоский список пунктов с отступом по глубине. */
 function renderItems(
   nodes: CategoryDto[],
+  tree: CategoryDto[],
   activeSlug: string | undefined,
   depth: number,
   locale: Locale,
@@ -45,11 +42,13 @@ function renderItems(
         className={`works-catalog-menu_group--item${active ? ' active' : ''}`}
         style={depth > 0 ? { paddingLeft: depth * 14 } : undefined}
       >
-        <a href={localizedHref(categoryPath(node.slug), locale)}>{node.name}</a>
+        <a href={localizedHref(categoryHref(tree, node.slug), locale)}>
+          {node.name}
+        </a>
       </div>,
     );
     if (node.children.length > 0) {
-      out.push(...renderItems(node.children, activeSlug, depth + 1, locale));
+      out.push(...renderItems(node.children, tree, activeSlug, depth + 1, locale));
     }
   }
   return out;
@@ -74,7 +73,7 @@ export default function CatalogSidebar({
         >
           <a href={localizedHref('/catalog', locale)}>{allLabel}</a>
         </div>
-        {renderItems(tree, activeSlug, 0, locale)}
+        {renderItems(tree, tree, activeSlug, 0, locale)}
       </div>
       <div className="works-catalog-menu__btns">
         <div>

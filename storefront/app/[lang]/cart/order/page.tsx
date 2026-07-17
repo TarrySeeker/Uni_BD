@@ -16,10 +16,17 @@ import { toLocale } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import CheckoutForm from './CheckoutForm';
 
-export const metadata: Metadata = {
-  title: 'Оформление заказа — carre',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const locale = toLocale((await params).lang);
+  return {
+    title: getDictionary(locale).checkout.title,
+    robots: { index: false, follow: false },
+  };
+}
 
 export const dynamic = 'force-dynamic';
 

@@ -32,7 +32,7 @@ export async function generateMetadata({
 
   const { meta } = page;
   return {
-    title: meta.title ?? `${page.title} — carre`,
+    title: meta.title ?? page.title,
     description: meta.description ?? undefined,
     alternates: meta.canonical
       ? { canonical: meta.canonical }
