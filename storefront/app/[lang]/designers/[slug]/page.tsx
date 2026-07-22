@@ -13,6 +13,7 @@ import { notFound } from 'next/navigation';
 import type { ProductListItemDto } from '@/lib/types';
 import { getDesigner, getProducts, getSettings } from '@/lib/api';
 import { toLocale, alternatesFor } from '@/lib/i18n';
+import { metaTitle } from '@/lib/seo';
 import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../../components/Breadcrumbs';
 import ProductCard from '../../components/ProductCard';
@@ -29,7 +30,9 @@ export async function generateMetadata({
   const designer = await getDesigner(slug, locale);
   if (!designer) return { title: getDictionary(locale).notFound.designerMetaTitle };
   return {
-    title: designer.meta.title ?? designer.seoTitle ?? designer.name,
+    // meta.title от Storefront API — уже с применённым titleTemplate (buildSeoMeta),
+    // поэтому absolute. Сырые seoTitle/name — фолбэк, им шаблон Next ещё нужен.
+    title: metaTitle(designer.meta.title, designer.seoTitle ?? designer.name),
     description:
       designer.meta.description ?? designer.seoDescription ?? undefined,
     alternates: alternatesFor(`/designers/${slug}`, locale),

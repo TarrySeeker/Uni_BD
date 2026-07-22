@@ -17,6 +17,7 @@ import {
   categoryHref,
 } from '@/lib/tree';
 import { localizedHref, toLocale, alternatesFor } from '@/lib/i18n';
+import { metaTitle } from '@/lib/seo';
 import { getDictionary } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../../components/Breadcrumbs';
 import Price from '../../components/Price';
@@ -36,7 +37,9 @@ export async function generateMetadata({
   const product = await getProduct(slug, locale);
   if (!product) return { title: getDictionary(locale).notFound.productMetaTitle };
   return {
-    title: product.meta.title ?? product.name,
+    // meta.title от Storefront API — уже с применённым titleTemplate (buildSeoMeta),
+    // поэтому absolute: иначе шаблон layout наложится вторым слоем.
+    title: metaTitle(product.meta.title, product.name),
     description: product.meta.description ?? undefined,
     alternates: alternatesFor(`/product/${slug}`, locale),
     robots: product.meta.noindex ? { index: false, follow: false } : undefined,

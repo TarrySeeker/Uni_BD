@@ -14,6 +14,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPage, getSettings } from '@/lib/api';
 import { toLocale, alternatesFor } from '@/lib/i18n';
+import { metaTitle } from '@/lib/seo';
 import { getDictionary } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../components/Breadcrumbs';
 import PageSections from '../components/cms/PageSections';
@@ -32,14 +33,17 @@ export async function generateMetadata({
 
   const { meta } = page;
   return {
-    title: meta.title ?? page.title,
+    // meta.title/meta.ogTitle от Storefront API — уже с применённым titleTemplate
+    // (buildSeoMeta), поэтому absolute: иначе шаблон layout наложится вторым слоем.
+    // og:title Next резолвит тем же шаблоном (resolve-opengraph), правило то же.
+    title: metaTitle(meta.title, page.title),
     description: meta.description ?? undefined,
     alternates: meta.canonical
       ? { canonical: meta.canonical }
       : alternatesFor(`/${slug}`, locale),
     robots: meta.noindex ? { index: false, follow: false } : undefined,
     openGraph: {
-      title: meta.ogTitle ?? meta.title ?? page.title,
+      title: metaTitle(meta.ogTitle ?? meta.title, page.title),
       description: meta.ogDescription ?? meta.description ?? undefined,
       images: meta.ogImageUrl ? [{ url: meta.ogImageUrl }] : undefined,
     },

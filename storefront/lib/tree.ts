@@ -5,6 +5,7 @@
  */
 
 import type { CategoryDto } from './types';
+import { localizedHref, type Locale } from './i18n';
 
 /** Верхний уровень каталога: дети корня `catalog`, иначе — сам массив. */
 export function topLevelCategories(tree: CategoryDto[]): CategoryDto[] {
@@ -62,6 +63,67 @@ export function categoryHref(tree: CategoryDto[], slug: string): string {
     .map((node) => node.slug)
     .filter((s) => s !== 'catalog');
   return `/catalog/${segments.join('/')}`;
+}
+
+/** Итог разбора запрошенного пути catch-all роута каталога. */
+export type CategoryRouteResult =
+  | { status: 'ok'; slug: string; canonicalPath: string }
+  | { status: 'redirect'; slug: string; canonicalPath: string }
+  | { status: 'not-found'; slug: string; canonicalPath: null };
+
+/**
+ * Валидация пути категории целиком (не только последнего сегмента).
+ *
+ * У категории ровно ОДИН валидный URL — канонический путь из цепочки предков
+ * (`categoryHref`). Catch-all роут физически принимает любой префикс, поэтому без
+ * этой проверки одна категория отдаёт 200 по неограниченному числу URL
+ * (`/catalog/certificates/twilly`, `/catalog/a/b/c/bandani`), и каждый канонизирует
+ * сам себя → дубли контента в индексе.
+ *
+ *   - категории с таким slug нет      → `not-found` (404);
+ *   - путь совпал с каноническим      → `ok` (рендерим);
+ *   - путь другой (мусорные предки,
+ *     плоский путь, лишний `catalog`) → `redirect` на `canonicalPath`.
+ *
+ * `canonicalPath` — «голый» путь без локали; локаль и query навешивает
+ * `categoryRouteLocation`.
+ */
+export function resolveCategoryRoute(
+  tree: CategoryDto[],
+  segments: string[],
+): CategoryRouteResult {
+  const requested = segments.filter(Boolean);
+  const slug = requested[requested.length - 1] ?? '';
+  if (!slug || !findCategory(tree, slug)) {
+    return { status: 'not-found', slug, canonicalPath: null };
+  }
+  const canonicalPath = categoryHref(tree, slug);
+  const requestedPath = `/catalog/${requested.join('/')}`;
+  return {
+    status: requestedPath === canonicalPath ? 'ok' : 'redirect',
+    slug,
+    canonicalPath,
+  };
+}
+
+/**
+ * Location для редиректа на канонический путь: префикс локали (ru — корень, en/fr —
+ * `/en`|`/fr`) + сохранённый query. Пагинация и сортировка (`?page`, `?sort`) обязаны
+ * пережить редирект, иначе постраничный обход схлопывается на первую страницу.
+ */
+export function categoryRouteLocation(
+  canonicalPath: string,
+  locale: Locale,
+  search?: Record<string, string | string[] | undefined>,
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search ?? {})) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) for (const v of value) params.append(key, v);
+    else params.append(key, value);
+  }
+  const query = params.toString();
+  return localizedHref(query ? `${canonicalPath}?${query}` : canonicalPath, locale);
 }
 
 /** Узел категории по slug (или null). */

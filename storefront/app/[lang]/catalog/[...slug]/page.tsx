@@ -1,18 +1,32 @@
 /**
  * Страница категории carre (/catalog/<slug> и вложенные, с локалью /en//fr/) —
- * сетка товаров категории с сайдбаром и пагинацией. Catch-all: активной считается
- * ПОСЛЕДНИЙ сегмент пути (slug'и категорий уникальны в API); неизвестный slug → 404
- * (CatalogView).
+ * сетка товаров категории с сайдбаром и пагинацией.
+ *
+ * Catch-all роут физически принимает ЛЮБОЙ префикс, поэтому путь валидируется
+ * целиком, а не по последнему сегменту: у категории ровно один валидный URL —
+ * канонический путь из цепочки предков (`resolveCategoryRoute`/`categoryHref`). Без
+ * этого одна категория отдавала 200 по неограниченному числу URL, канонизируя каждый
+ * сам на себя (дубли контента в индексе). Мусорный путь → постоянный редирект на
+ * канон (с сохранением локали и query), неизвестный slug → 404.
  */
 
 import type { Metadata } from 'next';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { getCategories } from '@/lib/api';
-import { rootCategories, findCategory } from '@/lib/tree';
+import {
+  rootCategories,
+  findCategory,
+  resolveCategoryRoute,
+  categoryRouteLocation,
+} from '@/lib/tree';
 import { toLocale, alternatesFor } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import CatalogView from '../CatalogView';
 
 export const dynamic = 'force-dynamic';
+
+/** Query-параметры страницы категории (переживают канонизацию URL). */
+type CatalogSearchParams = Record<string, string | string[] | undefined>;
 
 function parsePage(v: string | string[] | undefined): number {
   const raw = Array.isArray(v) ? v[0] : v;
@@ -25,10 +39,6 @@ function firstParam(v: string | string[] | undefined): string | undefined {
   return raw || undefined;
 }
 
-function lastSlug(slug: string[]): string {
-  return slug[slug.length - 1] ?? '';
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -38,10 +48,14 @@ export async function generateMetadata({
   const locale = toLocale(lang);
   const dict = getDictionary(locale);
   const categories = await getCategories(locale);
-  const cat = findCategory(rootCategories(categories), lastSlug(slug));
+  const roots = rootCategories(categories);
+  const route = resolveCategoryRoute(roots, slug);
+  if (route.status === 'not-found') return { title: dict.catalog.title };
+  const cat = findCategory(roots, route.slug);
+  // canonical — ВСЕГДА канонический путь категории, а не сырой путь запроса.
   return {
     title: cat ? cat.name : dict.catalog.title,
-    alternates: alternatesFor(`/catalog/${slug.join('/')}`, locale),
+    alternates: alternatesFor(route.canonicalPath, locale),
   };
 }
 
@@ -50,15 +64,28 @@ export default async function CategoryPage({
   searchParams,
 }: {
   params: Promise<{ lang: string; slug: string[] }>;
-  searchParams: Promise<{ page?: string | string[]; sort?: string | string[] }>;
+  searchParams: Promise<CatalogSearchParams>;
 }) {
   const [{ lang, slug }, sp] = await Promise.all([params, searchParams]);
+  const locale = toLocale(lang);
+  const categories = await getCategories(locale);
+  const route = resolveCategoryRoute(rootCategories(categories), slug);
+
+  if (route.status === 'not-found') notFound();
+
+  // Постоянный переезд: 308 (permanentRedirect) — permanent-аналог 301, но с
+  // гарантией сохранения метода; поисковики трактуют его как 301 и переносят вес на
+  // канонический URL. Временный redirect() (307) индекс бы не почистил.
+  if (route.status === 'redirect') {
+    permanentRedirect(categoryRouteLocation(route.canonicalPath, locale, sp));
+  }
+
   return (
     <CatalogView
-      activeSlug={lastSlug(slug)}
+      activeSlug={route.slug}
       page={parsePage(sp.page)}
       sort={firstParam(sp.sort)}
-      locale={toLocale(lang)}
+      locale={locale}
     />
   );
 }
