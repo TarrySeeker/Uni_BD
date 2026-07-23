@@ -5,9 +5,12 @@ import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
+import type { TranslationsMap } from '@/lib/i18n';
 
 import { updateLegalContactsAction } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
+import { SettingsTranslationTabs } from './SettingsTranslationTabs';
+import { CONTACTS_TR_FIELD_DEFS } from './content-i18n-form-state';
 
 /**
  * Форма реквизитов юрлица и публичных контактов (docs/11 §5.4.5).
@@ -18,9 +21,13 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 export function LegalContactsForm({
   legalEntity,
   contacts,
+  i18n,
+  translations,
 }: {
   legalEntity: EffectiveSettings['legalEntity'];
   contacts: EffectiveSettings['contacts'];
+  i18n: { defaultLocale: string; locales: string[] };
+  translations?: TranslationsMap;
 }) {
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
@@ -87,6 +94,13 @@ export function LegalContactsForm({
   const fe = (f: string) => fieldError(error, f);
 
   return (
+    <SettingsTranslationTabs
+      section="contacts"
+      fields={CONTACTS_TR_FIELD_DEFS}
+      locales={i18n.locales}
+      defaultLocale={i18n.defaultLocale}
+      translations={translations}
+    >
     <div>
       {error ? (
         <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -231,5 +245,6 @@ export function LegalContactsForm({
         </button>
       </div>
     </div>
+    </SettingsTranslationTabs>
   );
 }

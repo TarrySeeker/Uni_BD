@@ -16,6 +16,8 @@ function makeEffective(): EffectiveSettings {
     home: HOME_DEFAULTS,
     navigation: { header: [], footer: [] },
     access: { singleUserMode: false },
+    contentI18n: {},
+    i18n: { defaultLocale: 'ru', locales: ['ru', 'en', 'fr'] },
     branding: {
       shopName: 'Gang Auto',
       logoUrl: 'https://cdn/logo.png',

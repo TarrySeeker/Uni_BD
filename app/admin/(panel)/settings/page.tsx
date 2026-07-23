@@ -86,12 +86,12 @@ export default async function SettingsPage() {
         {/* Контент разделов. */}
         <div className="min-w-0">
           <Section id="branding" title="Брендинг">
-            <BrandingForm branding={eff.branding} />
+            <BrandingForm branding={eff.branding} i18n={eff.i18n} translations={eff.contentI18n} />
             <ResetRow keys={[{ key: 'branding', label: 'Сбросить брендинг' }]} />
           </Section>
 
           <Section id="home" title="Главная страница">
-            <HomeContentForm home={eff.home} />
+            <HomeContentForm home={eff.home} i18n={eff.i18n} translations={eff.contentI18n} />
             <ResetRow keys={[{ key: 'home', label: 'Сбросить контент главной' }]} />
           </Section>
 
@@ -111,7 +111,12 @@ export default async function SettingsPage() {
           </Section>
 
           <Section id="contacts" title="Реквизиты и контакты">
-            <LegalContactsForm legalEntity={eff.legalEntity} contacts={eff.contacts} />
+            <LegalContactsForm
+              legalEntity={eff.legalEntity}
+              contacts={eff.contacts}
+              i18n={eff.i18n}
+              translations={eff.contentI18n}
+            />
             <ResetRow
               keys={[
                 { key: 'contacts', label: 'Сбросить контакты' },
@@ -152,7 +157,7 @@ export default async function SettingsPage() {
           </Section>
 
           <Section id="navigation" title="Навигация (меню и футер)">
-            <NavigationForm navigation={eff.navigation} />
+            <NavigationForm navigation={eff.navigation} i18n={eff.i18n} translations={eff.contentI18n} />
           </Section>
 
           <Section id="access" title="Доступ">

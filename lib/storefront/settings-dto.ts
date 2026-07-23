@@ -18,6 +18,9 @@
  */
 
 import type { EffectiveSettings } from '@/lib/config/settings';
+import { localizeStructured, isNonEmptyValue } from '@/lib/i18n';
+import { SETTINGS_TR_FIELDS } from '@/lib/settings/schemas';
+import type { LocalizeCtx } from './locale';
 
 /** Публичная социальная ссылка. */
 export interface PublicSocialDto {
@@ -201,6 +204,53 @@ export interface PublicSettingsDto {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
   };
+  /**
+   * Набор языков магазина (ключ i18n ∩ whitelist платформы). Контракт для витрины:
+   * выключение языка в админке убирает его отсюда — витрина рендерит переключатель
+   * только по этому набору. defaultLocale — язык базовых (непереведённых) полей.
+   */
+  i18n: {
+    defaultLocale: string;
+    locales: string[];
+  };
+}
+
+/**
+ * Точечная локализация ПЛОСКОГО ключа настроек по whitelist полей: непустое
+ * значение из патча перекрывает базу, всё непереводимое (телефон/почта/URL/цвета)
+ * остаётся нетронутым. `patch` — сырой per-locale-per-section фрагмент оверлея.
+ * Возвращает базу без клонирования, если накладывать нечего.
+ */
+function localizeFlat<T extends object>(
+  base: T,
+  patch: unknown,
+  fields: readonly string[],
+): T {
+  if (patch == null || typeof patch !== 'object') return base;
+  const p = patch as Record<string, unknown>;
+  let out: Record<string, unknown> | null = null;
+  for (const f of fields) {
+    if (isNonEmptyValue(p[f])) {
+      out ??= { ...base } as Record<string, unknown>;
+      out[f] = p[f];
+    }
+  }
+  return (out ?? base) as T;
+}
+
+/**
+ * Структурная локализация ключа настроек (home/navigation): deep-merge патча
+ * поверх базы (массивы по индексу) тем же движком, что и CMS-секции. Патч несёт
+ * только переводимые поля; imageKey/href/enabled в патче отсутствуют → база цела.
+ */
+function localizeStruct<T>(base: T, patch: unknown, loc: LocalizeCtx): T {
+  if (patch == null || typeof patch !== 'object') return base;
+  return localizeStructured(
+    base,
+    { [loc.locale]: patch as Record<string, unknown> },
+    loc.locale,
+    loc.defaultLocale,
+  ) as T;
 }
 
 /**
@@ -211,19 +261,36 @@ export interface PublicSettingsDto {
 export function toPublicSettingsDto(
   eff: EffectiveSettings,
   publicUrl: PublicUrlResolver = (k) => k,
+  loc?: LocalizeCtx,
 ): PublicSettingsDto {
+  // Оверлей переводов активен только для НЕ дефолтного языка. Иначе (loc не задан
+  // или запрошен язык-канон) — patch=undefined → все localize* возвращают базу без
+  // изменений: форма и значения DTO байт-в-байт как раньше (обратная совместимость).
+  const patch =
+    loc && loc.locale !== loc.defaultLocale
+      ? (eff.contentI18n[loc.locale] as Record<string, unknown> | undefined)
+      : undefined;
+
+  // 🔴 Локализуем БАЗОВЫЕ формы (home ещё с imageKey!) СТРОГО ДО резолва ключей в
+  // URL ниже — иначе deep-merge патча поехал бы по уже подменённым картинкам/ссылкам.
+  const branding = localizeFlat(eff.branding, patch?.branding, SETTINGS_TR_FIELDS.branding);
+  const seo = localizeFlat(eff.seo, patch?.seo, SETTINGS_TR_FIELDS.seo);
+  const contacts = localizeFlat(eff.contacts, patch?.contacts, SETTINGS_TR_FIELDS.contacts);
+  const home = loc ? localizeStruct(eff.home, patch?.home, loc) : eff.home;
+  const navigation = loc ? localizeStruct(eff.navigation, patch?.navigation, loc) : eff.navigation;
+
   return {
     branding: {
-      shopName: eff.branding.shopName,
-      logoUrl: eff.branding.logoUrl,
-      faviconUrl: eff.branding.faviconUrl,
+      shopName: branding.shopName,
+      logoUrl: branding.logoUrl,
+      faviconUrl: branding.faviconUrl,
       theme: {
-        primaryColor: eff.branding.theme.primaryColor,
-        accentColor: eff.branding.theme.accentColor,
-        mode: eff.branding.theme.mode,
+        primaryColor: branding.theme.primaryColor,
+        accentColor: branding.theme.accentColor,
+        mode: branding.theme.mode,
       },
-      supportEmail: eff.branding.supportEmail,
-      supportPhone: eff.branding.supportPhone,
+      supportEmail: branding.supportEmail,
+      supportPhone: branding.supportPhone,
     },
     currency: {
       code: eff.currency.code,
@@ -245,11 +312,11 @@ export function toPublicSettingsDto(
       system: eff.units.system,
     },
     contacts: {
-      phone: eff.contacts.phone ?? null,
-      email: eff.contacts.email ?? null,
-      address: eff.contacts.address ?? null,
-      workingHours: eff.contacts.workingHours ?? null,
-      socials: (eff.contacts.socials ?? []).map((s) => ({ type: s.type, url: s.url })),
+      phone: contacts.phone ?? null,
+      email: contacts.email ?? null,
+      address: contacts.address ?? null,
+      workingHours: contacts.workingHours ?? null,
+      socials: (contacts.socials ?? []).map((s) => ({ type: s.type, url: s.url })),
     },
     legalEntity: {
       name: eff.legalEntity.name ?? null,
@@ -269,47 +336,48 @@ export function toPublicSettingsDto(
       })),
     },
     seo: {
-      siteName: eff.seo.site_name ?? null,
-      siteUrl: eff.seo.site_url ?? null,
-      titleTemplate: eff.seo.title_template,
-      defaultDescription: eff.seo.default_description ?? null,
-      twitterSite: eff.seo.twitter_site ?? null,
+      siteName: seo.site_name ?? null,
+      siteUrl: seo.site_url ?? null,
+      titleTemplate: seo.title_template,
+      defaultDescription: seo.default_description ?? null,
+      twitterSite: seo.twitter_site ?? null,
       // default_og_image_key (ключ S3), robots_extra, noindex_site — НЕ наружу.
     },
     // home публичен; изображения отдаём как URL (ключи S3 наружу не раскрываем).
+    // Значения уже локализованы (см. `home` выше) ДО резолва ключей в URL.
     home: {
       hero: {
-        title: eff.home.hero.title,
-        subtitle: eff.home.hero.subtitle,
-        imageUrl: eff.home.hero.imageKey ? publicUrl(eff.home.hero.imageKey) : null,
-        ctaLabel: eff.home.hero.ctaLabel,
-        ctaHref: eff.home.hero.ctaHref,
+        title: home.hero.title,
+        subtitle: home.hero.subtitle,
+        imageUrl: home.hero.imageKey ? publicUrl(home.hero.imageKey) : null,
+        ctaLabel: home.hero.ctaLabel,
+        ctaHref: home.hero.ctaHref,
       },
       about: {
-        title: eff.home.about.title,
-        paragraphs: [...eff.home.about.paragraphs],
-        imageUrls: eff.home.about.imageKeys.map((k) => publicUrl(k)),
-        values: [...eff.home.about.values],
+        title: home.about.title,
+        paragraphs: [...home.about.paragraphs],
+        imageUrls: home.about.imageKeys.map((k) => publicUrl(k)),
+        values: [...home.about.values],
       },
-      quality: { title: eff.home.quality.title, items: [...eff.home.quality.items] },
-      delivery: { items: eff.home.delivery.items.map((i) => ({ ...i })) },
+      quality: { title: home.quality.title, items: [...home.quality.items] },
+      delivery: { items: home.delivery.items.map((i) => ({ ...i })) },
       valuesStrip: {
-        enabled: eff.home.valuesStrip.enabled,
-        items: eff.home.valuesStrip.items.map((i) => ({ ...i })),
+        enabled: home.valuesStrip.enabled,
+        items: home.valuesStrip.items.map((i) => ({ ...i })),
       },
-      philosophy: { ...eff.home.philosophy },
+      philosophy: { ...home.philosophy },
       looks: {
-        enabled: eff.home.looks.enabled,
-        title: eff.home.looks.title,
-        categories: eff.home.looks.categories.map((c) => ({
+        enabled: home.looks.enabled,
+        title: home.looks.title,
+        categories: home.looks.categories.map((c) => ({
           title: c.title,
           text: c.text,
           imageUrl: publicUrl(c.imageKey),
         })),
       },
       tiles: {
-        enabled: eff.home.tiles.enabled,
-        items: eff.home.tiles.items.map((t) => ({
+        enabled: home.tiles.enabled,
+        items: home.tiles.items.map((t) => ({
           title: t.title,
           href: t.href,
           imageUrl: publicUrl(t.imageKey),
@@ -317,13 +385,13 @@ export function toPublicSettingsDto(
       },
       // embedUrl уже публичный https-URL (провалидирован схемой) — проброс как есть.
       video: {
-        enabled: eff.home.video.enabled,
-        embedUrl: eff.home.video.embedUrl,
+        enabled: home.video.enabled,
+        embedUrl: home.video.embedUrl,
       },
       designers: {
-        enabled: eff.home.designers.enabled,
-        title: eff.home.designers.title,
-        items: eff.home.designers.items.map((d) => ({
+        enabled: home.designers.enabled,
+        title: home.designers.title,
+        items: home.designers.items.map((d) => ({
           name: d.name,
           href: d.href,
           avatarUrl: publicUrl(d.avatarImageKey),
@@ -333,8 +401,8 @@ export function toPublicSettingsDto(
         })),
       },
       slider: {
-        enabled: eff.home.slider.enabled,
-        slides: eff.home.slider.slides.map((sl) => ({
+        enabled: home.slider.enabled,
+        slides: home.slider.slides.map((sl) => ({
           imageUrl: publicUrl(sl.imageKey),
           href: sl.href,
           name: sl.name,
@@ -342,8 +410,8 @@ export function toPublicSettingsDto(
         })),
       },
       corpCert: {
-        enabled: eff.home.corpCert.enabled,
-        tiles: eff.home.corpCert.tiles.map((t) => ({
+        enabled: home.corpCert.enabled,
+        tiles: home.corpCert.tiles.map((t) => ({
           imageUrl: publicUrl(t.imageKey),
           href: t.href,
           title: t.title,
@@ -351,11 +419,15 @@ export function toPublicSettingsDto(
       },
     },
     navigation: {
-      header: eff.navigation.header.map((i) => ({ label: i.label, href: i.href })),
-      footer: eff.navigation.footer.map((c) => ({
+      header: navigation.header.map((i) => ({ label: i.label, href: i.href })),
+      footer: navigation.footer.map((c) => ({
         title: c.title,
         links: c.links.map((l) => ({ label: l.label, href: l.href })),
       })),
+    },
+    i18n: {
+      defaultLocale: eff.i18n.defaultLocale,
+      locales: [...eff.i18n.locales],
     },
   };
 }

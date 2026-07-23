@@ -48,6 +48,8 @@ import {
   SETTING_KEYS,
 } from '@/lib/settings/schemas';
 import { DEFAULT_LOCALE_CONFIG, parseLocaleConfig } from '@/lib/i18n/config';
+import { mergeTranslations } from '@/lib/i18n';
+import type { TranslationsMap } from '@/lib/i18n';
 import {
   upsertSetting as dbUpsertSetting,
   deleteSetting as dbDeleteSetting,
@@ -186,6 +188,34 @@ export const AccessInputSchema = z.object({ access: accessSchema });
  * handler — она зависит от текущего состояния БД, а не от формы ввода.
  */
 export const I18nInputSchema = z.object({ i18n: i18nSchema });
+
+/** Секции настроек, доступные для перевода через оверлей content_i18n. */
+export const CONTENT_I18N_SECTIONS = [
+  'home',
+  'navigation',
+  'branding',
+  'seo',
+  'contacts',
+] as const;
+export type ContentI18nSection = (typeof CONTENT_I18N_SECTIONS)[number];
+
+/**
+ * Вход перевода настроек (волна 5, п.5 ТЗ): язык + секция + патч переводимых
+ * полей. locale нормализуется (trim + lower) — ключ оверлея совпадёт с тем, по
+ * которому DTO ищет перевод. patch — LOOSE (свободная структура, повторяющая
+ * форму базового ключа): строгую фильтрацию по whitelist делает форма (track C),
+ * а read-path точечно накладывает только переводимые поля. Пустой патч допустим —
+ * действие мержит его как есть (сохранение соседних секций/языков не затрагивается).
+ */
+export const ContentI18nInputSchema = z.object({
+  locale: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/, 'Код языка вида «ru», «en», «pt-br»'),
+  section: z.enum(CONTENT_I18N_SECTIONS),
+  patch: z.record(z.string(), z.unknown()),
+});
 
 /**
  * Вход загрузки изображения настроек: kind (logo|favicon|og) + байты файла.
@@ -803,6 +833,45 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     },
   });
 
+  /**
+   * Перевод настроек (ключ content_i18n). Мержит патч ОДНОЙ секции в ОДИН язык
+   * оверлея через mergeTranslations — переводы других языков и других секций не
+   * затрагиваются (mergeTranslations трактует секцию как «поле» карты locale→...).
+   *
+   * ОТДЕЛЬНЫЙ ключ настроек: базовые формы (branding/seo/home/...) хранятся
+   * независимо, их сохранение переводы не трогает и наоборот. Значение content_i18n
+   * — LOOSE (см. contentI18nSchema): один битый язык не роняет остальные переводы.
+   */
+  const updateContentI18n = defineAction({
+    permission: 'settings.manage',
+    input: ContentI18nInputSchema,
+    deps: actionDeps,
+    handler: async (data, ctx: ActionCtx) => {
+      const before = await deps.getSetting('content_i18n');
+      // LOOSE-парс: гарантирует объект-карту (битый верхний уровень → {}), не роняя
+      // существующие переводы. Секция целиком замещается новым патчем (как home).
+      const existing = (parseSettingValue('content_i18n', before?.value) ??
+        {}) as TranslationsMap;
+      const next = mergeTranslations(existing, data.locale, {
+        [data.section]: data.patch,
+      });
+      const row = await deps.upsertSetting('content_i18n', next, ctx.user.id);
+      deps.invalidateCache();
+      return {
+        result: { key: 'content_i18n' as const, locale: data.locale, section: data.section },
+        // Перевод виден на витрине (тексты настроек) и в форме настроек админки.
+        revalidate: [SETTINGS_PATH, ...STOREFRONT_PATHS],
+        audit: {
+          action: 'settings.content_i18n.update',
+          entityType: 'shop_settings',
+          entityId: 'content_i18n',
+          before: before?.value,
+          after: row.value,
+        },
+      };
+    },
+  });
+
   const resetSetting = defineAction({
     permission: 'settings.manage',
     input: ResetSettingInputSchema,
@@ -836,6 +905,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     updateNavigationAction,
     updateAccessSettings,
     updateI18nSettings,
+    updateContentI18n,
     uploadSettingsImageAction,
     uploadStoreImageAction,
     refreshExchangeRates,

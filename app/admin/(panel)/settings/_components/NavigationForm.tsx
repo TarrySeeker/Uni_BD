@@ -5,11 +5,14 @@ import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
+import type { TranslationsMap } from '@/lib/i18n';
 
 import { parseNavigationFormState } from '@/lib/settings/nav-form';
 import { updateNavigationContentAction } from './form-actions';
 import { errorMessage } from './action-result';
 import { ResetSettingButton } from './ResetSettingButton';
+import { SettingsTranslationTabs } from './SettingsTranslationTabs';
+import { buildNavigationTrFieldDefs } from './content-i18n-form-state';
 
 /**
  * C6 — форма «Навигация» (меню шапки и колонки футера витрины, G-10/G-11).
@@ -39,10 +42,17 @@ function footerToText(footer: EffectiveSettings['navigation']['footer']): string
 
 export function NavigationForm({
   navigation,
+  i18n,
+  translations,
 }: {
   navigation: EffectiveSettings['navigation'];
+  i18n: { defaultLocale: string; locales: string[] };
+  translations?: TranslationsMap;
 }) {
   const router = useRouter();
+  // Дескрипторы переводимых меток разворачиваются по фактической навигации
+  // (пункты шапки + заголовки/ссылки колонок футера); href не переводится.
+  const trFields = buildNavigationTrFieldDefs(navigation as unknown as Record<string, unknown>);
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -71,6 +81,13 @@ export function NavigationForm({
   const hintCls = 'mt-1 text-xs text-gray-500';
 
   return (
+    <SettingsTranslationTabs
+      section="navigation"
+      fields={trFields}
+      locales={i18n.locales}
+      defaultLocale={i18n.defaultLocale}
+      translations={translations}
+    >
     <div>
       {error ? (
         <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -123,5 +140,6 @@ export function NavigationForm({
         <ResetSettingButton settingKey="navigation" label="Сбросить навигацию" />
       </div>
     </div>
+    </SettingsTranslationTabs>
   );
 }

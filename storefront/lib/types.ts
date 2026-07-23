@@ -492,4 +492,15 @@ export interface PublicSettingsDto {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
   };
+  /**
+   * Набор языков магазина (ключ i18n ∩ whitelist платформы). Контракт трека A:
+   * выключение языка в админке убирает его из `locales` — витрина рендерит
+   * переключатель/hreflang только по этому набору (см. enabledLocalesFrom).
+   * defaultLocale — язык базовых (непереведённых) полей, живёт на корне без префикса.
+   * Опционально для устойчивости к старым ответам API без поля (тогда fail-open).
+   */
+  i18n?: {
+    defaultLocale: string;
+    locales: string[];
+  };
 }

@@ -711,6 +711,63 @@ export function resolveGiftSettings(raw: unknown): ResolvedGiftSettings {
 }
 
 // -----------------------------------------------------------------------------
+/**
+ * content_i18n — оверлей ПЕРЕВОДОВ настроек магазина (волна 5, п.5 ТЗ).
+ *
+ * Значение = карта `{ [localeTag]: patch }`, где patch повторяет структуру
+ * базовых ключей настроек (home/navigation/branding/seo/contacts), но несёт
+ * ТОЛЬКО переводимые поля (см. SETTINGS_TR_FIELDS). Базовый язык (defaultLocale)
+ * в оверлей не кладётся — его текст живёт в самих ключах настроек. Отсутствие
+ * ключа/пустой объект `{}` → оверлея нет → DTO отдаёт базовый язык байт-в-байт
+ * (обратная совместимость).
+ *
+ * 🔴 СХЕМА НАМЕРЕННО LOOSE (`z.record(string, unknown)`). Строгая валидация
+ * внутренних полей уронила бы ВЕСЬ ключ на null при малейшем несовпадении формы
+ * (класс дефекта exchange/gift: parseSettingValue → null → раздел молча падает на
+ * дефолты). Здесь один битый язык/патч не должен уносить переводы остальных —
+ * read-path (localizeStructured/deepMerge + точечный merge по whitelist) сам
+ * безопасно накладывает патч и игнорирует мусор. Единственное жёсткое требование —
+ * верхний уровень обязан быть объектом-картой.
+ */
+export const contentI18nSchema = z.record(z.string(), z.unknown());
+
+/**
+ * Переводимые поля ключей настроек — ЕДИНЫЙ источник правды (аналог lib/i18n/fields.ts)
+ * для read-path (toPublicSettingsDto) и админ-формы переводов (track C).
+ *
+ * Плоские ключи (branding/seo/contacts) — массивы имён полей: read-path
+ * накладывает перевод ТОЧЕЧНО по этому whitelist, чтобы патч не задел
+ * непереводимое (телефон/почта/логотип/URL/цвета). Структурные ключи
+ * (home/navigation) — вложенные дескрипторы: их контент локализуется ЦЕЛИКОМ
+ * через localizeStructured (deep-merge патча, массивы по индексу), а список полей
+ * служит контрактом для формы. Имена полей совпадают с базовыми схемами.
+ * НЕ включено принципиально: href/url/imageKey/embedUrl/theme/enabled/noindex/
+ * phone/email/socials/slug/id/числа/цвета/булевы — это идентификаторы, не текст.
+ */
+export const SETTINGS_TR_FIELDS = {
+  branding: ['shopName'],
+  seo: ['site_name', 'title_template', 'default_description'],
+  contacts: ['address', 'workingHours'],
+  home: {
+    hero: ['title', 'subtitle', 'ctaLabel'],
+    about: ['title', 'paragraphs', 'values'],
+    quality: ['title', 'items'],
+    delivery: ['items.title', 'items.text'],
+    valuesStrip: ['items.title', 'items.text'],
+    philosophy: ['eyebrow', 'title', 'text', 'linkLabel'],
+    looks: ['title', 'categories.title', 'categories.text'],
+    tiles: ['items.title'],
+    designers: ['title', 'items.name'],
+    slider: ['slides.name', 'slides.caption'],
+    corpCert: ['tiles.title'],
+  },
+  navigation: {
+    header: ['label'],
+    footer: ['title', 'links.label'],
+  },
+} as const;
+
+// -----------------------------------------------------------------------------
 // Реестр ключ → схема. Единственный источник правды о наборе ключей настроек.
 // -----------------------------------------------------------------------------
 
@@ -732,6 +789,7 @@ export const SETTING_KEYS = [
   'access',
   'i18n',
   'gift',
+  'content_i18n',
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -754,6 +812,7 @@ export const SETTING_SCHEMAS = {
   access: accessSchema,
   i18n: i18nSchema,
   gift: giftSettingsSchema,
+  content_i18n: contentI18nSchema,
 } as const satisfies Record<SettingKey, z.ZodTypeAny>;
 
 // Типы значений по ключам (выводятся из схем).
@@ -781,6 +840,8 @@ export type AccessSettings = z.infer<typeof accessSchema>;
 export type GiftSettings = z.infer<typeof giftSettingsSchema>;
 /** Набор языков магазина (значение ключа i18n). */
 export type I18nSettings = z.infer<typeof i18nSchema>;
+/** Оверлей переводов настроек (значение ключа content_i18n): карта locale → патч. */
+export type ContentI18nSettings = z.infer<typeof contentI18nSchema>;
 
 /**
  * Безопасный парс значения по ключу. Возвращает провалидированный частичный

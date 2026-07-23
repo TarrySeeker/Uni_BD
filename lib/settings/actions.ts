@@ -48,6 +48,14 @@ export async function updateI18nSettings(raw: unknown) {
 }
 
 /**
+ * Перевод настроек магазина (ключ content_i18n): язык + секция + патч переводимых
+ * полей. Право — settings.manage. Мержит один язык/секцию, не затирая остальные.
+ */
+export async function updateContentI18n(raw: unknown) {
+  return prod.updateContentI18n(raw);
+}
+
+/**
  * Загрузка изображения настроек (logo|favicon|og) из FormData. Фабричный action
  * сам извлекает kind/байты из FormData и валидирует magic-bytes/нормализует в
  * webp/пишет URL (logo,favicon) или S3-ключ (og)/audit.

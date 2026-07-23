@@ -19,7 +19,7 @@
 
 import type { Metadata } from 'next';
 import { getNewProducts, getSettings } from '@/lib/api';
-import { localizedHref, toLocale, LOCALES, localePrefix } from '@/lib/i18n';
+import { localizedHref, toLocale, DEFAULT_LOCALE, localePrefix } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import ProductCard from './components/ProductCard';
 import { PromoSlider } from './components/PromoSlider';
@@ -40,8 +40,10 @@ function isSafeHref(href: string): boolean {
   return (href.startsWith('/') && !href.startsWith('//')) || /^https:\/\//i.test(href);
 }
 
+// Пререндерим только дефолтную локаль; en/fr — динамически (force-dynamic выше),
+// т.к. набор включённых языков известен лишь в рантайме (настройки магазина).
 export function generateStaticParams() {
-  return LOCALES.map((lang) => ({ lang }));
+  return [{ lang: DEFAULT_LOCALE }];
 }
 
 export async function generateMetadata({

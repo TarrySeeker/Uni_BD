@@ -20,7 +20,6 @@ import { useCart } from '@/lib/cart';
 import { useFavorites } from '@/lib/favorites';
 import { useCurrency } from '@/lib/currency';
 import {
-  LOCALES,
   LOCALE_LABELS,
   localizedHref,
   switchLocalePath,
@@ -33,6 +32,11 @@ interface Props {
   categories: CategoryDto[];
   settings: PublicSettingsDto | null;
   locale: Locale;
+  /**
+   * ВКЛЮЧЁННЫЕ языки магазина (enabled-набор из настроек, волна 5). Переключатель
+   * рендерится ТОЛЬКО по ним — выключенный в админке язык сюда не попадает.
+   */
+  enabledLocales: Locale[];
   dict: Dictionary;
 }
 
@@ -103,7 +107,13 @@ function MenuNode({
   );
 }
 
-export default function SiteHeader({ categories, settings, locale, dict }: Props) {
+export default function SiteHeader({
+  categories,
+  settings,
+  locale,
+  enabledLocales,
+  dict,
+}: Props) {
   const { count, mounted } = useCart();
   const { count: favCount, mounted: favMounted } = useFavorites();
   const { currencies, selected, setCurrency } = useCurrency();
@@ -169,7 +179,7 @@ export default function SiteHeader({ categories, settings, locale, dict }: Props
           {/* Переключатель языка — ведёт на тот же путь с новым префиксом локали. */}
           <div className="page-head-settings__item">
             <div className="page-head-settings__dd">
-              {LOCALES.map((l) => (
+              {enabledLocales.map((l) => (
                 <a
                   key={l}
                   href={langHref(l)}
@@ -259,7 +269,7 @@ export default function SiteHeader({ categories, settings, locale, dict }: Props
           <div className="page-menu-footer-item">
             <div className="mm-row">
               <div className="mm-langs">
-                {LOCALES.map((l) => (
+                {enabledLocales.map((l) => (
                   <a
                     key={l}
                     href={langHref(l)}

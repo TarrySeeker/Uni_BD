@@ -5,10 +5,13 @@ import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
+import type { TranslationsMap } from '@/lib/i18n';
 
 import { updateShopSeoAction } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
 import { SettingsImageUpload } from './BrandingForm';
+import { SettingsTranslationTabs } from './SettingsTranslationTabs';
+import { SEO_TR_FIELD_DEFS } from './content-i18n-form-state';
 
 /**
  * Форма SEO-настроек магазина (docs/11 §5.3.5): site_name, site_url,
@@ -19,7 +22,15 @@ import { SettingsImageUpload } from './BrandingForm';
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
-export function SeoSettingsForm({ seo }: { seo: EffectiveSettings['seo'] }) {
+export function SeoSettingsForm({
+  seo,
+  i18n,
+  translations,
+}: {
+  seo: EffectiveSettings['seo'];
+  i18n: { defaultLocale: string; locales: string[] };
+  translations?: TranslationsMap;
+}) {
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -64,6 +75,13 @@ export function SeoSettingsForm({ seo }: { seo: EffectiveSettings['seo'] }) {
   const labelCls = 'block text-sm font-medium text-gray-700';
 
   return (
+    <SettingsTranslationTabs
+      section="seo"
+      fields={SEO_TR_FIELD_DEFS}
+      locales={i18n.locales}
+      defaultLocale={i18n.defaultLocale}
+      translations={translations}
+    >
     <div>
       {error ? (
         <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -133,5 +151,6 @@ export function SeoSettingsForm({ seo }: { seo: EffectiveSettings['seo'] }) {
         </button>
       </div>
     </div>
+    </SettingsTranslationTabs>
   );
 }

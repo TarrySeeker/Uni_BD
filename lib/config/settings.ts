@@ -38,6 +38,8 @@ import {
   resolveMasterColors,
   type MasterColor,
 } from '@/lib/catalog/master-colors';
+import { DEFAULT_LOCALE_CONFIG, parseLocaleConfig } from '@/lib/i18n/config';
+import type { TranslationsMap } from '@/lib/i18n';
 import { HOME_DEFAULTS, type HomeContent } from '@/lib/config/home-defaults';
 import { toMinor } from '@/lib/orders/money';
 import { getAllSettings, type SettingRow } from '@/lib/settings/repository';
@@ -173,6 +175,22 @@ export interface EffectiveSettings {
    */
   access: {
     singleUserMode: boolean;
+  };
+  /**
+   * Сырой оверлей ПЕРЕВОДОВ настроек (ключ content_i18n): карта locale → патч
+   * переводимых полей (home/navigation/branding/seo/contacts). Loose (см. схему):
+   * битый патч не роняет оверлей. Пустой объект = переводов нет → DTO отдаёт
+   * базовый язык байт-в-байт. Локализация накладывается в toPublicSettingsDto.
+   */
+  contentI18n: TranslationsMap;
+  /**
+   * Набор языков магазина (ключ i18n ∩ whitelist платформы ru/en/fr). Контракт
+   * для витрины: выключение языка в админке убирает его из этого набора, и витрина
+   * перестаёт его показывать. defaultLocale — язык базовых полей (канон контента).
+   */
+  i18n: {
+    defaultLocale: string;
+    locales: string[];
   };
 }
 
@@ -383,6 +401,24 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
   // module_overrides — мягкий парс (.strip): кривая строка БД → {} (нет оверрайда).
   const moduleOverrides: ModuleOverrides =
     parseSettingValue('module_overrides', rows.get('module_overrides')) ?? {};
+  // content_i18n — LOOSE-оверлей переводов (см. схему): битый патч → берётся как
+  // есть, но верхний уровень обязан быть картой; иначе → {} (переводов нет).
+  const contentI18n = (parseSettingValue('content_i18n', rows.get('content_i18n')) ??
+    {}) as TranslationsMap;
+  // i18n — набор языков магазина из той же строки БД (parseLocaleConfig — чистый,
+  // без обращения к БД). enabled-набор = пересечение конфига с whitelist платформы
+  // (ru/en/fr): выключенный/неизвестный язык не попадает на витрину. defaultLocale
+  // всегда остаётся в наборе (канон базовых полей).
+  const localeCfg = parseLocaleConfig(rows.get('i18n'));
+  const enabledLocales = localeCfg.locales.filter((l) =>
+    DEFAULT_LOCALE_CONFIG.locales.includes(l),
+  );
+  const i18n = {
+    defaultLocale: localeCfg.defaultLocale,
+    locales: enabledLocales.includes(localeCfg.defaultLocale)
+      ? enabledLocales
+      : [localeCfg.defaultLocale, ...enabledLocales],
+  };
 
   return {
     branding: {
@@ -471,6 +507,8 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
       // выключен (другие магазины не затронуты без явного включения).
       singleUserMode: access.singleUserMode ?? false,
     },
+    contentI18n,
+    i18n,
   };
 }
 

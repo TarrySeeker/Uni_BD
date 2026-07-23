@@ -5,10 +5,13 @@ import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
+import type { TranslationsMap } from '@/lib/i18n';
 
 import { updateHomeContentAction } from './form-actions';
 import { errorMessage } from './action-result';
 import { ImageUploadButton } from './ImageUploadButton';
+import { SettingsTranslationTabs } from './SettingsTranslationTabs';
+import { buildHomeTrFieldDefs } from './content-i18n-form-state';
 
 /**
  * Форма «Главная страница» (ADR-018, закрывает G-02/G-03): редактируемый контент
@@ -41,8 +44,19 @@ function pairsToArr(text: string): { title: string; text: string }[] {
     .filter((x): x is { title: string; text: string } => x !== null);
 }
 
-export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
+export function HomeContentForm({
+  home,
+  i18n,
+  translations,
+}: {
+  home: EffectiveSettings['home'];
+  i18n: { defaultLocale: string; locales: string[] };
+  translations?: TranslationsMap;
+}) {
   const router = useRouter();
+  // Дескрипторы переводимых полей разворачиваются по фактической длине базовых
+  // массивов «главной» (read-path мержит перевод по индексу).
+  const trFields = buildHomeTrFieldDefs(home as unknown as Record<string, unknown>);
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -335,6 +349,13 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
   const hintCls = 'mt-1 text-xs text-gray-500';
 
   return (
+    <SettingsTranslationTabs
+      section="home"
+      fields={trFields}
+      locales={i18n.locales}
+      defaultLocale={i18n.defaultLocale}
+      translations={translations}
+    >
     <div>
       {error ? (
         <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -870,5 +891,6 @@ export function HomeContentForm({ home }: { home: EffectiveSettings['home'] }) {
         </button>
       </div>
     </div>
+    </SettingsTranslationTabs>
   );
 }

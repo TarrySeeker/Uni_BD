@@ -38,7 +38,7 @@ export default async function SeoSettingsPage() {
       />
 
       <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <SeoSettingsForm seo={eff.seo} />
+        <SeoSettingsForm seo={eff.seo} i18n={eff.i18n} translations={eff.contentI18n} />
       </section>
     </div>
   );

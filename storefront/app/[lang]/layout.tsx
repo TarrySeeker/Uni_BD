@@ -14,11 +14,19 @@
 
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { getCategories, getSettings } from '@/lib/api';
 import { rootCategories, topLevelCategories } from '@/lib/tree';
 import { siteTitle } from '@/lib/seo';
 import { CurrencyProvider } from '@/lib/currency';
-import { HTML_LANG, LOCALES, toLocale } from '@/lib/i18n';
+import {
+  HTML_LANG,
+  DEFAULT_LOCALE,
+  toLocale,
+  enabledLocalesFrom,
+  switchLocalePath,
+} from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
@@ -54,9 +62,13 @@ export async function generateMetadata({
   };
 }
 
-/** Пререндер сегмента локали для всех трёх языков. */
+/**
+ * Пререндерим только дефолтную локаль: набор ВКЛЮЧЁННЫХ языков известен лишь в
+ * рантайме (из настроек магазина, force-dynamic за запрос), а нефиксированный
+ * список менять на этапе сборки нельзя. en/fr рендерятся динамически (dynamicParams).
+ */
 export function generateStaticParams() {
-  return LOCALES.map((lang) => ({ lang }));
+  return [{ lang: DEFAULT_LOCALE }];
 }
 
 export default async function RootLayout({
@@ -74,6 +86,21 @@ export default async function RootLayout({
     getSettings(locale),
     getCategories(locale),
   ]);
+
+  // Связка с настройкой языков (волна 5): enabled-набор = включённые в админке
+  // языки ∩ whitelist витрины. Если запрошенный язык выключен (нет в наборе) и это
+  // НЕ дефолт — уводим ВРЕМЕННЫМ редиректом на тот же путь дефолтной локали.
+  // 🔴 Именно временный 307 (redirect), а НЕ постоянный 301: 301 закрепил бы
+  // /en→/ в кэшах навсегда, а язык могут снова включить. Дефолт не редиректится
+  // (он всегда в наборе). Настройки недоступны → enabledLocalesFrom fail-open
+  // вернёт весь whitelist → редиректа нет (включение работает лишь по реальному
+  // набору из админки).
+  const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
+  if (locale !== DEFAULT_LOCALE && !enabledLocales.includes(locale)) {
+    const pathname = (await headers()).get('x-pathname') ?? `/${locale}`;
+    redirect(switchLocalePath(pathname, DEFAULT_LOCALE));
+  }
+
   // Меню шапки — оба корня со всей вложенностью; футер — группы каталога.
   const menuRoots = rootCategories(categories);
   const footerCats = topLevelCategories(categories);
@@ -91,6 +118,7 @@ export default async function RootLayout({
             categories={menuRoots}
             settings={settings}
             locale={locale}
+            enabledLocales={enabledLocales}
             dict={dict}
           />
 

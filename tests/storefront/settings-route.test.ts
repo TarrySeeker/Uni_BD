@@ -20,6 +20,8 @@ function fakeEffective(): EffectiveSettings {
     access: { singleUserMode: false },
     home: HOME_DEFAULTS,
     navigation: { header: [], footer: [] },
+    contentI18n: {},
+    i18n: { defaultLocale: 'ru', locales: ['ru', 'en', 'fr'] },
     branding: {
       shopName: 'Demo Shop',
       logoUrl: null,
@@ -48,6 +50,13 @@ async function loadRoute() {
   vi.doMock('@/lib/config/settings', () => ({
     getEffectiveSettings: vi.fn(async () => fakeEffective()),
   }));
+  // resolveStorefrontLocale → getLocaleConfig() читает shop_settings.i18n через
+  // репозиторий: отдаём детерминированную конфигурацию вместо обращения к БД.
+  vi.doMock('@/lib/settings/repository', () => ({
+    getSetting: vi.fn(async () => ({
+      value: { defaultLocale: 'ru', locales: ['ru', 'en', 'fr'] },
+    })),
+  }));
   return import('@/app/api/storefront/v1/settings/route');
 }
 
@@ -61,6 +70,7 @@ describe('GET /api/storefront/v1/settings — core-always-on', () => {
     process.env.STOREFRONT_API_KEYS = ORIGINAL_KEYS;
     process.env.STOREFRONT_ALLOWED_ORIGINS = ORIGINAL_ORIGINS;
     vi.doUnmock('@/lib/config/settings');
+    vi.doUnmock('@/lib/settings/repository');
     vi.resetModules();
   });
 

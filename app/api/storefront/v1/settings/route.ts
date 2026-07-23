@@ -10,6 +10,7 @@
 import { runStorefront, jsonData, handlePreflight } from '@/lib/storefront/response';
 import { getEffectiveSettings } from '@/lib/config/settings';
 import { toPublicSettingsDto } from '@/lib/storefront/settings-dto';
+import { resolveStorefrontLocale } from '@/lib/storefront/locale';
 import { getStorage } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -19,10 +20,21 @@ export async function GET(req: Request): Promise<Response> {
     req,
     async ({ cors }) => {
       const eff = await getEffectiveSettings();
+      // Резолв языка запроса (?locale= → Accept-Language → default), fail-safe.
+      // Тексты настроек локализуются оверлеем content_i18n; defaultLocale берём из
+      // эффективных настроек (единый источник, whitelist уже применён).
+      const { locale } = await resolveStorefrontLocale(req);
       // Изображения главной (home.*) отдаём как публичные URL: ключи S3 наружу
       // не раскрываем (инвариант, зеркально каталог-медиа/CMS).
       const storage = getStorage();
-      return jsonData(toPublicSettingsDto(eff, (k) => storage.url(k)), {}, cors);
+      return jsonData(
+        toPublicSettingsDto(eff, (k) => storage.url(k), {
+          locale,
+          defaultLocale: eff.i18n.defaultLocale,
+        }),
+        {},
+        cors,
+      );
     },
     { module: null },
   );
