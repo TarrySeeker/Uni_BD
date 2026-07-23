@@ -45,13 +45,13 @@ function toLocalInput(d: Date | null): string {
  */
 export function GiftCertificateForm({
   cert,
-  locales = ['ru'],
-  defaultLocale = 'ru',
+  locales,
+  defaultLocale,
 }: {
   /** null — режим выпуска; иначе — редактирование. */
   cert: GiftCertificate | null;
-  locales?: readonly string[];
-  defaultLocale?: string;
+  locales: readonly string[];
+  defaultLocale: string;
 }) {
   const router = useRouter();
   const isEdit = cert !== null;
@@ -176,7 +176,8 @@ export function GiftCertificateForm({
         fields={GIFT_TR_FIELD_DEFS}
         value={translations}
         onChange={setTranslations}
-        enabled={isEdit}
+        mode={isEdit ? 'edit' : 'create'}
+        supportsCreateTranslations
         pending={pending}
         onSave={save}
       >

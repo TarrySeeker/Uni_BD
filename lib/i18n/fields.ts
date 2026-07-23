@@ -62,3 +62,26 @@ export const CMS_PAGE_TR_FIELDS = [
   'ogTitle',
   'ogDescription',
 ] as const;
+
+/**
+ * ТЕЛО CMS-страницы — секции (cms_page_sections), whitelist ПО ТИПУ секции (T5).
+ *
+ * Контент секции структурный, поэтому оверлей — не плоская карта строк, а ПАТЧ
+ * content: read-path (lib/storefront/cms-dto) deep-merge'ит translations[locale]
+ * поверх базового content через localizeStructured. Ключи ниже — верхнеуровневые
+ * ключи content; `items` (faq) и `images` (gallery) переводятся структурно —
+ * по индексу элемента (q/a и alt соответственно), см. lib/cms/section-i18n.
+ *
+ * Непереводимо принципиально: дискриминатор type, ссылки (ctaHref/href/buttonHref),
+ * ключи хранилища (imageKey) и машинный фильтр подборки (mode/limit/slugs/*Slug) —
+ * это идентификаторы, а не текст; их перевод ломал бы ссылки и выдачу товаров.
+ */
+export const CMS_SECTION_TR_FIELDS: Record<string, readonly string[]> = {
+  hero: ['title', 'subtitle', 'html', 'ctaLabel'],
+  text: ['html'],
+  banner: ['alt'],
+  products_grid: ['title'],
+  faq: ['items'],
+  cta: ['title', 'html', 'buttonLabel'],
+  gallery: ['images'],
+};

@@ -2,6 +2,17 @@
 
 import { useState, type ReactNode } from 'react';
 
+import {
+  resolveLocaleTabsState,
+  type LocaleTabsMode,
+} from './locale-tabs-state';
+
+export {
+  resolveLocaleTabsState,
+  type LocaleTabsMode,
+  type LocaleTabsState,
+} from './locale-tabs-state';
+
 /**
  * Переключатель языков + пополевой ввод переводов на форме сущности
  * (ADR-i18n, docs/24 §1, инкремент 2b).
@@ -13,9 +24,10 @@ import { useState, type ReactNode } from 'react';
  * уходят в Server Action блоком translations (mergeTranslations пишет ТОЛЬКО
  * переданный язык; база ru остаётся в обычных колонках).
  *
- * Универсально/мультитенантно: набор языков и поля приходят пропсами; при одном
- * языке (или в режиме создания) панель переводов не показывается — форма выглядит
- * ровно как раньше.
+ * Универсально/мультитенантно: набор языков и поля приходят пропсами. Если вкладок
+ * нет (один язык магазина или экран создания сущности, чьё create-действие не
+ * принимает translations) — вместо тишины показывается видимое объяснение,
+ * см. resolveLocaleTabsState.
  */
 
 /** Описание одного переводимого поля (ключ + подпись + вид ввода). */
@@ -41,7 +53,8 @@ export function LocaleTabs({
   fields,
   value,
   onChange,
-  enabled = true,
+  mode,
+  supportsCreateTranslations = false,
   pending = false,
   onSave,
   disabled = false,
@@ -57,8 +70,10 @@ export function LocaleTabs({
   value: TranslationsState;
   /** Изменение состояния переводов. */
   onChange: (next: TranslationsState) => void;
-  /** Показывать ли панель переводов (обычно isEdit). */
-  enabled?: boolean;
+  /** Режим формы: создание или редактирование (влияет на доступность переводов). */
+  mode: LocaleTabsMode;
+  /** Принимает ли create-действие сущности блок translations (по факту Zod-схемы). */
+  supportsCreateTranslations?: boolean;
   /** Идёт ли сохранение. */
   pending?: boolean;
   /** Сохранить перевод (обычно тот же обработчик, что и базовое сохранение). */
@@ -69,12 +84,30 @@ export function LocaleTabs({
   children: ReactNode;
 }) {
   const [active, setActive] = useState<string>(defaultLocale);
-  const others = locales.filter((l) => l !== defaultLocale);
+  const state = resolveLocaleTabsState({
+    locales,
+    defaultLocale,
+    mode,
+    supportsCreateTranslations,
+  });
 
-  // Один язык или панель выключена → форма без изменений (обратная совместимость).
-  if (!enabled || others.length === 0) {
-    return <>{children}</>;
+  // Вкладок нет — пользователь обязан видеть ПОЧЕМУ (иначе решает, что перевода в
+  // системе не существует).
+  if (state.kind === 'notice') {
+    return (
+      <div>
+        <p
+          role="note"
+          className="mb-4 rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"
+        >
+          {state.text}
+        </p>
+        {children}
+      </div>
+    );
   }
+
+  const tabs = state.tabs;
 
   function setField(locale: string, key: string, v: string) {
     onChange({
@@ -82,8 +115,6 @@ export function LocaleTabs({
       [locale]: { ...(value[locale] ?? {}), [key]: v },
     });
   }
-
-  const tabs = [defaultLocale, ...others];
 
   return (
     <div>
@@ -118,6 +149,9 @@ export function LocaleTabs({
             Перевод для языка <strong>{active.toUpperCase()}</strong>. Пустое поле —
             на витрине показывается основной ({defaultLocale.toUpperCase()}) текст.
             Основные значения редактируются на вкладке «{defaultLocale.toUpperCase()} · основной».
+            {mode === 'create'
+              ? ' Перевод сохранится вместе с созданием записи.'
+              : null}
           </p>
 
           <div className="grid grid-cols-1 gap-4">
@@ -160,7 +194,11 @@ export function LocaleTabs({
                 disabled={pending}
                 className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
               >
-                {pending ? 'Сохранение…' : 'Сохранить перевод'}
+                {pending
+                  ? 'Сохранение…'
+                  : mode === 'create'
+                    ? 'Создать и сохранить перевод'
+                    : 'Сохранить перевод'}
               </button>
             </div>
           ) : null}

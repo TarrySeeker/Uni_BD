@@ -187,6 +187,10 @@ export const CmsSectionInputSchema = z.object({
   content: CmsSectionContentSchema,
   displayOrder: z.number().int().min(0).default(0),
   enabled: z.boolean().default(true),
+  // Перевод ТЕЛА страницы (T5): { [locale]: { [field]: string } } — плоские строки
+  // формы. Структурный патч content собирает СЕРВЕР (lib/cms/section-i18n,
+  // resolveSectionTranslationsUpdate): форму JSONB-оверлея клиенту не доверяем.
+  translations: translationsBlockSchema,
 });
 
 /** Reorder секций страницы (Server Action reorderCmsSections). */

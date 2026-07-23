@@ -28,6 +28,10 @@ import {
 import { CmsError } from './errors';
 import { slugifyOrFallback, uniquifySlug } from './slug';
 import { sanitizeSectionContent } from './sanitize-section';
+import {
+  resolveSectionTranslationsUpdate,
+  existingSectionTranslations,
+} from './section-i18n';
 
 /**
  * Server Actions подсистемы CMS (docs/11 §5.1.3, пакет 5.C-2, ADR-012).
@@ -365,16 +369,46 @@ export const upsertCmsSection = defineAction({
     // type берём из дискриминированного content (единый источник правды).
     const type = safeContent.type;
 
+    // Перевод ТЕЛА страницы (T5): оверлей секции — структурный патч content,
+    // симметричный read-path (localizeStructured в lib/storefront/cms-dto).
+    // Предыдущее состояние нужно, чтобы не затереть перевод соседнего языка;
+    // при СМЕНЕ типа секции старый патч невалиден и сбрасывается.
+    const prev = await sql<{ type: string; translations: unknown }[]>`
+      SELECT type, translations FROM cms_page_sections
+       WHERE page_id = ${data.pageId} AND section_key = ${data.sectionKey}
+       LIMIT 1
+    `;
+    const typeChanged = prev[0] ? prev[0].type !== type : false;
+    const localeConfig = await getLocaleConfig();
+    const tr = resolveSectionTranslationsUpdate(
+      type,
+      data.translations,
+      existingSectionTranslations(
+        prev[0]?.type,
+        type,
+        prev[0]?.translations as TranslationsMap | null,
+      ),
+      localeConfig,
+    );
+    // Колонку трогаем, только если переводы реально пришли (или устарели из-за
+    // смены типа) — иначе параллельная правка перевода была бы затёрта снимком.
+    const writeTranslations = tr.provided || typeChanged;
+
     const rows = await sql<{ id: string }[]>`
       INSERT INTO cms_page_sections
-        (page_id, section_key, type, content, display_order, enabled)
+        (page_id, section_key, type, content, translations, display_order, enabled)
       VALUES (
         ${data.pageId}, ${data.sectionKey}, ${type},
-        ${sql.json(safeContent as unknown as Record<string, never>)}, ${data.displayOrder}, ${data.enabled}
+        ${sql.json(safeContent as unknown as Record<string, never>)},
+        ${sql.json(tr.value as unknown as Record<string, never>)},
+        ${data.displayOrder}, ${data.enabled}
       )
       ON CONFLICT (page_id, section_key) DO UPDATE SET
         type          = EXCLUDED.type,
         content       = EXCLUDED.content,
+        translations  = CASE WHEN ${writeTranslations}
+                             THEN EXCLUDED.translations
+                             ELSE cms_page_sections.translations END,
         display_order = EXCLUDED.display_order,
         enabled       = EXCLUDED.enabled,
         updated_at    = now()
@@ -388,7 +422,12 @@ export const upsertCmsSection = defineAction({
         action: 'cms.section.upsert',
         entityType: 'cms_page_section',
         entityId: rows[0]!.id,
-        after: { pageId: data.pageId, sectionKey: data.sectionKey, type },
+        after: {
+          pageId: data.pageId,
+          sectionKey: data.sectionKey,
+          type,
+          translationLocales: Object.keys(tr.value),
+        },
       },
     };
   },

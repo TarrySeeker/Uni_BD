@@ -95,8 +95,8 @@ export function ProductForm({
   attributes,
   attributeValues = {},
   masterColors = DEFAULT_MASTER_COLORS as MasterColor[],
-  locales = ['ru'],
-  defaultLocale = 'ru',
+  locales,
+  defaultLocale,
 }: {
   /** null → режим создания. */
   product: ProductDetail | null;
@@ -112,9 +112,9 @@ export function ProductForm({
    */
   masterColors?: MasterColor[];
   /** Включённые языки магазина (shop_settings.i18n.locales). */
-  locales?: readonly string[];
+  locales: readonly string[];
   /** Язык по умолчанию (база = обычные колонки). */
-  defaultLocale?: string;
+  defaultLocale: string;
 }) {
   const router = useRouter();
   const isEdit = product !== null;
@@ -416,7 +416,7 @@ export function ProductForm({
         fields={CATALOG_ENTITY_TR_FIELD_DEFS}
         value={translations}
         onChange={setTranslations}
-        enabled={isEdit}
+        mode={isEdit ? 'edit' : 'create'}
         pending={pending}
         onSave={onSubmit}
       >

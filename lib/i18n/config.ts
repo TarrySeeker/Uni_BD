@@ -13,18 +13,20 @@
 
 import { z } from 'zod';
 
+import { normalizeLocale } from './locale-token';
 import type { Locale, LocaleConfig } from './types';
+
+/**
+ * Ре-экспорт для обратной совместимости. Клиентские модули обязаны импортировать
+ * normalizeLocale из '@/lib/i18n/locale-token' напрямую: этот файл тянет БД.
+ */
+export { normalizeLocale };
 
 /** Env-дефолт: применяется, когда в shop_settings.i18n нет валидной конфигурации. */
 export const DEFAULT_LOCALE_CONFIG: LocaleConfig = {
   defaultLocale: 'ru',
   locales: ['ru', 'en', 'fr'],
 };
-
-/** Нормализует тег языка: обрезка пробелов + нижний регистр ('EN' → 'en'). */
-export function normalizeLocale(raw: string): Locale {
-  return raw.trim().toLowerCase();
-}
 
 const localeToken = z.string().trim().min(1).max(35);
 

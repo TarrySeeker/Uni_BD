@@ -1,3 +1,5 @@
+import { getLocaleConfig } from '@/lib/i18n';
+
 import { Forbidden } from '../../../_components/Forbidden';
 import { PageHeader } from '../../../_components/PageHeader';
 import { guardCatalog } from '../../_components/guard';
@@ -20,6 +22,8 @@ export default async function NewBrandPage() {
     return <Forbidden permission={guard.permission} />;
   }
 
+  const localeConfig = await getLocaleConfig();
+
   return (
     <div>
       <PageHeader
@@ -35,7 +39,11 @@ export default async function NewBrandPage() {
       />
 
       <div className="mt-6">
-        <BrandForm brand={null} />
+        <BrandForm
+          brand={null}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
+        />
       </div>
     </div>
   );

@@ -80,7 +80,7 @@ export function ReviewReplyForm({
         fields={REPLY_FIELD_DEFS}
         value={tr}
         onChange={setTr}
-        enabled={canWrite}
+        mode="edit"
         pending={pending}
         onSave={save}
         disabled={!canWrite}

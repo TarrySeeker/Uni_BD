@@ -573,6 +573,62 @@ export const accessSchema = z
   })
   .strip();
 
+/**
+ * Тег языка магазина: 'ru', 'en', 'pt-br', 'zh-hans'. Нормализуется (trim +
+ * нижний регистр) ДО проверки формата, поэтому ' RU ' и 'ru' — одно и то же
+ * значение и в БД попадает канонический вид. Набор языков задаётся per-shop
+ * (мультитенантность), а не перечислением в типе.
+ */
+const localeTagField = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(
+    /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/,
+    'Код языка вида «ru», «en», «pt-br» (латиница, части через дефис)',
+  );
+
+/**
+ * i18n — набор языков магазина (ADR-i18n, docs/24 §1; сид миграции 0036).
+ *
+ * `defaultLocale` — язык БАЗОВЫХ колонок таблиц (канон контента), остальные языки
+ * живут в jsonb-оверлее `translations`. Инварианты значения:
+ *   - locales непуст (магазин без языков невозможен);
+ *   - без дублей (после нормализации регистра);
+ *   - defaultLocale ∈ locales — иначе резолв «запрошенный → default» указывал бы
+ *     на язык, которого в магазине нет.
+ * Смену defaultLocale схема НЕ запрещает (значение само по себе валидно) — это
+ * решает действие обновления: без миграции данных смена канона переобъявила бы
+ * весь существующий контент другим языком.
+ */
+export const i18nSchema = z
+  .object({
+    defaultLocale: localeTagField,
+    locales: z.array(localeTagField).min(1, 'Нужен хотя бы один язык'),
+  })
+  .strip()
+  .superRefine((value, ctx) => {
+    const seen = new Set<string>();
+    value.locales.forEach((locale, index) => {
+      if (seen.has(locale)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Язык «${locale}» указан дважды`,
+          path: ['locales', index],
+        });
+      }
+      seen.add(locale);
+    });
+
+    if (!seen.has(value.defaultLocale)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Язык по умолчанию должен входить в список включённых языков',
+        path: ['defaultLocale'],
+      });
+    }
+  });
+
 // -----------------------------------------------------------------------------
 // Реестр ключ → схема. Единственный источник правды о наборе ключей настроек.
 // -----------------------------------------------------------------------------
@@ -593,6 +649,7 @@ export const SETTING_KEYS = [
   'home',
   'navigation',
   'access',
+  'i18n',
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -613,6 +670,7 @@ export const SETTING_SCHEMAS = {
   home: homeSchema,
   navigation: navigationSchema,
   access: accessSchema,
+  i18n: i18nSchema,
 } as const satisfies Record<SettingKey, z.ZodTypeAny>;
 
 // Типы значений по ключам (выводятся из схем).
@@ -632,6 +690,8 @@ export type SeoSettings = z.infer<typeof seoSettingsSchema>;
 export type HomeSettings = z.infer<typeof homeSchema>;
 export type NavigationSettings = z.infer<typeof navigationSchema>;
 export type AccessSettings = z.infer<typeof accessSchema>;
+/** Набор языков магазина (значение ключа i18n). */
+export type I18nSettings = z.infer<typeof i18nSchema>;
 
 /**
  * Безопасный парс значения по ключу. Возвращает провалидированный частичный

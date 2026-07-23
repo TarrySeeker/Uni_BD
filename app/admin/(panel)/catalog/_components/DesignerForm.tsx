@@ -41,12 +41,12 @@ const SOCIAL_KEYS: Array<{ key: string; label: string }> = [
 
 export function DesignerForm({
   designer,
-  locales = ['ru'],
-  defaultLocale = 'ru',
+  locales,
+  defaultLocale,
 }: {
   designer: DesignerFormDesigner | null;
-  locales?: readonly string[];
-  defaultLocale?: string;
+  locales: readonly string[];
+  defaultLocale: string;
 }) {
   const router = useRouter();
   // Поиск/порядок списка пришли сюда в query — возврат обязан их вернуть.
@@ -177,7 +177,7 @@ export function DesignerForm({
         fields={DESIGNER_TR_FIELD_DEFS}
         value={translations}
         onChange={setTranslations}
-        enabled={isEdit}
+        mode={isEdit ? 'edit' : 'create'}
         pending={pending}
         onSave={save}
       >

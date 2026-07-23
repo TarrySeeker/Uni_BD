@@ -52,6 +52,13 @@ export {
 } from './write';
 
 export {
+  LEGACY_KEY_ALIASES,
+  normalizeLegacyTranslationKeys,
+  toSnakeCase,
+  type NormalizeLegacyKeysResult,
+} from './legacy-keys';
+
+export {
   computeCoverage,
   type FieldCoverage,
   type LocaleCoverage,

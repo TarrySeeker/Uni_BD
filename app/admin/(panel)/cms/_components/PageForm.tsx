@@ -64,8 +64,8 @@ function previewSlug(title: string): string {
 export function PageForm({
   page,
   canWrite = true,
-  locales = ['ru'],
-  defaultLocale = 'ru',
+  locales,
+  defaultLocale,
 }: {
   page: CmsPageWithSections | null;
   /**
@@ -76,9 +76,9 @@ export function PageForm({
    */
   canWrite?: boolean;
   /** Включённые языки магазина (shop_settings.i18n.locales). */
-  locales?: readonly string[];
+  locales: readonly string[];
   /** Язык по умолчанию (база = обычные колонки). */
-  defaultLocale?: string;
+  defaultLocale: string;
 }) {
   const router = useRouter();
   const isEdit = page !== null;
@@ -276,7 +276,8 @@ export function PageForm({
         fields={CMS_PAGE_TR_FIELD_DEFS}
         value={translations}
         onChange={setTranslations}
-        enabled={isEdit && canWrite}
+        mode={isEdit ? 'edit' : 'create'}
+        disabled={!canWrite}
         pending={pending}
         onSave={save}
       >
@@ -470,7 +471,12 @@ export function PageForm({
           Секции страницы станут доступны после её создания.
         </p>
       ) : canWrite ? (
-        <SectionEditor pageId={page!.id} sections={page!.sections} />
+        <SectionEditor
+          pageId={page!.id}
+          sections={page!.sections}
+          locales={locales}
+          defaultLocale={defaultLocale}
+        />
       ) : (
         <p className="mt-6 border-t border-gray-200 pt-4 text-sm text-gray-500">
           Редактор секций доступен только с правом «cms.write».

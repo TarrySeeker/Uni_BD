@@ -43,9 +43,11 @@ import {
   homeSchema,
   navigationSchema,
   accessSchema,
+  i18nSchema,
   parseSettingValue,
   SETTING_KEYS,
 } from '@/lib/settings/schemas';
+import { DEFAULT_LOCALE_CONFIG, parseLocaleConfig } from '@/lib/i18n/config';
 import {
   upsertSetting as dbUpsertSetting,
   deleteSetting as dbDeleteSetting,
@@ -176,6 +178,14 @@ export const NavigationInputSchema = z.object({ navigation: navigationSchema });
 
 /** access на ВХОДЕ действия (B9): флаги доступа уровня магазина (singleUserMode). */
 export const AccessInputSchema = z.object({ access: accessSchema });
+
+/**
+ * i18n на ВХОДЕ действия (T3): набор языков магазина целиком (defaultLocale +
+ * locales). Схема значения i18nSchema уже гарантирует непустой список без дублей
+ * и членство defaultLocale в locales; НЕИЗМЕННОСТЬ defaultLocale проверяет сам
+ * handler — она зависит от текущего состояния БД, а не от формы ввода.
+ */
+export const I18nInputSchema = z.object({ i18n: i18nSchema });
 
 /**
  * Вход загрузки изображения настроек: kind (logo|favicon|og) + байты файла.
@@ -753,6 +763,46 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     },
   });
 
+  /**
+   * Языки магазина (ключ i18n). Набор языков влияет и на админку (вкладки
+   * перевода в формах), и на витрину, поэтому инвалидируется и то и другое.
+   *
+   * ЗАЩИТА КАНОНА: defaultLocale сменить нельзя. Базовые колонки таблиц хранят
+   * контент именно на языке по умолчанию; смена значения без миграции данных
+   * молча объявила бы весь существующий контент другим языком и переставила бы
+   * URL витрины. Форма поле блокирует, но форма — не защита: отклоняем на сервере.
+   */
+  const updateI18nSettings = defineAction({
+    permission: 'settings.manage',
+    input: I18nInputSchema,
+    deps: actionDeps,
+    handler: async (data, ctx: ActionCtx) => {
+      const before = await deps.getSetting('i18n');
+      const current =
+        before?.value == null ? DEFAULT_LOCALE_CONFIG : parseLocaleConfig(before.value);
+
+      if (data.i18n.defaultLocale !== current.defaultLocale) {
+        throw new PublicActionError(
+          `Язык по умолчанию («${current.defaultLocale}») сменить нельзя: он хранится в базовых полях каталога и контента. Смена требует миграции данных.`,
+        );
+      }
+
+      const row = await deps.upsertSetting('i18n', data.i18n, ctx.user.id);
+      deps.invalidateCache();
+      return {
+        result: { key: 'i18n' as const, locales: data.i18n.locales },
+        revalidate: ['/admin', SETTINGS_PATH, ...STOREFRONT_PATHS],
+        audit: {
+          action: 'settings.languages.update',
+          entityType: 'shop_settings',
+          entityId: 'i18n',
+          before: before?.value,
+          after: row.value,
+        },
+      };
+    },
+  });
+
   const resetSetting = defineAction({
     permission: 'settings.manage',
     input: ResetSettingInputSchema,
@@ -785,6 +835,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     updateHomeAction,
     updateNavigationAction,
     updateAccessSettings,
+    updateI18nSettings,
     uploadSettingsImageAction,
     uploadStoreImageAction,
     refreshExchangeRates,

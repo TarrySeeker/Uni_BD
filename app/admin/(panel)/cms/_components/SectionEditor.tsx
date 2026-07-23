@@ -34,9 +34,15 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 export function SectionEditor({
   pageId,
   sections,
+  locales,
+  defaultLocale,
 }: {
   pageId: string;
   sections: CmsSection[];
+  /** Включённые языки магазина (для вкладок перевода тела страницы, T5). */
+  locales: readonly string[];
+  /** Язык по умолчанию магазина. */
+  defaultLocale: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
@@ -86,7 +92,10 @@ export function SectionEditor({
     }
   }
 
-  async function addSection(content: Record<string, unknown>) {
+  async function addSection(
+    content: Record<string, unknown>,
+    translations: Record<string, Record<string, string>>,
+  ) {
     setPending(true);
     setError(null);
     // section_key — стабильный машинный ключ; генерим из type + времени.
@@ -95,19 +104,25 @@ export function SectionEditor({
       pageId,
       sectionKey,
       content,
+      translations,
       displayOrder: ordered.length,
       enabled: true,
     });
     handle(result, () => setAdding(false));
   }
 
-  async function editSection(section: CmsSection, content: Record<string, unknown>) {
+  async function editSection(
+    section: CmsSection,
+    content: Record<string, unknown>,
+    translations: Record<string, Record<string, string>>,
+  ) {
     setPending(true);
     setError(null);
     const result = await upsertCmsSectionAction({
       pageId,
       sectionKey: section.sectionKey,
       content,
+      translations,
       displayOrder: section.displayOrder,
       enabled: section.enabled,
     });
@@ -207,6 +222,9 @@ export function SectionEditor({
           <SectionForm
             type={newType}
             initialContent={null}
+            initialTranslations={null}
+            locales={locales}
+            defaultLocale={defaultLocale}
             onSave={addSection}
             onCancel={() => setAdding(false)}
             pending={pending}
@@ -284,7 +302,12 @@ export function SectionEditor({
                 <SectionForm
                   type={section.type}
                   initialContent={section.content}
-                  onSave={(content) => editSection(section, content)}
+                  initialTranslations={section.translations ?? null}
+                  locales={locales}
+                  defaultLocale={defaultLocale}
+                  onSave={(content, translations) =>
+                    editSection(section, content, translations)
+                  }
                   onCancel={() => setEditingId(null)}
                   pending={pending}
                 />

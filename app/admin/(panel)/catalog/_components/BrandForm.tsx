@@ -36,14 +36,14 @@ export type BrandFormBrand = Brand & { logoUrl?: string | null };
 
 export function BrandForm({
   brand,
-  locales = ['ru'],
-  defaultLocale = 'ru',
+  locales,
+  defaultLocale,
 }: {
   brand: BrandFormBrand | null;
   /** Включённые языки магазина (shop_settings.i18n.locales). */
-  locales?: readonly string[];
+  locales: readonly string[];
   /** Язык по умолчанию (база = обычные колонки). */
-  defaultLocale?: string;
+  defaultLocale: string;
 }) {
   const router = useRouter();
   const isEdit = brand !== null;
@@ -159,7 +159,7 @@ export function BrandForm({
         fields={CATALOG_ENTITY_TR_FIELD_DEFS}
         value={translations}
         onChange={setTranslations}
-        enabled={isEdit}
+        mode={isEdit ? 'edit' : 'create'}
         pending={pending}
         onSave={save}
       >

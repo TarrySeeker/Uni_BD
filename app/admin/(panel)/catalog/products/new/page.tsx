@@ -1,6 +1,7 @@
 import { listBrands, getCategoryTree, listAttributes } from '@/lib/catalog/repository';
 import { listDesigners } from '@/lib/designers/repository';
 import { getEffectiveSettings } from '@/lib/config/settings';
+import { getLocaleConfig } from '@/lib/i18n';
 
 import { Forbidden } from '../../../_components/Forbidden';
 import { PageHeader } from '../../../_components/PageHeader';
@@ -24,12 +25,13 @@ export default async function NewProductPage() {
     return <Forbidden permission={guard.permission} />;
   }
 
-  const [brands, designers, categoryTree, attributes, settings] = await Promise.all([
+  const [brands, designers, categoryTree, attributes, settings, localeConfig] = await Promise.all([
     listBrands(),
     listDesigners(),
     getCategoryTree(),
     listAttributes(),
     getEffectiveSettings(),
+    getLocaleConfig(),
   ]);
 
   return (
@@ -50,6 +52,8 @@ export default async function NewProductPage() {
           categoryTree={categoryTree}
           attributes={attributes}
           masterColors={settings.catalog.masterColors}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
         />
       </div>
     </div>

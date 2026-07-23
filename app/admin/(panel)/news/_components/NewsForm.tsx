@@ -62,13 +62,13 @@ function toDatetimeLocal(d: Date | null): string {
 export function NewsForm({
   article,
   canWrite = true,
-  locales = ['ru'],
-  defaultLocale = 'ru',
+  locales,
+  defaultLocale,
 }: {
   article: NewsArticle | null;
   canWrite?: boolean;
-  locales?: readonly string[];
-  defaultLocale?: string;
+  locales: readonly string[];
+  defaultLocale: string;
 }) {
   const router = useRouter();
   const isEdit = article !== null;
@@ -227,7 +227,8 @@ export function NewsForm({
         fields={NEWS_TR_FIELD_DEFS}
         value={translations}
         onChange={setTranslations}
-        enabled={isEdit && canWrite}
+        mode={isEdit ? 'edit' : 'create'}
+        disabled={!canWrite}
         pending={pending}
         onSave={save}
       >

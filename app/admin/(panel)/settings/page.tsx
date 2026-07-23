@@ -53,6 +53,7 @@ export default async function SettingsPage() {
     { id: 'modules', title: 'Модули' },
     { id: 'navigation', title: 'Навигация (меню и футер)' },
     { id: 'access', title: 'Доступ' },
+    { id: 'languages', title: 'Языки' },
     { id: 'seo', title: 'SEO и поиск' },
   ];
 
@@ -141,6 +142,21 @@ export default async function SettingsPage() {
           <Section id="access" title="Доступ">
             <AccessForm singleUserMode={eff.access.singleUserMode} />
             <ResetRow keys={[{ key: 'access', label: 'Сбросить режим доступа' }]} />
+          </Section>
+
+          <Section id="languages" title="Языки">
+            <p className="text-sm text-gray-600">
+              Какие языки доступны в магазине и насколько заполнены переводы —
+              в отдельном разделе. Язык по умолчанию сменить нельзя: на нём
+              хранится весь основной контент.
+            </p>
+            <a
+              href="/admin/settings/languages"
+              className="mt-3 inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            >
+              Открыть настройки языков →
+            </a>
+            <ResetRow keys={[{ key: 'i18n', label: 'Сбросить языки' }]} />
           </Section>
 
           <Section id="seo" title="SEO и поиск">

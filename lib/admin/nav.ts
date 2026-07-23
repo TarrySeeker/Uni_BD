@@ -71,6 +71,10 @@ export const NAV: NavItem[] = [
   // «Настройки» — core (без module): не прячется за флагом, которым сам управляет
   // (self-lock guard, docs/11 §5.4.5). Виден при наличии settings.manage.
   { href: '/admin/settings', label: 'Настройки', permission: 'settings.manage' },
+  // «Языки» — core-подраздел настроек (набор языков магазина + покрытие переводов).
+  // Отдельный пункт, т.к. владелец ищет языки как самостоятельную функцию, а не
+  // как строку в длинной странице настроек. Право то же — settings.manage.
+  { href: '/admin/settings/languages', label: 'Языки', permission: 'settings.manage' },
 ];
 
 /** Опции построения меню. */

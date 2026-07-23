@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { getLocaleConfig } from '@/lib/i18n';
+
 import { Forbidden } from '../../_components/Forbidden';
 import { guardCms } from '../_components/guard';
 import { PageForm } from '../_components/PageForm';
@@ -21,6 +23,8 @@ export default async function NewCmsPage() {
     return <Forbidden permission={guard.permission} />;
   }
 
+  const localeConfig = await getLocaleConfig();
+
   return (
     <div>
       <nav className="text-sm text-gray-500" aria-label="Хлебные крошки">
@@ -36,7 +40,11 @@ export default async function NewCmsPage() {
       </p>
 
       <div className="mt-6">
-        <PageForm page={null} />
+        <PageForm
+          page={null}
+          locales={localeConfig.locales}
+          defaultLocale={localeConfig.defaultLocale}
+        />
       </div>
     </div>
   );

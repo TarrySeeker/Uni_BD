@@ -18,6 +18,7 @@ import {
   updateHomeAction as _updateHome,
   updateNavigationAction as _updateNavigation,
   updateAccessSettings as _updateAccess,
+  updateI18nSettings as _updateI18n,
   uploadSettingsImageAction as _uploadSettingsImage,
   uploadStoreImageAction as _uploadStoreImage,
   refreshExchangeRates as _refreshExchangeRates,
@@ -51,6 +52,9 @@ export async function updateNavigationContentAction(input: unknown): Promise<Act
 }
 export async function updateAccessAction(input: unknown): Promise<ActionResult<unknown>> {
   return _updateAccess(input);
+}
+export async function updateI18nAction(input: unknown): Promise<ActionResult<unknown>> {
+  return _updateI18n(input);
 }
 export async function uploadSettingsImageAction(
   formData: FormData,

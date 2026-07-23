@@ -29,14 +29,14 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
 export function CategoryForm({
   category,
-  locales = ['ru'],
-  defaultLocale = 'ru',
+  locales,
+  defaultLocale,
 }: {
   category: Category;
   /** Включённые языки магазина (shop_settings.i18n.locales). */
-  locales?: readonly string[];
+  locales: readonly string[];
   /** Язык по умолчанию (база = обычные колонки). */
-  defaultLocale?: string;
+  defaultLocale: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
@@ -98,6 +98,7 @@ export function CategoryForm({
       <LocaleTabs
         locales={locales}
         defaultLocale={defaultLocale}
+        mode="edit"
         fields={CATALOG_ENTITY_TR_FIELD_DEFS}
         value={translations}
         onChange={setTranslations}

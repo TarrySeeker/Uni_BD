@@ -10,7 +10,13 @@ import {
   type SectionFormState,
   type SectionFieldSpec,
 } from '@/lib/cms/section-form';
+import {
+  SECTION_TR_FIELD_SPECS,
+  sectionLocaleTabs,
+  sectionTranslationsFormState,
+} from '@/lib/cms/section-i18n';
 import type { CmsSectionType } from '@/lib/cms/types';
+import type { TranslationsMap } from '@/lib/i18n';
 
 import { RichTextEditor } from './RichTextEditor';
 import { CmsImageUploadButton } from './CmsImageUploadButton';
@@ -22,14 +28,29 @@ import { CmsImageUploadButton } from './CmsImageUploadButton';
  * (валидируется тем же CmsSectionContentSchema, что и сервер). rich-text-поля —
  * Tiptap; их HTML санитизирует сервер при upsertCmsSection (анти-XSS, инвариант 5.1).
  *
- * Вызывает onSave(content) с уже собранным/провалидированным на клиенте content;
- * сервер всё равно перевалидирует и санитизирует (доверие клиенту запрещено).
+ * Вызывает onSave(content, translations) с уже собранным/провалидированным на
+ * клиенте content; сервер всё равно перевалидирует и санитизирует (доверие клиенту
+ * запрещено).
+ *
+ * Переводы ТЕЛА страницы (T5): вкладки языков магазина. Вкладка defaultLocale —
+ * базовые поля (как раньше), остальные — переводимые поля типа секции
+ * (SECTION_TR_FIELD_SPECS = whitelist write-path). Значения уходят плоскими
+ * строками; структурный патч content собирает сервер (lib/cms/section-i18n).
  */
 export interface SectionFormProps {
   type: CmsSectionType;
   /** Сохранённый content (режим редактирования) или null (новая секция). */
   initialContent: Record<string, unknown> | null;
-  onSave: (content: Record<string, unknown>) => void | Promise<void>;
+  /** Сохранённый оверлей переводов секции (режим редактирования). */
+  initialTranslations?: TranslationsMap | null;
+  /** Включённые языки магазина (shop_settings.i18n.locales). */
+  locales: readonly string[];
+  /** Язык по умолчанию (база = обычный content секции). */
+  defaultLocale: string;
+  onSave: (
+    content: Record<string, unknown>,
+    translations: Record<string, Record<string, string>>,
+  ) => void | Promise<void>;
   onCancel?: () => void;
   pending?: boolean;
 }
@@ -40,6 +61,9 @@ const labelCls = 'block text-sm font-medium text-gray-700';
 export function SectionForm({
   type,
   initialContent,
+  initialTranslations,
+  locales,
+  defaultLocale,
   onSave,
   onCancel,
   pending = false,
@@ -48,31 +72,91 @@ export function SectionForm({
     initialContent ? formStateFromContent(initialContent) : emptyFormStateFor(type),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [tr, setTr] = useState<Record<string, Record<string, string>>>(() =>
+    sectionTranslationsFormState(type, initialTranslations),
+  );
+  const tabs = sectionLocaleTabs(locales, defaultLocale);
+  const [active, setActive] = useState<string>(defaultLocale);
 
   const set = (name: string, v: string) =>
     setState((prev) => ({ ...prev, [name]: v }));
+
+  const setTrField = (locale: string, name: string, v: string) =>
+    setTr((prev) => ({ ...prev, [locale]: { ...(prev[locale] ?? {}), [name]: v } }));
 
   function submit() {
     const built = buildSectionContent(state);
     if (!built.ok) {
       setErrors(built.fieldErrors);
+      // Ошибки живут на базовых полях — показываем их владельцу, а не прячем
+      // за вкладкой перевода (иначе «Сохранить» молча ничего не делает).
+      setActive(defaultLocale);
       return;
     }
     setErrors({});
-    void onSave(built.content as Record<string, unknown>);
+    void onSave(built.content as Record<string, unknown>, tr);
   }
+
+  const trFields = SECTION_TR_FIELD_SPECS[type];
 
   return (
     <div className="space-y-3">
-      {SECTION_FIELD_SPECS[type].map((field) => (
-        <FieldControl
-          key={field.name}
-          field={field}
-          value={state[field.name] ?? ''}
-          error={errors[field.name]}
-          onChange={(v) => set(field.name, v)}
-        />
-      ))}
+      {tabs.length > 1 ? (
+        <div
+          role="tablist"
+          aria-label="Язык секции"
+          className="mb-2 flex flex-wrap gap-1 border-b border-gray-200"
+        >
+          {tabs.map((loc) => (
+            <button
+              key={loc}
+              role="tab"
+              type="button"
+              aria-selected={active === loc}
+              onClick={() => setActive(loc)}
+              className={`px-3 py-1.5 text-sm font-medium ${
+                active === loc
+                  ? 'border-b-2 border-gray-900 text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {loc === defaultLocale ? `${loc.toUpperCase()} · основной` : loc.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {active === defaultLocale ? (
+        SECTION_FIELD_SPECS[type].map((field) => (
+          <FieldControl
+            key={field.name}
+            field={field}
+            value={state[field.name] ?? ''}
+            error={errors[field.name]}
+            onChange={(v) => set(field.name, v)}
+          />
+        ))
+      ) : (
+        <div className="space-y-3">
+          <p className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            Перевод секции на <strong>{active.toUpperCase()}</strong>. Пустое поле — на
+            витрине покажется основной ({defaultLocale.toUpperCase()}) текст. Ссылки,
+            изображения и настройки подборки не переводятся — они общие для всех языков.
+          </p>
+          {trFields.length === 0 ? (
+            <p className="text-sm text-gray-500">У секции этого типа нет переводимого текста.</p>
+          ) : (
+            trFields.map((field) => (
+              <FieldControl
+                key={field.name}
+                field={field}
+                value={tr[active]?.[field.name] ?? ''}
+                onChange={(v) => setTrField(active, field.name, v)}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-3 pt-1">
         <button
