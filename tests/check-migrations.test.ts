@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
  *
  * Прогоняет РЕАЛЬНЫЙ bash-скрипт scripts/check-migrations.sh через child_process
  * на фикстурах и на настоящих миграциях. Docker/Postgres НЕ нужны — линтер
- * статический (grep/sed/awk).
+ * статический (один проход awk).
  *
  * Контракт линтера:
  *   • деструктивный DDL (DROP COLUMN/TABLE/CONSTRAINT, RENAME, ALTER TYPE,
@@ -309,14 +309,7 @@ describe('check-migrations.sh — carve-out ADR-P1-2 (расширение мн�
 });
 
 describe('check-migrations.sh — реальные миграции 0001..0024', () => {
-  // retry: тест запускает bash-скрипт через execFileSync, а тот под set -e/pipefail
-  // порождает много подпроцессов (grep/sed/awk/cut в циклах). При полном прогоне с
-  // 16 параллельными воркерами fork может временно не пройти (EAGAIN «Resource
-  // temporarily unavailable») → скрипт падает с ненулевым кодом БЕЗ нарушения схемы.
-  // Реальная не-аддитивная миграция детерминирована (регэксп сматчит каждый раз) и
-  // провалит все попытки; retry гасит только окружённый flake fork-а, не ослабляя
-  // проверку. Изолированно тест и прямой вызов скрипта стабильно дают exit 0.
-  it('все db/migrations/*.sql аддитивны (exit 0)', { retry: 2 }, () => {
+  it('все db/migrations/*.sql аддитивны (exit 0)', () => {
     // Без аргументов линтер берёт все db/migrations/*.sql.
     const { code, stdout } = runLint();
     if (code !== 0) {

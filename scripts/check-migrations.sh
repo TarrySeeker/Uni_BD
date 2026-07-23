@@ -52,7 +52,7 @@
 #                          вставляющий строки без этой колонки, начнёт падать.
 #                          (С DEFAULT в той же инструкции — допустимо, т.к. вставка
 #                          без значения получит дефолт. Эвристика: ловим SET NOT NULL,
-#                          но пропускаем, если в той же строке есть DEFAULT.)
+#                          но пропускаем, если в той же инструкции есть DEFAULT.)
 #   9. ALTER TYPE ... DROP VALUE / RENAME VALUE — удаление/переименование значения
 #                          enum: старый код, пишущий это значение, упадёт. (Postgres
 #                          и так не умеет DROP VALUE напрямую, но ловим явный запрет.)
@@ -84,7 +84,15 @@
 # Код возврата: 0 — все файлы чисты; ≠0 — найдено нарушение (печатает файл:строку
 # и что именно нарушено).
 #
-# Зависимости: только grep/sed/awk (без внешних утилит).
+# Зависимости: только awk (POSIX; проверено на mawk и gawk).
+#
+# ПРОИЗВОДИТЕЛЬНОСТЬ/НАДЁЖНОСТЬ: вся проверка выполняется ОДНИМ процессом awk на
+# ВЕСЬ список файлов (bash только печатает готовый результат встроенными командами).
+# Раньше на каждый файл порождалось ~17 подпроцессов (grep/sed/awk/cut/tr/sort в
+# циклах) — на 55 миграциях это ~950 exec и ~2300 fork. Под нагрузкой (полный
+# прогон vitest в 16 воркеров) fork временами не проходил с EAGAIN, и линтер падал
+# с ненулевым кодом БЕЗ реального нарушения схемы — гейт флакал. Теперь число
+# процессов КОНСТАНТНО (не зависит от количества миграций), флак устранён по корню.
 #
 # Запуск:
 #   ./scripts/check-migrations.sh                      # все db/migrations/*.sql
@@ -128,230 +136,231 @@ fi
 printf "${BOLD}=== Admik · линтер аддитивности миграций ===${NC}\n"
 printf "Файлов к проверке: %s\n\n" "${#FILES[@]}"
 
-# -----------------------------------------------------------------------------
-# normalize_statements <file>
-# -----------------------------------------------------------------------------
-# Превращает файл в поток ЛОГИЧЕСКИХ SQL-инструкций (по одной на строку вывода) в
-# формате «N:<инструкция>», где N — номер ИСХОДНОЙ строки, на которой инструкция
-# началась. Это критично: деструктивный DDL может быть разнесён по физическим
-# строкам (`ALTER ... DROP\n COLUMN ...`), и построчный матч его пропускал
-# (MAJOR-находка QA). Нормализуем на уровне инструкции, а не строки.
-#
-# Алгоритм (awk, без внешних зависимостей):
-#   1. Убираем хвостовой `--`-комментарий в каждой строке (DROP в комментарии
-#      не считается нарушением).
-#   2. Аккумулируем строки в текущую инструкцию, схлопывая любые
-#      последовательности whitespace (включая переводы строк) в один пробел.
-#   3. На каждом `;` закрываем инструкцию и печатаем её с номером строки, на
-#      которой она НАЧАЛАСЬ.
-#   4. Хвост без завершающего `;` (последняя инструкция файла) тоже печатаем.
-# Примечание: блочные /* */ комментарии в миграциях проекта не используются;
-# намеренно не усложняем (эвристика, как и сказано в §6.4).
-normalize_statements() {
-  awk '
-    function flush_stmt(   s) {
-      # Схлопываем повторные пробелы и подчищаем края.
-      s = cur
-      gsub(/[[:space:]]+/, " ", s)
-      sub(/^ /, "", s)
-      sub(/ $/, "", s)
-      if (s != "") { printf "%d:%s\n", start_line, s }
-      cur = ""
-      start_line = 0
-    }
-    {
-      line = $0
-      pos = index(line, "--")
-      if (pos > 0) { line = substr(line, 1, pos - 1) }
-
-      # Разбиваем физическую строку по `;` — каждый `;` закрывает инструкцию.
-      n = split(line, parts, ";")
-      for (i = 1; i <= n; i++) {
-        seg = parts[i]
-        # Запоминаем номер строки начала инструкции: первый непустой сегмент.
-        if (cur == "" && start_line == 0) {
-          probe = seg
-          gsub(/[[:space:]]+/, "", probe)
-          if (probe != "") { start_line = NR }
-        }
-        cur = cur " " seg
-        # Все сегменты, кроме последнего, имели после себя `;` → закрываем.
-        if (i < n) { flush_stmt() }
-      }
-    }
-    END { flush_stmt() }
-  ' "$1"
-}
-
-# -----------------------------------------------------------------------------
-# Описание правил: каждое — «регэксп ERE» + «человекочитаемое объяснение».
-# Регистронезависимость обеспечивает grep -iE. Все регэкспы допускают любое
-# число пробелов/табов между токенами (\s заменяем на [[:space:]]).
-# -----------------------------------------------------------------------------
-
-# Один проход по файлу для каждого правила. Возвращает 0, если нарушений нет.
 violations_total=0
-
-check_rule() {
-  # $1 — нормализованные инструкции (по одной на строку, формат «N:sql», где N —
-  #      номер исходной строки начала инструкции, --комментарии уже убраны).
-  local content="$1" file="$2" regex="$3" reason="$4"
-  # grep по ERE, регистронезависимо. Строки уже в формате «N:sql».
-  local hits
-  hits="$(printf '%s\n' "${content}" | grep -inE "${regex}" || true)"
-  if [ -n "${hits}" ]; then
-    # hits имеют вид «<grep-lineno>:<наш-lineno>:<sql>» — grep -n добавит свой
-    # счётчик. Нам нужен наш номер (второе поле). Перепарсим аккуратно.
-    while IFS= read -r raw; do
-      [ -z "${raw}" ] && continue
-      # raw = "<grep_no>:<orig_no>:<rest...>"; вытащим orig_no (2-е поле) и rest.
-      local orig_no rest
-      orig_no="$(printf '%s' "${raw}" | cut -d: -f2)"
-      rest="$(printf '%s' "${raw}" | cut -d: -f3-)"
-      # Подчистим ведущие пробелы для читаемости.
-      rest="$(printf '%s' "${rest}" | sed 's/^[[:space:]]*//')"
-      fail "${file}:${orig_no}: ${reason}"
-      printf "        ${YELLOW}%s${NC}\n" "${rest}" >&2
-      violations_total=$((violations_total + 1))
-    done <<< "${hits}"
-  fi
-}
-
-# -----------------------------------------------------------------------------
-# Главный цикл по файлам.
-# -----------------------------------------------------------------------------
 RC=0
+
+# Отсутствующие файлы отсеиваем здесь (test -f — встроенная команда, без fork).
+EXISTING=()
 for f in "${FILES[@]}"; do
   if [ ! -f "${f}" ]; then
     fail "Файл не найден: ${f}"
     RC=1
     continue
   fi
-
-  step "Проверяю $(basename "${f}")"
-
-  # Поток ЛОГИЧЕСКИХ инструкций (формат «N:sql»): --комментарии убраны, whitespace
-  # внутри инструкции схлопнут, перевод строки больше не «прячет» деструктив.
-  content="$(normalize_statements "${f}")"
-
-  before="${violations_total}"
-
-  # 1. DROP TABLE
-  check_rule "${content}" "${f}" \
-    'drop[[:space:]]+table' \
-    'запрещён DROP TABLE (удаление таблицы ломает старый код; expand/contract)'
-
-  # 2. DROP COLUMN
-  check_rule "${content}" "${f}" \
-    'drop[[:space:]]+column' \
-    'запрещён DROP COLUMN (удаление колонки ломает старый код; expand/contract)'
-
-  # 3. DROP CONSTRAINT — с точечным carve-out ADR-P1-2 (расширение множества CHECK).
-  #    Общее правило: любой DROP CONSTRAINT запрещён. Исключение — ТОЛЬКО пара
-  #    «DROP CONSTRAINT <name>» + «ADD CONSTRAINT <name> CHECK(...)» под явным
-  #    маркером-комментарием. Реализуем отдельным блоком (как SET NOT NULL), а не
-  #    generic check_rule, потому что решение зависит от имени ограничения и от
-  #    наличия парного ADD ... CHECK того же имени.
-  #
-  #    Маркер ищем в СЫРОМ файле (normalize_statements срезает --комментарии, где
-  #    он и живёт). Требуем непустой <proof> после токена — owner-signed по ADR-P1-2.
-  widen_marker=0
-  if grep -qiE 'check-migrations:allow-widen-check[[:space:]]+[^[:space:]]' "${f}"; then
-    widen_marker=1
-  fi
-
-  # Множество имён ограничений, которые в ЭТОМ файле пересоздаются с CHECK
-  # (кандидаты на «расширение»): токен после `ADD CONSTRAINT`, за которым идёт CHECK.
-  widened_names="$(printf '%s\n' "${content}" \
-    | grep -ioE 'add[[:space:]]+constraint[[:space:]]+[a-z0-9_"]+[[:space:]]+check' \
-    | sed -E 's/.*constraint[[:space:]]+([a-z0-9_"]+)[[:space:]]+check.*/\1/I' \
-    | tr 'A-Z' 'a-z' | sort -u || true)"
-
-  drop_con="$(printf '%s\n' "${content}" | grep -inE 'drop[[:space:]]+constraint' || true)"
-  if [ -n "${drop_con}" ]; then
-    while IFS= read -r raw; do
-      [ -z "${raw}" ] && continue
-      orig_no="$(printf '%s' "${raw}" | cut -d: -f2)"
-      rest="$(printf '%s' "${raw}" | cut -d: -f3-)"
-      # Имя снимаемого ограничения: токен после `DROP CONSTRAINT [IF EXISTS]`.
-      dname="$(printf '%s' "${rest}" \
-        | grep -ioE 'drop[[:space:]]+constraint[[:space:]]+(if[[:space:]]+exists[[:space:]]+)?[a-z0-9_"]+' \
-        | sed -E 's/.*[[:space:]]([a-z0-9_"]+)[[:space:]]*$/\1/' \
-        | tr 'A-Z' 'a-z' | head -1 || true)"
-      # Разрешаем ТОЛЬКО если: есть маркер И это же имя пересоздаётся ADD ... CHECK.
-      if [ "${widen_marker}" -eq 1 ] && [ -n "${dname}" ] \
-         && printf '%s\n' "${widened_names}" | grep -qxF "${dname}"; then
-        continue  # carve-out ADR-P1-2: расширение множества CHECK — аддитивно.
-      fi
-      rest_trim="$(printf '%s' "${rest}" | sed 's/^[[:space:]]*//')"
-      fail "${f}:${orig_no}: запрещён DROP CONSTRAINT (снятие инварианта в одном релизе; expand/contract). Расширение множества CHECK — только парой DROP+ADD того же имени под маркером -- check-migrations:allow-widen-check <proof> (ADR-P1-2)"
-      printf "        ${YELLOW}%s${NC}\n" "${rest_trim}" >&2
-      violations_total=$((violations_total + 1))
-    done <<< "${drop_con}"
-  fi
-
-  # 4. DROP DEFAULT
-  check_rule "${content}" "${f}" \
-    'drop[[:space:]]+default' \
-    'запрещён DROP DEFAULT (старый код, полагавшийся на дефолт, сломается)'
-
-  # 5. DROP NOT NULL
-  check_rule "${content}" "${f}" \
-    'drop[[:space:]]+not[[:space:]]+null' \
-    'запрещён DROP NOT NULL (ослабление гарантии в одном релизе)'
-
-  # 6. ALTER ... RENAME (таблицы/колонки/constraint/индекса)
-  check_rule "${content}" "${f}" \
-    'alter[[:space:]]+.*rename|rename[[:space:]]+(to|column|constraint)' \
-    'запрещён RENAME (переименование ломает обращение старого кода по имени)'
-
-  # 7. ALTER [COLUMN] ... TYPE / SET DATA TYPE
-  #    Postgres допускает форму БЕЗ слова COLUMN: `ALTER TABLE foo ALTER bar TYPE
-  #    bigint`. Поэтому `column` делаем НЕОБЯЗАТЕЛЬНЫМ, а `set data` перед `type`
-  #    тоже опциональным — ловим обе записи смены типа (с COLUMN и без).
-  check_rule "${content}" "${f}" \
-    'alter[[:space:]]+(column[[:space:]]+)?[a-z_"]+[[:space:]]+(set[[:space:]]+data[[:space:]]+)?type|set[[:space:]]+data[[:space:]]+type' \
-    'запрещена смена типа колонки (ALTER [COLUMN] ... TYPE; возможна потеря данных)'
-
-  # 9. ALTER TYPE ... DROP/RENAME VALUE (enum)
-  check_rule "${content}" "${f}" \
-    'alter[[:space:]]+type[[:space:]]+.*(drop|rename)[[:space:]]+value|drop[[:space:]]+value' \
-    'запрещено удаление/переименование значения enum (ломает запись старым кодом)'
-
-  # 10. DROP INDEX — снятие индекса убирает инвариант уникальности/идемпотентности.
-  #     'drop INDEX' покрывает обе формы: DROP INDEX [IF EXISTS] foo и
-  #     DROP INDEX CONCURRENTLY foo (модификаторы идут ПОСЛЕ слов DROP INDEX).
-  #     ВАЖНО: CREATE [UNIQUE] INDEX правилом НЕ ловится (нет токена 'drop index').
-  check_rule "${content}" "${f}" \
-    'drop[[:space:]]+index' \
-    'запрещён DROP INDEX (снятие индекса убирает инвариант уникальности/идемпотентности; expand/contract)'
-
-  # 8. SET NOT NULL без DEFAULT в той же ИНСТРУКЦИИ — особый случай: ловим
-  #    SET NOT NULL, но пропускаем инструкции, где есть и DEFAULT (тогда вставка
-  #    без значения безопасна). Работаем на уровне инструкции, не строки.
-  set_nn="$(printf '%s\n' "${content}" | grep -inE 'set[[:space:]]+not[[:space:]]+null' || true)"
-  if [ -n "${set_nn}" ]; then
-    while IFS= read -r raw; do
-      [ -z "${raw}" ] && continue
-      orig_no="$(printf '%s' "${raw}" | cut -d: -f2)"
-      rest="$(printf '%s' "${raw}" | cut -d: -f3-)"
-      # Если в той же инструкции есть DEFAULT — считаем безопасным (вставка получит дефолт).
-      if printf '%s' "${rest}" | grep -iqE 'default'; then
-        continue
-      fi
-      rest_trim="$(printf '%s' "${rest}" | sed 's/^[[:space:]]*//')"
-      fail "${f}:${orig_no}: запрещён SET NOT NULL без DEFAULT (старый код, вставляющий без значения, упадёт)"
-      printf "        ${YELLOW}%s${NC}\n" "${rest_trim}" >&2
-      violations_total=$((violations_total + 1))
-    done <<< "${set_nn}"
-  fi
-
-  if [ "${violations_total}" -eq "${before}" ]; then
-    ok "аддитивна — нарушений не найдено"
-  else
-    RC=1
-  fi
+  EXISTING+=("${f}")
 done
+
+# -----------------------------------------------------------------------------
+# ЯДРО: единственный процесс awk на весь список файлов.
+# -----------------------------------------------------------------------------
+# awk сам открывает файлы через getline (а не через штатный цикл записей) — это
+# позволяет получить корректные S/O-строки даже для ПУСТЫХ файлов и не зависеть от
+# трактовки аргументов вида `var=value` как присваиваний.
+#
+# Протокол вывода (поля разделены табом; в инструкциях табов нет — whitespace
+# схлопнут в пробелы, в идентификаторах правил табов нет по построению):
+#   S <file>                        — начало проверки файла
+#   V <file> <line> <rule> <stmt>   — нарушение
+#   O <file>                        — файл чист
+# Тексты причин живут в bash (case ниже), чтобы не дублировать их в двух языках.
+#
+# Нормализация (та же, что раньше): файл превращается в поток ЛОГИЧЕСКИХ SQL-
+# инструкций. Это критично: деструктивный DDL может быть разнесён по физическим
+# строкам (`ALTER ... DROP\n COLUMN ...`), и построчный матч его пропускал.
+#   1. хвостовой `--`-комментарий срезается (DROP в комментарии — не нарушение);
+#   2. строки аккумулируются, любые последовательности whitespace (включая \n)
+#      схлопываются в один пробел;
+#   3. каждый `;` закрывает инструкцию; запоминается номер ИСХОДНОЙ строки, на
+#      которой инструкция началась;
+#   4. хвост без завершающего `;` тоже проверяется.
+# Блочные /* */ комментарии в миграциях проекта не используются — намеренно не
+# усложняем (эвристика, как и сказано в §6.4).
+#
+# Матчинг регистронезависим за счёт tolower() над инструкцией (IGNORECASE есть
+# только в gawk, нам нужен и mawk).
+AWK_PROG='
+function flush_stmt(   s) {
+  s = g_cur
+  gsub(/[[:space:]]+/, " ", s)
+  sub(/^ /, "", s)
+  sub(/ $/, "", s)
+  if (s != "") { g_ns++; stx[g_ns] = s; stl[g_ns] = g_start }
+  g_cur = ""
+  g_start = 0
+}
+
+function emit(f, ln, rule, s) {
+  printf "V\t%s\t%d\t%s\t%s\n", f, ln, rule, s
+  g_fileviol++
+}
+
+# Множество имён ограничений, пересоздаваемых в ЭТОМ файле через ADD CONSTRAINT
+# <name> CHECK — кандидаты на «расширение» (carve-out ADR-P1-2).
+function collect_widened(   k, p, st, ln, m, nm) {
+  for (k = 1; k <= g_ns; k++) {
+    p = tolower(stx[k])
+    while (match(p, RE_ADDCHK)) {
+      st = RSTART; ln = RLENGTH
+      m = substr(p, st, ln)
+      p = substr(p, st + ln)
+      if (match(m, "[a-z0-9_\"]+[[:space:]]+check$")) {
+        nm = substr(m, RSTART, RLENGTH)
+        sub("[[:space:]]+check$", "", nm)
+        widened[nm] = 1
+      }
+    }
+  }
+}
+
+# Правило №3: DROP CONSTRAINT с точечным carve-out ADR-P1-2. Отдельным проходом,
+# а не общим регэкспом, потому что решение зависит от ИМЕНИ ограничения и от
+# наличия парного ADD ... CHECK того же имени в том же файле.
+function check_drop_constraint(f,   k, low, m, n, tk, dname) {
+  for (k = 1; k <= g_ns; k++) {
+    low = tolower(stx[k])
+    if (!match(low, RE_DROPCON)) continue
+    dname = ""
+    if (match(low, RE_DROPCON_NAME)) {
+      m = substr(low, RSTART, RLENGTH)
+      n = split(m, tk, "[[:space:]]+")
+      dname = tk[n]
+    }
+    if (g_marker == 1 && dname != "" && (dname in widened)) continue
+    emit(f, stl[k], "drop_constraint", stx[k])
+  }
+}
+
+# Правило №8: SET NOT NULL без DEFAULT в той же ИНСТРУКЦИИ (с DEFAULT — безопасно,
+# вставка без значения получит дефолт).
+function check_set_not_null(f,   k, low) {
+  for (k = 1; k <= g_ns; k++) {
+    low = tolower(stx[k])
+    if (!match(low, RE_SETNN)) continue
+    if (index(low, "default") > 0) continue
+    emit(f, stl[k], "set_not_null", stx[k])
+  }
+}
+
+function lint_file(f,   line, lineno, pos, i, n, parts, seg, probe, j, k) {
+  printf "S\t%s\n", f
+
+  delete stx; delete stl; delete widened
+  g_ns = 0; g_cur = ""; g_start = 0; g_marker = 0; g_fileviol = 0
+
+  lineno = 0
+  while ((getline line < f) > 0) {
+    lineno++
+    # Маркер carve-out ищем в СЫРОЙ строке: он живёт в --комментарии, который
+    # ниже срезается. Требуем непустой <proof> — owner-signed по ADR-P1-2.
+    if (g_marker == 0 && match(tolower(line), RE_MARKER)) g_marker = 1
+
+    pos = index(line, "--")
+    if (pos > 0) line = substr(line, 1, pos - 1)
+
+    n = split(line, parts, ";")
+    for (i = 1; i <= n; i++) {
+      seg = parts[i]
+      if (g_cur == "" && g_start == 0) {
+        probe = seg
+        gsub(/[[:space:]]+/, "", probe)
+        if (probe != "") g_start = lineno
+      }
+      g_cur = g_cur " " seg
+      if (i < n) flush_stmt()
+    }
+  }
+  close(f)
+  flush_stmt()
+
+  collect_widened()
+
+  # Порядок правил ФИКСИРОВАН — он определяет порядок строк в отчёте.
+  for (j = 1; j <= g_nrules; j++) {
+    if (rid[j] == "@drop_constraint") { check_drop_constraint(f); continue }
+    if (rid[j] == "@set_not_null")    { check_set_not_null(f);    continue }
+    for (k = 1; k <= g_ns; k++) {
+      if (match(tolower(stx[k]), rre[j])) emit(f, stl[k], rid[j], stx[k])
+    }
+  }
+
+  if (g_fileviol == 0) printf "O\t%s\n", f
+}
+
+BEGIN {
+  RE_MARKER       = "check-migrations:allow-widen-check[[:space:]]+[^[:space:]]"
+  RE_ADDCHK       = "add[[:space:]]+constraint[[:space:]]+[a-z0-9_\"]+[[:space:]]+check"
+  RE_DROPCON      = "drop[[:space:]]+constraint"
+  RE_DROPCON_NAME = "drop[[:space:]]+constraint[[:space:]]+(if[[:space:]]+exists[[:space:]]+)?[a-z0-9_\"]+"
+  RE_SETNN        = "set[[:space:]]+not[[:space:]]+null"
+
+  g_nrules = 0
+  rid[++g_nrules] = "drop_table";        rre[g_nrules] = "drop[[:space:]]+table"
+  rid[++g_nrules] = "drop_column";       rre[g_nrules] = "drop[[:space:]]+column"
+  rid[++g_nrules] = "@drop_constraint";  rre[g_nrules] = ""
+  rid[++g_nrules] = "drop_default";      rre[g_nrules] = "drop[[:space:]]+default"
+  rid[++g_nrules] = "drop_not_null";     rre[g_nrules] = "drop[[:space:]]+not[[:space:]]+null"
+  rid[++g_nrules] = "rename";            rre[g_nrules] = "alter[[:space:]]+.*rename|rename[[:space:]]+(to|column|constraint)"
+  rid[++g_nrules] = "alter_type";        rre[g_nrules] = "alter[[:space:]]+(column[[:space:]]+)?[a-z_\"]+[[:space:]]+(set[[:space:]]+data[[:space:]]+)?type|set[[:space:]]+data[[:space:]]+type"
+  rid[++g_nrules] = "enum_value";        rre[g_nrules] = "alter[[:space:]]+type[[:space:]]+.*(drop|rename)[[:space:]]+value|drop[[:space:]]+value"
+  rid[++g_nrules] = "drop_index";        rre[g_nrules] = "drop[[:space:]]+index"
+  rid[++g_nrules] = "@set_not_null";     rre[g_nrules] = ""
+
+  for (ai = 1; ai < ARGC; ai++) lint_file(ARGV[ai])
+  exit 0
+}
+'
+
+LINT_RAW=''
+if [ "${#EXISTING[@]}" -gt 0 ]; then
+  if ! LINT_RAW="$(awk "${AWK_PROG}" "${EXISTING[@]}")"; then
+    fail "внутренняя ошибка линтера (awk завершился с ошибкой)"
+    exit 2
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# Печать отчёта. Цикл целиком на встроенных командах bash — ни одного fork.
+# -----------------------------------------------------------------------------
+while IFS=$'\t' read -r kind a b c d; do
+  case "${kind}" in
+    S)
+      step "Проверяю ${a##*/}"
+      ;;
+    O)
+      ok "аддитивна — нарушений не найдено"
+      ;;
+    V)
+      case "${c}" in
+        drop_table)
+          reason='запрещён DROP TABLE (удаление таблицы ломает старый код; expand/contract)' ;;
+        drop_column)
+          reason='запрещён DROP COLUMN (удаление колонки ломает старый код; expand/contract)' ;;
+        drop_constraint)
+          reason='запрещён DROP CONSTRAINT (снятие инварианта в одном релизе; expand/contract). Расширение множества CHECK — только парой DROP+ADD того же имени под маркером -- check-migrations:allow-widen-check <proof> (ADR-P1-2)' ;;
+        drop_default)
+          reason='запрещён DROP DEFAULT (старый код, полагавшийся на дефолт, сломается)' ;;
+        drop_not_null)
+          reason='запрещён DROP NOT NULL (ослабление гарантии в одном релизе)' ;;
+        rename)
+          reason='запрещён RENAME (переименование ломает обращение старого кода по имени)' ;;
+        alter_type)
+          reason='запрещена смена типа колонки (ALTER [COLUMN] ... TYPE; возможна потеря данных)' ;;
+        enum_value)
+          reason='запрещено удаление/переименование значения enum (ломает запись старым кодом)' ;;
+        drop_index)
+          reason='запрещён DROP INDEX (снятие индекса убирает инвариант уникальности/идемпотентности; expand/contract)' ;;
+        set_not_null)
+          reason='запрещён SET NOT NULL без DEFAULT (старый код, вставляющий без значения, упадёт)' ;;
+        *)
+          reason="нарушение аддитивности (${c})" ;;
+      esac
+      fail "${a}:${b}: ${reason}"
+      printf "        ${YELLOW}%s${NC}\n" "${d}" >&2
+      violations_total=$((violations_total + 1))
+      RC=1
+      ;;
+  esac
+done <<< "${LINT_RAW}"
 
 # -----------------------------------------------------------------------------
 # Итог.
