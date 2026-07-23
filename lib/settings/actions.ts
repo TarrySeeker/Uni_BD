@@ -61,6 +61,14 @@ export async function uploadStoreImageAction(formData: FormData) {
   return prod.uploadStoreImageAction(formData);
 }
 
+/**
+ * Ручной запуск обновления курсов валют с ЦБ РФ из админки (без ожидания
+ * ночного крона). Право — settings.manage, как у прочих настроек.
+ */
+export async function refreshExchangeRates(raw: unknown) {
+  return prod.refreshExchangeRates(raw);
+}
+
 export async function resetSetting(raw: unknown) {
   return prod.resetSetting(raw);
 }

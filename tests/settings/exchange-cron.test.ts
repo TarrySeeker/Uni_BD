@@ -64,13 +64,14 @@ describe('exchange — extractRate (парсинг ЦБ)', () => {
 
 describe('exchange — applyCbrRates', () => {
   it('обновляет rate у известных валют, symbol/fractionDigits не трогает', () => {
-    const { currencies, updated, missing } = applyCbrRates(
+    const { currencies, updated, missing, skipped } = applyCbrRates(
       [{ code: 'EUR', symbol: '€', rate: 90, fractionDigits: 2 }],
       CBR_FIXTURE,
     );
     expect(currencies[0]).toEqual({ code: 'EUR', symbol: '€', rate: 100.5, fractionDigits: 2 });
     expect(updated).toBe(1);
     expect(missing).toEqual([]);
+    expect(skipped).toEqual([]);
   });
   it('валюта не из ответа ЦБ → прежний rate, попадает в missing', () => {
     const { currencies, updated, missing } = applyCbrRates(
@@ -96,7 +97,7 @@ describe('runUpdateExchangeRates', () => {
       write,
     );
     const stats = await runUpdateExchangeRates(d);
-    expect(stats).toEqual({ ok: true, updated: 1, missing: [] });
+    expect(stats).toEqual({ ok: true, updated: 1, missing: [], skipped: [] });
     expect(write).toHaveBeenCalledTimes(1);
     const written = write.mock.calls[0][0] as ExchangeSettings;
     expect(written.displayCurrencies?.[0].rate).toBe(100.5);

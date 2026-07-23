@@ -67,6 +67,10 @@ export interface EffectiveDisplayCurrency {
   symbol: string;
   rate: number;
   fractionDigits: number;
+  /** Курс задан вручную: ночной крон ЦБ эту валюту не обновляет. */
+  manualRate: boolean;
+  /** Метка обновления курса ИМЕННО этой валюты (null, если не обновлялся). */
+  rateUpdatedAt: string | null;
 }
 
 /** Эффективные настройки магазина (env ⊕ БД). Деньги — в копейках. */
@@ -408,6 +412,10 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
         symbol: d.symbol,
         rate: d.rate,
         fractionDigits: d.fractionDigits ?? 2,
+        // Признак/метка пер-валютные и опциональные в схеме (старые значения БД
+        // их не содержат) → добиваем дефолтами: валюта на автокурсе, не обновлялась.
+        manualRate: d.manualRate ?? false,
+        rateUpdatedAt: d.rateUpdatedAt ?? null,
       })),
       autoRate: exchange.autoRate ?? false,
       rateUpdatedAt: exchange.rateUpdatedAt ?? null,

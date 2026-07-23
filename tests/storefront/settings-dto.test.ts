@@ -26,7 +26,16 @@ function makeEffective(): EffectiveSettings {
     },
     currency: { code: 'RUB', symbol: '₽', locale: 'ru-RU', fractionDigits: 2 },
     exchange: {
-      displayCurrencies: [{ code: 'EUR', symbol: '€', rate: 100, fractionDigits: 2 }],
+      displayCurrencies: [
+        {
+          code: 'EUR',
+          symbol: '€',
+          rate: 100,
+          fractionDigits: 2,
+          manualRate: false,
+          rateUpdatedAt: null,
+        },
+      ],
       autoRate: true,
       rateUpdatedAt: '2026-07-16T10:00:00.000Z',
     },

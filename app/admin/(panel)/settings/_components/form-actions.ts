@@ -20,6 +20,7 @@ import {
   updateAccessSettings as _updateAccess,
   uploadSettingsImageAction as _uploadSettingsImage,
   uploadStoreImageAction as _uploadStoreImage,
+  refreshExchangeRates as _refreshExchangeRates,
   resetSetting as _resetSetting,
 } from '@/lib/settings/actions';
 import type { ActionResult } from '@/lib/server/action';
@@ -60,6 +61,11 @@ export async function uploadStoreImageAction(
   formData: FormData,
 ): Promise<ActionResult<unknown>> {
   return _uploadStoreImage(formData);
+}
+export async function refreshExchangeRatesAction(
+  input: unknown,
+): Promise<ActionResult<unknown>> {
+  return _refreshExchangeRates(input);
 }
 export async function resetSettingAction(input: unknown): Promise<ActionResult<unknown>> {
   return _resetSetting(input);

@@ -65,6 +65,8 @@ export interface UpdateRatesStats {
   updated: number;
   /** Валюты, которых нет в ответе ЦБ (курс оставлен прежним). */
   missing: string[];
+  /** Валюты с ручным курсом (manualRate) — намеренно пропущены прогоном. */
+  skipped: string[];
   /**
    * Причина, по которой прогон не обновил курсы (для лога/диагностики):
    *   'auto_rate_off'   — autoRate выключен (магазин ведёт курс вручную) — no-op;
@@ -93,26 +95,49 @@ export function extractRate(cbr: CbrResponse, code: string): number | null {
 }
 
 /**
- * ЧИСТЫЙ пересчёт: обновляет rate у каждой доп.валюты по данным ЦБ. Валюты, для
- * которых ЦБ не дал курс, остаются с прежним rate (собираются в missing). Базовая
- * валюта и остальные поля (symbol/fractionDigits) не трогаются. Идемпотентно.
+ * Помечена ли валюта как «курс задан вручную». Признак ПЕР-ВАЛЮТНЫЙ и
+ * опциональный: отсутствует → валюта на автокурсе (обратная совместимость со
+ * значениями настроек, записанными до появления признака).
+ */
+export function isManualRate(c: DisplayCurrencySetting): boolean {
+  return c.manualRate === true;
+}
+
+/**
+ * ЧИСТЫЙ пересчёт: обновляет rate у доп.валют по данным ЦБ.
+ *  • валюта с manualRate=true — НЕ трогается вовсе (курс владельца приоритетен),
+ *    попадает в skipped;
+ *  • валюта, которой нет в ответе ЦБ, остаётся с прежним rate → missing;
+ *  • обновлённой валюте ставится СВОЯ метка rateUpdatedAt = now.
+ * symbol/fractionDigits/manualRate не трогаются. Идемпотентно.
  */
 export function applyCbrRates(
   currencies: DisplayCurrencySetting[],
   cbr: CbrResponse,
-): { currencies: DisplayCurrencySetting[]; updated: number; missing: string[] } {
+  now?: string,
+): {
+  currencies: DisplayCurrencySetting[];
+  updated: number;
+  missing: string[];
+  skipped: string[];
+} {
   const missing: string[] = [];
+  const skipped: string[] = [];
   let updated = 0;
   const next = currencies.map((c) => {
+    if (isManualRate(c)) {
+      skipped.push(c.code);
+      return c;
+    }
     const rate = extractRate(cbr, c.code);
     if (rate === null) {
       missing.push(c.code);
-      return c; // ЦБ не дал курс — сохраняем прежний (ручной/предыдущий).
+      return c; // ЦБ не дал курс — сохраняем прежний (предыдущий).
     }
     updated += 1;
-    return { ...c, rate };
+    return now ? { ...c, rate, rateUpdatedAt: now } : { ...c, rate };
   });
-  return { currencies: next, updated, missing };
+  return { currencies: next, updated, missing, skipped };
 }
 
 /** Инъецируемые зависимости воркера (для тестов без сети/БД). */
@@ -131,6 +156,8 @@ export interface UpdateRatesDeps {
    * не задан, база считается неизвестной и прогон идёт как раньше (совместимость).
    */
   readBaseCurrency?: () => Promise<string | null | undefined>;
+  /** Источник «сейчас» в ISO (для детерминированных тестов пер-валютной метки). */
+  now?: () => string;
 }
 
 /**
@@ -147,11 +174,11 @@ export async function runUpdateExchangeRates(
 
   // Магазин ведёт курс вручную → крон не трогает (ручной override приоритетен).
   if (exchange.autoRate !== true) {
-    return { ok: true, updated: 0, missing: [], reason: 'auto_rate_off' };
+    return { ok: true, updated: 0, missing: [], skipped: [], reason: 'auto_rate_off' };
   }
   // Нет доп.валют → нечего обновлять.
   if (currencies.length === 0) {
-    return { ok: true, updated: 0, missing: [], reason: 'no_currencies' };
+    return { ok: true, updated: 0, missing: [], skipped: [], reason: 'no_currencies' };
   }
 
   // База не RUB → курсы ЦБ для этого магазина неверны по построению: не трогаем
@@ -162,8 +189,18 @@ export async function runUpdateExchangeRates(
       console.warn(
         `[exchange/update-rates] базовая валюта магазина ${base} != ${CBR_BASE_CURRENCY}: курсы ЦБ РФ не применяются`,
       );
-      return { ok: true, updated: 0, missing: [], reason: 'unsupported_base' };
+      return { ok: true, updated: 0, missing: [], skipped: [], reason: 'unsupported_base' };
     }
+  }
+
+  // Все доп.валюты ведутся вручную → в ЦБ идти незачем (и писать нечего).
+  if (currencies.every(isManualRate)) {
+    return {
+      ok: true,
+      updated: 0,
+      missing: [],
+      skipped: currencies.map((c) => c.code),
+    };
   }
 
   let cbr: CbrResponse;
@@ -176,10 +213,16 @@ export async function runUpdateExchangeRates(
       '[exchange/update-rates] ЦБ РФ недоступен, курс оставлен прежним:',
       err instanceof Error ? err.message : String(err),
     );
-    return { ok: false, updated: 0, missing: [], reason: 'fetch_failed' };
+    return { ok: false, updated: 0, missing: [], skipped: [], reason: 'fetch_failed' };
   }
 
-  const { currencies: nextCurrencies, updated, missing } = applyCbrRates(currencies, cbr);
+  const now = deps.now ? deps.now() : new Date().toISOString();
+  const {
+    currencies: nextCurrencies,
+    updated,
+    missing,
+    skipped,
+  } = applyCbrRates(currencies, cbr, now);
 
   // Записываем ЦЕЛИКОМ обновлённый exchange (сохраняем autoRate; rateUpdatedAt
   // проставит writeExchange). Пишем даже если updated=0, но какие-то валюты нашлись?
@@ -191,7 +234,7 @@ export async function runUpdateExchangeRates(
     });
   }
 
-  return { ok: true, updated, missing };
+  return { ok: true, updated, missing, skipped };
 }
 
 /**

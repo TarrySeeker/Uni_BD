@@ -97,7 +97,7 @@ describe('runUpdateExchangeRates — гейт базовой валюты', () =
 
     const stats = await runUpdateExchangeRates(d);
 
-    expect(stats).toEqual({ ok: true, updated: 1, missing: [] });
+    expect(stats).toEqual({ ok: true, updated: 1, missing: [], skipped: [] });
     expect(write).toHaveBeenCalledTimes(1);
     expect((write.mock.calls[0][0] as ExchangeSettings).displayCurrencies?.[0].rate).toBe(100.5);
   });

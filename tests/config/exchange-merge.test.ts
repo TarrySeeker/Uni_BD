@@ -36,8 +36,17 @@ describe('config/settings — exchange merge', () => {
     ]);
     expect(eff.exchange.autoRate).toBe(true);
     expect(eff.exchange.rateUpdatedAt).toBe('2026-07-16T10:00:00.000Z');
+    // manualRate/rateUpdatedAt — пер-валютные признаки: в значении их нет →
+    // добиваются дефолтами (валюта на автокурсе, отдельной метки нет).
     expect(eff.exchange.displayCurrencies).toEqual([
-      { code: 'EUR', symbol: '€', rate: 100.5, fractionDigits: 2 },
+      {
+        code: 'EUR',
+        symbol: '€',
+        rate: 100.5,
+        fractionDigits: 2,
+        manualRate: false,
+        rateUpdatedAt: null,
+      },
     ]);
   });
 

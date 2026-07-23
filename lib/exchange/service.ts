@@ -9,8 +9,9 @@
  */
 
 import { getSetting, upsertSetting } from '@/lib/settings/repository';
-import { invalidateSettingsCache } from '@/lib/config/settings';
+import { invalidateSettingsCache, getEffectiveSettings } from '@/lib/config/settings';
 import { parseSettingValue, type ExchangeSettings } from '@/lib/settings/schemas';
+import { mergeCronRates } from './merge';
 import {
   runUpdateExchangeRates,
   defaultFetchCbr,
@@ -30,8 +31,13 @@ async function readExchangeFromDb(): Promise<ExchangeSettings> {
  * (read-your-own-writes — витрина сразу увидит новый курс).
  */
 async function writeExchangeToDb(value: ExchangeSettings): Promise<void> {
+  // Гонка read-modify-write: между чтением воркера и этой записью владелец мог
+  // сохранить форму (в т.ч. пометить валюту ручной). Читаем СВЕЖИЙ снимок прямо
+  // перед upsert и накладываем на него только курсы автоматических валют.
+  const latest = await readExchangeFromDb();
+  const merged = mergeCronRates(latest, value.displayCurrencies ?? []);
   const toStore: ExchangeSettings = {
-    ...value,
+    ...merged,
     rateUpdatedAt: new Date().toISOString(),
   };
   // Ре-валидация схемой перед записью (rate>0 и т.п.) — как admin-путь.
@@ -43,12 +49,32 @@ async function writeExchangeToDb(value: ExchangeSettings): Promise<void> {
   invalidateSettingsCache();
 }
 
-/** Прод-зависимости воркера (реальный fetch ЦБ + чтение/запись настроек). */
+/**
+ * Базовая валюта магазина для гейта применимости ЦБ. Graceful: настройки не
+ * читаются → база неизвестна, гейт не срабатывает (недоступность БД не должна
+ * тихо замораживать курс на штатном рублёвом магазине).
+ */
+async function readBaseCurrencyFromDb(): Promise<string | null | undefined> {
+  try {
+    return (await getEffectiveSettings()).currency.code ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Прод-зависимости воркера (реальный fetch ЦБ + чтение/запись настроек).
+ *
+ * readBaseCurrency обязателен именно здесь: раньше гейт «база не RUB» жил ТОЛЬКО
+ * в HTTP-роуте, поэтому любой другой вызов воркера (ручной запуск из админки,
+ * будущий внутренний планировщик) писал бы курсы ЦБ на не-рублёвый магазин.
+ */
 export function productionExchangeDeps(): UpdateRatesDeps {
   return {
     fetchCbr: () => defaultFetchCbr(),
     readExchange: readExchangeFromDb,
     writeExchange: writeExchangeToDb,
+    readBaseCurrency: readBaseCurrencyFromDb,
   };
 }
 

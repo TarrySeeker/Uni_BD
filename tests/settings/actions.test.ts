@@ -189,9 +189,12 @@ describe('settings/actions — currency/units и legal/contacts', () => {
     const exchangeCall = calls.find((c) => c[0] === 'exchange');
     const stored = exchangeCall?.[1] as Record<string, unknown>;
     expect(stored.autoRate).toBe(true);
-    expect(stored.displayCurrencies).toEqual([
+    // Новая валюта получает и ПЕР-ВАЛЮТНУЮ метку обновления курса.
+    expect(stored.displayCurrencies).toMatchObject([
       { code: 'EUR', symbol: '€', rate: 100, fractionDigits: 2 },
     ]);
+    const first = (stored.displayCurrencies as Record<string, unknown>[])[0];
+    expect(typeof first.rateUpdatedAt).toBe('string');
     // Ручное сохранение курса ставит rateUpdatedAt (метка «когда обновлён»).
     expect(typeof stored.rateUpdatedAt).toBe('string');
   });

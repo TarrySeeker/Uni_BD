@@ -43,6 +43,7 @@ import {
   homeSchema,
   navigationSchema,
   accessSchema,
+  parseSettingValue,
   SETTING_KEYS,
 } from '@/lib/settings/schemas';
 import {
@@ -52,6 +53,9 @@ import {
   type ShopSettingRow,
 } from '@/lib/settings/repository';
 import { invalidateSettingsCache } from '@/lib/config/settings';
+import { runUpdateExchangeRatesProd } from '@/lib/exchange/service';
+import { stampManualSave } from '@/lib/exchange/merge';
+import type { UpdateRatesStats } from '@/lib/exchange/cron';
 import { getStorage as defaultGetStorage } from '@/lib/storage';
 import { validateUpload as defaultValidateUpload } from '@/lib/storage/validate';
 import { generatePreviews as defaultGeneratePreviews } from '@/lib/storage/image';
@@ -146,6 +150,13 @@ const moduleOverridesShape = Object.fromEntries(
 export const ModuleOverridesInputSchema = z.object({
   moduleOverrides: z.object(moduleOverridesShape).strict(),
 });
+/**
+ * Ручной запуск обновления курсов ЦБ из админки (без ожидания ночного крона).
+ * Входа нет — форма шлёт пустой объект; `.strip()`, чтобы лишние поля не роняли
+ * действие валидацией.
+ */
+export const RefreshExchangeRatesInputSchema = z.object({}).strip();
+
 /** reset: ключ обязан быть известным разделом настроек (иначе validation). */
 export const ResetSettingInputSchema = z.object({
   key: z.enum(SETTING_KEYS),
@@ -224,6 +235,11 @@ export interface SettingsActionDeps {
   generatePreviews: (bytes: Buffer) => Promise<PreviewSet>;
   /** Фабрика хранилища объектов (S3 или local mock). */
   getStorage: () => ObjectStorage;
+  /**
+   * Прогон обновления курсов ЦБ (ручной запуск из админки). Опционально: по
+   * умолчанию берётся прод-воркер lib/exchange/service.
+   */
+  runExchangeUpdate?: () => Promise<UpdateRatesStats>;
 }
 
 /** Пути инвалидации витрины (форматирование цен/брендинг). */
@@ -263,6 +279,7 @@ export function productionSettingsDeps(): SettingsActionDeps {
     validateUpload: defaultValidateUpload,
     generatePreviews: defaultGeneratePreviews,
     getStorage: defaultGetStorage,
+    runExchangeUpdate: runUpdateExchangeRatesProd,
   };
 }
 
@@ -315,7 +332,16 @@ export function createSettingsActions(deps: SettingsActionDeps) {
       // value записывается ЦЕЛИКОМ (JSONB-оверрайд ключа).
       let exchangeValue: Record<string, unknown> | undefined;
       if (data.exchange) {
-        exchangeValue = { ...data.exchange, rateUpdatedAt: new Date().toISOString() };
+        const now = new Date().toISOString();
+        // Пер-валютная метка обновляется только у валют с реально изменённым
+        // курсом — иначе сохранение соседней настройки выдавало бы подтянутый
+        // кроном автокурс за «только что введённый вручную».
+        const prev = parseSettingValue('exchange', before.exchange) ?? {};
+        exchangeValue = {
+          ...data.exchange,
+          displayCurrencies: stampManualSave(prev, data.exchange.displayCurrencies ?? [], now),
+          rateUpdatedAt: now,
+        };
         await deps.upsertSetting('exchange', exchangeValue, ctx.user.id);
       }
       if (data.units) await deps.upsertSetting('units', data.units, ctx.user.id);
@@ -685,6 +711,48 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     return _uploadStoreImage({ filename, bytes });
   };
 
+  /**
+   * Ручной запуск обновления курсов ЦБ из админки (C3).
+   *
+   * Зачем: сняв у валюты признак «ручной курс», владелец не должен ждать ночного
+   * крона — курс подтягивается сразу. Права те же, что у прочих настроек
+   * (settings.manage), т.е. это НЕ обходной путь к защищённому cron-роуту.
+   * Валюты, оставшиеся ручными, прогон по-прежнему не трогает.
+   */
+  const refreshExchangeRates = defineAction({
+    permission: 'settings.manage',
+    input: RefreshExchangeRatesInputSchema,
+    deps: actionDeps,
+    handler: async (_data, _ctx: ActionCtx) => {
+      const run = deps.runExchangeUpdate ?? runUpdateExchangeRatesProd;
+      const stats = await run();
+      if (!stats.ok) {
+        // Внешний источник не ответил — прежние курсы целы, сообщаем владельцу.
+        throw new PublicActionError(
+          'Не удалось получить курсы с ЦБ РФ. Прежние курсы сохранены, попробуйте позже.',
+        );
+      }
+      // Воркер уже инвалидировал кеш настроек, но действие обязано отдать
+      // свежие данные и странице админки тоже.
+      deps.invalidateCache();
+      return {
+        result: stats,
+        revalidate: ['/admin', SETTINGS_PATH, ...STOREFRONT_PATHS],
+        audit: {
+          action: 'settings.exchange.refresh',
+          entityType: 'shop_settings',
+          entityId: 'exchange',
+          after: {
+            updated: stats.updated,
+            missing: stats.missing,
+            skipped: stats.skipped,
+            reason: stats.reason ?? null,
+          },
+        },
+      };
+    },
+  });
+
   const resetSetting = defineAction({
     permission: 'settings.manage',
     input: ResetSettingInputSchema,
@@ -719,6 +787,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     updateAccessSettings,
     uploadSettingsImageAction,
     uploadStoreImageAction,
+    refreshExchangeRates,
     resetSetting,
   };
 }
