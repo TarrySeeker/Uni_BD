@@ -30,6 +30,23 @@ import type { ExchangeSettings, DisplayCurrencySetting } from '@/lib/settings/sc
 /** Публичный URL JSON ЦБ РФ (cbr-xml-daily). Переопределяется env EXCHANGE_CBR_URL. */
 export const CBR_JSON_URL = 'https://www.cbr-xml-daily.ru/daily_json.js';
 
+/** Единственная базовая валюта магазина, к которой применимы курсы ЦБ РФ. */
+export const CBR_BASE_CURRENCY = 'RUB';
+
+/**
+ * Применим ли источник ЦБ РФ к магазину с такой базовой валютой.
+ *
+ * WHY: ЦБ отдаёт «рублей за единицу валюты», а витрина делит цену БАЗОВОЙ валюты
+ * на rate. На магазине с базой не-RUB (платформа мультитенантная, форма настроек
+ * разрешает любой ISO-код) те же числа означали бы другой курс → молча испорченные
+ * цены. Неизвестная база (настройки не прочитались) не блокирует прогон — иначе
+ * недоступность БД тихо заморозила бы курс на штатном рублёвом магазине.
+ */
+export function isCbrBaseSupported(code: string | null | undefined): boolean {
+  if (!code || !code.trim()) return true;
+  return code.trim().toUpperCase() === CBR_BASE_CURRENCY;
+}
+
 /** Одна запись валюты в ответе ЦБ (нас интересуют Value и Nominal). */
 export interface CbrValute {
   Value: number;
@@ -53,9 +70,11 @@ export interface UpdateRatesStats {
    *   'auto_rate_off'   — autoRate выключен (магазин ведёт курс вручную) — no-op;
    *   'no_currencies'   — доп.валют нет — нечего обновлять — no-op;
    *   'fetch_failed'    — ЦБ недоступен/невалидный JSON — прежний курс сохранён;
+   *   'unsupported_base'— базовая валюта магазина не RUB → курсы ЦБ неприменимы,
+   *                       настройки не тронуты (это не сбой, а неприменимость);
    *   undefined         — успешный прогон.
    */
-  reason?: 'auto_rate_off' | 'no_currencies' | 'fetch_failed';
+  reason?: 'auto_rate_off' | 'no_currencies' | 'fetch_failed' | 'unsupported_base';
 }
 
 /**
@@ -107,6 +126,11 @@ export interface UpdateRatesDeps {
    * repository + invalidateCache). Ставит rateUpdatedAt внутри реализации.
    */
   writeExchange: (value: ExchangeSettings) => Promise<void>;
+  /**
+   * Базовая валюта магазина (settings.currency.code). Опционально: если источник
+   * не задан, база считается неизвестной и прогон идёт как раньше (совместимость).
+   */
+  readBaseCurrency?: () => Promise<string | null | undefined>;
 }
 
 /**
@@ -128,6 +152,18 @@ export async function runUpdateExchangeRates(
   // Нет доп.валют → нечего обновлять.
   if (currencies.length === 0) {
     return { ok: true, updated: 0, missing: [], reason: 'no_currencies' };
+  }
+
+  // База не RUB → курсы ЦБ для этого магазина неверны по построению: не трогаем
+  // настройки (ручной курс владельца остаётся в силе) и не ходим в ЦБ.
+  if (deps.readBaseCurrency) {
+    const base = await deps.readBaseCurrency();
+    if (!isCbrBaseSupported(base)) {
+      console.warn(
+        `[exchange/update-rates] базовая валюта магазина ${base} != ${CBR_BASE_CURRENCY}: курсы ЦБ РФ не применяются`,
+      );
+      return { ok: true, updated: 0, missing: [], reason: 'unsupported_base' };
+    }
   }
 
   let cbr: CbrResponse;

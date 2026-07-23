@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 
 import type { Designer } from '@/lib/designers/types';
@@ -11,6 +11,7 @@ import {
   uploadDesignerImageAction,
 } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
+import { DESIGNER_LIST_PATH, buildDesignerHref } from './designer-list-url';
 import type { ActionResult } from '@/lib/server/action';
 import { SeoFieldset, type SeoFieldsetValue } from '../../_components/SeoFieldset';
 import {
@@ -48,6 +49,8 @@ export function DesignerForm({
   defaultLocale?: string;
 }) {
   const router = useRouter();
+  // Поиск/порядок списка пришли сюда в query — возврат обязан их вернуть.
+  const listQuery = useSearchParams().toString();
   const isEdit = designer !== null;
   const fileRef = useRef<HTMLInputElement>(null);
   const [translations, setTranslations] = useState<TranslationsState>(
@@ -122,7 +125,7 @@ export function DesignerForm({
         setSuccess('Изменения сохранены.');
         router.refresh();
       } else {
-        router.push(`/admin/catalog/designers/${result.data.id}`);
+        router.push(buildDesignerHref(`${DESIGNER_LIST_PATH}/${result.data.id}`, listQuery));
       }
     } else {
       setError(result);
@@ -255,7 +258,7 @@ export function DesignerForm({
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
             {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать дизайнера'}
           </button>
-          <button type="button" onClick={() => router.push('/admin/catalog/designers')}
+          <button type="button" onClick={() => router.push(buildDesignerHref(DESIGNER_LIST_PATH, listQuery))}
             className="text-sm text-gray-600 hover:underline">
             Отмена
           </button>

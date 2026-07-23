@@ -10,7 +10,19 @@ export {
   getDesignerById,
   getDesignerBySlug,
   getActiveDesignerBySlug,
+  type DesignerListOptions,
 } from './repository';
+export {
+  DESIGNER_SORTS,
+  DEFAULT_DESIGNER_SORT,
+  ADMIN_DEFAULT_DESIGNER_SORT,
+  isDesignerSort,
+  parseDesignerListParams,
+  sortDesignersByName,
+  applyDesignerSort,
+  type DesignerSort,
+  type DesignerListParams,
+} from './sort';
 export {
   DesignerCreateSchema,
   DesignerUpdateSchema,

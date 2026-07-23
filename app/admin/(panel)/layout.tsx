@@ -58,7 +58,13 @@ export default async function AdminLayout({
       />
       <div className="flex flex-1 flex-col md:flex-row">
         <Sidebar items={nav} />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        {/*
+          min-w-0 обязателен: у flex-элемента min-width:auto, т.е. <main> не может
+          стать уже своего min-content. Без него широкая таблица раздела распирала
+          всю страницу (вбок ехали и Topbar, и Sidebar) вместо того, чтобы
+          прокручиваться внутри собственной обёртки overflow-x-auto.
+        */}
+        <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

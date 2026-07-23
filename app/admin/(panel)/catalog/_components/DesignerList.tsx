@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import type { Designer } from '@/lib/designers/types';
 
 import { deleteDesignerAction } from './form-actions';
 import { errorMessage } from './action-result';
+import { DESIGNER_LIST_PATH, buildDesignerHref } from './designer-list-url';
 import type { ActionResult } from '@/lib/server/action';
 
 /**
@@ -21,6 +22,9 @@ export type DesignerListItem = Designer & { imageUrl: string | null };
 
 export function DesignerList({ designers }: { designers: DesignerListItem[] }) {
   const router = useRouter();
+  // Поиск/порядок списка живут в query. Карточка обязана получить их ссылкой:
+  // иначе useSearchParams() в форме пуст и «Отмена» выбрасывает в начало списка.
+  const listQuery = useSearchParams().toString();
   const [error, setError] = useState<Fail | null>(null);
 
   async function remove(designer: Designer) {
@@ -65,43 +69,46 @@ export function DesignerList({ designers }: { designers: DesignerListItem[] }) {
                 </td>
               </tr>
             ) : (
-              designers.map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2">
-                    {d.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={d.imageUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
-                    ) : (
-                      <span className="text-gray-300" aria-hidden="true">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    <Link href={`/admin/catalog/designers/${d.id}`} className="font-medium text-blue-700 hover:underline">
-                      {d.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2 text-gray-600"><code className="text-xs">{d.slug}</code></td>
-                  <td className="px-4 py-2 text-gray-600">{d.country || '—'}</td>
-                  <td className="px-4 py-2 text-gray-600">{d.isActive ? 'да' : 'нет'}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex justify-end gap-2">
-                      <Link
-                        href={`/admin/catalog/designers/${d.id}`}
-                        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                      >
-                        Редактировать
+              designers.map((d) => {
+                const cardHref = buildDesignerHref(`${DESIGNER_LIST_PATH}/${d.id}`, listQuery);
+                return (
+                  <tr key={d.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2">
+                      {d.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={d.imageUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                      ) : (
+                        <span className="text-gray-300" aria-hidden="true">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      <Link href={cardHref} className="font-medium text-blue-700 hover:underline">
+                        {d.name}
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => remove(d)}
-                        className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-4 py-2 text-gray-600"><code className="text-xs">{d.slug}</code></td>
+                    <td className="px-4 py-2 text-gray-600">{d.country || '—'}</td>
+                    <td className="px-4 py-2 text-gray-600">{d.isActive ? 'да' : 'нет'}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex justify-end gap-2">
+                        <Link
+                          href={cardHref}
+                          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                        >
+                          Редактировать
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => remove(d)}
+                          className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -10,8 +10,10 @@
  */
 
 import { sql } from '@/lib/db/client';
+import { escapeLike } from '@/lib/db/like';
 import type { TranslationsMap } from '@/lib/i18n';
 
+import { applyDesignerSort, type DesignerSort } from './sort';
 import type { Designer, DesignerSocials } from './types';
 
 // -----------------------------------------------------------------------------
@@ -76,11 +78,33 @@ export function mapDesigner(row: Record<string, unknown>): Designer {
 // уровне модуля, иначе ленивый клиент дёрнется при импорте без DATABASE_URL
 // (тот же инвариант, что у listBrands — см. lib/catalog/repository).
 
-/** Список дизайнеров; по умолчанию все, опционально только активные. */
+/** Опции списка дизайнеров. Все поля необязательны — см. инвариант в listDesigners. */
+export interface DesignerListOptions {
+  activeOnly?: boolean;
+  /** Подстрока для ILIKE по имени/стране/slug. Пустая строка = поиск выключен. */
+  search?: string;
+  /** Порядок; 'manual' (дефолт) = как отдала БД. */
+  sort?: DesignerSort;
+  /** Локаль коллатора для алфавита (настройка магазина). */
+  locale?: string;
+}
+
+/**
+ * Список дизайнеров; по умолчанию все, опционально только активные.
+ *
+ * ИНВАРИАНТ: вызов без аргументов ведёт себя ровно как раньше — searchTerm = null
+ * гасит условие поиска, sort = 'manual' не переупорядочивает результат. На этом
+ * держатся публичный Storefront API и селекты дизайнера в форме товара.
+ *
+ * Алфавит считается в приложении (Intl.Collator), а не в SQL: см. ./sort.ts.
+ */
 export async function listDesigners(
-  opts: { activeOnly?: boolean } = {},
+  opts: DesignerListOptions = {},
 ): Promise<Designer[]> {
   const activeOnly = opts.activeOnly ?? false;
+  const search = opts.search?.trim();
+  const searchTerm = search ? `%${escapeLike(search)}%` : null;
+
   const rows = await sql<Record<string, unknown>[]>`
     SELECT id, slug, name, country, description, image_key, page_image_key,
            video_url, socials, work_count, is_active, sort,
@@ -88,9 +112,13 @@ export async function listDesigners(
            canonical_url, noindex, translations, created_at, updated_at
     FROM designers
     WHERE (${activeOnly} = false OR is_active = true)
+      AND (${searchTerm}::text IS NULL
+           OR name ILIKE ${searchTerm}
+           OR country ILIKE ${searchTerm}
+           OR slug::text ILIKE ${searchTerm})
     ORDER BY sort, name
   `;
-  return rows.map(mapDesigner);
+  return applyDesignerSort(rows.map(mapDesigner), opts.sort, opts.locale);
 }
 
 /** Дизайнер по id или null. */

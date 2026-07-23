@@ -3,13 +3,23 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
-import type { Brand, CategoryTreeNode } from '@/lib/catalog/types';
+import {
+  buildProductListQuery,
+  buildProductListResetQuery,
+} from '@/lib/catalog/list-filters';
+import type { CategoryTreeNode } from '@/lib/catalog/types';
 import { PRODUCT_STATUSES, type ProductStatus } from '@/lib/catalog/types';
+import type { Designer } from '@/lib/designers/types';
 
 /**
  * Панель фильтров списка товаров (docs/05 §5.2). Состояние фильтров живёт в URL
- * (shareable): поиск, статус, бренд, категория, флаги. Сабмит формирует
+ * (shareable): поиск, статус, дизайнер, категория, флаги. Сабмит формирует
  * querystring и навигирует — серверная страница перечитывает listProducts.
+ *
+ * Фасет по бренду убран из панели по ТЗ владельца (п.3) в пользу дизайнера;
+ * репозиторий brandId по-прежнему поддерживает, старые ссылки ?brandId=… живы.
+ * Поэтому querystring собирает buildProductListQuery: параметры без контрола
+ * (brandId, sort) переносятся из текущего URL, иначе «Применить» стёр бы их.
  */
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
@@ -32,10 +42,10 @@ function flattenCategories(
 }
 
 export function ProductFilters({
-  brands,
+  designers,
   categoryTree,
 }: {
-  brands: Brand[];
+  designers: Designer[];
   categoryTree: CategoryTreeNode[];
 }) {
   const router = useRouter();
@@ -43,7 +53,7 @@ export function ProductFilters({
 
   const [search, setSearch] = useState(params.get('search') ?? '');
   const [status, setStatus] = useState(params.get('status') ?? '');
-  const [brandId, setBrandId] = useState(params.get('brandId') ?? '');
+  const [designerId, setDesignerId] = useState(params.get('designerId') ?? '');
   const [categoryId, setCategoryId] = useState(params.get('categoryId') ?? '');
   const [isFeatured, setIsFeatured] = useState(params.get('isFeatured') === '1');
   const [isNew, setIsNew] = useState(params.get('isNew') === '1');
@@ -51,29 +61,34 @@ export function ProductFilters({
 
   const categories = flattenCategories(categoryTree);
 
+  function go(query: string) {
+    router.push(`/admin/catalog${query ? `?${query}` : ''}`);
+  }
+
   function submit(e: FormEvent) {
     e.preventDefault();
-    const next = new URLSearchParams();
-    if (search.trim()) next.set('search', search.trim());
-    if (status) next.set('status', status);
-    if (brandId) next.set('brandId', brandId);
-    if (categoryId) next.set('categoryId', categoryId);
-    if (isFeatured) next.set('isFeatured', '1');
-    if (isNew) next.set('isNew', '1');
-    if (onSale) next.set('onSale', '1');
-    // Сброс на первую страницу при изменении фильтров.
-    router.push(`/admin/catalog${next.toString() ? `?${next.toString()}` : ''}`);
+    go(
+      buildProductListQuery(params, {
+        search,
+        status,
+        designerId,
+        categoryId,
+        isFeatured,
+        isNew,
+        onSale,
+      }),
+    );
   }
 
   function reset() {
     setSearch('');
     setStatus('');
-    setBrandId('');
+    setDesignerId('');
     setCategoryId('');
     setIsFeatured(false);
     setIsNew(false);
     setOnSale(false);
-    router.push('/admin/catalog');
+    go(buildProductListResetQuery(params));
   }
 
   return (
@@ -117,19 +132,19 @@ export function ProductFilters({
         </div>
 
         <div>
-          <label htmlFor="f-brand" className="block text-xs font-medium text-gray-600">
-            Бренд
+          <label htmlFor="f-designer" className="block text-xs font-medium text-gray-600">
+            Дизайнер
           </label>
           <select
-            id="f-brand"
-            value={brandId}
-            onChange={(e) => setBrandId(e.target.value)}
+            id="f-designer"
+            value={designerId}
+            onChange={(e) => setDesignerId(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
             <option value="">Любой</option>
-            {brands.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
+            {designers.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
               </option>
             ))}
           </select>

@@ -2,8 +2,17 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 
+import {
+  childCount,
+  expandAll,
+  initialExpanded,
+  isNodeExpanded,
+  parseExpandedState,
+  pathTo,
+  visibleRows,
+} from '@/lib/catalog/tree';
 import type { CategoryTreeNode } from '@/lib/catalog/types';
 
 import {
@@ -23,6 +32,11 @@ import type { ActionResult } from '@/lib/server/action';
  * UX: переименование и перемещение делаются ПРЯМО в строке (inline-поле и
  * выпадающий список родителя), БЕЗ window.prompt и ручного ввода UUID — раньше
  * владелец-неспециалист не мог переместить категорию (требовался машинный ID).
+ *
+ * ТЗ владельца п.1: дерево раскрывается по «+» — раньше оно рендерилось целиком
+ * развёрнутым, и на реальном каталоге список был нечитаемо длинным. Логика
+ * видимости строк — чистые функции lib/catalog/tree (isNodeExpanded/visibleRows/
+ * expandAll/pathTo), покрытые юнитами; здесь только состояние и вёрстка.
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
@@ -49,6 +63,45 @@ function selfAndDescendants(node: CategoryTreeNode): Set<string> {
   return ids;
 }
 
+/** Ключ хранения раскрытых веток. Инстанс платформы = один магазин. */
+const EXPANDED_STORAGE_KEY = 'admik:catalog:categories:expanded';
+
+// localStorage — внешнее хранилище, у которого есть серверный снимок (его нет),
+// поэтому читаем его через useSyncExternalStore, а не через setState в эффекте:
+// так нет ни hydration mismatch, ни react-hooks/set-state-in-effect.
+const expandedListeners = new Set<() => void>();
+
+function subscribeExpanded(onStoreChange: () => void): () => void {
+  expandedListeners.add(onStoreChange);
+  window.addEventListener('storage', onStoreChange);
+  return () => {
+    expandedListeners.delete(onStoreChange);
+    window.removeEventListener('storage', onStoreChange);
+  };
+}
+
+/** Снимок ДОЛЖЕН быть стабильным примитивом — новый Set каждый вызов зациклил бы рендер. */
+function readExpandedSnapshot(): string | null {
+  try {
+    return window.localStorage.getItem(EXPANDED_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function serverExpandedSnapshot(): null {
+  return null;
+}
+
+function writeExpandedSnapshot(ids: ReadonlySet<string>): void {
+  try {
+    window.localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* приватный режим/переполнение — персист не критичен */
+  }
+  for (const listener of expandedListeners) listener();
+}
+
 export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
@@ -58,47 +111,90 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
   const [newSlug, setNewSlug] = useState('');
   const [newParent, setNewParent] = useState('');
 
-  // Какой узел сейчас редактируется/перемещается (inline).
+  // Какой узел сейчас редактируется/перемещается/показывает меню действий (inline).
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [moveId, setMoveId] = useState<string | null>(null);
   const [moveParent, setMoveParent] = useState('');
+  const [menuId, setMenuId] = useState<string | null>(null);
+
+  // Раскрытые ветки: сохранённый снимок (внешнее хранилище) + override текущей
+  // сессии, у которого приоритет. Серверный снимок — null, поэтому SSR и первый
+  // клиентский рендер совпадают, а сохранённое состояние React применяет сам.
+  const storedRaw = useSyncExternalStore(
+    subscribeExpanded,
+    readExpandedSnapshot,
+    serverExpandedSnapshot,
+  );
+  const [override, setOverride] = useState<Set<string> | null>(null);
+  const expanded = useMemo(
+    () => override ?? parseExpandedState(storedRaw) ?? initialExpanded(tree),
+    [override, storedRaw, tree],
+  );
 
   const options = flatten(tree);
+  const rows = visibleRows(tree, expanded);
+
+  /** Единственная точка изменения раскрытия: состояние + персист сразу, без эффекта. */
+  function applyExpanded(next: Set<string>) {
+    setOverride(next);
+    writeExpandedSnapshot(next);
+  }
+
+  function toggle(id: string) {
+    const next = new Set(expanded);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    applyExpanded(next);
+  }
+
+  /** Раскрыть ветку до узла — чтобы созданная/перемещённая категория была видна. */
+  function reveal(id: string | null) {
+    if (!id) return;
+    const path = pathTo(tree, id);
+    if (path.length === 0) return;
+    applyExpanded(new Set([...expanded, ...path]));
+  }
 
   async function run<T>(
     fn: () => Promise<ActionResult<T>>,
     okMsg: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     setError(null);
     setNotice(null);
     const result = await fn();
     if (result.ok) {
       setNotice(okMsg);
       router.refresh();
-    } else {
-      setError(result);
+      return true;
     }
+    setError(result);
+    return false;
   }
 
   async function create() {
     if (!newName.trim()) return;
-    await run(
+    const parentId = newParent || null;
+    const ok = await run(
       () =>
         createCategoryAction({
           name: newName.trim(),
           slug: newSlug.trim() || undefined,
-          parentId: newParent || null,
+          parentId,
         }),
       'Категория создана.',
     );
-    setNewName('');
-    setNewSlug('');
-    setNewParent('');
+    if (ok) {
+      reveal(parentId);
+      setNewName('');
+      setNewSlug('');
+      setNewParent('');
+    }
   }
 
   function startRename(node: CategoryTreeNode) {
     setMoveId(null);
+    setMenuId(null);
     setRenameId(node.id);
     setRenameValue(node.name);
   }
@@ -111,15 +207,20 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
 
   function startMove(node: CategoryTreeNode) {
     setRenameId(null);
+    setMenuId(null);
     setMoveId(node.id);
     setMoveParent(node.parentId ?? '');
   }
 
   async function saveMove(node: CategoryTreeNode) {
-    await run(
-      () => moveCategoryAction({ id: node.id, parentId: moveParent || null }),
+    const parentId = moveParent || null;
+    const ok = await run(
+      () => moveCategoryAction({ id: node.id, parentId }),
       'Категория перемещена.',
     );
+    if (ok) {
+      reveal(parentId);
+    }
     setMoveId(null);
   }
 
@@ -128,9 +229,36 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
   function renderNode(node: CategoryTreeNode, depth: number) {
     const forbidden = selfAndDescendants(node); // нельзя сделать родителем себя/потомка
     const parentOptions = options.filter((o) => !forbidden.has(o.id));
+    const kids = childCount(node);
+    const isExpanded = isNodeExpanded(node, expanded);
+    const childrenId = `category-children-${node.id}`;
     return (
       <li key={node.id} className="py-1">
         <div className="flex flex-wrap items-center gap-2" style={{ paddingLeft: depth * 16 }}>
+          {kids > 0 ? (
+            <button
+              type="button"
+              onClick={() => toggle(node.id)}
+              aria-expanded={isExpanded}
+              // поддерево есть в DOM только раскрытым; ссылка на несуществующий id
+              // ломает скринридер, а рендерить всё дерево скрытым дорого (дерево
+              // магазина может быть большим) — по WAI-ARIA хватает aria-expanded
+              aria-controls={isExpanded ? childrenId : undefined}
+              aria-label={
+                isExpanded
+                  ? `Свернуть подкатегории «${node.name}»`
+                  : `Показать подкатегории «${node.name}»`
+              }
+              title={isExpanded ? 'Свернуть подкатегории' : 'Показать подкатегории'}
+              className="h-6 w-6 shrink-0 rounded border border-gray-300 text-sm font-bold leading-none text-gray-700 hover:bg-gray-100"
+            >
+              {isExpanded ? '−' : '+'}
+            </button>
+          ) : (
+            // распорка вместо кнопки — иначе строки листьев уезжают влево
+            <span aria-hidden="true" className="inline-block h-6 w-6 shrink-0" />
+          )}
+
           {renameId === node.id ? (
             <>
               <input
@@ -171,47 +299,69 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
           ) : (
             <>
               <span className="text-sm text-gray-800">{node.name}</span>
+              {kids > 0 ? (
+                <span className="text-xs text-gray-500" title="Подкатегорий внутри">
+                  ({kids})
+                </span>
+              ) : null}
               {!node.isActive ? <span className="text-xs text-amber-700">(скрыта)</span> : null}
-              <button type="button" onClick={() => startRename(node)} className={`${btn} text-gray-700`}>
-                Переименовать
-              </button>
-              <button type="button" onClick={() => startMove(node)} className={`${btn} text-gray-700`}>
-                Переместить
-              </button>
-              {/* C4: скрыть/показать категорию (is_active) — синхронизирует видимость
-                  на витрине через updateCategory (COALESCE is_active). */}
-              <button
-                type="button"
-                onClick={() =>
-                  void run(
-                    () => updateCategoryAction({ id: node.id, isActive: !node.isActive }),
-                    node.isActive ? 'Категория скрыта на сайте.' : 'Категория показана на сайте.',
-                  )
-                }
-                className={`${btn} ${node.isActive ? 'text-amber-700' : 'text-green-700'}`}
-              >
-                {node.isActive ? 'Скрыть' : 'Показать'}
-              </button>
               {/* C13: переход к полной форме категории (описание + SEO/OG). */}
               <Link href={`/admin/catalog/categories/${node.id}`} className={`${btn} text-gray-700`}>
                 Изменить
               </Link>
+              {/* Редкие действия убраны под «Ещё» — иначе строка длиннее имени категории. */}
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm(`Удалить категорию «${node.name}»?`)) {
-                    void run(() => deleteCategoryAction({ id: node.id }), 'Категория удалена.');
-                  }
+                  setRenameId(null);
+                  setMoveId(null);
+                  setMenuId(menuId === node.id ? null : node.id);
                 }}
-                className={`${btn} text-red-600`}
+                aria-expanded={menuId === node.id}
+                className={`${btn} text-gray-600`}
               >
-                Удалить
+                Ещё {menuId === node.id ? '▴' : '▾'}
               </button>
+              {menuId === node.id ? (
+                <>
+                  <button type="button" onClick={() => startRename(node)} className={`${btn} text-gray-700`}>
+                    Переименовать
+                  </button>
+                  <button type="button" onClick={() => startMove(node)} className={`${btn} text-gray-700`}>
+                    Переместить
+                  </button>
+                  {/* C4: скрыть/показать категорию (is_active) — синхронизирует видимость
+                      на витрине через updateCategory (COALESCE is_active). */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void run(
+                        () => updateCategoryAction({ id: node.id, isActive: !node.isActive }),
+                        node.isActive ? 'Категория скрыта на сайте.' : 'Категория показана на сайте.',
+                      )
+                    }
+                    className={`${btn} ${node.isActive ? 'text-amber-700' : 'text-green-700'}`}
+                  >
+                    {node.isActive ? 'Скрыть' : 'Показать'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Удалить категорию «${node.name}»?`)) {
+                        void run(() => deleteCategoryAction({ id: node.id }), 'Категория удалена.');
+                      }
+                    }}
+                    className={`${btn} text-red-600`}
+                  >
+                    Удалить
+                  </button>
+                </>
+              ) : null}
             </>
           )}
         </div>
-        {node.children.length > 0 ? (
-          <ul>{node.children.map((c) => renderNode(c, depth + 1))}</ul>
+        {isExpanded ? (
+          <ul id={childrenId}>{node.children.map((c) => renderNode(c, depth + 1))}</ul>
         ) : null}
       </li>
     );
@@ -237,7 +387,20 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
             раскладываются в каталоге на сайте.
           </p>
         ) : (
-          <ul>{tree.map((n) => renderNode(n, 0))}</ul>
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
+              <button type="button" onClick={() => applyExpanded(expandAll(tree))} className={`${btn} text-gray-700`}>
+                Развернуть всё
+              </button>
+              <button type="button" onClick={() => applyExpanded(new Set())} className={`${btn} text-gray-700`}>
+                Свернуть всё
+              </button>
+              <span className="text-xs text-gray-500">
+                Показано {rows.length} из {options.length}
+              </span>
+            </div>
+            <ul>{tree.map((n) => renderNode(n, 0))}</ul>
+          </>
         )}
       </div>
 

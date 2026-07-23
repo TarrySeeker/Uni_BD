@@ -20,6 +20,19 @@ export const dynamic = 'force-dynamic';
 /** Сколько заявок показываем (без пагинации). При превышении — плашка усечения. */
 const LIST_LIMIT = 200;
 
+/**
+ * Шапка липкая: обёртка таблицы прокручивается и по вертикали (max-h), иначе при
+ * LIST_LIMIT строк с инлайновой textarea в каждой обёртка вырастает на десятки
+ * тысяч px и горизонтальный скроллбар — он всегда у НИЖНЕЙ кромки обёртки —
+ * оказывается недостижим. sticky вешаем на <th>: на <thead>/<tr> он не работает.
+ *
+ * Нижняя линия — инсет-тенью, а не border-b: при border-collapse:collapse (его
+ * ставит preflight) границу рисует таблица, а не ячейка, и со sticky-шапкой она
+ * не едет — при прокрутке линия пропадает, строки наезжают на шапку.
+ */
+const TH =
+  'sticky top-0 z-10 shadow-[inset_0_-1px_0_theme(colors.gray.200)] bg-white px-4 py-2 font-medium';
+
 export default async function LeadsPage() {
   const guard = await guardLeads();
   if (!guard.ok) {
@@ -46,8 +59,11 @@ export default async function LeadsPage() {
     createdAtIso: l.created_at.toISOString(),
   }));
 
+  // Без max-w-*: девять колонок не помещаются в 1024px, и ограничитель мешал
+  // таблице выйти на ширину экрана. Горизонтальный скролл берёт на себя обёртка
+  // таблицы ниже — она работает только в паре с min-w-0 у <main> каркаса.
   return (
-    <div className="max-w-5xl">
+    <div>
       <PageHeader
         title="Заявки"
         subtitle={`Сообщения с формы обратной связи витрины (/contacts). Меняйте статус или удаляйте обработанные. Всего: ${total}.`}
@@ -67,19 +83,24 @@ export default async function LeadsPage() {
       {leads.length === 0 ? (
         <p className="mt-6 text-sm text-gray-600">Пока нет заявок.</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
-          <table className="w-full text-sm">
+        <div className="mt-6 max-h-[70vh] overflow-x-auto overflow-y-auto rounded-lg border border-gray-200 bg-white">
+          {/*
+            min-w-[72rem] — арифметическая ширина, а не min-w-full: последний
+            равен min-width:100% и скролла не даёт. При auto table-layout таблица
+            без явного минимума схлопывается по ширине обёртки, сжимая колонки.
+          */}
+          <table className="w-full min-w-[72rem] text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-500">
-                <th className="px-4 py-2 font-medium">Дата</th>
-                <th className="px-4 py-2 font-medium">Имя</th>
-                <th className="px-4 py-2 font-medium">Контакт</th>
-                <th className="px-4 py-2 font-medium">Источник</th>
-                <th className="px-4 py-2 font-medium">Детали</th>
-                <th className="px-4 py-2 font-medium">Сообщение</th>
-                <th className="px-4 py-2 font-medium">Ответ оператора</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
-                <th className="px-4 py-2 font-medium">Действия</th>
+              <tr className="text-left text-gray-500">
+                <th className={TH}>Дата</th>
+                <th className={TH}>Имя</th>
+                <th className={TH}>Контакт</th>
+                <th className={TH}>Источник</th>
+                <th className={TH}>Детали</th>
+                <th className={TH}>Сообщение</th>
+                <th className={TH}>Ответ оператора</th>
+                <th className={TH}>Статус</th>
+                <th className={TH}>Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -107,9 +128,21 @@ export default async function LeadsPage() {
                       <span className="text-gray-400">—</span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-2 text-gray-700">{l.message}</td>
+                  {/*
+                    Ограничитель ширины стоит на блоке ВНУТРИ ячейки: по CSS 2.1
+                    действие max-width на <td> не определено, и браузеры при
+                    table-layout:auto его игнорируют — длинное сообщение растянуло
+                    бы колонку на всю таблицу.
+                  */}
+                  <td className="px-4 py-2 text-gray-700">
+                    <div className="max-w-[28rem] break-words whitespace-pre-line">
+                      {l.message}
+                    </div>
+                  </td>
                   <td className="px-4 py-2">
-                    <LeadAnswerForm id={l.id} answer={l.answer} />
+                    <div className="w-[20rem]">
+                      <LeadAnswerForm id={l.id} answer={l.answer} />
+                    </div>
                   </td>
                   <td className="px-4 py-2">
                     <LeadStatusBadge status={l.status} />

@@ -1,14 +1,12 @@
 import Link from 'next/link';
 
 import { getEnv } from '@/lib/config/env';
+import { listProducts, getCategoryTree } from '@/lib/catalog/repository';
 import {
-  listProducts,
-  listBrands,
-  getCategoryTree,
-  type ProductListFilter,
-  type ProductSort,
-} from '@/lib/catalog/repository';
-import { PRODUCT_STATUSES, type ProductStatus } from '@/lib/catalog/types';
+  PRODUCT_LIST_PAGE_SIZE,
+  parseProductListFilter,
+} from '@/lib/catalog/list-filters';
+import { listDesigners } from '@/lib/designers';
 
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
@@ -28,38 +26,7 @@ import { ProductBulkTable } from './_components/ProductBulkTable';
  */
 export const dynamic = 'force-dynamic';
 
-const PAGE_SIZE = 25;
-
-/** searchParams → строго типизированный фильтр listProducts. */
-function parseFilter(
-  sp: Record<string, string | string[] | undefined>,
-): ProductListFilter {
-  const one = (k: string): string | undefined => {
-    const v = sp[k];
-    return Array.isArray(v) ? v[0] : v;
-  };
-  const status = one('status');
-  const sort = one('sort');
-  const page = Number(one('page') ?? '1');
-  return {
-    search: one('search') || undefined,
-    status: PRODUCT_STATUSES.includes(status as ProductStatus)
-      ? (status as ProductStatus)
-      : undefined,
-    brandId: one('brandId') || undefined,
-    categoryId: one('categoryId') || undefined,
-    isFeatured: one('isFeatured') === '1' ? true : undefined,
-    isNew: one('isNew') === '1' ? true : undefined,
-    onSale: one('onSale') === '1' ? true : undefined,
-    page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
-    pageSize: PAGE_SIZE,
-    sort: (['created_desc', 'name_asc', 'price_asc', 'price_desc'] as ProductSort[]).includes(
-      sort as ProductSort,
-    )
-      ? (sort as ProductSort)
-      : 'created_desc',
-  };
-}
+const PAGE_SIZE = PRODUCT_LIST_PAGE_SIZE;
 
 /** Сохраняет текущие фильтры, меняя только page (для ссылок пагинации). */
 function pageHref(
@@ -90,12 +57,12 @@ export default async function CatalogPage({
   }
 
   const sp = await searchParams;
-  const filter = parseFilter(sp);
+  const filter = parseProductListFilter(sp, PAGE_SIZE);
   const currency = getEnv().SHOP_CURRENCY;
 
-  const [{ rows, total }, brands, categoryTree] = await Promise.all([
+  const [{ rows, total }, designers, categoryTree] = await Promise.all([
     listProducts(filter),
-    listBrands(),
+    listDesigners(),
     getCategoryTree(),
   ]);
 
@@ -137,7 +104,7 @@ export default async function CatalogPage({
       </nav>
 
       <div className="mt-4">
-        <ProductFilters brands={brands} categoryTree={categoryTree} />
+        <ProductFilters designers={designers} categoryTree={categoryTree} />
       </div>
 
       <div className="mt-6">
