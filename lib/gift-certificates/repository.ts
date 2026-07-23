@@ -21,10 +21,13 @@ import type { TranslationsMap } from '@/lib/i18n';
 
 import { certRemaining } from './balance';
 import { GiftOverspendError, GiftCertificateError } from './errors';
+import type { CertificateSourceItem } from './origin';
 import type {
   GiftCertificate,
   GiftCertificateRedemption,
   GiftCertificateStatus,
+  GiftIssueSource,
+  GiftParty,
 } from './types';
 
 // -----------------------------------------------------------------------------
@@ -36,6 +39,24 @@ function toDate(v: unknown): Date {
 }
 function toNullableDate(v: unknown): Date | null {
   return v == null ? null : toDate(v);
+}
+
+function toStrOrNull(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+
+/**
+ * Снимок стороны сделки из строки с префиксом колонок (purchaser_/recipient_).
+ * Чистая функция — покрыта юнитом без БД.
+ */
+export function mapGiftParty(row: Record<string, unknown>, prefix: 'purchaser' | 'recipient'): GiftParty {
+  return {
+    name: toStrOrNull(row[`${prefix}_name`]),
+    email: toStrOrNull(row[`${prefix}_email`]),
+    phone: toStrOrNull(row[`${prefix}_phone`]),
+  };
 }
 
 /** Строка gift_certificates → домен (remaining вычисляется). */
@@ -56,6 +77,12 @@ export function mapGiftCertificate(row: Record<string, unknown>): GiftCertificat
     validUntil: toNullableDate(row.valid_until),
     translations: (row.translations ?? {}) as TranslationsMap,
     comment: String(row.comment ?? ''),
+    purchaser: mapGiftParty(row, 'purchaser'),
+    purchaserCustomerId: row.purchaser_customer_id != null ? String(row.purchaser_customer_id) : null,
+    recipient: mapGiftParty(row, 'recipient'),
+    issuedOrderId: row.issued_order_id != null ? String(row.issued_order_id) : null,
+    issuedOrderItemId: row.issued_order_item_id != null ? String(row.issued_order_item_id) : null,
+    issueSource: row.issue_source != null ? (String(row.issue_source) as GiftIssueSource) : null,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
   };
@@ -82,8 +109,21 @@ export function mapRedemption(row: Record<string, unknown>): GiftCertificateRede
 function giftCols() {
   return sql`
     id, code, name, description, terms, initial_amount, spent_total, currency,
-    status, valid_until, translations, comment, created_at, updated_at
+    status, valid_until, translations, comment,
+    purchaser_name, purchaser_email, purchaser_phone, purchaser_customer_id,
+    recipient_name, recipient_email, recipient_phone,
+    issued_order_id, issued_order_item_id, issue_source,
+    created_at, updated_at
   `;
+}
+
+/**
+ * Тот же список колонок для запросов, которые строятся вне этого модуля
+ * (RETURNING в actions.updateGiftFieldsDb). Единый источник — giftCols():
+ * новая колонка не может появиться в одном месте и пропасть в другом.
+ */
+export function giftColumnsFragment() {
+  return giftCols();
 }
 
 // -----------------------------------------------------------------------------
@@ -155,20 +195,108 @@ export interface IssueGiftCertificateRow {
   terms: string | null;
   comment: string;
   translations: TranslationsMap;
+  /** Снимок «кто купил» (ТЗ п.7); по умолчанию пустой. */
+  purchaser?: GiftParty;
+  /** Связь покупателя с учёткой клиента; гость → null. */
+  purchaserCustomerId?: string | null;
+  /** Снимок «на чьё имя» (ТЗ п.7). */
+  recipient?: GiftParty;
+  /** Происхождение выпуска (заказ/позиция); ручной выпуск → null. */
+  issuedOrderId?: string | null;
+  issuedOrderItemId?: string | null;
+  issueSource?: GiftIssueSource;
 }
 
-/** Вставляет сертификат, возвращает домен. Уникальность кода — на UNIQUE-индексе. */
+/**
+ * Вставляет сертификат, возвращает домен. Уникальность кода — на UNIQUE-индексе
+ * 0039; уникальность выпуска по позиции заказа — на ЧАСТИЧНОМ UNIQUE 0054
+ * (повторный выпуск по той же позиции → 23505, обрабатывается в actions).
+ */
 export async function insertGiftCertificate(input: IssueGiftCertificateRow): Promise<GiftCertificate> {
+  const purchaser = input.purchaser ?? { name: null, email: null, phone: null };
+  const recipient = input.recipient ?? { name: null, email: null, phone: null };
   const rows = await sql<Record<string, unknown>[]>`
     INSERT INTO gift_certificates (
-      code, name, description, terms, initial_amount, valid_until, comment, translations
+      code, name, description, terms, initial_amount, valid_until, comment, translations,
+      purchaser_name, purchaser_email, purchaser_phone, purchaser_customer_id,
+      recipient_name, recipient_email, recipient_phone,
+      issued_order_id, issued_order_item_id, issue_source
     ) VALUES (
       ${input.code}, ${input.name}, ${input.description}, ${input.terms},
-      ${input.initialAmount}, ${input.validUntil}, ${input.comment}, ${sql.json(input.translations as Record<string, never>)}
+      ${input.initialAmount}, ${input.validUntil}, ${input.comment}, ${sql.json(input.translations as Record<string, never>)},
+      ${purchaser.name}, ${purchaser.email}, ${purchaser.phone}, ${input.purchaserCustomerId ?? null},
+      ${recipient.name}, ${recipient.email}, ${recipient.phone},
+      ${input.issuedOrderId ?? null}, ${input.issuedOrderItemId ?? null}, ${input.issueSource ?? 'manual'}
     )
     RETURNING ${giftCols()}
   `;
   return mapGiftCertificate(rows[0]!);
+}
+
+/** Сертификаты, ВЫПУЩЕННЫЕ по заказу (блок в карточке заказа). */
+export async function listGiftCertificatesIssuedForOrder(orderId: string): Promise<GiftCertificate[]> {
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT ${giftCols()} FROM gift_certificates
+    WHERE issued_order_id = ${orderId}
+    ORDER BY created_at DESC, id
+  `;
+  return rows.map(mapGiftCertificate);
+}
+
+/** Источник выпуска: заказ + его позиция (снимок) — для issueGiftFromOrder. */
+export interface GiftIssueSourceRow {
+  orderId: string;
+  orderNumber: string;
+  currency: string;
+  customerId: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  item: CertificateSourceItem;
+}
+
+/**
+ * Читает позицию заказа вместе с заголовком (покупатель — из ДЕНОРМАЛИЗОВАННЫХ
+ * полей заказа: гостевой чекаут не имеет customers-строки). null — позиция не
+ * найдена или принадлежит другому заказу (защита от подмены orderId в форме).
+ */
+export async function getOrderItemForGiftIssue(
+  orderId: string,
+  orderItemId: string,
+): Promise<GiftIssueSourceRow | null> {
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT o.id            AS order_id,
+           o.number        AS order_number,
+           o.currency      AS currency,
+           o.customer_id, o.customer_name, o.customer_email, o.customer_phone,
+           i.id            AS item_id,
+           i.name_snapshot, i.sku_snapshot, i.attributes_snapshot,
+           i.unit_price, i.quantity, i.line_total
+    FROM order_items i
+    JOIN orders o ON o.id = i.order_id
+    WHERE i.id = ${orderItemId} AND i.order_id = ${orderId}
+    LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    orderId: String(row.order_id),
+    orderNumber: String(row.order_number),
+    currency: String(row.currency ?? 'RUB'),
+    customerId: row.customer_id != null ? String(row.customer_id) : null,
+    customerName: String(row.customer_name ?? ''),
+    customerEmail: String(row.customer_email ?? ''),
+    customerPhone: String(row.customer_phone ?? ''),
+    item: {
+      id: String(row.item_id),
+      nameSnapshot: String(row.name_snapshot ?? ''),
+      skuSnapshot: String(row.sku_snapshot ?? ''),
+      attributesSnapshot: (row.attributes_snapshot ?? {}) as Record<string, unknown>,
+      unitPrice: String(row.unit_price),
+      quantity: Number(row.quantity ?? 1),
+      lineTotal: String(row.line_total),
+    },
+  };
 }
 
 /** Меняет статус (active/disabled — деактивация/реактивация). true — строка найдена. */

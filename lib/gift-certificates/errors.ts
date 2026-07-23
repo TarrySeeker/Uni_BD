@@ -18,6 +18,8 @@ export type GiftErrorCode =
   | 'invalid_amount'
   | 'face_below_spent'
   | 'duplicate_code'
+  /** По этой позиции заказа сертификат уже выпущен (частичный UNIQUE 0054). */
+  | 'duplicate_issue'
   | 'validation';
 
 export class GiftCertificateError extends PublicActionError {

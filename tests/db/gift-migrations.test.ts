@@ -19,6 +19,10 @@ function stripSqlComments(s: string): string {
 async function getMigration(version: string) {
   return (await listMigrations()).find((m) => m.version === version);
 }
+/** Схлопывает ЛЮБОЙ whitespace (включая переводы строк) — для многострочного DDL. */
+function flat(s: string): string {
+  return s.replace(/\s+/g, ' ');
+}
 async function body(version: string): Promise<string> {
   const m = await getMigration(version);
   return stripSqlComments(await readFile(m!.path, 'utf8'));
@@ -99,6 +103,74 @@ describe('db/migrations — 0041_orders_gift_columns (юнит)', () => {
   });
 });
 
+describe('db/migrations — 0054_gift_certificates_people (юнит)', () => {
+  it('файл 0054 существует с именем gift_certificates_people', async () => {
+    const m = await getMigration('0054');
+    expect(m).toBeDefined();
+    expect(m!.name).toBe('gift_certificates_people');
+  });
+
+  it('стороны сделки: снимки покупателя и получателя + ссылка на клиента (все аддитивно)', async () => {
+    const lower = (await body('0054')).toLowerCase();
+    for (const col of [
+      'purchaser_name text',
+      'purchaser_email citext',
+      'purchaser_phone text',
+      'purchaser_customer_id uuid',
+      'recipient_name text',
+      'recipient_email citext',
+      'recipient_phone text',
+    ]) {
+      expect(lower).toContain(`alter table gift_certificates add column if not exists ${col}`);
+    }
+    // Снимок, а НЕ только FK: колонок-снимков хватает без customers.
+    expect(lower).toContain('references customers(id) on delete set null');
+  });
+
+  it('происхождение выпуска: issued_order_id / issued_order_item_id с FK ON DELETE SET NULL', async () => {
+    const lower = (await body('0054')).toLowerCase();
+    expect(lower).toContain('alter table gift_certificates add column if not exists issued_order_id uuid');
+    expect(lower).toContain('alter table gift_certificates add column if not exists issued_order_item_id uuid');
+    expect(lower).toContain('references orders(id) on delete set null');
+    expect(lower).toContain('references order_items(id) on delete set null');
+    // Семантическая ловушка: НЕ переиспользуем orders.gift_certificate_id
+    // («сертификат ПОТРАЧЕН на заказ») под «выпущен по заказу».
+    expect(lower).not.toContain('alter table orders');
+  });
+
+  it('источник выпуска — text + CHECK, НЕ enum, и набор включает автовыпуск волны 4', async () => {
+    const lower = (await body('0054')).toLowerCase();
+    expect(flat(lower)).toContain('add column if not exists issue_source text');
+    expect(lower).toContain("issue_source in ('manual','order','auto')");
+    // Антипаттерн: ENUM (ALTER TYPE ... ADD VALUE неаддитивен).
+    expect(lower).not.toContain('create type');
+    expect(lower).not.toContain('alter type');
+  });
+
+  it('идемпотентность автовыпуска: ЧАСТИЧНЫЙ UNIQUE по issued_order_item_id', async () => {
+    const lower = (await body('0054')).toLowerCase();
+    expect(flat(lower)).toContain('create unique index if not exists gift_certificates_issued_item_uniq');
+    expect(flat(lower)).toMatch(
+      /create unique index if not exists gift_certificates_issued_item_uniq on gift_certificates \(issued_order_item_id\) where issued_order_item_id is not null/,
+    );
+  });
+
+  it('аддитивность: ни одной NOT NULL-колонки, CHECK/FK через DO-блок, запись версии', async () => {
+    const raw = await body('0054');
+    const lower = raw.toLowerCase();
+    // Все новые колонки NULL-able — 2 строки стенда и 288 заказов не ломаются.
+    const addColumns = lower.match(/add column if not exists [^;]+/g) ?? [];
+    expect(addColumns.length).toBeGreaterThanOrEqual(10);
+    for (const stmt of addColumns) {
+      expect(stmt).not.toContain('not null');
+    }
+    expect(lower).toContain('pg_constraint'); // идемпотентный DO-блок
+    expect(lower).toContain("insert into schema_migrations");
+    expect(lower).toContain("'0054'");
+    expect(lower).toContain('on conflict do nothing');
+  });
+});
+
 // =============================================================================
 // (б) ИНТЕГРАЦИЯ — двойной накат (идемпотентность) + структура.
 // =============================================================================
@@ -131,8 +203,27 @@ describe.skipIf(!INTEGRATION_DB_URL)('db/migrations 0039-0041 (интеграц�
     expect(cols.map((c) => c.column_name).sort()).toEqual(['gift_certificate_id', 'gift_discount_total']);
 
     const [reg] = await sql<{ n: string }[]>`
-      SELECT count(*)::text AS n FROM schema_migrations WHERE version IN ('0039','0040','0041')
+      SELECT count(*)::text AS n FROM schema_migrations WHERE version IN ('0039','0040','0041','0054')
     `;
-    expect(reg!.n).toBe('3');
+    expect(reg!.n).toBe('4');
+
+    // 0054: стороны сделки и происхождение выпуска на gift_certificates.
+    const giftCols = await sql<{ column_name: string; is_nullable: string }[]>`
+      SELECT column_name, is_nullable FROM information_schema.columns
+      WHERE table_name = 'gift_certificates'
+        AND column_name IN ('purchaser_name','purchaser_email','purchaser_phone',
+                            'purchaser_customer_id','recipient_name','recipient_email',
+                            'recipient_phone','issued_order_id','issued_order_item_id','issue_source')
+    `;
+    expect(giftCols).toHaveLength(10);
+    expect(giftCols.every((c) => c.is_nullable === 'YES')).toBe(true);
+
+    // Частичный UNIQUE по позиции заказа — защита автовыпуска волны 4 от дублей.
+    const [idx] = await sql<{ def: string }[]>`
+      SELECT indexdef AS def FROM pg_indexes
+      WHERE indexname = 'gift_certificates_issued_item_uniq'
+    `;
+    expect(idx!.def).toMatch(/UNIQUE/i);
+    expect(idx!.def).toMatch(/WHERE .*issued_order_item_id IS NOT NULL/i);
   });
 });

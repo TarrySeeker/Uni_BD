@@ -6,6 +6,8 @@ import {
   IssueGiftCertificateSchema,
   UpdateGiftCertificateSchema,
   SetGiftStatusSchema,
+  IssueGiftFromOrderSchema,
+  giftPartySchema,
 } from '@/lib/gift-certificates/schemas';
 
 describe('gift-certificates/schemas — код и номинал', () => {
@@ -76,5 +78,55 @@ describe('gift-certificates/schemas — Update / SetStatus', () => {
     expect(
       SetGiftStatusSchema.safeParse({ id: '11111111-1111-4111-8111-111111111111', status: 'depleted' }).success,
     ).toBe(false);
+  });
+});
+
+describe('gift-certificates/schemas — стороны сделки (ТЗ п.7)', () => {
+  it('все поля стороны опциональны (владелец может знать только имя)', () => {
+    expect(giftPartySchema.safeParse({}).success).toBe(true);
+    expect(giftPartySchema.safeParse({ name: 'Мария' }).success).toBe(true);
+    expect(giftPartySchema.safeParse({ email: null, phone: null }).success).toBe(true);
+  });
+
+  it('email валидируется, пустая строка допустима (нормализуется в null)', () => {
+    expect(giftPartySchema.safeParse({ email: 'a@b.io' }).success).toBe(true);
+    expect(giftPartySchema.safeParse({ email: '' }).success).toBe(true);
+    expect(giftPartySchema.safeParse({ email: 'не-email' }).success).toBe(false);
+  });
+
+  it('issue/update принимают блоки purchaser/recipient', () => {
+    const issue = IssueGiftCertificateSchema.safeParse({
+      code: 'G1',
+      initialAmount: '100.00',
+      purchaser: { name: 'Иван' },
+      recipient: { name: 'Мария' },
+    });
+    expect(issue.success).toBe(true);
+    const upd = UpdateGiftCertificateSchema.safeParse({
+      id: '11111111-1111-4111-8111-111111111111',
+      recipient: { name: 'Мария' },
+    });
+    expect(upd.success).toBe(true);
+  });
+});
+
+describe('gift-certificates/schemas — IssueGiftFromOrderSchema', () => {
+  const base = {
+    orderId: '22222222-2222-4222-8222-222222222222',
+    orderItemId: '33333333-3333-4333-8333-333333333333',
+  };
+
+  it('минимальный ввод — только заказ и позиция', () => {
+    expect(IssueGiftFromOrderSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('НОМИНАЛА во входе нет: он берётся из снимка позиции на сервере', () => {
+    const parsed = IssueGiftFromOrderSchema.parse({ ...base, initialAmount: '999999.00' });
+    expect('initialAmount' in parsed).toBe(false);
+  });
+
+  it('не-uuid заказа/позиции отвергается (защита от подмены)', () => {
+    expect(IssueGiftFromOrderSchema.safeParse({ ...base, orderId: 'x' }).success).toBe(false);
+    expect(IssueGiftFromOrderSchema.safeParse({ ...base, orderItemId: 'x' }).success).toBe(false);
   });
 });

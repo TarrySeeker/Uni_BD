@@ -30,10 +30,21 @@ import {
 } from '../_components/StatusBadges';
 import { OrderActionsPanel } from '../_components/OrderActionsPanel';
 import {
+  certificateItemHint,
+  giftFaceValueFromItem,
+  listGiftCertificatesIssuedForOrder,
+} from '@/lib/gift-certificates';
+
+import {
   CdekBlock,
   type CdekShipmentView,
   type CdekStatusLogView,
 } from './_components/CdekBlock';
+import {
+  GiftIssueBlock,
+  type GiftIssueItemView,
+  type IssuedCertificateView,
+} from './_components/GiftIssueBlock';
 
 /**
  * Карточка заказа админки (docs/07 §5, Пакет 3.E).
@@ -169,6 +180,29 @@ export default async function OrderDetailPage({
   const showCdek = (await isModuleEffectivelyEnabled('cdek')) && can(guard.user, 'cdek.manage');
   const cdek = showCdek ? await loadCdek(order.id) : null;
 
+  // Блок подарочных сертификатов (ТЗ п.7): выпущенные по заказу коды + выпуск по
+  // позиции. Виден при праве gift.read; кнопка требует gift.write (сервер тоже
+  // проверяет). Номинал считаем ЗДЕСЬ из снимка позиции, чтобы админ видел ровно
+  // ту сумму, которую запишет сервер.
+  const showGift = can(guard.user, 'gift.read');
+  const issuedCerts = showGift ? await listGiftCertificatesIssuedForOrder(order.id) : [];
+  const giftItems: GiftIssueItemView[] = showGift
+    ? items.map((it) => ({
+        id: it.id,
+        name: it.nameSnapshot,
+        faceValue: giftFaceValueFromItem(it),
+        quantity: it.quantity,
+        hint: certificateItemHint(it),
+      }))
+    : [];
+  const issuedView: IssuedCertificateView[] = issuedCerts.map((c) => ({
+    id: c.id,
+    code: c.code,
+    initialAmount: c.initialAmount,
+    orderItemId: c.issuedOrderItemId,
+    recipient: c.recipient.name ?? c.recipient.email ?? '—',
+  }));
+
   return (
     <div>
       <nav className="text-sm" aria-label="Хлебные крошки">
@@ -260,6 +294,15 @@ export default async function OrderDetailPage({
               </div>
             </dl>
           </section>
+
+          {showGift ? (
+            <GiftIssueBlock
+              orderId={order.id}
+              items={giftItems}
+              issued={issuedView}
+              canWrite={can(guard.user, 'gift.write')}
+            />
+          ) : null}
 
           {/* --- История статусов --- */}
           <section className="mt-6 rounded-lg border border-gray-200 bg-white">

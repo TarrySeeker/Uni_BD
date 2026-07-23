@@ -20,6 +20,14 @@ import { GiftCertificateForm } from '../_components/GiftCertificateForm';
  */
 export const dynamic = 'force-dynamic';
 
+/** Подпись источника выпуска (issue_source, миграция 0054). */
+function issueSourceLabel(src: string | null): string {
+  if (src === 'order') return 'администратором по позиции заказа';
+  if (src === 'auto') return 'автоматически';
+  if (src === 'manual') return 'вручную';
+  return 'без указания источника';
+}
+
 export default async function EditGiftCertificatePage({
   params,
 }: {
@@ -61,6 +69,19 @@ export default async function EditGiftCertificatePage({
         backHref="/admin/gift-certificates"
         backLabel="К сертификатам"
       />
+
+      {cert.issuedOrderId ? (
+        <section className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
+          <h2 className="font-semibold text-gray-900">Происхождение выпуска</h2>
+          <p className="mt-1 text-gray-700">
+            Выпущен {issueSourceLabel(cert.issueSource)} по заказу{' '}
+            <Link href={`/admin/orders/${cert.issuedOrderId}`} className="text-blue-700 hover:underline">
+              {cert.issuedOrderId.slice(0, 8)}…
+            </Link>
+            . Номинал — фактически уплаченная сумма позиции заказа.
+          </p>
+        </section>
+      ) : null}
 
       <div className="mt-6">
         <GiftCertificateForm

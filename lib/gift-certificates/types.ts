@@ -28,6 +28,32 @@ export const GIFT_CERTIFICATE_STATUSES: readonly GiftCertificateStatus[] = [
   'expired',
 ];
 
+/**
+ * Источник выпуска (колонка issue_source, CHECK в 0054 — text, НЕ enum):
+ *  - manual — заведён руками в админке;
+ *  - order  — выпущен по позиции заказа (кнопка в карточке заказа);
+ *  - auto   — выпущен автоматически (волна 4, вебхук оплаты).
+ * null — выпущен до появления поля (исторические строки).
+ */
+export type GiftIssueSource = 'manual' | 'order' | 'auto';
+
+/** Все допустимые источники выпуска (совпадает с CHECK миграции 0054). */
+export const GIFT_ISSUE_SOURCES: readonly GiftIssueSource[] = ['manual', 'order', 'auto'];
+
+/**
+ * Снимок стороны сделки (покупатель/получатель) — ТЕКСТ, а не ссылка (ADR-010):
+ * покупатель может быть гостем без аккаунта, а получатель вообще не клиент
+ * магазина; правка карточки клиента не должна менять уже выпущенный документ.
+ */
+export interface GiftParty {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+/** Пустой снимок стороны (все поля не заданы). */
+export const EMPTY_GIFT_PARTY: GiftParty = { name: null, email: null, phone: null };
+
 /** Подарочный сертификат (домен). remaining вычисляется маппером (initialAmount − spentTotal). */
 export interface GiftCertificate {
   id: string;
@@ -52,6 +78,27 @@ export interface GiftCertificate {
   /** Сырой i18n-оверлей (locale-агностично; резолв — на границе). */
   translations: TranslationsMap;
   comment: string;
+
+  // ---- Стороны сделки (ТЗ п.7; миграция 0054) ----
+  /** «Кто купил» — снимок на момент выпуска. */
+  purchaser: GiftParty;
+  /** Опциональная связь покупателя с учёткой клиента (навигация); гость → null. */
+  purchaserCustomerId: string | null;
+  /** «На чьё имя» — снимок получателя. */
+  recipient: GiftParty;
+
+  // ---- Происхождение выпуска (0054) ----
+  /**
+   * Заказ, ПО КОТОРОМУ сертификат выпущен (продажа сертификата).
+   * ⚠️ Не путать с orders.gift_certificate_id — там обратный смысл: заказ, НА
+   * который сертификат потрачен.
+   */
+  issuedOrderId: string | null;
+  /** Позиция заказа-источника: из её ценового снимка взят номинал. */
+  issuedOrderItemId: string | null;
+  /** Способ выпуска; null — историческая строка до 0054. */
+  issueSource: GiftIssueSource | null;
+
   createdAt: Date;
   updatedAt: Date;
 }

@@ -38,16 +38,26 @@ import {
   IssueGiftCertificateSchema,
   UpdateGiftCertificateSchema,
   SetGiftStatusSchema,
+  IssueGiftFromOrderSchema,
 } from './schemas';
 import {
   insertGiftCertificate,
   getGiftCertificateById,
+  getOrderItemForGiftIssue,
   updateGiftStatus,
   mapGiftCertificate,
+  giftColumnsFragment,
   type IssueGiftCertificateRow,
+  type GiftIssueSourceRow,
 } from './repository';
+import {
+  buildGiftCodeForOrderItem,
+  giftFaceValueFromItem,
+  normalizeGiftParty,
+  type GiftPartyInput,
+} from './origin';
 import { sql } from '@/lib/db/client';
-import type { GiftCertificate, GiftCertificateStatus } from './types';
+import type { GiftCertificate, GiftCertificateStatus, GiftParty } from './types';
 
 /** Путь раздела сертификатов для инвалидации после мутации. */
 const GIFT_LIST_PATH = '/admin/gift-certificates';
@@ -75,6 +85,8 @@ export interface GiftActionDeps {
   getGiftCertificateById: (id: string) => Promise<GiftCertificate | null>;
   updateGiftStatus: (id: string, status: GiftCertificateStatus) => Promise<boolean>;
   updateGiftFields: (input: UpdateFieldsInput) => Promise<GiftCertificate>;
+  /** Заказ + позиция-снимок для выпуска «по заказу» (ТЗ п.7). */
+  getOrderItemForGiftIssue: (orderId: string, orderItemId: string) => Promise<GiftIssueSourceRow | null>;
 }
 
 /** Поля обновления, уже разрешённые (translations посчитан). */
@@ -91,6 +103,12 @@ export interface UpdateFieldsInput {
   comment?: string;
   translations?: TranslationsMap;
   translationsProvided: boolean;
+  /** Снимок «кто купил»; пишется только когда блок пришёл в форме. */
+  purchaser?: GiftParty;
+  purchaserProvided: boolean;
+  /** Снимок «на чьё имя». */
+  recipient?: GiftParty;
+  recipientProvided: boolean;
 }
 
 /** Прод-зависимости (реальная БД + дефолтный пайплайн). */
@@ -103,6 +121,7 @@ export function productionGiftDeps(): GiftActionDeps {
     getGiftCertificateById,
     updateGiftStatus,
     updateGiftFields: updateGiftFieldsDb,
+    getOrderItemForGiftIssue,
   };
 }
 
@@ -125,10 +144,21 @@ async function updateGiftFieldsDb(input: UpdateFieldsInput): Promise<GiftCertifi
       translations   = CASE WHEN ${input.translationsProvided}
                             THEN ${sql.json((input.translations ?? {}) as Record<string, never>)}
                             ELSE translations END,
+      purchaser_name  = CASE WHEN ${input.purchaserProvided}
+                            THEN ${input.purchaser?.name ?? null} ELSE purchaser_name END,
+      purchaser_email = CASE WHEN ${input.purchaserProvided}
+                            THEN ${input.purchaser?.email ?? null} ELSE purchaser_email END,
+      purchaser_phone = CASE WHEN ${input.purchaserProvided}
+                            THEN ${input.purchaser?.phone ?? null} ELSE purchaser_phone END,
+      recipient_name  = CASE WHEN ${input.recipientProvided}
+                            THEN ${input.recipient?.name ?? null} ELSE recipient_name END,
+      recipient_email = CASE WHEN ${input.recipientProvided}
+                            THEN ${input.recipient?.email ?? null} ELSE recipient_email END,
+      recipient_phone = CASE WHEN ${input.recipientProvided}
+                            THEN ${input.recipient?.phone ?? null} ELSE recipient_phone END,
       updated_at     = now()
     WHERE id = ${input.id}
-    RETURNING id, code, name, description, terms, initial_amount, spent_total,
-              currency, status, valid_until, translations, comment, created_at, updated_at
+    RETURNING ${giftColumnsFragment()}
   `;
   return mapGiftCertificate(rows[0]!);
 }
@@ -166,6 +196,10 @@ export function createGiftActions(deps: GiftActionDeps) {
           terms: data.terms ?? null,
           comment: data.comment ?? '',
           translations: tr.value,
+          // Стороны сделки — СНИМКИ (ТЗ п.7): правка карточки клиента их не меняет.
+          purchaser: normalizeGiftParty(data.purchaser as GiftPartyInput | undefined),
+          recipient: normalizeGiftParty(data.recipient as GiftPartyInput | undefined),
+          issueSource: 'manual',
         });
       } catch (err) {
         if (isUniqueViolation(err)) {
@@ -247,6 +281,10 @@ export function createGiftActions(deps: GiftActionDeps) {
         comment: data.comment,
         translations: tr.value,
         translationsProvided: tr.provided,
+        purchaser: normalizeGiftParty(data.purchaser as GiftPartyInput | undefined),
+        purchaserProvided: data.purchaser !== undefined,
+        recipient: normalizeGiftParty(data.recipient as GiftPartyInput | undefined),
+        recipientProvided: data.recipient !== undefined,
       });
 
       return {
@@ -298,7 +336,95 @@ export function createGiftActions(deps: GiftActionDeps) {
     },
   });
 
-  return { issueGiftCertificate, updateGiftCertificate, setGiftStatus };
+  /**
+   * Выпуск сертификата ПО ПОЗИЦИИ ЗАКАЗА (gift.write, ТЗ п.7).
+   *
+   * Номинал — ФАКТИЧЕСКИ УПЛАЧЕННАЯ сумма из ценового снимка позиции
+   * (order_items.line_total), а не текущая цена товара: каталог мог подорожать
+   * после покупки. Покупатель — из денормализованных полей заказа (гостевой
+   * чекаут не даёт customers-строки; customer_id пишем ссылкой, если он есть).
+   * Получатель — из формы («на чьё имя»).
+   *
+   * Идемпотентность: повторный выпуск по той же позиции упирается в частичный
+   * UNIQUE (issued_order_item_id) миграции 0054 → duplicate_issue. Это же
+   * ограничение защитит автовыпуск волны 4 при повторных вебхуках оплаты.
+   */
+  const issueGiftFromOrder = defineAction({
+    permission: 'gift.write',
+    input: IssueGiftFromOrderSchema,
+    deps: actionDeps,
+    handler: async (data) => {
+      await assertOrdersEnabled();
+
+      const src = await deps.getOrderItemForGiftIssue(data.orderId, data.orderItemId);
+      if (!src) {
+        throw new GiftCertificateError('not_found', 'Позиция заказа не найдена.');
+      }
+
+      const faceValue = giftFaceValueFromItem(src.item);
+      if (toMinor(faceValue) <= 0) {
+        throw new GiftCertificateError(
+          'invalid_amount',
+          'По бесплатной позиции сертификат выпустить нельзя: номинал должен быть больше нуля.',
+        );
+      }
+
+      const code =
+        data.code ??
+        buildGiftCodeForOrderItem({ orderNumber: src.orderNumber, orderItemId: src.item.id });
+
+      let cert: GiftCertificate;
+      try {
+        cert = await deps.insertGiftCertificate({
+          code,
+          name: data.name ?? src.item.nameSnapshot,
+          initialAmount: faceValue,
+          validUntil: data.validUntil ?? null,
+          description: null,
+          terms: null,
+          comment: data.comment ?? '',
+          translations: {},
+          purchaser: {
+            name: src.customerName || null,
+            email: src.customerEmail || null,
+            phone: src.customerPhone || null,
+          },
+          purchaserCustomerId: src.customerId,
+          recipient: normalizeGiftParty(data.recipient as GiftPartyInput | undefined),
+          issuedOrderId: src.orderId,
+          issuedOrderItemId: src.item.id,
+          issueSource: 'order',
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw new GiftCertificateError(
+            'duplicate_issue',
+            'По этой позиции заказа сертификат уже выпущен.',
+          );
+        }
+        throw err;
+      }
+
+      return {
+        result: { id: cert.id, code: cert.code, initialAmount: cert.initialAmount },
+        revalidate: [GIFT_LIST_PATH, `/admin/orders/${src.orderId}`],
+        audit: {
+          action: 'gift.issue',
+          entityType: 'gift_certificate',
+          entityId: cert.id,
+          after: {
+            code: cert.code,
+            initialAmount: cert.initialAmount,
+            issueSource: 'order',
+            issuedOrderId: src.orderId,
+            issuedOrderItemId: src.item.id,
+          },
+        },
+      };
+    },
+  });
+
+  return { issueGiftCertificate, updateGiftCertificate, setGiftStatus, issueGiftFromOrder };
 }
 
 // Прод-инстанс (тонкие обёртки для form-actions).
@@ -306,6 +432,7 @@ const prodActions = createGiftActions(productionGiftDeps());
 export const issueGiftCertificate = prodActions.issueGiftCertificate;
 export const updateGiftCertificate = prodActions.updateGiftCertificate;
 export const setGiftStatus = prodActions.setGiftStatus;
+export const issueGiftFromOrder = prodActions.issueGiftFromOrder;
 
 // PublicActionError реэкспорт для форм (единый тип отображаемых ошибок).
 export { PublicActionError };

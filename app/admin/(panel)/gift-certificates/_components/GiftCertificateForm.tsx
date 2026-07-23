@@ -67,6 +67,13 @@ export function GiftCertificateForm({
   const [description, setDescription] = useState(cert?.description ?? '');
   const [terms, setTerms] = useState(cert?.terms ?? '');
   const [comment, setComment] = useState(cert?.comment ?? '');
+  // Стороны сделки (ТЗ п.7): «кто купил» / «на чьё имя» — снимки, не ссылки.
+  const [purchaserName, setPurchaserName] = useState(cert?.purchaser.name ?? '');
+  const [purchaserEmail, setPurchaserEmail] = useState(cert?.purchaser.email ?? '');
+  const [purchaserPhone, setPurchaserPhone] = useState(cert?.purchaser.phone ?? '');
+  const [recipientName, setRecipientName] = useState(cert?.recipient.name ?? '');
+  const [recipientEmail, setRecipientEmail] = useState(cert?.recipient.email ?? '');
+  const [recipientPhone, setRecipientPhone] = useState(cert?.recipient.phone ?? '');
   const [translations, setTranslations] = useState<TranslationsState>(
     toTranslationsState(cert?.translations),
   );
@@ -82,6 +89,8 @@ export function GiftCertificateForm({
 
     const validUntilIso = validUntil ? new Date(validUntil).toISOString() : null;
     const trPayload = translationsPayload(translations);
+    const purchaser = { name: purchaserName, email: purchaserEmail, phone: purchaserPhone };
+    const recipient = { name: recipientName, email: recipientEmail, phone: recipientPhone };
 
     let result: ActionResult<{ id: string }>;
     if (isEdit) {
@@ -94,6 +103,8 @@ export function GiftCertificateForm({
         terms: terms.trim() === '' ? null : terms,
         comment,
         translations: trPayload,
+        purchaser,
+        recipient,
       });
     } else {
       result = await issueGiftCertificateAction({
@@ -105,6 +116,8 @@ export function GiftCertificateForm({
         terms: terms.trim() === '' ? null : terms,
         comment,
         translations: trPayload,
+        purchaser,
+        recipient,
       });
     }
 
@@ -248,6 +261,47 @@ export function GiftCertificateForm({
               className={inputCls}
             />
           </div>
+
+          <fieldset className="lg:col-span-2 rounded border border-gray-200 p-4">
+            <legend className="px-1 text-sm font-medium text-gray-700">Кто купил</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label htmlFor="g-buyer-name" className="block text-xs text-gray-500">Имя</label>
+                <input id="g-buyer-name" value={purchaserName} onChange={(e) => setPurchaserName(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label htmlFor="g-buyer-email" className="block text-xs text-gray-500">E-mail</label>
+                <input id="g-buyer-email" value={purchaserEmail} onChange={(e) => setPurchaserEmail(e.target.value)} className={inputCls} />
+                {fe('purchaser.email') ? <p className="mt-1 text-xs text-red-600">{fe('purchaser.email')}</p> : null}
+              </div>
+              <div>
+                <label htmlFor="g-buyer-phone" className="block text-xs text-gray-500">Телефон</label>
+                <input id="g-buyer-phone" value={purchaserPhone} onChange={(e) => setPurchaserPhone(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Снимок на момент выпуска: правка карточки клиента его не изменит.
+            </p>
+          </fieldset>
+
+          <fieldset className="lg:col-span-2 rounded border border-gray-200 p-4">
+            <legend className="px-1 text-sm font-medium text-gray-700">На чьё имя</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label htmlFor="g-rcpt-name" className="block text-xs text-gray-500">Имя</label>
+                <input id="g-rcpt-name" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label htmlFor="g-rcpt-email" className="block text-xs text-gray-500">E-mail</label>
+                <input id="g-rcpt-email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} className={inputCls} />
+                {fe('recipient.email') ? <p className="mt-1 text-xs text-red-600">{fe('recipient.email')}</p> : null}
+              </div>
+              <div>
+                <label htmlFor="g-rcpt-phone" className="block text-xs text-gray-500">Телефон</label>
+                <input id="g-rcpt-phone" value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+          </fieldset>
 
           <div className="lg:col-span-2">
             <label htmlFor="g-comment" className="block text-sm font-medium text-gray-700">Комментарий (внутренний)</label>

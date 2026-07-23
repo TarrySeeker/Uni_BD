@@ -23,6 +23,11 @@ export const dynamic = 'force-dynamic';
 
 const LIST_LIMIT = 200;
 
+/** Снимок стороны сделки одной строкой (имя, иначе email/телефон, иначе прочерк). */
+function partyLabel(party: { name: string | null; email: string | null; phone: string | null }): string {
+  return party.name ?? party.email ?? party.phone ?? '—';
+}
+
 export default async function GiftCertificatesPage() {
   const guard = await guardGift('gift.read');
   if (!guard.ok) {
@@ -69,6 +74,8 @@ export default async function GiftCertificatesPage() {
               <tr className="border-b border-gray-200 text-left text-gray-500">
                 <th className="px-4 py-2 font-medium">Код</th>
                 <th className="px-4 py-2 font-medium">Наименование</th>
+                <th className="px-4 py-2 font-medium">Кто купил</th>
+                <th className="px-4 py-2 font-medium">На чьё имя</th>
                 <th className="px-4 py-2 font-medium">Номинал</th>
                 <th className="px-4 py-2 font-medium">Потрачено</th>
                 <th className="px-4 py-2 font-medium">Остаток</th>
@@ -86,6 +93,13 @@ export default async function GiftCertificatesPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-gray-700">{c.name || '—'}</td>
+                  <td className="px-4 py-2 text-gray-700">
+                    {partyLabel(c.purchaser)}
+                    {c.issuedOrderId ? (
+                      <div className="text-xs text-gray-400">по заказу</div>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-2 text-gray-700">{partyLabel(c.recipient)}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-900">{c.initialAmount}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">{c.spentTotal}</td>
                   <td className="whitespace-nowrap px-4 py-2 font-medium text-gray-900">{c.remaining}</td>

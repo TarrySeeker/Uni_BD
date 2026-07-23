@@ -10,8 +10,22 @@ export type {
   GiftCertificate,
   GiftCertificateRedemption,
   GiftCertificateStatus,
+  GiftIssueSource,
+  GiftParty,
 } from './types';
-export { GIFT_CERTIFICATE_STATUSES } from './types';
+export { GIFT_CERTIFICATE_STATUSES, GIFT_ISSUE_SOURCES, EMPTY_GIFT_PARTY } from './types';
+
+export {
+  GIFT_ITEM_MARKER_KEYS,
+  buildGiftCodeForOrderItem,
+  certificateItemHint,
+  giftFaceValueFromItem,
+  looksLikeCertificateItem,
+  normalizeGiftParty,
+  isGiftPartyEmpty,
+  type CertificateSourceItem,
+  type GiftPartyInput,
+} from './origin';
 
 export { GIFT_TR_FIELDS } from './fields';
 
@@ -41,7 +55,10 @@ export {
 export {
   giftCodeSchema,
   giftFaceValueSchema,
+  giftPartySchema,
   IssueGiftCertificateSchema,
+  IssueGiftFromOrderSchema,
+  type IssueGiftFromOrderInput,
   UpdateGiftCertificateSchema,
   SetGiftStatusSchema,
   applyGiftCodeSchema,
@@ -52,11 +69,14 @@ export {
 
 export {
   mapGiftCertificate,
+  mapGiftParty,
   mapRedemption,
   findByCode,
   getGiftCertificateById,
   getBalance,
   listGiftCertificates,
+  listGiftCertificatesIssuedForOrder,
+  getOrderItemForGiftIssue,
   countGiftCertificates,
   getRedemptions,
   insertGiftCertificate,
@@ -68,6 +88,7 @@ export {
   type RedeemResult,
   type ReleaseResult,
   type IssueGiftCertificateRow,
+  type GiftIssueSourceRow,
 } from './repository';
 
 export {
@@ -76,5 +97,6 @@ export {
   issueGiftCertificate,
   updateGiftCertificate,
   setGiftStatus,
+  issueGiftFromOrder,
   type GiftActionDeps,
 } from './actions';

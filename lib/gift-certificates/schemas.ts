@@ -41,9 +41,33 @@ const validUntilSchema = z
   .nullable()
   .optional();
 
+/**
+ * Снимок стороны сделки (покупатель/получатель, ТЗ п.7). Все поля опциональны:
+ * владелец может знать только имя («на чьё имя»), а гость-покупатель — только
+ * телефон. Пустые строки нормализуются в null в normalizeGiftParty.
+ */
+const partyEmailSchema = z
+  .string()
+  .trim()
+  .max(320)
+  .refine((v) => v === '' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), {
+    message: 'Некорректный email.',
+  });
+
+export const giftPartySchema = z.object({
+  name: z.string().trim().max(255).nullable().optional(),
+  email: partyEmailSchema.nullable().optional(),
+  phone: z.string().trim().max(64).nullable().optional(),
+});
+export type GiftPartyInputSchema = z.infer<typeof giftPartySchema>;
+
 /** Выпуск сертификата (gift.write). */
 export const IssueGiftCertificateSchema = z.object({
   code: giftCodeSchema,
+  /** «Кто купил» — снимок (не ссылка): покупатель может быть гостем. */
+  purchaser: giftPartySchema.optional(),
+  /** «На чьё имя» — снимок получателя. */
+  recipient: giftPartySchema.optional(),
   name: z.string().trim().max(255).optional().default(''),
   initialAmount: giftFaceValueSchema,
   validUntil: validUntilSchema,
@@ -63,6 +87,8 @@ export type IssueGiftCertificateInput = z.infer<typeof IssueGiftCertificateSchem
 export const UpdateGiftCertificateSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().max(255).optional(),
+  purchaser: giftPartySchema.optional(),
+  recipient: giftPartySchema.optional(),
   initialAmount: giftFaceValueSchema.optional(),
   validUntil: validUntilSchema,
   description: z.string().trim().max(20000).nullable().optional(),
@@ -78,6 +104,27 @@ export const SetGiftStatusSchema = z.object({
   status: z.enum(['active', 'disabled'] as [string, ...string[]]),
 });
 export type SetGiftStatusInput = z.infer<typeof SetGiftStatusSchema>;
+
+/**
+ * Выпуск сертификата ПО ПОЗИЦИИ ЗАКАЗА (gift.write, ТЗ п.7).
+ *
+ * Номинала во входе НЕТ намеренно: он берётся из ценового СНИМКА позиции
+ * (order_items.line_total) на сервере — админ не может выпустить код дороже,
+ * чем покупатель заплатил. Код опционален: без него строится детерминированный
+ * по заказу+позиции (buildGiftCodeForOrderItem), что делает повтор безопасным.
+ * Покупатель тоже берётся с сервера (денормализованные поля заказа); во входе
+ * только получатель — «на чьё имя».
+ */
+export const IssueGiftFromOrderSchema = z.object({
+  orderId: z.string().uuid(),
+  orderItemId: z.string().uuid(),
+  code: giftCodeSchema.optional(),
+  name: z.string().trim().max(255).optional(),
+  recipient: giftPartySchema.optional(),
+  validUntil: validUntilSchema,
+  comment: z.string().trim().max(2000).optional().default(''),
+});
+export type IssueGiftFromOrderInput = z.infer<typeof IssueGiftFromOrderSchema>;
 
 /** Применение кода сертификата в корзине/заказе (задел под 4b — quote/create). */
 export const applyGiftCodeSchema = giftCodeSchema;
