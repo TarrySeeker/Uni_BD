@@ -48,6 +48,7 @@ import {
 } from './schemas';
 import { countCategoryChildren } from './repository';
 import { CatalogError } from './errors';
+import { parseStoredColors, toJsonColors } from './colors';
 import { canMoveCategory } from './tree';
 import {
   rebuildProductAttributesCache,
@@ -351,6 +352,7 @@ export const createProduct = defineAction({
       const rows = await sql<{ id: string }[]>`
         INSERT INTO products (sku, slug, name, description, status, base_price,
                               compare_at_price, is_featured, is_new, brand_id, designer_id,
+                              colors,
                               seo_title, seo_description,
                               weight_g, length_cm, width_cm, height_cm)
         VALUES (
@@ -358,6 +360,7 @@ export const createProduct = defineAction({
           ${data.status ?? 'draft'}, ${data.basePrice ?? '0'},
           ${data.compareAtPrice ?? null}, ${data.isFeatured ?? false},
           ${data.isNew ?? null}, ${data.brandId ?? null}, ${data.designerId ?? null},
+          ${sql.json(toJsonColors(data.colors ?? []))}::jsonb,
           ${data.seoTitle ?? null}, ${data.seoDescription ?? null},
           ${data.weightG ?? null}, ${data.lengthCm ?? null},
           ${data.widthCm ?? null}, ${data.heightCm ?? null}
@@ -445,6 +448,13 @@ export const updateProduct = defineAction({
                                THEN ${data.widthCm ?? null} ELSE width_cm END,
         height_cm       = CASE WHEN ${data.heightCm !== undefined}
                                THEN ${data.heightCm ?? null} ELSE height_cm END,
+        -- 🔴 Цвета (п.4): undefined = «не трогать» (частичный апдейт статуса/цены
+        -- НЕ должен стирать ETL-цвета), [] = «очистить». Биндим МАССИВОМ через
+        -- sql.json — JSON.stringify положил бы jsonb-СТРОКУ (баг ETL 0050,
+        -- замаскированный терпимым asColors).
+        colors          = CASE WHEN ${data.colors !== undefined}
+                               THEN ${sql.json(toJsonColors(data.colors ?? []))}::jsonb
+                               ELSE colors END,
         translations    = CASE WHEN ${tr.provided}
                                THEN ${sql.json(tr.value as Record<string, never>)}
                                ELSE translations END,
@@ -608,11 +618,12 @@ export const duplicateProduct = defineAction({
         length_cm: number | null;
         width_cm: number | null;
         height_cm: number | null;
+        colors: unknown;
       }[]
     >`
       SELECT id, sku, slug, name, description, base_price, compare_at_price,
              is_featured, is_new, brand_id, designer_id, seo_title, seo_description,
-             weight_g, length_cm, width_cm, height_cm
+             weight_g, length_cm, width_cm, height_cm, colors
       FROM products WHERE id = ${data.id} LIMIT 1
     `;
     const src = srcRows[0];
@@ -638,6 +649,7 @@ export const duplicateProduct = defineAction({
         const ins = await sql<{ id: string }[]>`
           INSERT INTO products (sku, slug, name, description, status, base_price,
                                 compare_at_price, is_featured, is_new, brand_id, designer_id,
+                                colors,
                                 seo_title, seo_description,
                                 weight_g, length_cm, width_cm, height_cm)
           VALUES (
@@ -645,6 +657,7 @@ export const duplicateProduct = defineAction({
             'draft', ${src.base_price ?? '0'},
             ${src.compare_at_price ?? null}, ${src.is_featured ?? false},
             ${src.is_new ?? null}, ${src.brand_id ?? null}, ${src.designer_id ?? null},
+            ${sql.json(toJsonColors(parseStoredColors(src.colors)))}::jsonb,
             ${src.seo_title ?? null}, ${src.seo_description ?? null},
             ${src.weight_g ?? null}, ${src.length_cm ?? null},
             ${src.width_cm ?? null}, ${src.height_cm ?? null}

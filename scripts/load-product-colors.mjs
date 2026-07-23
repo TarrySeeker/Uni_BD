@@ -158,10 +158,11 @@ async function main() {
   let updated = 0;
   let unknown = 0;
   let cleared = 0;
+  /** Строки, у которых после записи jsonb_typeof(colors) ≠ 'array' (см. пост-проверку). */
+  let badTypes = [];
 
   try {
     for (const [slug, colors] of bySlug) {
-      const value = JSON.stringify(colors);
       if (dryRun) {
         // Только проверяем существование товара.
         const rows = await sql`SELECT 1 FROM products WHERE slug = ${slug} LIMIT 1`;
@@ -174,8 +175,12 @@ async function main() {
         }
         continue;
       }
+      // БИНДИНГ МАССИВОМ: sql.json(colors) кладёт jsonb-МАССИВ. Прежний
+      // биндинг сериализованной строкой клал jsonb-СТРОКУ ('"[…]"'), что
+      // маскировал терпимый парсер asColors — и 664 товара стенда получили
+      // colors типа string вместо array.
       const rows = await sql`
-        UPDATE products SET colors = ${value}::jsonb, updated_at = now()
+        UPDATE products SET colors = ${sql.json(colors)}::jsonb, updated_at = now()
         WHERE slug = ${slug}
         RETURNING id
       `;
@@ -187,8 +192,31 @@ async function main() {
         if (colors.length === 0) cleared += 1;
       }
     }
+    // ПОСТ-ПРОВЕРКА ТИПА: колонка обязана хранить jsonb-МАССИВ. Если хоть одна
+    // строка легла как 'string'/'object' — биндинг сломан снова, и терпимый
+    // asColors это опять замаскирует. Лучше упасть на ETL, чем возить битые данные.
+    if (!dryRun) {
+      const slugs = [...bySlug.keys()];
+      const bad = await sql`
+        SELECT slug, jsonb_typeof(colors) AS t
+        FROM products
+        WHERE slug = ANY(${slugs}) AND jsonb_typeof(colors) IS DISTINCT FROM 'array'
+        LIMIT 5
+      `;
+      if (bad.length > 0) {
+        badTypes = bad;
+      }
+    }
   } finally {
     await sql.end({ timeout: 5 });
+  }
+
+  if (badTypes.length > 0) {
+    console.error(
+      `  [etl:colors] products.colors записан НЕ массивом (jsonb_typeof): ` +
+        badTypes.map((r) => `${r.slug}=${r.t}`).join(', '),
+    );
+    process.exit(1);
   }
 
   info(`Готово. Обновлено товаров: ${updated}${cleared ? ` (из них очищено до []: ${cleared})` : ''}.`);

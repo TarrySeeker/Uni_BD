@@ -12,6 +12,7 @@ import { listBlocksByProduct } from '@/lib/product-blocks';
 import { can } from '@/lib/auth/rbac';
 import { getLocaleConfig } from '@/lib/i18n';
 import { getStorage } from '@/lib/storage';
+import { getEffectiveSettings } from '@/lib/config/settings';
 
 import { Forbidden } from '../../../_components/Forbidden';
 import { PageHeader } from '../../../_components/PageHeader';
@@ -43,7 +44,7 @@ export default async function ProductDetailPage({
   }
 
   const { id } = await params;
-  const [product, brands, designers, categoryTree, attributes, attributeValues, localeConfig, blocks] =
+  const [product, brands, designers, categoryTree, attributes, attributeValues, localeConfig, blocks, settings] =
     await Promise.all([
       getProductById(id),
       listBrands(),
@@ -53,6 +54,7 @@ export default async function ProductDetailPage({
       listAttributeValuesByAttribute(),
       getLocaleConfig(),
       listBlocksByProduct(id),
+      getEffectiveSettings(),
     ]);
 
   if (!product) {
@@ -94,6 +96,7 @@ export default async function ProductDetailPage({
           categoryTree={categoryTree}
           attributes={attributes}
           attributeValues={attributeValues}
+          masterColors={settings.catalog.masterColors}
           locales={localeConfig.locales}
           defaultLocale={localeConfig.defaultLocale}
         />

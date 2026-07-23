@@ -33,7 +33,7 @@ function fakeEffective(): EffectiveSettings {
     units: { weight: 'g', dimension: 'cm', system: 'metric' },
     contacts: {},
     legalEntity: { bankDetails: 'SECRET-BANK-DETAILS' },
-    catalog: { newProductDays: 30 },
+    catalog: { newProductDays: 30, masterColors: [] },
     delivery: { freeDeliveryThreshold: 0, zones: [] },
     orders: { orderPrefix: '' },
     seo: {

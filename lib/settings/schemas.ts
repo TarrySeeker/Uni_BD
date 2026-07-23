@@ -235,9 +235,26 @@ export const legalEntitySchema = z
   .strip();
 
 /** catalog — оверрайд SHOP_NEW_PRODUCT_DAYS. */
+/**
+ * Позиция справочника мастер-цветов магазина (оверрайд DEFAULT_MASTER_COLORS,
+ * lib/catalog/master-colors.ts). Задан → ЗАМЕНЯЕТ дефолтный список платформы
+ * целиком; не задан/пуст → дефолт. hex — '#rrggbb' (канонизацию и отбраковку
+ * битых записей делает resolveMasterColors). До 64 позиций — защита от мусора
+ * в JSONB, легаси-справочник был на 13.
+ */
+export const masterColorSchema = z
+  .object({
+    id: nonEmpty,
+    name: nonEmpty,
+    hex: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
+  })
+  .strip();
+
 export const catalogSettingsSchema = z
   .object({
     newProductDays: z.number().int().min(0).optional(),
+    /** Справочник мастер-цветов магазина (мультитенантный оверрайд, п.4 ТЗ). */
+    masterColors: z.array(masterColorSchema).max(64).optional(),
   })
   .strip();
 

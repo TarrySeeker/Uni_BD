@@ -13,6 +13,7 @@
 
 import { z } from 'zod';
 
+import { MAX_PRODUCT_COLORS, normalizeHex } from './colors';
 import {
   ATTRIBUTE_TYPES,
   MEDIA_TYPES,
@@ -85,6 +86,34 @@ export const attributeCodeSchema = z
   .regex(
     /^[a-z0-9_]+$/,
     'код атрибута: латиница в нижнем регистре, цифры и подчёркивание',
+  );
+
+/**
+ * Один цвето-свотч товара (products.colors, 0050; ТЗ владельца п.4 — перенос
+ * «выбора цвета» из старой админки). hex канонизируется препроцессором
+ * (normalizeHex: '#abc'/'abc'/'#AABBCC' → '#aabbcc'), мусор ('red', '#ff')
+ * отклоняется — на клиенте до отправки его отбрасывает normalizeProductColors.
+ * name необязательно (в легаси заполнялось у 4 товаров из 1653).
+ */
+export const productColorSchema = z.object({
+  hex: z.preprocess(
+    (v) => (typeof v === 'string' ? (normalizeHex(v) ?? v) : v),
+    z
+      .string()
+      .regex(/^#[0-9a-f]{6}$/, 'цвет: код вида #rrggbb (например #1e88e5)'),
+  ),
+  name: z.string().trim().max(64).optional().default(''),
+});
+
+/**
+ * Набор свотчей товара: до MAX_PRODUCT_COLORS (легаси — «Основной» +
+ * «Дополнительный»). Порядок = порядок показа, первый — основной.
+ */
+export const productColorsSchema = z
+  .array(productColorSchema)
+  .max(
+    MAX_PRODUCT_COLORS,
+    `цвета: не больше ${MAX_PRODUCT_COLORS} (основной и дополнительный)`,
   );
 
 const seoTitle = z.string().max(255).optional();
@@ -203,6 +232,10 @@ export const ProductCreateSchema = z
     designerId: uuidSchema.nullish(),
     categoryIds: z.array(uuidSchema).optional().default([]),
     primaryCategoryId: uuidSchema.nullish(),
+    // Цвето-свотчи (п.4). Опционально: не передали → пишем [] (у нового товара
+    // цветов нет). ВАЖНО: без .default([]) — чтобы отличать «не передали» от
+    // «передали пустой», как в Update-схеме.
+    colors: productColorsSchema.optional(),
     seoTitle,
     seoDescription,
     ...dimensionFields,
@@ -233,6 +266,12 @@ export const ProductUpdateSchema = z.object({
   designerId: uuidSchema.nullish(),
   categoryIds: z.array(uuidSchema).optional(),
   primaryCategoryId: uuidSchema.nullish(),
+  /**
+   * 🔴 КОНТРАКТ ЧАСТИЧНОГО АПДЕЙТА: undefined = «не трогать цвета», [] = «очистить».
+   * Поле ОБЯЗАНО оставаться optional без .default([]): иначе любой частичный
+   * апдейт (смена статуса/цены) стёр бы ETL-цвета товара.
+   */
+  colors: productColorsSchema.optional(),
   seoTitle,
   seoDescription,
   ...seoEntityFields,

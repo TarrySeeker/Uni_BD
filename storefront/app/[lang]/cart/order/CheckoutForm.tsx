@@ -168,7 +168,10 @@ export default function CheckoutForm({
   // Текущий выбор доставки → тело для /cart/quote и /orders (единый источник).
   const buildDelivery = useCallback((): DeliverySelectionInput => {
     if (deliveryChoice === 'zone') {
-      return { type: 'courier', zoneId: zoneId || undefined };
+      // Адрес ОБЯЗАТЕЛЕН: зона — это курьер (type:'courier'), а серверная схема
+      // CreateOrderSchema (refineCourierAddress) без непустого адреса даёт 400 —
+      // раньше зональный заказ вообще нельзя было оформить.
+      return { type: 'courier', zoneId: zoneId || undefined, address: address.trim() || undefined };
     }
     if (deliveryChoice === 'pvz') {
       return {
@@ -189,7 +192,8 @@ export default function CheckoutForm({
 
   // Достаточно ли данных доставки для осмысленного расчёта/оформления.
   const deliveryReady = useMemo(() => {
-    if (deliveryChoice === 'zone') return Boolean(zoneId);
+    // Зона: нужен и выбор зоны, и адрес (сервер требует адрес для курьера).
+    if (deliveryChoice === 'zone') return Boolean(zoneId && address.trim());
     if (deliveryChoice === 'pvz') return Boolean(selectedCity && pvzCode);
     return Boolean(address.trim()); // courier требует адрес (серверная схема)
   }, [deliveryChoice, zoneId, selectedCity, pvzCode, address]);
@@ -523,8 +527,8 @@ export default function CheckoutForm({
               </div>
             )}
 
-            {/* Адрес (курьер) */}
-            {deliveryChoice === 'courier' && (
+            {/* Адрес (курьер СДЭК и курьер по зоне — сервер требует адрес для обоих) */}
+            {(deliveryChoice === 'zone' || deliveryChoice === 'courier') && (
               <label className="sf-field">
                 <span className="sf-field__label">{t.addressLabel}</span>
                 <input

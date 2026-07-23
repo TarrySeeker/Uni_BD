@@ -75,9 +75,17 @@ vi.mock('@/lib/orders/delivery-cost', () => ({
     source: 'stub' as const,
     provider: 'stub',
   }),
-  // resolveDeliveryZone используется repository для выбора зоны/порога (ТЗ_1);
-  // в этом тесте зон нет → возвращаем undefined (обычный расчёт, без зоны).
+  // Разрешение зоны/порога (ТЗ_1 п.9) — repository зовёт строгий резолвер и
+  // чистое ценообразование зоны; в этом тесте зон нет → зона не выбрана.
   resolveDeliveryZone: () => undefined,
+  resolveDeliveryZoneStrict: () => undefined,
+  resolveZonePricing: ({ shopFreeThresholdMinor }: { shopFreeThresholdMinor: number }) => ({
+    zone: undefined,
+    unknown: false,
+    freeThresholdMinor: shopFreeThresholdMinor,
+  }),
+  UnknownDeliveryZoneError: class UnknownDeliveryZoneError extends Error {},
+  DeliveryCalculationError: class DeliveryCalculationError extends Error {},
 }));
 
 // resolveCartLine резолвит позицию из «каталога» (anti-tamper) — подменяем, чтобы

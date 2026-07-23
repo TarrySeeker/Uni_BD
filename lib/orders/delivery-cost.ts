@@ -24,10 +24,10 @@
 
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { fromMinor } from './money';
-import { DeliveryCalculationError } from './errors';
+import { DeliveryCalculationError, UnknownDeliveryZoneError } from './errors';
 import type { DeliveryType } from './types';
 
-export { DeliveryCalculationError } from './errors';
+export { DeliveryCalculationError, UnknownDeliveryZoneError } from './errors';
 
 /**
  * Конфигурация зоны доставки (ТЗ_1) для расчёта стоимости. Деньги — в КОПЕЙКАХ.
@@ -177,6 +177,71 @@ export function resolveDeliveryZone(args: {
   const { zoneId, zones } = args;
   if (!zoneId || !zones || zones.length === 0) return undefined;
   return zones.find((z) => z.id === zoneId);
+}
+
+/**
+ * СТРОГОЕ разрешение зоны (ТЗ_1 п.9) — для quote/создания заказа.
+ *
+ * Отличается от мягкого resolveDeliveryZone ТОЛЬКО одним: если магазин задал
+ * зоны, а покупатель прислал id, которого среди них нет, — это ошибка, а не
+ * тихий фолбэк на СДЭК/stub (иначе при выключенном СДЭК доставка станет 0.00 —
+ * недоплата). Семантику resolveDeliveryZone намеренно НЕ меняем: её зовёт
+ * computeDeliveryCost, где мягкий фолбэк на ветку СДЭК корректен.
+ *
+ * zoneId не прислан → undefined (обычный расчёт, поведение не менялось).
+ * У магазина зон нет → зональный режим выключен, id игнорируется (не ошибка:
+ * витрина другого инстанса платформы может слать легаси-поле).
+ */
+export function resolveDeliveryZoneStrict(args: {
+  zoneId?: string;
+  zones?: readonly DeliveryZoneConfig[];
+}): DeliveryZoneConfig | undefined {
+  const { zoneId, zones } = args;
+  if (!zoneId || !zones || zones.length === 0) return undefined;
+  const zone = zones.find((z) => z.id === zoneId);
+  if (!zone) throw new UnknownDeliveryZoneError(zoneId);
+  return zone;
+}
+
+/** Результат зонального ценообразования для превью корзины. */
+export interface ZonePricing {
+  /** Найденная зона (undefined — зона не выбрана либо неизвестна). */
+  zone?: DeliveryZoneConfig;
+  /** Прислан неизвестный id зоны: доставку считать нельзя, бесплатной не делаем. */
+  unknown: boolean;
+  /**
+   * Порог бесплатной доставки, КОПЕЙКИ. Зона может задать свой порог (перекрывает
+   * общий порог магазина). Для неизвестной зоны — 0: calculateQuote трактует
+   * порог 0 как недостижимый (Infinity), т.е. бесплатной доставки не будет
+   * (anti-undercharge: иначе неизвестный id давал бы и 0.00, и «бесплатно»).
+   */
+  freeThresholdMinor: number;
+}
+
+/**
+ * ЧИСТОЕ зональное ценообразование для quote: зона + действующий порог бесплатной
+ * доставки. Не бросает (превью корзины не должно падать) — сигнализирует флагом.
+ */
+export function resolveZonePricing(args: {
+  zoneId?: string;
+  zones?: readonly DeliveryZoneConfig[];
+  /** Общий порог бесплатной доставки магазина, КОПЕЙКИ. */
+  shopFreeThresholdMinor: number;
+}): ZonePricing {
+  const { zoneId, zones, shopFreeThresholdMinor } = args;
+  try {
+    const zone = resolveDeliveryZoneStrict({ zoneId, zones });
+    return {
+      zone,
+      unknown: false,
+      freeThresholdMinor: zone?.freeThreshold ?? shopFreeThresholdMinor,
+    };
+  } catch (e) {
+    if (e instanceof UnknownDeliveryZoneError) {
+      return { zone: undefined, unknown: true, freeThresholdMinor: 0 };
+    }
+    throw e;
+  }
 }
 
 /** Есть ли в назначении хоть один признак для расчёта СДЭК. */

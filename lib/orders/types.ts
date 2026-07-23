@@ -171,6 +171,14 @@ export interface Order {
   deliveryCity: string | null;
   deliveryAddress: string | null;
   deliveryPvzCode: string | null;
+  /**
+   * Зона доставки (ТЗ_1 п.9): снимок выбранной зоны из НАСТРОЕК магазина.
+   * id — машинный (settings.delivery.zones[].id), label — подпись на момент
+   * заказа (владелец может переименовать зону позже, снимок не поедет).
+   * null у заказов, оформленных до появления зон (миграция 0053).
+   */
+  deliveryZoneId: string | null;
+  deliveryZoneLabel: string | null;
   /** Расчётная стоимость доставки (СДЭК/заглушка); null → не рассчитана. */
   deliveryCost: string | null;
   cdekUuid: string | null;

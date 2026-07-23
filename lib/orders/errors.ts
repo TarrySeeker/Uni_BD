@@ -60,3 +60,23 @@ export class DeliveryCalculationError extends PublicActionError {
     Object.setPrototypeOf(this, DeliveryCalculationError.prototype);
   }
 }
+
+/**
+ * Покупатель прислал zoneId, которого НЕТ в зонах магазина (ТЗ_1 п.9).
+ *
+ * WHY: раньше такой id молча проваливался в общую ветку расчёта и при
+ * выключенном СДЭК/без назначения давал доставку 0.00 — недоплата (владелец
+ * задал 500 ₽ по МКАД, а заказ приходил с бесплатной доставкой). Теперь это
+ * ЯВНАЯ доменная ошибка: quote помечает доставку нерассчитанной, createOrder
+ * отказывает (code='invalid_zone').
+ */
+export class UnknownDeliveryZoneError extends PublicActionError {
+  readonly code = 'invalid_zone';
+  readonly zoneId: string;
+  constructor(zoneId: string, message = 'Выбранная зона доставки недоступна. Обновите страницу и выберите зону заново.') {
+    super(message);
+    this.zoneId = zoneId;
+    this.name = 'UnknownDeliveryZoneError';
+    Object.setPrototypeOf(this, UnknownDeliveryZoneError.prototype);
+  }
+}

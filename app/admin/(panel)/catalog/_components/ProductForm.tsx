@@ -11,6 +11,11 @@ import type {
 import type { Designer } from '@/lib/designers/types';
 import { PRODUCT_STATUSES, type ProductStatus } from '@/lib/catalog/types';
 import { normalizeMoney } from '@/lib/catalog/schemas';
+import { normalizeProductColors, MAX_PRODUCT_COLORS } from '@/lib/catalog/colors';
+import {
+  DEFAULT_MASTER_COLORS,
+  type MasterColor,
+} from '@/lib/catalog/master-colors';
 import { isPubliclyVisible } from '@/lib/catalog/visibility';
 import type { ActionResult } from '@/lib/server/action';
 
@@ -47,7 +52,20 @@ import {
  * createProduct/updateProduct; ошибки валидации берутся из fieldErrors.
  */
 
-type Section = 'main' | 'variants' | 'attributes' | 'media' | 'seo';
+type Section = 'main' | 'colors' | 'variants' | 'attributes' | 'media' | 'seo';
+
+/**
+ * Слот цвета в форме (легаси старой админки: РОВНО два набора полей).
+ * masterId — выбор из справочника (только для подстановки имени/оттенка, в БД
+ * не хранится: товар хранит уже разрешённые {hex,name}).
+ */
+type ColorSlot = { masterId: string; name: string; hex: string };
+
+/** Подписи слотов — как в старой админке. */
+const COLOR_SLOT_LABELS = ['Основной цвет', 'Дополнительный цвет'];
+
+/** Пустой слот. */
+const EMPTY_COLOR_SLOT: ColorSlot = { masterId: '', name: '', hex: '' };
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
   draft: 'Черновик — скрыт с сайта',
@@ -76,6 +94,7 @@ export function ProductForm({
   categoryTree,
   attributes,
   attributeValues = {},
+  masterColors = DEFAULT_MASTER_COLORS as MasterColor[],
   locales = ['ru'],
   defaultLocale = 'ru',
 }: {
@@ -87,6 +106,11 @@ export function ProductForm({
   attributes: Attribute[];
   /** Значения словарей характеристик по attribute_id — для select-атрибутов. */
   attributeValues?: Record<string, AttributeValue[]>;
+  /**
+   * Справочник мастер-цветов магазина (shop_settings.catalog.masterColors или
+   * дефолт платформы). Приходит со страницы — в форме никакого хардкода цветов.
+   */
+  masterColors?: MasterColor[];
   /** Включённые языки магазина (shop_settings.i18n.locales). */
   locales?: readonly string[];
   /** Язык по умолчанию (база = обычные колонки). */
@@ -139,6 +163,35 @@ export function ProductForm({
     noindex: product?.noindex ?? false,
   });
 
+  // Цвета (ТЗ п.4, легаси-вкладка «Цвета»): два фиксированных слота.
+  // Мастер-цвет в БД не хранится — восстанавливаем выбор по совпадению имени.
+  const [colorSlots, setColorSlots] = useState<ColorSlot[]>(() =>
+    Array.from({ length: MAX_PRODUCT_COLORS }, (_, i) => {
+      const c = product?.colors?.[i];
+      if (!c) return { ...EMPTY_COLOR_SLOT };
+      const master = masterColors.find(
+        (m) => m.name.toLowerCase() === (c.name ?? '').toLowerCase(),
+      );
+      return { masterId: master?.id ?? '', name: c.name ?? '', hex: c.hex };
+    }),
+  );
+
+  function patchColorSlot(index: number, patch: Partial<ColorSlot>) {
+    setColorSlots((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    );
+  }
+
+  // Выбор мастер-цвета подставляет имя и стартовый оттенок (оттенок правится руками).
+  function pickMasterColor(index: number, masterId: string) {
+    const master = masterColors.find((m) => m.id === masterId);
+    if (!master) {
+      patchColorSlot(index, { masterId: '' });
+      return;
+    }
+    patchColorSlot(index, { masterId, name: master.name, hex: master.hex });
+  }
+
   const initialCategoryIds = product?.categories.map((c) => c.categoryId) ?? [];
   const [categoryIds, setCategoryIds] = useState<string[]>(initialCategoryIds);
   const [primaryCategoryId, setPrimaryCategoryId] = useState<string>(
@@ -186,6 +239,10 @@ export function ProductForm({
       designerId: designerId || null,
       categoryIds,
       primaryCategoryId: primaryCategoryId || null,
+      // Цвето-свотчи: чистая функция отбрасывает пустые слоты и канонизирует hex.
+      // Шлём ВСЕГДА (и при создании, и при сохранении) — форма показывает текущее
+      // состояние обоих слотов, поэтому её отправка = полное состояние цветов.
+      colors: normalizeProductColors(colorSlots),
       seoTitle: seo.seoTitle.trim() || undefined,
       seoDescription: seo.seoDescription.trim() || undefined,
       weightG: strToNum(weightG),
@@ -305,6 +362,7 @@ export function ProductForm({
 
   const tabs: Array<{ key: Section; label: string; editOnly?: boolean }> = [
     { key: 'main', label: 'Основное' },
+    { key: 'colors', label: 'Цвета' },
     { key: 'variants', label: 'Варианты', editOnly: true },
     { key: 'attributes', label: 'Характеристики', editOnly: true },
     { key: 'media', label: 'Медиа', editOnly: true },
@@ -675,6 +733,101 @@ export function ProductForm({
           </div>
         ) : null}
 
+        {section === 'colors' ? (
+          <div className="grid grid-cols-1 gap-4">
+            <p className="text-sm text-gray-500">
+              Кружки цвета на карточке товара. Можно оставить пустыми — тогда блок
+              цветов на сайте не показывается. Выберите цвет из списка (имя и оттенок
+              подставятся) либо задайте свой оттенок.
+            </p>
+            {colorSlots.map((slot, i) => (
+              <fieldset
+                key={i}
+                className="rounded border border-gray-200 p-3"
+              >
+                <legend className="px-1 text-sm font-medium text-gray-700">
+                  {COLOR_SLOT_LABELS[i]}
+                </legend>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label
+                      htmlFor={`p-color-master-${i}`}
+                      className="block text-xs font-medium text-gray-600"
+                    >
+                      Цвет из списка
+                    </label>
+                    <select
+                      id={`p-color-master-${i}`}
+                      value={slot.masterId}
+                      onChange={(e) => pickMasterColor(i, e.target.value)}
+                      className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    >
+                      <option value="">— не выбран —</option>
+                      {masterColors.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor={`p-color-name-${i}`}
+                      className="block text-xs font-medium text-gray-600"
+                    >
+                      Название цвета
+                    </label>
+                    <input
+                      id={`p-color-name-${i}`}
+                      value={slot.name}
+                      onChange={(e) => patchColorSlot(i, { name: e.target.value })}
+                      placeholder="необязательно"
+                      className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor={`p-color-hex-${i}`}
+                      className="block text-xs font-medium text-gray-600"
+                    >
+                      Оттенок
+                    </label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        id={`p-color-hex-${i}`}
+                        type="color"
+                        value={/^#[0-9a-fA-F]{6}$/.test(slot.hex) ? slot.hex : '#ffffff'}
+                        onChange={(e) => patchColorSlot(i, { hex: e.target.value })}
+                        className="h-9 w-12 rounded border border-gray-300"
+                        aria-label={`${COLOR_SLOT_LABELS[i]}: выбрать оттенок`}
+                      />
+                      <input
+                        value={slot.hex}
+                        onChange={(e) => patchColorSlot(i, { hex: e.target.value })}
+                        placeholder="#rrggbb"
+                        className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        aria-label={`${COLOR_SLOT_LABELS[i]}: код цвета`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => patchColorSlot(i, { ...EMPTY_COLOR_SLOT })}
+                        className="whitespace-nowrap text-xs text-gray-500 hover:underline"
+                      >
+                        Очистить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+            ))}
+            {fieldErr('colors') ? (
+              <p className="text-xs text-red-600">{fieldErr('colors')}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         {section === 'seo' ? (
           <div className="grid grid-cols-1 gap-4">
             <SeoFieldset
@@ -712,7 +865,7 @@ export function ProductForm({
         {section === 'media' && isEdit ? <MediaSection product={product!} /> : null}
       </div>
 
-      {section === 'main' || section === 'seo' ? (
+      {section === 'main' || section === 'seo' || section === 'colors' ? (
         <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
           <button
             type="button"

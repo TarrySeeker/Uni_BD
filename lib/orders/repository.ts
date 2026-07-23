@@ -43,8 +43,10 @@ import { GiftCertificateError } from '@/lib/gift-certificates/errors';
 import type { GiftCertificate } from '@/lib/gift-certificates/types';
 import {
   computeDeliveryCost,
-  resolveDeliveryZone,
+  resolveDeliveryZoneStrict,
+  resolveZonePricing,
   DeliveryCalculationError,
+  UnknownDeliveryZoneError,
   type DeliveryDestination,
   type DeliveryCostLine,
   type DeliveryZoneConfig,
@@ -146,6 +148,9 @@ export function mapOrder(row: Record<string, unknown>): Order {
     deliveryCity: strOrNull(row.delivery_city),
     deliveryAddress: strOrNull(row.delivery_address),
     deliveryPvzCode: strOrNull(row.delivery_pvz_code),
+    // Зона (0053): у заказов до миграции колонок нет вовсе → strOrNull даёт null.
+    deliveryZoneId: strOrNull(row.delivery_zone_id),
+    deliveryZoneLabel: strOrNull(row.delivery_zone_label),
     deliveryCost: strOrNull(row.delivery_cost),
     cdekUuid: strOrNull(row.cdek_uuid),
     cdekTrack: strOrNull(row.cdek_track),
@@ -673,13 +678,14 @@ export async function quoteCart(
   const eff = await getEffectiveSettings();
   // Порог бесплатной доставки: зона (ТЗ_1) может задать СВОЙ порог — тогда он
   // перекрывает общий порог магазина для заказов в эту зону; иначе — общий порог.
-  const deliveryZone = resolveDeliveryZone({
+  // Неизвестный id зоны (zonePricing.unknown) → порог 0 (бесплатной доставки не
+  // будет) и доставка помечается нерассчитанной: тихие 0.00 = недоплата.
+  const zonePricing = resolveZonePricing({
     zoneId: input.delivery?.zoneId,
     zones: eff.delivery.zones,
+    shopFreeThresholdMinor: eff.delivery.freeDeliveryThreshold,
   });
-  const freeThreshold = Number(
-    fromMinor(deliveryZone?.freeThreshold ?? eff.delivery.freeDeliveryThreshold),
-  );
+  const freeThreshold = Number(fromMinor(zonePricing.freeThresholdMinor));
 
   const issues: QuoteCartResult['issues'] = [];
   // BUG A: тип ResolvedLine (а не PricedLine) — чтобы вес/габариты позиции были
@@ -754,16 +760,21 @@ export async function quoteCart(
 
   // quote — превью: softFail, чтобы сбой расчёта СДЭК не ронял корзину (resolved
   // прокидывается наружу; реальную блокировку недоплаты делает createOrder).
-  const delivery = await resolveDeliveryCost({
-    deliveryType: input.delivery?.type,
-    lines,
-    city: input.delivery?.city,
-    cityCode: input.delivery?.cityCode,
-    pvzCode: input.delivery?.pvzCode,
-    zoneId: input.delivery?.zoneId,
-    zones: eff.delivery.zones,
-    softFail: true,
-  });
+  const delivery = zonePricing.unknown
+    ? // Неизвестная зона: считать нечего — цену не выдумываем, помечаем
+      // нерассчитанной (витрина покажет «уточняется» и не даст оформить;
+      // createOrder такой заказ всё равно отклонит с invalid_zone).
+      { cost: '0.00', resolved: false }
+    : await resolveDeliveryCost({
+        deliveryType: input.delivery?.type,
+        lines,
+        city: input.delivery?.city,
+        cityCode: input.delivery?.cityCode,
+        pvzCode: input.delivery?.pvzCode,
+        zoneId: input.delivery?.zoneId,
+        zones: eff.delivery.zones,
+        softFail: true,
+      });
 
   const quote = calculateQuote({
     lines,
@@ -949,6 +960,7 @@ export type CreateOrderResult =
         | 'invalid_promo'
         | 'invalid_gift'
         | 'delivery_unavailable'
+        | 'invalid_zone'
         | 'payments_disabled';
       message: string;
     };
@@ -991,10 +1003,21 @@ export async function createOrder(
   const eff = await getEffectiveSettings();
   // Порог бесплатной доставки: зона (ТЗ_1) может задать СВОЙ порог (перекрывает
   // общий порог магазина для этой зоны); иначе — общий порог магазина.
-  const deliveryZone = resolveDeliveryZone({
-    zoneId: input.delivery?.zoneId,
-    zones: eff.delivery.zones,
-  });
+  // СТРОГО: неизвестный id зоны — отказ, а не тихая доставка 0.00 (anti-undercharge).
+  let deliveryZone: DeliveryZoneConfig | undefined;
+  try {
+    deliveryZone = resolveDeliveryZoneStrict({
+      zoneId: input.delivery?.zoneId,
+      zones: eff.delivery.zones,
+    });
+  } catch (e) {
+    if (e instanceof UnknownDeliveryZoneError) {
+      return { ok: false, code: 'invalid_zone', message: e.message };
+    }
+    throw e;
+  }
+  // Самовывоз бесплатен всегда — зона к нему не применяется (см. computeDeliveryCost).
+  const appliedZone = input.delivery?.type === 'pickup' ? undefined : deliveryZone;
   const freeThreshold = Number(
     fromMinor(deliveryZone?.freeThreshold ?? eff.delivery.freeDeliveryThreshold),
   );
@@ -1224,7 +1247,8 @@ export async function createOrder(
           number, status, items_total, discount_total, delivery_total, grand_total,
           currency, payment_method, payment_status, payment_provider, paid_at,
           delivery_type, is_postamat, delivery_city,
-          delivery_address, delivery_pvz_code, delivery_cost, promo_code_id, promo_code,
+          delivery_address, delivery_pvz_code, delivery_zone_id, delivery_zone_label,
+          delivery_cost, promo_code_id, promo_code,
           gift_certificate_id, gift_discount_total,
           customer_id, customer_name, customer_email, customer_phone, comment, idempotency_key,
           source, ip
@@ -1234,6 +1258,7 @@ export async function createOrder(
           ${paymentProvider}, ${paidAt},
           ${input.delivery.type}, ${input.delivery.isPostamat ?? false}, ${input.delivery.city ?? null},
           ${input.delivery.address ?? null}, ${input.delivery.pvzCode ?? null},
+          ${appliedZone?.id ?? null}, ${appliedZone?.label ?? null},
           ${quote.deliveryCost}, ${promoRow?.id ?? null}, ${appliedPromo?.code ?? null},
           ${giftCertId}, ${giftDiscountTotal},
           ${ctx.customerId ?? null},

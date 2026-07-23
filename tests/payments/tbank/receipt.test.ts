@@ -29,6 +29,8 @@ function order(extra: Partial<Order> = {}): Order {
     deliveryCity: null,
     deliveryAddress: null,
     deliveryPvzCode: null,
+    deliveryZoneId: null,
+    deliveryZoneLabel: null,
     deliveryCost: null,
     cdekUuid: null,
     cdekTrack: null,

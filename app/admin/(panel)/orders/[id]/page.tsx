@@ -318,6 +318,9 @@ export default async function OrderDetailPage({
                 }
               />
               <Row label="Статус" value={<DeliveryStatusBadge status={order.deliveryStatus} />} />
+              {order.deliveryZoneLabel || order.deliveryZoneId ? (
+                <Row label="Зона" value={order.deliveryZoneLabel ?? order.deliveryZoneId ?? ''} />
+              ) : null}
               {order.deliveryCity ? <Row label="Город" value={order.deliveryCity} /> : null}
               {order.deliveryAddress ? <Row label="Адрес" value={order.deliveryAddress} /> : null}
               {order.deliveryPvzCode ? <Row label="ПВЗ" value={order.deliveryPvzCode} /> : null}

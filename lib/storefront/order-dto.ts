@@ -175,6 +175,12 @@ export interface OrderPublicDto {
     /** Постамат (§9): подвид ПВЗ с автовыдачей; true → показать метку «постамат». */
     isPostamat: boolean;
     city: string | null;
+    /**
+     * Зона доставки (ТЗ_1 п.9) — снимок из настроек магазина на момент заказа.
+     * null у заказов до появления зон (миграция 0053) и вне зонального режима.
+     */
+    zoneId: string | null;
+    zoneLabel: string | null;
     /** Трек-номер СДЭК (если присвоен, Этап 4). */
     track: string | null;
   };
@@ -243,6 +249,8 @@ export function toOrderPublicDto(order: Order, items: OrderItem[]): OrderPublicD
       type: order.deliveryType,
       isPostamat: order.isPostamat,
       city: order.deliveryCity,
+      zoneId: order.deliveryZoneId,
+      zoneLabel: order.deliveryZoneLabel,
       track: order.cdekTrack,
     },
 

@@ -34,6 +34,10 @@ import {
   type NavigationSettings,
   type AccessSettings,
 } from '@/lib/settings/schemas';
+import {
+  resolveMasterColors,
+  type MasterColor,
+} from '@/lib/catalog/master-colors';
 import { HOME_DEFAULTS, type HomeContent } from '@/lib/config/home-defaults';
 import { toMinor } from '@/lib/orders/money';
 import { getAllSettings, type SettingRow } from '@/lib/settings/repository';
@@ -108,6 +112,12 @@ export interface EffectiveSettings {
   catalog: {
     /** Порог «новизны» товара в днях. */
     newProductDays: number;
+    /**
+     * Справочник мастер-цветов для формы товара (п.4 ТЗ). Оверрайд магазина
+     * (shop_settings.catalog.masterColors) или дефолт платформы —
+     * разрешается resolveMasterColors, хардкода под магазин нет.
+     */
+    masterColors: MasterColor[];
   };
   delivery: {
     /** Порог бесплатной доставки — в КОПЕЙКАХ (0 = выключено). */
@@ -411,6 +421,7 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
     legalEntity,
     catalog: {
       newProductDays: catalog.newProductDays ?? env.SHOP_NEW_PRODUCT_DAYS,
+      masterColors: resolveMasterColors(catalog.masterColors),
     },
     delivery: {
       // env-порог задаётся в рублях (number) → конвертируем в копейки.

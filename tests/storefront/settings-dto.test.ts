@@ -46,7 +46,7 @@ function makeEffective(): EffectiveSettings {
       legalAddress: 'Москва, ул. ...',
       bankDetails: 'р/с 40702810000000000000, БИК 044525225',
     },
-    catalog: { newProductDays: 30 },
+    catalog: { newProductDays: 30, masterColors: [] },
     delivery: {
       freeDeliveryThreshold: 300000,
       zones: [

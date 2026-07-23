@@ -60,6 +60,8 @@ function makeOrder(over: Partial<Order> = {}): Order {
     deliveryCity: 'Москва',
     deliveryAddress: null,
     deliveryPvzCode: 'MSK42',
+    deliveryZoneId: null,
+    deliveryZoneLabel: null,
     deliveryCost: '0.00',
     cdekUuid: 'secret-cdek-uuid',
     cdekTrack: '1234567890',
