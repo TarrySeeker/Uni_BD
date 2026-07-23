@@ -168,6 +168,15 @@ export interface RecordWebhookResult {
   inserted: boolean;
   /** Переход payment_status применён в этой же транзакции. */
   processed: boolean;
+  /**
+   * Синоним processed под именем вызывающей стороны: «переход реально применён
+   * ЭТИМ событием». Вынесен наружу вместе с paymentStatus, чтобы пост-коммитные
+   * эффекты (автовыпуск подарочных сертификатов, ТЗ п.11) могли отличить
+   * «заказ стал paid прямо сейчас» от «событие записано, перехода не было».
+   */
+  applied: boolean;
+  /** Статус, в который заказ переведён этим событием; null — перехода не было. */
+  paymentStatus: PaymentStatus | null;
 }
 
 /**
@@ -199,7 +208,8 @@ export async function recordWebhookEvent(input: {
     `;
     const id = rows[0]?.id ?? null;
     // Дубликат (повторная доставка) — эффект уже применён, не повторяем.
-    if (id === null) return { inserted: false, processed: false };
+    if (id === null)
+      return { inserted: false, processed: false, applied: false, paymentStatus: null };
 
     let processed = false;
     if (input.nextStatus) {
@@ -212,7 +222,12 @@ export async function recordWebhookEvent(input: {
     }
 
     await tx`UPDATE paykeeper_payment_log SET processed = true WHERE id = ${id}`;
-    return { inserted: true, processed };
+    return {
+      inserted: true,
+      processed,
+      applied: processed,
+      paymentStatus: processed ? input.nextStatus : null,
+    };
   });
 }
 

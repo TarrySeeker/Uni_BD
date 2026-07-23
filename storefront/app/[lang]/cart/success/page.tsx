@@ -15,6 +15,7 @@ import { getOrder } from '@/lib/api';
 import { formatPrice } from '@/lib/format';
 import { localizedHref, toLocale } from '@/lib/i18n';
 import { getDictionary, fillTemplate } from '@/lib/dictionaries';
+import GiftCodes from './GiftCodes';
 
 export async function generateMetadata({
   params,
@@ -97,6 +98,20 @@ export default async function SuccessPage({
             </div>
           </>
         )}
+
+        {/*
+          Код подарочного сертификата (ТЗ п.11) — ТОЛЬКО клиентский блок по токену
+          заказа: в общем DTO заказа кода нет и быть не должно (деньги на
+          предъявителя). Сам блок решает, показываться ли ему вообще.
+        */}
+        {number && token ? (
+          <GiftCodes
+            number={number}
+            token={token}
+            strings={dict.success}
+            locale={locale}
+          />
+        ) : null}
 
         <p className="sf-success__actions">
           <a href={localizedHref('/catalog', locale)} className="sf-checkout__link">

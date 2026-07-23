@@ -22,6 +22,7 @@
  */
 
 import type { Order, OrderItem } from '@/lib/orders/types';
+import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
 import { getOrderByNumber } from '@/lib/orders/repository';
 import { TbankManager, getTbankManager } from './manager';
 import { TbankError } from './errors';
@@ -30,7 +31,12 @@ import { isOrderPayable } from '@/lib/orders/status';
 import { verifyNotificationToken } from './token';
 import { buildReceipt } from './receipt';
 import { toKopecks } from './receipt';
-import { recordWebhookEvent, setPaymentRefAndProvider, insertPaymentLog } from './repository';
+import {
+  recordWebhookEvent,
+  setPaymentRefAndProvider,
+  insertPaymentLog,
+  type RecordWebhookResult,
+} from './repository';
 import type {
   HandleWebhookResult,
   InitPaymentResult,
@@ -119,6 +125,32 @@ export function sanitizeNotification(
 // =============================================================================
 // PaymentService — Init + webhook.
 // =============================================================================
+
+/**
+ * ПОСТ-КОММИТНЫЙ автовыпуск подарочных сертификатов по оплаченному заказу (ТЗ п.11).
+ *
+ * ВЫЗЫВАТЬ СТРОГО ПОСЛЕ `await recordWebhookEvent`, то есть ПОСЛЕ КОММИТА. Внутри
+ * той транзакции (лог события + переход в paid + пометка processed) любой throw
+ * откатил бы САМ ФАКТ ОПЛАТЫ, а повторная доставка события была бы отсечена
+ * уникальным ключом лога: деньги приняты, а заказ навсегда pending.
+ *
+ * По той же причине ошибка выпуска ГЛОТАЕТСЯ: ответ провайдеру обязан остаться
+ * успешным, иначе банк начнёт ретраить событие. Невыпущенное подхватит крон-сверка.
+ */
+async function autoIssueGiftsAfterCommit(
+  orderId: string,
+  result: RecordWebhookResult,
+): Promise<void> {
+  if (!(result.inserted && result.applied && result.paymentStatus === 'paid')) return;
+  try {
+    await autoIssueGiftsForPaidOrder(orderId);
+  } catch (err) {
+    console.warn(
+      `[tbank] автовыпуск подарочных сертификатов не удался (order=${orderId}): ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
 export class PaymentService {
   constructor(private readonly manager: TbankManager = getTbankManager()) {}
@@ -252,7 +284,7 @@ export class PaymentService {
     //    Недопустимый/отсутствующий маппинг (next=null) → processed=false (no-op),
     //    дубликат (inserted=false) → ранний выход без эффектов.
     const next = mapTbankStatus(event.status);
-    const { inserted, processed } = await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId,
         paymentId: event.paymentId,
@@ -264,6 +296,9 @@ export class PaymentService {
       nextStatus: next,
       comment: `tbank-webhook:${event.status}`,
     });
+    // ПОСЛЕ КОММИТА: подарочные сертификаты по оплаченному заказу (ТЗ п.11).
+    await autoIssueGiftsAfterCommit(orderId, result);
+    const { inserted, processed } = result;
     if (!inserted) {
       // Дубликат: уже обработано — НЕ повторяем эффекты.
       return { verified: true, processed: false, duplicate: true, paymentStatus: null };
@@ -294,7 +329,7 @@ export class PaymentService {
     if (!found.order.paymentRef || paymentId !== found.order.paymentRef) {
       return { ok: false, reason: 'payment_ref_mismatch' };
     }
-    await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId: found.order.id,
         paymentId,
@@ -306,6 +341,7 @@ export class PaymentService {
       nextStatus: mapTbankStatus('CONFIRMED'),
       comment: 'mock-pay-demo:CONFIRMED',
     });
+    await autoIssueGiftsAfterCommit(found.order.id, result);
     return { ok: true };
   }
 
@@ -353,7 +389,7 @@ export class PaymentService {
     }
 
     const next = mapTbankStatus(status);
-    const { processed } = await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId: input.orderId,
         paymentId: input.paymentId,
@@ -365,7 +401,8 @@ export class PaymentService {
       nextStatus: next,
       comment: `reconcile-getstate:${status}`,
     });
-    return { ok: true, status, applied: processed, isMock };
+    await autoIssueGiftsAfterCommit(input.orderId, result);
+    return { ok: true, status, applied: result.processed, isMock };
   }
 
   /**

@@ -43,11 +43,17 @@ export function OrderActionsPanel({
   status,
   paymentStatus,
   deliveryStatus,
+  giftWarnings = [],
 }: {
   orderId: string;
   status: string;
   paymentStatus: string;
   deliveryStatus: string;
+  /**
+   * Готовые строки giftRefundWarnings (ТЗ п.11): что случится с выпущенными
+   * сертификатами при возврате. Считает сервер — здесь только показ.
+   */
+  giftWarnings?: readonly string[];
 }) {
   const router = useRouter();
 
@@ -106,6 +112,20 @@ export function OrderActionsPanel({
           <p className="font-medium">Возможное рассогласование статусов:</p>
           <ul className="mt-1 list-disc pl-5">
             {contradictions.map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {giftWarnings.length > 0 ? (
+        <div
+          role="status"
+          className="mt-3 rounded border border-violet-200 bg-violet-50 p-3 text-sm text-violet-900"
+        >
+          <p className="font-medium">Подарочные сертификаты по этому заказу:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {giftWarnings.map((msg) => (
               <li key={msg}>{msg}</li>
             ))}
           </ul>

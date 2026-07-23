@@ -36,6 +36,8 @@ import {
   type QuoteResult,
 } from './pricing';
 import { validatePromo, type PromoValidationResult } from './promo';
+import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
+import { GIFT_ITEM_MARKER_KEYS } from '@/lib/gift-certificates/origin';
 import { findByCode as findGiftByCode, redeemGiftTx } from '@/lib/gift-certificates/repository';
 import { certRemaining } from '@/lib/gift-certificates/balance';
 import { assertRedeemable } from '@/lib/gift-certificates/service';
@@ -53,6 +55,9 @@ import {
 } from './delivery-cost';
 import type { DeliveryType, Order, OrderItem, PaymentMethod, PromoCode } from './types';
 import type { CartQuoteInput, CreateOrderInput } from './schemas';
+import { getSetting } from '@/lib/settings/repository';
+import { resolveGiftSettings } from '@/lib/settings/schemas';
+import { logger } from '@/lib/logger';
 
 // Сентинель для COALESCE(variant_id, ...) в inventory_unit_uniq (0010).
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
@@ -403,6 +408,107 @@ function availableFor(product: ProductDetail, variantId: string | null): number 
   return Math.max(0, row.quantity - row.reserved);
 }
 
+// =============================================================================
+// Подарочные сертификаты: маркер в снимке позиции + автовыпуск (ТЗ владельца п.11).
+// =============================================================================
+
+/**
+ * Автовыпуск сертификатов ПОСЛЕ КОММИТА транзакции — единая обёртка врезок.
+ *
+ * 🔴 Вызывать только вне транзакции и только так: выпуск открывает СВОИ
+ * транзакции, а любое исключение, всплывшее внутри транзакции фиксации оплаты,
+ * откатило бы сам факт оплаты (повторный вебхук отсекается по
+ * UNIQUE(payment_id,status) — деньги приняты, заказ висит pending). Конвейер и
+ * сам не бросает, но обёртка страхует от сбоя на границе (сеть/пул соединений).
+ */
+async function autoIssueGiftsAfterCommit(orderId: string): Promise<void> {
+  try {
+    await autoIssueGiftsForPaidOrder(orderId);
+  } catch (err) {
+    logger.error('автовыпуск сертификатов не выполнен', {
+      orderId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * Дописывает маркер сертификата в СНИМОК атрибутов позиции, если товар лежит в
+ * одном из разделов настройки gift.categorySlugs.
+ *
+ * ЗАЧЕМ: автовыпуск (isGiftItemForAutoIssue) решает ТОЛЬКО по маркеру в снимке —
+ * в реальных данных магазина у товаров-сертификатов атрибутов нет вообще, и без
+ * этой врезки автовыпуск не сработал бы ни разу, молча. Маркер ставится один раз,
+ * при оформлении, и дальше живёт в снимке: переименование/удаление раздела задним
+ * числом не отменит того, что покупатель купил сертификат (ADR-010).
+ *
+ * Явный маркер каталога НЕ перезаписываем — в т.ч. отрицательный: если владелец
+ * положил в раздел «подарочная упаковка» и выключил её атрибутом, категория не
+ * должна это молча отменить.
+ */
+export function applyGiftCategoryMarker(
+  attrs: Record<string, unknown>,
+  isGiftCategory: boolean,
+): Record<string, unknown> {
+  if (!isGiftCategory) return attrs;
+  if (GIFT_ITEM_MARKER_KEYS.some((key) => key in attrs)) return attrs;
+  return { ...attrs, [GIFT_ITEM_MARKER_KEYS[0]]: true };
+}
+
+/** Зависимости резолва разделов-сертификатов (инъекция для юнитов без БД). */
+export interface GiftCategoryDeps {
+  readGiftSetting: () => Promise<unknown>;
+  readCategoryIdsBySlug: (slugs: string[]) => Promise<string[]>;
+}
+
+/**
+ * id разделов-сертификатов по адресам из настроек магазина. МУЛЬТИТЕНАНТНОСТЬ:
+ * список задаётся настройкой gift.categorySlugs, в коде заказов адресов нет.
+ * Пустой список — явный выбор владельца («ни один раздел»), БД не дёргаем.
+ */
+export async function resolveGiftCategoryIds(deps: GiftCategoryDeps): Promise<Set<string>> {
+  const slugs = resolveGiftSettings(await deps.readGiftSetting()).categorySlugs;
+  if (slugs.length === 0) return new Set();
+  return new Set(await deps.readCategoryIdsBySlug(slugs));
+}
+
+const GIFT_CATEGORY_TTL_MS = 30_000;
+
+/**
+ * Кэш разделов-сертификатов: резолв нужен на КАЖДУЮ позицию корзины, а это два
+ * запроса (настройки + категории). Короткий TTL — компромисс: правка списка в
+ * админке подхватывается в течение полуминуты, а расчёт корзины не платит за неё.
+ */
+let giftCategoryCache: { ids: Set<string>; at: number } | null = null;
+
+async function giftCategoryIdsCached(): Promise<Set<string>> {
+  const now = Date.now();
+  if (giftCategoryCache && now - giftCategoryCache.at < GIFT_CATEGORY_TTL_MS) {
+    return giftCategoryCache.ids;
+  }
+  try {
+    const ids = await resolveGiftCategoryIds({
+      readGiftSetting: async () => (await getSetting('gift'))?.value ?? null,
+      readCategoryIdsBySlug: async (slugs) => {
+        const rows = await sql<{ id: string }[]>`
+          SELECT id FROM categories WHERE slug = ANY(${slugs}::text[])
+        `;
+        return rows.map((r) => String(r.id));
+      },
+    });
+    giftCategoryCache = { ids, at: now };
+    return ids;
+  } catch (err) {
+    // Разметка сертификата — ДОПОЛНЕНИЕ к снимку: её сбой не должен ронять
+    // расчёт корзины и оформление заказа. Заказ пройдёт без маркера, менеджер
+    // выпустит код вручную (кнопка в карточке заказа).
+    logger.warn('не удалось определить разделы-сертификаты', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return new Set<string>();
+  }
+}
+
 /**
  * Резолвит одну позицию витрины в ценовую строку ИЗ КАТАЛОГА (цена не из
  * запроса). variantId приоритетен; иначе берётся товар без варианта.
@@ -465,6 +571,12 @@ export async function resolveCartLine(input: {
   // фиксирует снимок для СДЭК, из тела запроса они НЕ берутся.
   const dims = resolveLineDims(product, variant);
 
+  // Маркер сертификата — часть СНИМКА (см. applyGiftCategoryMarker): проставляем
+  // по разделам товара из настроек магазина, иначе автовыпуск не увидит позицию.
+  const giftCategoryIds = await giftCategoryIdsCached();
+  const isGiftCategoryItem =
+    giftCategoryIds.size > 0 && product.categories.some((c) => giftCategoryIds.has(c.categoryId));
+
   return {
     ok: true,
     line: {
@@ -479,7 +591,10 @@ export async function resolveCartLine(input: {
       // категории/бренд позиции для определения принадлежности scope акции.
       categoryIds: product.categories.map((c) => c.categoryId),
       brandId: product.brandId,
-      attributesSnapshot: variant?.attributesCache ?? product.attributesCache ?? {},
+      attributesSnapshot: applyGiftCategoryMarker(
+        variant?.attributesCache ?? product.attributesCache ?? {},
+        isGiftCategoryItem,
+      ),
       available,
       inStock: available >= input.qty,
       ...dims,
@@ -1342,6 +1457,15 @@ export async function createOrder(
 
       return { row: orderRow!, reused: false } as const;
     });
+
+    // ПОСЛЕ КОММИТА: заказ, полностью покрытый сертификатом, рождается сразу
+    // оплаченным (payment_status='paid', provider='manual') и НЕ проходит через
+    // статус-машину — значит врезка автовыпуска в setPaymentStatus его не увидит.
+    // Выпускать ли по такому заказу (обмен номинала) решает настройка
+    // gift.allowIssueOnGiftPaidOrder внутри самого конвейера.
+    if (fullyGiftCovered && !order.reused) {
+      await autoIssueGiftsAfterCommit(String(order.row.id));
+    }
 
     return { ok: true, order: mapOrder(order.row), reused: order.reused };
   } catch (err) {

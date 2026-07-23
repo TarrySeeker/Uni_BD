@@ -7,6 +7,7 @@ import { useState } from 'react';
 import type { ActionResult } from '@/lib/server/action';
 
 import { errorMessage } from '../../_components/action-result';
+import { GiftStatusBadge } from '../../../gift-certificates/_components/GiftStatusBadge';
 import { issueGiftFromOrderAction } from './gift-actions';
 
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
@@ -29,6 +30,9 @@ export interface IssuedCertificateView {
   initialAmount: string;
   orderItemId: string | null;
   recipient: string;
+  /** Потрачено с кода (уже с валютой) — менеджеру важно ДО возврата (ТЗ п.11). */
+  spentLabel: string;
+  status: string;
 }
 
 /**
@@ -50,11 +54,14 @@ export function GiftIssueBlock({
   items,
   issued,
   canWrite,
+  warnings = [],
 }: {
   orderId: string;
   items: readonly GiftIssueItemView[];
   issued: readonly IssuedCertificateView[];
   canWrite: boolean;
+  /** Готовые строки giftRefundWarnings (считает сервер, kind='revoked'). */
+  warnings?: readonly string[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
@@ -105,6 +112,19 @@ export function GiftIssueBlock({
           </div>
         ) : null}
 
+        {warnings.length > 0 ? (
+          <div
+            role="alert"
+            className="mb-3 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800"
+          >
+            <ul className="list-disc pl-5">
+              {warnings.map((msg) => (
+                <li key={msg}>{msg}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {issued.length > 0 ? (
           <ul className="mb-3 space-y-1 text-sm">
             {issued.map((c) => (
@@ -114,6 +134,8 @@ export function GiftIssueBlock({
                 </Link>{' '}
                 <span className="text-gray-600">на {c.initialAmount}</span>
                 <span className="text-gray-500"> · на чьё имя: {c.recipient}</span>
+                <span className="text-gray-500"> · потрачено: {c.spentLabel}</span>{' '}
+                <GiftStatusBadge status={c.status} />
               </li>
             ))}
           </ul>

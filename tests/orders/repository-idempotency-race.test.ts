@@ -57,6 +57,13 @@ vi.mock('@/lib/config/env', () => ({
   getEnv: () => ({ SHOP_CURRENCY: 'RUB', SHOP_ORDER_PREFIX: '' }),
 }));
 
+// Разделы-сертификаты (маркер в снимке позиции, ТЗ владельца п.11): резолв
+// читает настройки магазина. Здесь список ПУСТ — значит БД по категориям не
+// опрашивается и очередь sqlResultQueue ниже остаётся про идемпотентность.
+vi.mock('@/lib/settings/repository', () => ({
+  getSetting: async () => ({ value: { categorySlugs: [] } }),
+}));
+
 vi.mock('@/lib/config/settings', () => ({
   getEffectiveSettings: async () => ({
     delivery: { freeDeliveryThreshold: 0 },

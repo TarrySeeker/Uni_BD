@@ -148,7 +148,7 @@ describe('paykeeper/repository — recordWebhookEvent (идемпотентно�
     state.updateCount = 1;
     state.logInsertId = 'log-1';
     const res = await recordWebhookEvent(input('paid'));
-    expect(res).toEqual({ inserted: true, processed: true });
+    expect(res).toEqual({ inserted: true, processed: true, applied: true, paymentStatus: 'paid' });
     expect(state.beginCalls).toBe(1);
     // INSERT лога содержит ON CONFLICT (invoice_id, status) DO NOTHING.
     const ins = state.queries.find((q) => /paykeeper_payment_log/i.test(q.text) && /^INSERT/i.test(q.text));
@@ -159,7 +159,12 @@ describe('paykeeper/repository — recordWebhookEvent (идемпотентно�
   it('дубликат: ON CONFLICT DO NOTHING (INSERT → []) → {inserted:false, processed:false}, без перехода', async () => {
     state.logInsertId = null;
     const res = await recordWebhookEvent(input('paid'));
-    expect(res).toEqual({ inserted: false, processed: false });
+    expect(res).toEqual({
+      inserted: false,
+      processed: false,
+      applied: false,
+      paymentStatus: null,
+    });
     const updOrders = state.queries.find((q) => /^UPDATE/i.test(q.text) && /orders/i.test(q.text));
     expect(updOrders).toBeUndefined();
   });

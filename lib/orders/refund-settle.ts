@@ -1,7 +1,7 @@
 import type { TransactionSql } from 'postgres';
 
 import { releaseReservation } from './repository';
-import { releaseGiftTx } from '@/lib/gift-certificates/repository';
+import { releaseGiftTx, revokeIssuedGiftsTx } from '@/lib/gift-certificates/repository';
 import type { OrderStatus } from './types';
 
 /**
@@ -85,6 +85,14 @@ export async function settleRefundEffectsTx(
   // releaseGiftTx возвращает spent_total по активным списаниям заказа и метит
   // reversed_at; идемпотентно (повтор/заказ без сертификата → no-op).
   await releaseGiftTx(tx, { orderId });
+
+  // (b3) ГАШЕНИЕ сертификатов, ВЫПУЩЕННЫХ по этому заказу (ТЗ владельца п.11).
+  // Зеркало (b2): там возвращается потраченный номинал, здесь отзывается
+  // выданный. Иначе покупателю вернули деньги, а код на предъявителя остался
+  // рабочим. Гасим БЕЗУСЛОВНО: частично потраченный остаток — не повод оставлять
+  // код живым, это лишь предупреждение менеджеру в карточке заказа.
+  // Идемпотентно (UPDATE ... WHERE status IN ('active','depleted')).
+  await revokeIssuedGiftsTx(tx, { orderId });
 
   // (c) order.status → refunded (guarded по from) + история заказа.
   await tx`

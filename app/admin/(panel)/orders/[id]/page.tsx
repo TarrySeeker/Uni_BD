@@ -34,6 +34,8 @@ import {
   giftFaceValueFromItem,
   listGiftCertificatesIssuedForOrder,
 } from '@/lib/gift-certificates';
+// Из конкретного модуля, а не из бочки: index.ts принадлежит другому треку.
+import { giftRefundWarnings } from '@/lib/gift-certificates/warnings';
 
 import {
   CdekBlock,
@@ -201,7 +203,25 @@ export default async function OrderDetailPage({
     initialAmount: c.initialAmount,
     orderItemId: c.issuedOrderItemId,
     recipient: c.recipient.name ?? c.recipient.email ?? '—',
+    spentLabel: formatPrice(c.spentTotal, c.currency),
+    status: c.status,
   }));
+  // ТЗ п.11: менеджер должен узнать о судьбе выпущенных кодов ДО возврата
+  // (погашение не вернёт уже потраченное). Код в админке показываем целиком.
+  const giftWarningInput = issuedCerts.map((c) => ({
+    code: c.code,
+    spentTotal: c.spentTotal,
+    currency: c.currency,
+    status: c.status,
+  }));
+  const giftRefundNotice = giftRefundWarnings(giftWarningInput, {
+    kind: 'preventive',
+    revealCode: true,
+  });
+  const giftRevokedNotice = giftRefundWarnings(giftWarningInput, {
+    kind: 'revoked',
+    revealCode: true,
+  });
 
   return (
     <div>
@@ -301,6 +321,7 @@ export default async function OrderDetailPage({
               items={giftItems}
               issued={issuedView}
               canWrite={can(guard.user, 'gift.write')}
+              warnings={giftRevokedNotice}
             />
           ) : null}
 
@@ -402,6 +423,7 @@ export default async function OrderDetailPage({
               status={order.status}
               paymentStatus={order.paymentStatus}
               deliveryStatus={order.deliveryStatus}
+              giftWarnings={giftRefundNotice}
             />
           ) : null}
 

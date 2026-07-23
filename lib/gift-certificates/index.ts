@@ -12,20 +12,38 @@ export type {
   GiftCertificateStatus,
   GiftIssueSource,
   GiftParty,
+  GiftSettings,
+  ResolvedGiftSettings,
 } from './types';
 export { GIFT_CERTIFICATE_STATUSES, GIFT_ISSUE_SOURCES, EMPTY_GIFT_PARTY } from './types';
 
 export {
   GIFT_ITEM_MARKER_KEYS,
+  GIFT_CODE_ALPHABET,
+  GIFT_VALID_DAYS_KEYS,
   buildGiftCodeForOrderItem,
   certificateItemHint,
   giftFaceValueFromItem,
+  giftValidDaysFor,
+  giftValidUntil,
+  isGiftItemForAutoIssue,
   looksLikeCertificateItem,
   normalizeGiftParty,
   isGiftPartyEmpty,
+  randomGiftCode,
   type CertificateSourceItem,
   type GiftPartyInput,
 } from './origin';
+
+export {
+  autoIssueGiftsForPaidOrder,
+  createGiftAutoIssuer,
+  productionAutoIssueDeps,
+  type AutoIssueDeps,
+  type AutoIssueItemOutcome,
+  type AutoIssueReport,
+  type AutoIssueSkipReason,
+} from './auto-issue';
 
 export { GIFT_TR_FIELDS } from './fields';
 
@@ -85,10 +103,20 @@ export {
   releaseGiftTx,
   redeemGift,
   releaseGift,
+  getOrderForAutoIssue,
+  insertGiftCertificateTx,
+  lockOrderForGiftIssueTx,
+  revokeIssuedGiftsTx,
+  findOrdersPendingGiftIssue,
   type RedeemResult,
   type ReleaseResult,
   type IssueGiftCertificateRow,
   type GiftIssueSourceRow,
+  type AutoIssueOrderSnapshot,
+  type IssuedGiftRef,
+  type RevokedGiftRef,
+  type RevokeIssuedGiftsResult,
+  type PendingGiftIssueOrder,
 } from './repository';
 
 export {

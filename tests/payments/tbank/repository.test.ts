@@ -213,7 +213,7 @@ describe('tbank/repository — recordWebhookEvent (атомарность)', () 
     state.updateCount = 1;
     state.logInsertId = 'log-1';
     const res = await recordWebhookEvent(baseInput('paid'));
-    expect(res).toEqual({ inserted: true, processed: true });
+    expect(res).toEqual({ inserted: true, processed: true, applied: true, paymentStatus: 'paid' });
     // ВСЯ работа в одной транзакции (вставка лога + применение статуса + пометка).
     expect(state.beginCalls).toBe(1);
     // INSERT лога, UPDATE orders, INSERT history, UPDATE tbank_payment_log (processed).
@@ -231,7 +231,12 @@ describe('tbank/repository — recordWebhookEvent (атомарность)', () 
   it('дубликат: INSERT лога вернул [] (ON CONFLICT) → {inserted:false, processed:false}, переход НЕ применялся', async () => {
     state.logInsertId = null; // дубликат
     const res = await recordWebhookEvent(baseInput('paid'));
-    expect(res).toEqual({ inserted: false, processed: false });
+    expect(res).toEqual({
+      inserted: false,
+      processed: false,
+      applied: false,
+      paymentStatus: null,
+    });
     // Переход не применялся: нет UPDATE orders / INSERT history / UPDATE лога.
     const orderUpdate = state.queries.find(
       (q) => /^UPDATE/i.test(q.text) && !/tbank_payment_log/i.test(q.text),
@@ -250,7 +255,12 @@ describe('tbank/repository — recordWebhookEvent (атомарность)', () 
   it('неизвестный статус (nextStatus null) → {inserted:true, processed:false}, но лог помечен обработанным', async () => {
     state.logInsertId = 'log-1';
     const res = await recordWebhookEvent(baseInput(null));
-    expect(res).toEqual({ inserted: true, processed: false });
+    expect(res).toEqual({
+      inserted: true,
+      processed: false,
+      applied: false,
+      paymentStatus: null,
+    });
     // Переход не применялся (нет UPDATE orders), но пометка лога processed выполнена.
     const orderUpdate = state.queries.find(
       (q) => /^UPDATE/i.test(q.text) && !/tbank_payment_log/i.test(q.text),
@@ -352,7 +362,12 @@ describe('tbank/repository — гард мёртвого заказа на се�
       nextStatus: 'paid',
       comment: 'tbank-webhook:CONFIRMED',
     });
-    expect(res).toEqual({ inserted: true, processed: false });
+    expect(res).toEqual({
+      inserted: true,
+      processed: false,
+      applied: false,
+      paymentStatus: null,
+    });
     expect(hasOrderUpdate()).toBe(false);
     const logUpdate = state.queries.find(
       (q) => /^UPDATE/i.test(q.text) && /tbank_payment_log/i.test(q.text),

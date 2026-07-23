@@ -37,6 +37,28 @@ export const GIFT_CERTIFICATE_STATUSES: readonly GiftCertificateStatus[] = [
  */
 export type GiftIssueSource = 'manual' | 'order' | 'auto';
 
+/**
+ * Настройки раздела «Подарочные сертификаты» (ключ настроек 'gift').
+ *
+ * 🔴 ТИП И ДЕФОЛТЫ ЖИВУТ В РЕЕСТРЕ НАСТРОЕК lib/settings/schemas — здесь только
+ * реэкспорт. Своей копии домен не держит осознанно: пока копий было две, форма
+ * в админке после «Сбросить настройки сертификатов» рисовала автовыпуск
+ * включённым, а фактически выдача денег на предъявителя была выключена.
+ *
+ *  - autoIssue                — главный рубильник автовыпуска (дефолт платформы —
+ *    включён, тем же значением ключ сеет миграция 0056);
+ *  - validDays                — срок действия кода в днях от ОПЛАТЫ; 0/пусто/null = бессрочно;
+ *  - categorySlugs            — разделы каталога, товары которых при ОФОРМЛЕНИИ
+ *    получают маркер сертификата в снимок позиции (lib/orders/repository →
+ *    applyGiftCategoryMarker); сам выпуск решает по маркеру — см. isGiftItemForAutoIssue;
+ *  - allowIssueOnGiftPaidOrder — разрешить выпуск по заказу, который сам оплачен
+ *    сертификатом (иначе баланс переливается сам в себя).
+ *
+ * Дефолты — GIFT_SETTINGS_DEFAULTS, наложение оверрайда — resolveGiftSettings
+ * (обе из lib/settings/schemas; их же читает форма админки).
+ */
+export type { GiftSettings, ResolvedGiftSettings } from '@/lib/settings/schemas';
+
 /** Все допустимые источники выпуска (совпадает с CHECK миграции 0054). */
 export const GIFT_ISSUE_SOURCES: readonly GiftIssueSource[] = ['manual', 'order', 'auto'];
 

@@ -50,6 +50,7 @@ export default async function SettingsPage() {
     { id: 'currency', title: 'Валюта и единицы измерения' },
     { id: 'contacts', title: 'Реквизиты и контакты' },
     { id: 'catalog', title: 'Каталог, доставка, заказы' },
+    { id: 'gift', title: 'Подарочные сертификаты' },
     { id: 'modules', title: 'Модули' },
     { id: 'navigation', title: 'Навигация (меню и футер)' },
     { id: 'access', title: 'Доступ' },
@@ -128,6 +129,21 @@ export default async function SettingsPage() {
                 { key: 'orders', label: 'Сбросить заказы' },
               ]}
             />
+          </Section>
+
+          <Section id="gift" title="Подарочные сертификаты">
+            <p className="text-sm text-gray-600">
+              Создавать ли код сертификата автоматически при оплате, сколько дней он
+              действует и какие разделы каталога считаются сертификатами — в отдельном
+              разделе.
+            </p>
+            <a
+              href="/admin/settings/gift"
+              className="mt-3 inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            >
+              Открыть настройки сертификатов →
+            </a>
+            <ResetRow keys={[{ key: 'gift', label: 'Сбросить настройки сертификатов' }]} />
           </Section>
 
           <Section id="modules" title="Модули">

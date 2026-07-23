@@ -111,18 +111,36 @@ export interface OrderAccessProof {
 }
 
 /**
+ * Политика проверки доступа (НЕ подтверждение клиента — не смешивать с proof).
+ */
+export interface OrderAccessPolicy {
+  /**
+   * Разрешён ли email-путь. По умолчанию true — штатный трекинг заказа.
+   *
+   * 🔴 false обязателен там, где отдаются ДЕНЬГИ НА ПРЕДЪЯВИТЕЛЯ (код подарочного
+   * сертификата): номера заказов последовательны, а email покупателей известен
+   * (утечка базы, оператор, сам покупатель-злоумышленник по чужому заказу) —
+   * для трекинга такой доступ приемлем, для кода нет. Остаётся только токен.
+   */
+  allowEmail?: boolean;
+}
+
+/**
  * Проверяет право читать заказ: верный токен ИЛИ совпадение email покупателя
  * (регистронезависимо, как citext). Пустое подтверждение → отказ (анти-перебор).
+ * `policy.allowEmail === false` оставляет ТОЛЬКО токен.
  */
 export function verifyOrderAccess(
   order: Order,
   proof: OrderAccessProof,
   env: Record<string, string | undefined> = process.env,
+  policy: OrderAccessPolicy = {},
 ): boolean {
   const token = proof.token?.trim();
   if (token && safeEqual(token, orderAccessToken(order.id, env))) {
     return true;
   }
+  if (policy.allowEmail === false) return false;
   const email = proof.email?.trim().toLowerCase();
   if (email && email === order.customerEmail.trim().toLowerCase()) {
     return true;

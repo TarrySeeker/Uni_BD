@@ -629,6 +629,87 @@ export const i18nSchema = z
     }
   });
 
+/**
+ * gift — политика подарочных сертификатов (ТЗ владельца п.11: при покупке
+ * сертификата код выпускается автоматически и показывается покупателю).
+ *
+ * 🔴 ЭТОТ МОДУЛЬ — ЕДИНСТВЕННЫЙ ИСТОЧНИК ПРАВДЫ по ключу `gift`: схема, тип и
+ * дефолты. Домен сертификатов (lib/gift-certificates/*) СВОЕЙ копии дефолтов не
+ * держит: пока копий было две, форма в админке после «Сбросить настройки»
+ * показывала автовыпуск включённым, а выпуск денег на предъявителя был выключен.
+ *
+ *  - autoIssue: выпускать ли код автоматически при оплате заказа;
+ *  - validDays: срок действия кода в днях; 0/отсутствует/null → бессрочный;
+ *  - categorySlugs: адреса разделов каталога, товары которых при ОФОРМЛЕНИИ
+ *    заказа помечаются в снимке позиции как сертификаты (lib/orders/repository →
+ *    applyGiftCategoryMarker); выпуск потом решает по этой пометке, а не по
+ *    категории. МУЛЬТИТЕНАНТНОСТЬ: у другого магазина раздел называется иначе —
+ *    набор задаётся настройкой, а не хардкодом в коде выпуска. ⚠️ Пустой список
+ *    НЕ значит «автовыпуск выключен»: товар, у которого признак сертификата
+ *    задан своим атрибутом, будет помечен и без категорий (рубильник — autoIssue);
+ *  - allowIssueOnGiftPaidOrder: выпускать ли код по заказу, который сам полностью
+ *    оплачен другим сертификатом (обмен номинала). Выключение закрывает сценарий
+ *    «кручу номинал по кругу», если магазин этого не хочет.
+ *
+ * ВСЕ поля опциональны: отсутствие строки/поля = «нет оверрайда», действуют
+ * GIFT_SETTINGS_DEFAULTS. `.strip()` — анти-tamper JSONB.
+ */
+export const giftSettingsSchema = z
+  .object({
+    autoIssue: z.boolean().optional(),
+    // null допускается ОСОЗНАННО: «бессрочно» в jsonb пишут и нулём, и null-ом.
+    // Строгий `number | undefined` уронил бы разбор ВСЕГО ключа, и раздел молча
+    // вернулся бы к дефолтам — тот же класс дефекта, что уже кусал ключ exchange.
+    validDays: z.number().int().min(0).nullable().optional(),
+    categorySlugs: z.array(nonEmpty).max(64).optional(),
+    allowIssueOnGiftPaidOrder: z.boolean().optional(),
+  })
+  .strip();
+
+/** Значение gift со ВСЕМИ полями — результат наложения оверрайда на дефолты. */
+export type ResolvedGiftSettings = {
+  autoIssue: boolean;
+  validDays: number;
+  categorySlugs: string[];
+  allowIssueOnGiftPaidOrder: boolean;
+};
+
+/**
+ * Дефолты платформы для gift. Автовыпуск включён (владелец ждёт код сразу после
+ * оплаты — тем же значением ключ сеет миграция 0056), срок 0 = бессрочно, обмен
+ * номинала разрешён. `certificates` — лишь ДЕФОЛТНЫЙ адрес раздела; конкретный
+ * магазин меняет его в админке.
+ */
+export const GIFT_SETTINGS_DEFAULTS: Readonly<ResolvedGiftSettings> = Object.freeze({
+  autoIssue: true,
+  validDays: 0,
+  categorySlugs: Object.freeze(['certificates']) as unknown as string[],
+  allowIssueOnGiftPaidOrder: true,
+});
+
+/**
+ * Эффективная политика сертификатов: дефолты ⊕ оверрайд из БД, merge по полям.
+ * Одна функция и для формы админки, и для рантайма выпуска — так «что нарисовано»
+ * и «как выдаются деньги» не могут разъехаться.
+ *
+ * Кривое значение не роняет выпуск — падаем на дефолты (как parseSettingValue).
+ * Пустой список категорий — ЯВНЫЙ выбор владельца («ни один раздел»), а не
+ * «поля нет»: подменять его дефолтом значило бы вернуть чужие разделы втихую.
+ */
+export function resolveGiftSettings(raw: unknown): ResolvedGiftSettings {
+  const parsed = parseSettingValue('gift', raw) ?? {};
+  return {
+    autoIssue: parsed.autoIssue ?? GIFT_SETTINGS_DEFAULTS.autoIssue,
+    // null = явное «бессрочно» (0), а не «поля нет»: дефолт подставляем только
+    // на отсутствие поля, иначе ненулевой дефолт срока перебил бы выбор владельца.
+    validDays:
+      parsed.validDays === undefined ? GIFT_SETTINGS_DEFAULTS.validDays : (parsed.validDays ?? 0),
+    categorySlugs: [...(parsed.categorySlugs ?? GIFT_SETTINGS_DEFAULTS.categorySlugs)],
+    allowIssueOnGiftPaidOrder:
+      parsed.allowIssueOnGiftPaidOrder ?? GIFT_SETTINGS_DEFAULTS.allowIssueOnGiftPaidOrder,
+  };
+}
+
 // -----------------------------------------------------------------------------
 // Реестр ключ → схема. Единственный источник правды о наборе ключей настроек.
 // -----------------------------------------------------------------------------
@@ -650,6 +731,7 @@ export const SETTING_KEYS = [
   'navigation',
   'access',
   'i18n',
+  'gift',
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -671,6 +753,7 @@ export const SETTING_SCHEMAS = {
   navigation: navigationSchema,
   access: accessSchema,
   i18n: i18nSchema,
+  gift: giftSettingsSchema,
 } as const satisfies Record<SettingKey, z.ZodTypeAny>;
 
 // Типы значений по ключам (выводятся из схем).
@@ -690,6 +773,12 @@ export type SeoSettings = z.infer<typeof seoSettingsSchema>;
 export type HomeSettings = z.infer<typeof homeSchema>;
 export type NavigationSettings = z.infer<typeof navigationSchema>;
 export type AccessSettings = z.infer<typeof accessSchema>;
+/**
+ * Политика подарочных сертификатов (значение ключа gift, оверрайд; все поля
+ * опциональны). ЕДИНСТВЕННОЕ определение типа: домен сертификатов
+ * (lib/gift-certificates/types) реэкспортирует его отсюда, своего не заводит.
+ */
+export type GiftSettings = z.infer<typeof giftSettingsSchema>;
 /** Набор языков магазина (значение ключа i18n). */
 export type I18nSettings = z.infer<typeof i18nSchema>;
 

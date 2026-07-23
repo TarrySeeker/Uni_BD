@@ -43,6 +43,14 @@ const H = vi.hoisted(() => {
      * Каждый элемент: { strings: статические куски, args: значения интерполяции }.
      */
     txCallsWithArgs: [] as { strings: string[]; args: unknown[] }[],
+    /**
+     * Порядок событий «коммит транзакции» / «автовыпуск сертификатов» — им
+     * проверяется, что выпуск идёт ПОСЛЕ коммита (внутри транзакции фиксации
+     * оплаты любой сбой откатил бы сам факт оплаты).
+     */
+    timeline: [] as string[],
+    /** Автовыпуск должен бросить (проверка «сбой выпуска не ломает операцию»). */
+    autoIssueThrows: false,
   };
   // sql.begin как управляемый спай: по умолчанию выполняет колбэк с tx-моком.
   // tx`...` снимает результат из txResultQueue, а если очередь пуста — возвращает
@@ -61,7 +69,9 @@ const H = vi.hoisted(() => {
       return Promise.resolve(next);
     };
     (tx as unknown as { json: unknown }).json = (v: unknown) => v;
-    return cb(tx);
+    const out = await cb(tx);
+    state.timeline.push('tx:commit');
+    return out;
   });
   // sql как tagged-template-спай: по умолчанию возвращает [] (как раньше), но это
   // vi.fn — тесты могут переопределить ОДИН вызов (mockImplementationOnce), чтобы
@@ -111,6 +121,11 @@ const H = vi.hoisted(() => {
         reason: 'manual',
       }),
     ),
+    autoIssueMock: vi.fn(async (orderId: string) => {
+      state.timeline.push('auto-issue');
+      if (state.autoIssueThrows) throw new Error('пул соединений недоступен');
+      return { orderId, ok: true, issued: 0, skipped: 0, failed: 0, items: [] };
+    }),
     getCurrentUserMock: vi.fn(async () => state.currentUser),
     getOrderByIdMock: vi.fn(async (..._args: unknown[]) => state.getOrderByIdQueue.shift() ?? null),
     releaseReservationMock: vi.fn(async (..._args: unknown[]) => true),
@@ -134,7 +149,14 @@ const {
   releaseReservationMock,
   commitReservationMock,
   createOrderMock,
+  autoIssueMock,
 } = H;
+
+// Автовыпуск сертификатов (ТЗ владельца п.11): в юнитах подменяем — проверяем
+// САМУ ВРЕЗКУ (после коммита, ошибка не ломает операцию), а не логику выпуска.
+vi.mock('@/lib/gift-certificates/auto-issue', () => ({
+  autoIssueGiftsForPaidOrder: (orderId: string) => H.autoIssueMock(orderId),
+}));
 
 // --- vi.mock (hoisted) -------------------------------------------------------
 
@@ -249,6 +271,9 @@ beforeEach(() => {
   H.state.txResultQueue = [];
   H.state.txCalls = [];
   H.state.txCallsWithArgs = [];
+  H.state.timeline = [];
+  H.state.autoIssueThrows = false;
+  autoIssueMock.mockClear();
   sqlBeginMock.mockClear();
   sqlMock.mockClear();
   writeAuditSpy.mockClear();
@@ -1372,5 +1397,77 @@ describe('refundOrder: шлюзовой возврат Т-Банка', () => {
     // Возврат отклонён ДО транзакции перехода.
     expect(sqlBeginMock).not.toHaveBeenCalled();
     expect(releaseReservationMock).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// ПОДАРОЧНЫЕ СЕРТИФИКАТЫ: врезки автовыпуска и гашения (ТЗ владельца п.11).
+// =============================================================================
+
+describe('сертификаты: автовыпуск после оплаты и гашение при возврате', () => {
+  /** Все статические куски tx-запросов одной плоской строкой. */
+  function txText(): string {
+    return H.state.txCalls.map((tpl) => tpl.join('|')).join('||');
+  }
+
+  it('setPaymentStatus(→paid): выпуск запускается ПОСЛЕ коммита транзакции оплаты', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ paymentStatus: 'pending' }),
+      orderDetail({ paymentStatus: 'paid' }),
+    ];
+    const res = await setPaymentStatus({ id: UUID, to: 'paid' });
+    expect(res.ok).toBe(true);
+    expect(autoIssueMock).toHaveBeenCalledWith(UUID);
+    // Порядок принципиален: внутри транзакции фиксации оплаты сбой выпуска
+    // откатил бы САМ ФАКТ ОПЛАТЫ (повтор вебхука отсекается по UNIQUE).
+    expect(H.state.timeline).toEqual(['tx:commit', 'auto-issue']);
+  });
+
+  it('сбой выпуска НЕ ломает фиксацию оплаты (ошибка проглочена)', async () => {
+    H.state.autoIssueThrows = true;
+    H.state.getOrderByIdQueue = [
+      orderDetail({ paymentStatus: 'pending' }),
+      orderDetail({ paymentStatus: 'paid' }),
+    ];
+    const res = await setPaymentStatus({ id: UUID, to: 'paid' });
+    expect(res.ok).toBe(true);
+  });
+
+  it('прочие переходы оплаты (→authorized) выпуск НЕ запускают', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ paymentStatus: 'pending' }),
+      orderDetail({ paymentStatus: 'authorized' }),
+    ];
+    const res = await setPaymentStatus({ id: UUID, to: 'authorized' });
+    expect(res.ok).toBe(true);
+    expect(autoIssueMock).not.toHaveBeenCalled();
+  });
+
+  it('возврат заказа (кнопка админа) ГАСИТ выпущенные по нему коды', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'paid', paymentStatus: 'paid', paymentProvider: null }),
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded' }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(true);
+    expect(txText()).toContain('UPDATE gift_certificates');
+    expect(txText()).toContain("status = 'disabled'");
+  });
+
+  it('отмена заказа ГАСИТ выпущенные коды, а обычный переход (paid) — нет', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'paid' }),
+      orderDetail({ status: 'cancelled' }),
+    ];
+    expect((await cancelOrder({ id: UUID, reason: 'передумал' })).ok).toBe(true);
+    expect(txText()).toContain("status = 'disabled'");
+
+    H.state.txCalls = [];
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'new' }),
+      orderDetail({ status: 'paid' }),
+    ];
+    expect((await changeOrderStatus({ id: UUID, to: 'paid' })).ok).toBe(true);
+    expect(txText()).not.toContain("status = 'disabled'");
   });
 });

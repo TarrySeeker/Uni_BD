@@ -27,7 +27,9 @@ import {
 } from './repository';
 import { canTransition, paymentStatusOnSettle } from './status';
 import { settleRefundEffectsTx } from './refund-settle';
-import { releaseGiftTx } from '@/lib/gift-certificates/repository';
+import { releaseGiftTx, revokeIssuedGiftsTx } from '@/lib/gift-certificates/repository';
+import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
+import { logger } from '@/lib/logger';
 import { OrderError } from './errors';
 import type { Order, OrderItem, PromoCode } from './types';
 import { toKopecks } from '@/lib/payments/tbank';
@@ -174,6 +176,25 @@ function stockEffectFor(from: Order['status'], to: Order['status']): StockEffect
  *
  * Возвращает before/after для аудита и обновлённый заказ.
  */
+/**
+ * Автовыпуск сертификатов ПОСЛЕ КОММИТА перехода оплаты (ТЗ владельца п.11).
+ *
+ * 🔴 Только вне транзакции: выпуск открывает СВОИ транзакции, а исключение
+ * внутри транзакции фиксации оплаты откатило бы сам факт оплаты. Конвейер и сам
+ * не бросает — обёртка страхует границу (сеть/пул) и гарантирует, что сбой
+ * выпуска не превратится в отказ основной операции.
+ */
+async function autoIssueGiftsAfterCommit(orderId: string): Promise<void> {
+  try {
+    await autoIssueGiftsForPaidOrder(orderId);
+  } catch (err) {
+    logger.error('автовыпуск сертификатов не выполнен', {
+      orderId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 async function applyOrderStatusTransition(args: {
   id: string;
   to: Order['status'];
@@ -273,6 +294,11 @@ async function applyOrderStatusTransition(args: {
     // поэтому двойного возврата с webhook-путём (settleRefundEffectsTx) не будет.
     if (revertPromo) {
       await releaseGiftTx(tx, { orderId: args.id });
+      // (c3) И симметрично гасим коды, ВЫПУЩЕННЫЕ по этому заказу (ТЗ п.11):
+      // возврат/отмена не должны оставлять на руках рабочий код на предъявителя.
+      // Внутри транзакции перехода намеренно: не состоялся возврат — не состоялось
+      // и гашение. Идемпотентно (гасит только active/depleted).
+      await revokeIssuedGiftsTx(tx, { orderId: args.id });
     }
 
     // (d) История статуса заказа.
@@ -597,6 +623,12 @@ export const setPaymentStatus = defineAction({
         await settleRefundEffectsTx(tx, data.id, ctx.user.id);
       }
     });
+
+    // ПОСЛЕ КОММИТА: переход в paid реально применён (guarded UPDATE выше иначе
+    // бросил бы conflict) → выпускаем сертификаты по позициям-сертификатам.
+    if (data.to === 'paid') {
+      await autoIssueGiftsAfterCommit(data.id);
+    }
 
     const after = await getOrderById(data.id);
     return {

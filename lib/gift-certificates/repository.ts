@@ -19,6 +19,8 @@ import type { TransactionSql } from 'postgres';
 import { sql } from '@/lib/db/client';
 import type { TranslationsMap } from '@/lib/i18n';
 
+import type { OrderStatus, PaymentStatus } from '@/lib/orders/types';
+
 import { certRemaining } from './balance';
 import { GiftOverspendError, GiftCertificateError } from './errors';
 import type { CertificateSourceItem } from './origin';
@@ -481,4 +483,202 @@ export async function redeemGift(input: {
 /** Обёртка releaseGiftTx с собственной транзакцией (standalone/тесты). */
 export async function releaseGift(input: { orderId: string }): Promise<ReleaseResult> {
   return sql.begin((tx: TransactionSql) => releaseGiftTx(tx, input));
+}
+
+// -----------------------------------------------------------------------------
+// Автовыпуск сертификатов по оплаченному заказу (ТЗ владельца п.11).
+// -----------------------------------------------------------------------------
+
+/** Заказ + его позиции-снимки: всё, что нужно решить «выпускать ли и на сколько». */
+export interface AutoIssueOrderSnapshot {
+  orderId: string;
+  orderNumber: string;
+  currency: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  /** Момент оплаты — ЕДИНСТВЕННАЯ база отсчёта срока действия кода. */
+  paidAt: Date | null;
+  /** Сертификат, которым оплачен САМ заказ (0041). Не путать с issued_order_id. */
+  giftCertificateId: string | null;
+  customerId: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  items: CertificateSourceItem[];
+}
+
+/** Заказ + позиции для автовыпуска. null — заказа нет. */
+export async function getOrderForAutoIssue(orderId: string): Promise<AutoIssueOrderSnapshot | null> {
+  const orders = await sql<Record<string, unknown>[]>`
+    SELECT id, number, currency, status, payment_status, paid_at, gift_certificate_id,
+           customer_id, customer_name, customer_email, customer_phone
+    FROM orders WHERE id = ${orderId} LIMIT 1
+  `;
+  const o = orders[0];
+  if (!o) return null;
+
+  const items = await sql<Record<string, unknown>[]>`
+    SELECT id, name_snapshot, sku_snapshot, attributes_snapshot, unit_price, quantity, line_total
+    FROM order_items WHERE order_id = ${orderId} ORDER BY id
+  `;
+
+  return {
+    orderId: String(o.id),
+    orderNumber: String(o.number),
+    currency: String(o.currency ?? 'RUB'),
+    status: String(o.status) as OrderStatus,
+    paymentStatus: String(o.payment_status) as PaymentStatus,
+    paidAt: toNullableDate(o.paid_at),
+    giftCertificateId: o.gift_certificate_id != null ? String(o.gift_certificate_id) : null,
+    customerId: o.customer_id != null ? String(o.customer_id) : null,
+    customerName: String(o.customer_name ?? ''),
+    customerEmail: String(o.customer_email ?? ''),
+    customerPhone: String(o.customer_phone ?? ''),
+    items: items.map((row) => ({
+      id: String(row.id),
+      nameSnapshot: String(row.name_snapshot ?? ''),
+      skuSnapshot: String(row.sku_snapshot ?? ''),
+      attributesSnapshot: (row.attributes_snapshot ?? {}) as Record<string, unknown>,
+      unitPrice: String(row.unit_price),
+      quantity: Number(row.quantity ?? 1),
+      lineTotal: String(row.line_total),
+    })),
+  };
+}
+
+/** Минимальная ссылка на выпущенный сертификат (без лишних полей в автопути). */
+export interface IssuedGiftRef {
+  id: string;
+  code: string;
+  initialAmount: string;
+}
+
+/**
+ * Пространство advisory-локов автовыпуска (первый аргумент двухключевой формы).
+ * Отдельное число, чтобы не пересечься с локами других подсистем.
+ */
+const GIFT_ISSUE_LOCK_NAMESPACE = 5401;
+
+/**
+ * Транзакционный advisory-лок по ЗАКАЗУ. Корректность дублей обеспечивает
+ * частичный UNIQUE (issued_order_item_id); лок нужен лишь чтобы вебхук и
+ * крон-догоняльщик не молотили конфликтующими транзакциями по одному заказу.
+ * Снимается автоматически при commit/rollback (xact).
+ */
+export async function lockOrderForGiftIssueTx(tx: TransactionSql, orderId: string): Promise<void> {
+  await tx`
+    SELECT pg_advisory_xact_lock(${GIFT_ISSUE_LOCK_NAMESPACE}::int4, hashtext(${orderId}::text)::int4)
+  `;
+}
+
+/**
+ * INSERT сертификата на ПЕРЕДАННОЙ транзакции (одна транзакция на позицию).
+ * Возвращает только id/code/номинал: автопуть не таскает полный документ.
+ * Дубликаты (23505 по issued_order_item_id или по code) обрабатывает вызывающий.
+ */
+export async function insertGiftCertificateTx(
+  tx: TransactionSql,
+  input: IssueGiftCertificateRow,
+): Promise<IssuedGiftRef> {
+  const purchaser = input.purchaser ?? { name: null, email: null, phone: null };
+  const recipient = input.recipient ?? { name: null, email: null, phone: null };
+  const rows = await tx<{ id: string; code: string; initial_amount: string }[]>`
+    INSERT INTO gift_certificates (
+      code, name, description, terms, initial_amount, valid_until, comment, translations,
+      purchaser_name, purchaser_email, purchaser_phone, purchaser_customer_id,
+      recipient_name, recipient_email, recipient_phone,
+      issued_order_id, issued_order_item_id, issue_source
+    ) VALUES (
+      ${input.code}, ${input.name}, ${input.description}, ${input.terms},
+      ${input.initialAmount}, ${input.validUntil}, ${input.comment},
+      ${tx.json(input.translations as Record<string, never>)},
+      ${purchaser.name}, ${purchaser.email}, ${purchaser.phone}, ${input.purchaserCustomerId ?? null},
+      ${recipient.name}, ${recipient.email}, ${recipient.phone},
+      ${input.issuedOrderId ?? null}, ${input.issuedOrderItemId ?? null}, ${input.issueSource ?? 'auto'}
+    )
+    RETURNING id, code, initial_amount
+  `;
+  const row = rows[0]!;
+  return { id: String(row.id), code: String(row.code), initialAmount: String(row.initial_amount) };
+}
+
+/** Погашенный при возврате код (для аудита и уведомления владельца). */
+export interface RevokedGiftRef {
+  id: string;
+  code: string;
+  initialAmount: string;
+  spentTotal: string;
+}
+
+/** Результат гашения выпущенных по заказу кодов. */
+export interface RevokeIssuedGiftsResult {
+  revokedCount: number;
+  revoked: RevokedGiftRef[];
+}
+
+/**
+ * Гасит коды, ВЫПУЩЕННЫЕ по заказу, при его возврате/отмене (ТЗ п.11).
+ *
+ * Без этого возврат денег оставляет покупателю действующий сертификат на ту же
+ * сумму — магазин платит дважды. Нового статуса 'revoked' не вводим: setGiftStatus
+ * и CHECK 0039 знают active|disabled|depleted|expired, схему не трогаем.
+ *
+ * Идемпотентна: гасим только «живые» (active/depleted) — повторный вызов вернёт
+ * 0 строк. depleted тоже гасим: остаток нулевой, но код мог бы «ожить» после
+ * releaseGiftTx по другому заказу.
+ */
+export async function revokeIssuedGiftsTx(
+  tx: TransactionSql,
+  input: { orderId: string },
+): Promise<RevokeIssuedGiftsResult> {
+  const rows = await tx<Record<string, unknown>[]>`
+    UPDATE gift_certificates
+       SET status = 'disabled', updated_at = now()
+     WHERE issued_order_id = ${input.orderId}
+       AND status IN ('active','depleted')
+    RETURNING id, code, initial_amount, spent_total
+  `;
+  const revoked = rows.map((r) => ({
+    id: String(r.id),
+    code: String(r.code),
+    initialAmount: String(r.initial_amount),
+    spentTotal: String(r.spent_total),
+  }));
+  return { revokedCount: revoked.length, revoked };
+}
+
+/** Заказ-кандидат на догоняющий автовыпуск (для крона). */
+export interface PendingGiftIssueOrder {
+  orderId: string;
+  orderNumber: string;
+  paidAt: Date | null;
+}
+
+/**
+ * Оплаченные заказы, у которых есть позиции БЕЗ выпущенного сертификата —
+ * страховка на случай, если вебхук не довёз автовыпуск (сбой БД, рестарт).
+ *
+ * Окно 30 дней: старше — уже не «пропущенный выпуск», а история; без окна
+ * выборка со временем деградирует. Фильтр «позиция похожа на сертификат» здесь
+ * НЕ применяется (маркер лежит в jsonb-снимке) — отбор делает резолвер автопути,
+ * поэтому в выдаче возможны заказы, по которым выпускать нечего.
+ */
+export async function findOrdersPendingGiftIssue(limit = 100): Promise<PendingGiftIssueOrder[]> {
+  const rows = await sql<{ id: string; number: string; paid_at: Date | null }[]>`
+    SELECT DISTINCT o.id, o.number, o.paid_at
+    FROM orders o
+    JOIN order_items i ON i.order_id = o.id
+    LEFT JOIN gift_certificates g ON g.issued_order_item_id = i.id
+    WHERE o.payment_status = 'paid'
+      AND o.status NOT IN ('cancelled','refunded')
+      AND o.paid_at > now() - interval '30 days'
+      AND g.id IS NULL
+    ORDER BY o.paid_at DESC
+    LIMIT ${Math.max(1, Math.min(100, Math.trunc(limit)))}
+  `;
+  return rows.map((r) => ({
+    orderId: String(r.id),
+    orderNumber: String(r.number),
+    paidAt: toNullableDate(r.paid_at),
+  }));
 }

@@ -20,6 +20,7 @@
  * confirmMockPayment / reconcilePayment / refundPayment — как в tbank/paykeeper.
  */
 
+import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
 import { getOrderByNumber } from '@/lib/orders/repository';
 import { isOrderPayable } from '@/lib/orders/status';
 import { toMinor } from '@/lib/orders/money';
@@ -33,6 +34,7 @@ import {
   setPaymentRefAndProvider,
   findOrderIdByRef,
   insertPaymentLog,
+  type RecordWebhookResult,
 } from './repository';
 import type {
   AlfabankCallbackParams,
@@ -138,6 +140,32 @@ export function sanitizeCallback(params: AlfabankCallbackParams): Record<string,
 // =============================================================================
 // PaymentService — init + callback.
 // =============================================================================
+
+/**
+ * ПОСТ-КОММИТНЫЙ автовыпуск подарочных сертификатов по оплаченному заказу (ТЗ п.11).
+ *
+ * ВЫЗЫВАТЬ СТРОГО ПОСЛЕ `await recordWebhookEvent`, то есть ПОСЛЕ КОММИТА. Внутри
+ * той транзакции (лог события + переход в paid + пометка processed) любой throw
+ * откатил бы САМ ФАКТ ОПЛАТЫ, а повторная доставка события была бы отсечена
+ * уникальным ключом лога: деньги приняты, а заказ навсегда pending.
+ *
+ * По той же причине ошибка выпуска ГЛОТАЕТСЯ: ответ провайдеру обязан остаться
+ * успешным, иначе банк начнёт ретраить событие. Невыпущенное подхватит крон-сверка.
+ */
+async function autoIssueGiftsAfterCommit(
+  orderId: string,
+  result: RecordWebhookResult,
+): Promise<void> {
+  if (!(result.inserted && result.applied && result.paymentStatus === 'paid')) return;
+  try {
+    await autoIssueGiftsForPaidOrder(orderId);
+  } catch (err) {
+    console.warn(
+      `[alfabank] автовыпуск подарочных сертификатов не удался (order=${orderId}): ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
 export class PaymentService {
   constructor(private readonly manager: AlfabankManager = getAlfabankManager()) {}
@@ -265,7 +293,7 @@ export class PaymentService {
     // 4) АТОМАРНАЯ идемпотентная обработка (UNIQUE (order_ref, status)). order_ref
     //    обязателен для ключа — берём mdOrder (если пуст — фолбэк на orderNumber).
     const orderRef = params.mdOrder || params.orderNumber;
-    const { inserted, processed } = await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId,
         orderRef,
@@ -277,6 +305,9 @@ export class PaymentService {
       nextStatus: next,
       comment: `alfabank-callback:${logStatus}`,
     });
+    // ПОСЛЕ КОММИТА: подарочные сертификаты по оплаченному заказу (ТЗ п.11).
+    await autoIssueGiftsAfterCommit(orderId, result);
+    const { inserted, processed } = result;
     if (!inserted) {
       // Дубликат: уже обработано — эффекты не повторяем.
       return { verified: true, processed: false, duplicate: true, paymentStatus: null };
@@ -305,7 +336,7 @@ export class PaymentService {
     if (!found.order.paymentRef || paymentId !== found.order.paymentRef) {
       return { ok: false, reason: 'payment_ref_mismatch' };
     }
-    await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId: found.order.id,
         orderRef: paymentId,
@@ -317,6 +348,7 @@ export class PaymentService {
       nextStatus: mapCallbackOperation('deposited', '1'),
       comment: 'mock-pay-demo:deposited',
     });
+    await autoIssueGiftsAfterCommit(found.order.id, result);
     return { ok: true };
   }
 
@@ -354,7 +386,7 @@ export class PaymentService {
 
     const statusStr = orderStatus === null ? null : String(orderStatus);
     const next = mapOrderStatus(orderStatus);
-    const { processed } = await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId: input.orderId,
         orderRef: input.paymentId,
@@ -366,7 +398,8 @@ export class PaymentService {
       nextStatus: next,
       comment: `reconcile-status:${statusStr}`,
     });
-    return { ok: true, status: statusStr, applied: processed, isMock };
+    await autoIssueGiftsAfterCommit(input.orderId, result);
+    return { ok: true, status: statusStr, applied: result.processed, isMock };
   }
 
   /**

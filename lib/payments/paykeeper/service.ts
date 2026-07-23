@@ -22,6 +22,7 @@
  * handleCallback — с моком репозитория / интеграционно.
  */
 
+import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
 import { getOrderByNumber } from '@/lib/orders/repository';
 import { isOrderPayable } from '@/lib/orders/status';
 import { normalizeMoney, toMinor } from '@/lib/orders/money';
@@ -32,6 +33,7 @@ import { mapPaykeeperStatus } from './status-map';
 import { verifyCallbackSignature, buildCallbackAck } from './token';
 import {
   recordWebhookEvent,
+  type RecordWebhookResult,
   setPaymentRefAndProvider,
   findOrderIdByInvoiceId,
   getOrderGrandTotalById,
@@ -113,6 +115,32 @@ export function sanitizeCallback(params: PaykeeperCallbackParams): Record<string
 // =============================================================================
 // PaymentService — init + callback.
 // =============================================================================
+
+/**
+ * ПОСТ-КОММИТНЫЙ автовыпуск подарочных сертификатов по оплаченному заказу (ТЗ п.11).
+ *
+ * ВЫЗЫВАТЬ СТРОГО ПОСЛЕ `await recordWebhookEvent`, то есть ПОСЛЕ КОММИТА. Внутри
+ * той транзакции (лог события + переход в paid + пометка processed) любой throw
+ * откатил бы САМ ФАКТ ОПЛАТЫ, а повторная доставка события была бы отсечена
+ * уникальным ключом лога: деньги приняты, а заказ навсегда pending.
+ *
+ * По той же причине ошибка выпуска ГЛОТАЕТСЯ: ответ провайдеру обязан остаться
+ * успешным, иначе банк начнёт ретраить событие. Невыпущенное подхватит крон-сверка.
+ */
+async function autoIssueGiftsAfterCommit(
+  orderId: string,
+  result: RecordWebhookResult,
+): Promise<void> {
+  if (!(result.inserted && result.applied && result.paymentStatus === 'paid')) return;
+  try {
+    await autoIssueGiftsForPaidOrder(orderId);
+  } catch (err) {
+    console.warn(
+      `[paykeeper] автовыпуск подарочных сертификатов не удался (order=${orderId}): ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
 export class PaymentService {
   constructor(private readonly manager: PaykeeperManager = getPaykeeperManager()) {}
@@ -280,7 +308,7 @@ export class PaymentService {
     const next = mapPaykeeperStatus('PAID');
 
     // 4) АТОМАРНАЯ идемпотентная обработка (UNIQUE (invoice_id, status)).
-    const { inserted, processed } = await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId,
         invoiceId: params.id,
@@ -292,6 +320,9 @@ export class PaymentService {
       nextStatus: next,
       comment: 'paykeeper-callback:PAID',
     });
+    // ПОСЛЕ КОММИТА: подарочные сертификаты по оплаченному заказу (ТЗ п.11).
+    await autoIssueGiftsAfterCommit(orderId, result);
+    const { inserted, processed } = result;
     if (!inserted) {
       // Дубликат: уже обработано — эффекты не повторяем, но OK отдаём.
       return { verified: true, processed: false, duplicate: true, paymentStatus: null, ack };
@@ -320,7 +351,7 @@ export class PaymentService {
     if (!found.order.paymentRef || invoiceId !== found.order.paymentRef) {
       return { ok: false, reason: 'payment_ref_mismatch' };
     }
-    await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId: found.order.id,
         invoiceId,
@@ -332,6 +363,7 @@ export class PaymentService {
       nextStatus: mapPaykeeperStatus('PAID'),
       comment: 'mock-pay-demo:PAID',
     });
+    await autoIssueGiftsAfterCommit(found.order.id, result);
     return { ok: true };
   }
 
@@ -368,7 +400,7 @@ export class PaymentService {
 
     const status = statusRes.status;
     const next = mapPaykeeperStatus(status);
-    const { processed } = await recordWebhookEvent({
+    const result = await recordWebhookEvent({
       log: {
         orderId: input.orderId,
         invoiceId: input.invoiceId,
@@ -380,7 +412,8 @@ export class PaymentService {
       nextStatus: next,
       comment: `reconcile-status:${status}`,
     });
-    return { ok: true, status, applied: processed, isMock };
+    await autoIssueGiftsAfterCommit(input.orderId, result);
+    return { ok: true, status, applied: result.processed, isMock };
   }
 
   /**

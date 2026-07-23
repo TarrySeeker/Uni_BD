@@ -176,10 +176,28 @@ export interface Dictionary {
     metaTitle: string; // <title> страницы (metadata)
     noOrder: string; // «Не удалось определить заказ.»
     thanks: string; // шаблон «Спасибо! Ваш заказ №{number} принят.» с {number}
-    emailNote: string; // примечание про письмо/оплату
+    /**
+     * Примечание под номером заказа. 🔴 Здесь НЕ должно быть обещания письма:
+     * модуля отправки email в платформе нет, поэтому прежняя формулировка про
+     * высланное письмо была прямым обманом покупателя (сторожит guard-тест).
+     */
+    emailNote: string;
     statusOrder: string; // «Статус заказа»
     statusPayment: string; // «Оплата»
     statusTotal: string; // «Сумма»
+
+    // ---- Блок кода подарочного сертификата (ТЗ п.11) ----
+    giftTitle: string; // «Ваш подарочный сертификат»
+    giftPending: string; // «Оплата подтверждается, код появится здесь автоматически»
+    giftRefresh: string; // «Обновить»
+    giftTimeout: string; // «подтверждение задерживается… обратитесь к менеджеру»
+    giftAmount: string; // «Номинал»
+    giftRemaining: string; // «Остаток»
+    giftValidUntil: string; // «Действует до»
+    giftForever: string; // «бессрочно»
+    giftCopy: string; // «Скопировать»
+    giftCopied: string; // «Скопировано»
+    giftWarning: string; // «сохраните код — он равносилен деньгам»
   };
   notFound: {
     text: string; // «Страница не найдена.»
@@ -347,10 +365,23 @@ const ru: Dictionary = {
     noOrder: 'Не удалось определить заказ.',
     thanks: 'Спасибо! Ваш заказ №{number} принят.',
     emailNote:
-      'Мы отправили детали на вашу почту. Если оплата ещё обрабатывается, статус обновится автоматически.',
+      'Детали заказа доступны на этой странице по вашей ссылке — сохраните её. ' +
+      'Если оплата ещё обрабатывается, статус обновится автоматически.',
     statusOrder: 'Статус заказа',
     statusPayment: 'Оплата',
     statusTotal: 'Сумма',
+    giftTitle: 'Ваш подарочный сертификат',
+    giftPending: 'Оплата подтверждается, код появится здесь автоматически.',
+    giftRefresh: 'Обновить',
+    giftTimeout:
+      'Подтверждение задерживается. Код закреплён за вашим заказом — обратитесь к менеджеру.',
+    giftAmount: 'Номинал',
+    giftRemaining: 'Остаток',
+    giftValidUntil: 'Действует до',
+    giftForever: 'бессрочно',
+    giftCopy: 'Скопировать',
+    giftCopied: 'Скопировано',
+    giftWarning: 'Сохраните код — он равносилен деньгам. Не показывайте его посторонним.',
   },
   notFound: {
     text: 'Страница не найдена.',
@@ -518,10 +549,23 @@ const en: Dictionary = {
     noOrder: 'Could not identify the order.',
     thanks: 'Thank you! Your order #{number} has been received.',
     emailNote:
-      'We have sent the details to your email. If payment is still processing, the status will update automatically.',
+      'Your order details are available on this page via your link — keep it. ' +
+      'If payment is still processing, the status will update automatically.',
     statusOrder: 'Order status',
     statusPayment: 'Payment',
     statusTotal: 'Amount',
+    giftTitle: 'Your gift certificate',
+    giftPending: 'Payment is being confirmed, the code will appear here automatically.',
+    giftRefresh: 'Refresh',
+    giftTimeout:
+      'Confirmation is taking longer than usual. The code is reserved for your order — please contact the store.',
+    giftAmount: 'Value',
+    giftRemaining: 'Balance',
+    giftValidUntil: 'Valid until',
+    giftForever: 'no expiry',
+    giftCopy: 'Copy',
+    giftCopied: 'Copied',
+    giftWarning: 'Keep this code safe — it is equivalent to money. Do not share it.',
   },
   notFound: {
     text: 'Page not found.',
@@ -689,10 +733,23 @@ const fr: Dictionary = {
     noOrder: 'Impossible d’identifier la commande.',
     thanks: 'Merci ! Votre commande n°{number} a bien été reçue.',
     emailNote:
-      'Nous avons envoyé les détails à votre adresse e-mail. Si le paiement est encore en cours, le statut se mettra à jour automatiquement.',
+      'Les détails de votre commande sont disponibles sur cette page via votre lien — conservez-le. ' +
+      'Si le paiement est encore en cours, le statut se mettra à jour automatiquement.',
     statusOrder: 'Statut de la commande',
     statusPayment: 'Paiement',
     statusTotal: 'Montant',
+    giftTitle: 'Votre carte cadeau',
+    giftPending: 'Le paiement est en cours de confirmation, le code apparaîtra ici automatiquement.',
+    giftRefresh: 'Actualiser',
+    giftTimeout:
+      'La confirmation prend plus de temps que prévu. Le code est réservé à votre commande — contactez la boutique.',
+    giftAmount: 'Valeur',
+    giftRemaining: 'Solde',
+    giftValidUntil: 'Valable jusqu’au',
+    giftForever: 'sans expiration',
+    giftCopy: 'Copier',
+    giftCopied: 'Copié',
+    giftWarning: 'Conservez ce code — il équivaut à de l’argent. Ne le partagez pas.',
   },
   notFound: {
     text: 'Page introuvable.',
