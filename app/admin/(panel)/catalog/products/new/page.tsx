@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { listBrands, getCategoryTree, listAttributes } from '@/lib/catalog/repository';
 import { listDesigners } from '@/lib/designers/repository';
 import { getEffectiveSettings } from '@/lib/config/settings';
@@ -17,10 +19,11 @@ import { ProductForm } from '../../_components/ProductForm';
 export const dynamic = 'force-dynamic';
 
 export default async function NewProductPage() {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -37,11 +40,11 @@ export default async function NewProductPage() {
   return (
     <div>
       <PageHeader
-        title="Новый товар"
-        subtitle="Заполните основные поля и создайте товар. Варианты, характеристики, медиа и остатки станут доступны после создания."
-        breadcrumbs={[{ label: 'Каталог', href: '/admin/catalog' }, { label: 'Новый товар' }]}
+        title={t('catalog.product.newTitle')}
+        subtitle={t('catalog.product.newSubtitle')}
+        breadcrumbs={[{ label: t('nav.catalog'), href: '/admin/catalog' }, { label: t('catalog.product.newTitle') }]}
         backHref="/admin/catalog"
-        backLabel="К списку товаров"
+        backLabel={t('catalog.product.backToList')}
       />
 
       <div className="mt-6">

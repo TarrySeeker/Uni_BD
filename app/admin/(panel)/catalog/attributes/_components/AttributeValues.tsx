@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { AttributeValue } from '@/lib/catalog/types';
 
 import { addAttributeValueAction, deleteAttributeValueAction } from './form-actions';
@@ -29,6 +31,7 @@ export function AttributeValues({
   editable: boolean;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -59,7 +62,7 @@ export function AttributeValues({
   }
 
   async function remove(v: AttributeValue) {
-    if (!window.confirm(`Удалить значение «${v.value}» из словаря?`)) return;
+    if (!window.confirm(t('catalog.attribute.values.confirmDelete', { value: v.value }))) return;
     setError(null);
     const result = await deleteAttributeValueAction({ id: v.id });
     if (result.ok) router.refresh();
@@ -72,16 +75,15 @@ export function AttributeValues({
 
   return (
     <section className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <h2 className="text-sm font-semibold text-gray-800">Значения словаря</h2>
+      <h2 className="text-sm font-semibold text-gray-800">{t('catalog.attribute.values.title')}</h2>
       {!editable ? (
         <p className="mt-2 text-sm text-gray-500">
-          Словарь значений используется только для типа «Список значений (select)».
-          Для текущего типа значение вводится у конкретного товара.
+          {t('catalog.attribute.values.notEditable')}
         </p>
       ) : (
         <>
           <p className="mt-1 text-sm text-gray-500">
-            Эти значения выбираются у товара для данной характеристики.
+            {t('catalog.attribute.values.intro')}
           </p>
 
           {error ? (
@@ -94,17 +96,17 @@ export function AttributeValues({
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50 text-left text-gray-500">
                 <tr>
-                  <th scope="col" className="px-4 py-2 font-medium">Значение</th>
-                  <th scope="col" className="px-4 py-2 font-medium">ЧПУ (slug)</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Порядок</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Действия</th>
+                  <th scope="col" className="px-4 py-2 font-medium">{t('catalog.attribute.values.colValue')}</th>
+                  <th scope="col" className="px-4 py-2 font-medium">{t('catalog.common.slugLabel')}</th>
+                  <th scope="col" className="px-4 py-2 font-medium">{t('catalog.attribute.values.colSort')}</th>
+                  <th scope="col" className="px-4 py-2 font-medium">{t('common.table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {values.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
-                      Значений пока нет.
+                      {t('catalog.attribute.values.empty')}
                     </td>
                   </tr>
                 ) : (
@@ -118,7 +120,7 @@ export function AttributeValues({
                       <td className="px-4 py-2">
                         <button type="button" onClick={() => void remove(v)}
                           className="text-xs text-red-600 hover:underline">
-                          Удалить
+                          {t('common.actions.delete')}
                         </button>
                       </td>
                     </tr>
@@ -130,27 +132,27 @@ export function AttributeValues({
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
             <div>
-              <label htmlFor="av-value" className="block text-xs font-medium text-gray-600">Новое значение*</label>
+              <label htmlFor="av-value" className="block text-xs font-medium text-gray-600">{t('catalog.attribute.values.newValueLabel')}*</label>
               <input id="av-value" value={value} onChange={(e) => setValue(e.target.value)}
-                placeholder="например: Красный"
+                placeholder={t('catalog.attribute.values.valuePlaceholder')}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
               {fe('value') ? <p className="mt-1 text-xs text-red-600">{fe('value')}</p> : null}
             </div>
             <div>
-              <label htmlFor="av-slug" className="block text-xs font-medium text-gray-600">ЧПУ (slug)</label>
+              <label htmlFor="av-slug" className="block text-xs font-medium text-gray-600">{t('catalog.common.slugLabel')}</label>
               <input id="av-slug" value={slug} onChange={(e) => setSlug(e.target.value)}
-                placeholder="авто из значения"
+                placeholder={t('catalog.attribute.values.slugPlaceholder')}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
               {fe('slug') ? <p className="mt-1 text-xs text-red-600">{fe('slug')}</p> : null}
             </div>
             <div>
-              <label htmlFor="av-sort" className="block text-xs font-medium text-gray-600">Порядок</label>
+              <label htmlFor="av-sort" className="block text-xs font-medium text-gray-600">{t('catalog.attribute.values.colSort')}</label>
               <input id="av-sort" type="number" min={0} value={sort} onChange={(e) => setSort(e.target.value)}
                 className="mt-1 w-24 rounded border border-gray-300 px-3 py-2 text-sm" />
             </div>
             <button type="button" onClick={add} disabled={pending}
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              {pending ? 'Добавление…' : 'Добавить'}
+              {pending ? t('catalog.variants.adding') : t('common.actions.add')}
             </button>
           </div>
         </>

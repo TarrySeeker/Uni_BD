@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { ProductDetail } from '@/lib/catalog/types';
 
 import { setInventoryAction } from './form-actions';
@@ -29,6 +31,7 @@ interface Unit {
 
 export function InventorySection({ product }: { product: ProductDetail }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
@@ -60,7 +63,7 @@ export function InventorySection({ product }: { product: ProductDetail }) {
 
   const units: Unit[] =
     product.variants.length === 0
-      ? [unitFor('product', 'Товар (без вариантов)', null)]
+      ? [unitFor('product', t('catalog.inventory.productNoVariants'), null)]
       : product.variants.map((v) =>
           unitFor(v.id, `${v.sku}${v.name ? ` — ${v.name}` : ''}`, v.id),
         );
@@ -74,7 +77,7 @@ export function InventorySection({ product }: { product: ProductDetail }) {
     setError(null);
     const qty = Number(draft[unit.key]);
     if (!Number.isInteger(qty) || qty < 0) {
-      setError({ ok: false, error: 'validation', fieldErrors: {}, message: 'Остаток — целое ≥ 0.' });
+      setError({ ok: false, error: 'validation', fieldErrors: {}, message: t('catalog.inventory.errors.invalidQuantity') });
       setSavingKey(null);
       return;
     }
@@ -91,11 +94,9 @@ export function InventorySection({ product }: { product: ProductDetail }) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-800">Остатки (склад main)</h3>
+      <h3 className="text-sm font-semibold text-gray-800">{t('catalog.inventory.title')}</h3>
       <p className="mt-1 text-xs text-gray-500">
-        Редактируется физический остаток. При оформлении заказа товар уходит в
-        резерв (столбец «Зарезервировано») и списывается с остатка только при
-        отгрузке — поэтому «Доступно» = остаток − резерв.
+        {t('catalog.inventory.help')}
       </p>
       {error ? (
         <div role="alert" className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
@@ -106,17 +107,17 @@ export function InventorySection({ product }: { product: ProductDetail }) {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-3 py-2 font-medium">Юнит</th>
-              <th scope="col" className="px-3 py-2 font-medium" title="Физический остаток на складе">
-                Физический остаток
+              <th scope="col" className="px-3 py-2 font-medium">{t('catalog.inventory.colUnit')}</th>
+              <th scope="col" className="px-3 py-2 font-medium" title={t('catalog.inventory.colPhysicalTitle')}>
+                {t('catalog.inventory.colPhysical')}
               </th>
-              <th scope="col" className="px-3 py-2 font-medium" title="Зарезервировано под незавершённые заказы">
-                Зарезервировано
+              <th scope="col" className="px-3 py-2 font-medium" title={t('catalog.inventory.colReservedTitle')}>
+                {t('catalog.inventory.colReserved')}
               </th>
-              <th scope="col" className="px-3 py-2 font-medium" title="Доступно к продаже = физический остаток − зарезервировано">
-                Доступно
+              <th scope="col" className="px-3 py-2 font-medium" title={t('catalog.inventory.colAvailableTitle')}>
+                {t('catalog.inventory.colAvailable')}
               </th>
-              <th scope="col" className="px-3 py-2 font-medium">Действие</th>
+              <th scope="col" className="px-3 py-2 font-medium">{t('catalog.inventory.colAction')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -125,7 +126,7 @@ export function InventorySection({ product }: { product: ProductDetail }) {
                 <td className="px-3 py-2 text-gray-700">{u.label}</td>
                 <td className="px-3 py-2">
                   <label htmlFor={`inv-${u.key}`} className="sr-only">
-                    Остаток для {u.label}
+                    {t('catalog.inventory.stockForLabel', { label: u.label })}
                   </label>
                   <input
                     id={`inv-${u.key}`}
@@ -139,7 +140,7 @@ export function InventorySection({ product }: { product: ProductDetail }) {
                 <td className="px-3 py-2 text-gray-700">{u.reserved}</td>
                 <td
                   className="px-3 py-2 font-medium text-gray-900"
-                  title="Физический остаток − зарезервировано"
+                  title={t('catalog.inventory.availableCellTitle')}
                 >
                   {u.available}
                 </td>
@@ -150,7 +151,7 @@ export function InventorySection({ product }: { product: ProductDetail }) {
                     disabled={savingKey === u.key}
                     className="rounded bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
                   >
-                    {savingKey === u.key ? '…' : 'Сохранить'}
+                    {savingKey === u.key ? '…' : t('common.actions.save')}
                   </button>
                 </td>
               </tr>

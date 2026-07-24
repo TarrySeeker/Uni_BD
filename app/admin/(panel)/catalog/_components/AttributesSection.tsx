@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { Attribute, AttributeValue, ProductDetail } from '@/lib/catalog/types';
 
 import { setProductAttributesAction } from './form-actions';
@@ -27,6 +29,7 @@ export function AttributesSection({
   attributeValues?: Record<string, AttributeValue[]>;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState(false);
   const [pending, setPending] = useState(false);
@@ -72,7 +75,7 @@ export function AttributesSection({
   if (attributes.length === 0) {
     return (
       <p className="text-sm text-gray-500">
-        Справочник характеристик пуст. Заведите атрибуты в разделе характеристик.
+        {t('catalog.product.attributesSection.empty')}
       </p>
     );
   }
@@ -86,7 +89,7 @@ export function AttributesSection({
       ) : null}
       {success ? (
         <div role="status" className="mb-3 rounded border border-green-200 bg-green-50 p-2 text-sm text-green-700">
-          Характеристики сохранены.
+          {t('catalog.product.attributesSection.saved')}
         </div>
       ) : null}
 
@@ -108,8 +111,8 @@ export function AttributesSection({
                   className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 >
                   <option value="">—</option>
-                  <option value="true">Да</option>
-                  <option value="false">Нет</option>
+                  <option value="true">{t('common.confirm.yes')}</option>
+                  <option value="false">{t('common.confirm.no')}</option>
                 </select>
               ) : attr.type === 'select' ? (
                 // Выбор значения из словаря по названию (раньше — ввод ID вручную).
@@ -119,7 +122,7 @@ export function AttributesSection({
                   onChange={(e) => setValue(attr.id, e.target.value)}
                   className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                 >
-                  <option value="">— не выбрано —</option>
+                  <option value="">{t('catalog.product.attributesSection.notSelected')}</option>
                   {(attributeValues[attr.id] ?? []).map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.value}
@@ -147,7 +150,7 @@ export function AttributesSection({
         disabled={pending}
         className="mt-4 rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
       >
-        {pending ? 'Сохранение…' : 'Сохранить характеристики'}
+        {pending ? t('common.form.saving') : t('catalog.product.attributesSection.saveButton')}
       </button>
     </div>
   );

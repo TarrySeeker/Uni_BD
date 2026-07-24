@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import {
   getProductById,
@@ -35,10 +36,11 @@ export default async function ProductDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -73,18 +75,20 @@ export default async function ProductDetailPage({
     <div>
       <PageHeader
         title={product.name}
-        subtitle={`Артикул: ${product.sku}`}
+        subtitle={t('catalog.product.detailSubtitle', { sku: product.sku })}
         breadcrumbs={[
-          { label: 'Каталог', href: '/admin/catalog' },
+          { label: t('nav.catalog'), href: '/admin/catalog' },
           { label: product.name },
         ]}
         backHref="/admin/catalog"
-        backLabel="К списку товаров"
+        backLabel={t('catalog.product.backToList')}
       />
 
       {!canWrite ? (
         <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
-          У вас нет права <code>catalog.write</code> — изменения будут отклонены сервером.
+          {t.rich('catalog.product.noWriteWarning', {
+            code: (chunks) => <code>{chunks}</code>,
+          })}
         </p>
       ) : null}
 

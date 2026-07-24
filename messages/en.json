@@ -280,6 +280,17 @@
         "afterSaveHint": "OG/canonical/noindex become available after the product is saved.",
         "canonicalPlaceholder": "Auto: /product/{slug}",
         "slugFallback": "product-slug"
+      },
+      "newTitle": "New product",
+      "newSubtitle": "Fill in the main fields and create the product. Variants, attributes, media and stock become available after creation.",
+      "backToList": "Back to products",
+      "detailSubtitle": "SKU: {sku}",
+      "noWriteWarning": "You don't have the <code>catalog.write</code> permission — changes will be rejected by the server.",
+      "attributesSection": {
+        "saved": "Attributes saved.",
+        "empty": "The attribute reference is empty. Add attributes in the attributes section.",
+        "notSelected": "— not selected —",
+        "saveButton": "Save attributes"
       }
     },
     "category": {
@@ -408,7 +419,38 @@
         "filterable": "In storefront filters",
         "required": "Required"
       },
-      "createButton": "Create attribute"
+      "createButton": "Create attribute",
+      "createLink": "+ Create attribute",
+      "pageSubtitle": "Reference of product attributes: color, size, etc. Select values are collected into a dictionary.",
+      "newTitle": "New attribute",
+      "newSubtitle": "After creation, the value dictionary becomes available for the «Value list» type.",
+      "backToList": "Back to attributes",
+      "typeShort": {
+        "select": "List",
+        "boolean": "Yes/no"
+      },
+      "list": {
+        "colType": "Type",
+        "colValuesCount": "Values",
+        "empty": "No attributes yet."
+      },
+      "badges": {
+        "variant": "variant",
+        "filterable": "filter",
+        "required": "req."
+      },
+      "values": {
+        "title": "Dictionary values",
+        "notEditable": "The value dictionary is used only for the «Value list (select)» type. For the current type, the value is entered on the specific product.",
+        "intro": "These values are selected on the product for this attribute.",
+        "colValue": "Value",
+        "colSort": "Order",
+        "empty": "No values yet.",
+        "newValueLabel": "New value",
+        "valuePlaceholder": "e.g.: Red",
+        "slugPlaceholder": "auto from value",
+        "confirmDelete": "Delete value «{value}» from the dictionary?"
+      }
     },
     "variants": {
       "labels": {
@@ -542,6 +584,38 @@
       "featuredFilter": "Bestsellers",
       "newFilter": "New",
       "onSaleFilter": "On sale"
+    },
+    "inventory": {
+      "title": "Stock (warehouse main)",
+      "help": "The physical stock is edited. When an order is placed, the product goes into reserve (the «Reserved» column) and is deducted from stock only at shipment — so «Available» = stock − reserve.",
+      "productNoVariants": "Product (no variants)",
+      "colUnit": "Unit",
+      "colPhysical": "Physical stock",
+      "colReserved": "Reserved",
+      "colAvailable": "Available",
+      "colAction": "Action",
+      "colPhysicalTitle": "Physical stock in the warehouse",
+      "colReservedTitle": "Reserved for pending orders",
+      "colAvailableTitle": "Available for sale = physical stock − reserved",
+      "stockForLabel": "Stock for {label}",
+      "availableCellTitle": "Physical stock − reserved",
+      "errors": {
+        "invalidQuantity": "Stock — an integer ≥ 0."
+      }
+    },
+    "media": {
+      "empty": "No media files yet.",
+      "noPreview": "no preview",
+      "primary": "primary",
+      "makePrimary": "make primary",
+      "removeInline": "delete",
+      "confirmDelete": "Delete the image?",
+      "uploadTitle": "Upload an image",
+      "altLabel": "Photo caption",
+      "uploading": "Uploading…"
+    },
+    "badges": {
+      "featured": "Hit"
     }
   }
 }

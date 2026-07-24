@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { Forbidden } from '../../../_components/Forbidden';
 import { PageHeader } from '../../../_components/PageHeader';
 import { guardCatalog } from '../../_components/guard';
@@ -13,10 +15,11 @@ import { AttributeForm } from '../_components/AttributeForm';
 export const dynamic = 'force-dynamic';
 
 export default async function NewAttributePage() {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -24,15 +27,15 @@ export default async function NewAttributePage() {
   return (
     <div>
       <PageHeader
-        title="Новая характеристика"
-        subtitle="После создания для типа «Список значений» станет доступен словарь значений."
+        title={t('catalog.attribute.newTitle')}
+        subtitle={t('catalog.attribute.newSubtitle')}
         breadcrumbs={[
-          { label: 'Каталог', href: '/admin/catalog' },
-          { label: 'Характеристики', href: '/admin/catalog/attributes' },
-          { label: 'Новая характеристика' },
+          { label: t('nav.catalog'), href: '/admin/catalog' },
+          { label: t('catalog.list.nav.attributes'), href: '/admin/catalog/attributes' },
+          { label: t('catalog.attribute.newTitle') },
         ]}
         backHref="/admin/catalog/attributes"
-        backLabel="К списку характеристик"
+        backLabel={t('catalog.attribute.backToList')}
       />
 
       <div className="mt-6">

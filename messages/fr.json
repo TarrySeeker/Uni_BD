@@ -280,6 +280,17 @@
         "afterSaveHint": "OG/canonical/noindex deviennent disponibles après l’enregistrement du produit.",
         "canonicalPlaceholder": "Auto : /product/{slug}",
         "slugFallback": "slug-produit"
+      },
+      "newTitle": "Nouveau produit",
+      "newSubtitle": "Remplissez les champs principaux et créez le produit. Les variantes, caractéristiques, médias et stocks deviennent disponibles après la création.",
+      "backToList": "Retour aux produits",
+      "detailSubtitle": "Référence : {sku}",
+      "noWriteWarning": "Vous n’avez pas le droit <code>catalog.write</code> — les modifications seront rejetées par le serveur.",
+      "attributesSection": {
+        "saved": "Caractéristiques enregistrées.",
+        "empty": "Le référentiel des caractéristiques est vide. Ajoutez des attributs dans la section des caractéristiques.",
+        "notSelected": "— non sélectionné —",
+        "saveButton": "Enregistrer les caractéristiques"
       }
     },
     "category": {
@@ -408,7 +419,38 @@
         "filterable": "Dans les filtres de la vitrine",
         "required": "Obligatoire"
       },
-      "createButton": "Créer la caractéristique"
+      "createButton": "Créer la caractéristique",
+      "createLink": "+ Créer une caractéristique",
+      "pageSubtitle": "Référentiel des caractéristiques produit : couleur, taille, etc. Les valeurs « select » sont regroupées dans un dictionnaire.",
+      "newTitle": "Nouvelle caractéristique",
+      "newSubtitle": "Après la création, le dictionnaire de valeurs devient disponible pour le type « Liste de valeurs ».",
+      "backToList": "Retour aux caractéristiques",
+      "typeShort": {
+        "select": "Liste",
+        "boolean": "Oui/non"
+      },
+      "list": {
+        "colType": "Type",
+        "colValuesCount": "Valeurs",
+        "empty": "Aucune caractéristique pour le moment."
+      },
+      "badges": {
+        "variant": "variante",
+        "filterable": "filtre",
+        "required": "oblig."
+      },
+      "values": {
+        "title": "Valeurs du dictionnaire",
+        "notEditable": "Le dictionnaire de valeurs n’est utilisé que pour le type « Liste de valeurs (select) ». Pour le type actuel, la valeur est saisie sur le produit concerné.",
+        "intro": "Ces valeurs sont sélectionnées sur le produit pour cette caractéristique.",
+        "colValue": "Valeur",
+        "colSort": "Ordre",
+        "empty": "Aucune valeur pour le moment.",
+        "newValueLabel": "Nouvelle valeur",
+        "valuePlaceholder": "ex. : Rouge",
+        "slugPlaceholder": "auto à partir de la valeur",
+        "confirmDelete": "Supprimer la valeur « {value} » du dictionnaire ?"
+      }
     },
     "variants": {
       "labels": {
@@ -542,6 +584,38 @@
       "featuredFilter": "Meilleures ventes",
       "newFilter": "Nouveautés",
       "onSaleFilter": "En promo"
+    },
+    "inventory": {
+      "title": "Stocks (entrepôt main)",
+      "help": "Le stock physique est modifié. Lors de la commande, le produit passe en réserve (colonne « Réservé ») et n’est déduit du stock qu’à l’expédition — donc « Disponible » = stock − réserve.",
+      "productNoVariants": "Produit (sans variantes)",
+      "colUnit": "Unité",
+      "colPhysical": "Stock physique",
+      "colReserved": "Réservé",
+      "colAvailable": "Disponible",
+      "colAction": "Action",
+      "colPhysicalTitle": "Stock physique dans l’entrepôt",
+      "colReservedTitle": "Réservé pour les commandes en cours",
+      "colAvailableTitle": "Disponible à la vente = stock physique − réservé",
+      "stockForLabel": "Stock pour {label}",
+      "availableCellTitle": "Stock physique − réservé",
+      "errors": {
+        "invalidQuantity": "Stock — un entier ≥ 0."
+      }
+    },
+    "media": {
+      "empty": "Aucun fichier média pour le moment.",
+      "noPreview": "pas d’aperçu",
+      "primary": "principale",
+      "makePrimary": "définir comme principale",
+      "removeInline": "supprimer",
+      "confirmDelete": "Supprimer l’image ?",
+      "uploadTitle": "Téléverser une image",
+      "altLabel": "Légende de la photo",
+      "uploading": "Téléversement…"
+    },
+    "badges": {
+      "featured": "Top"
     }
   }
 }

@@ -1,16 +1,15 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+
 import type { ProductStatus } from '@/lib/catalog/types';
 import { formatDiscount } from '@/lib/admin/format';
 
 /**
- * Презентационные бейджи каталога (без 'use client' — чистый рендер).
+ * Презентационные бейджи каталога. Рендерятся внутри клиентского дерева
+ * (список товаров/ячейка цены), поэтому лейблы берутся из useTranslations.
  * Используются в списке товаров и карточке: статус, флаги New/Хит, скидка%.
  */
-
-const STATUS_LABEL: Record<ProductStatus, string> = {
-  draft: 'Черновик',
-  active: 'Активен',
-  archived: 'В архиве',
-};
 
 const STATUS_CLASS: Record<ProductStatus, string> = {
   draft: 'bg-gray-100 text-gray-700',
@@ -19,11 +18,17 @@ const STATUS_CLASS: Record<ProductStatus, string> = {
 };
 
 export function StatusBadge({ status }: { status: ProductStatus }) {
+  const t = useTranslations();
+  const statusLabel: Record<ProductStatus, string> = {
+    draft: t('common.states.draft'),
+    active: t('common.states.active'),
+    archived: t('catalog.list.statusArchived'),
+  };
   return (
     <span
       className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[status]}`}
     >
-      {STATUS_LABEL[status]}
+      {statusLabel[status]}
     </span>
   );
 }
@@ -39,9 +44,10 @@ export function NewBadge() {
 
 /** Бейдж «Хит/Рекомендуемый» (ручной флаг is_featured). */
 export function FeaturedBadge() {
+  const t = useTranslations();
   return (
     <span className="inline-block rounded bg-purple-100 px-1.5 py-0.5 text-xs font-semibold text-purple-800">
-      Хит
+      {t('catalog.badges.featured')}
     </span>
   );
 }

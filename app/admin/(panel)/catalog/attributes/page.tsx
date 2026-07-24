@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { listAttributes, listAttributeValuesByAttribute } from '@/lib/catalog/repository';
 
@@ -18,10 +19,11 @@ import { AttributeList, type AttributeListItem } from './_components/AttributeLi
 export const dynamic = 'force-dynamic';
 
 export default async function AttributesPage() {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -38,17 +40,17 @@ export default async function AttributesPage() {
   return (
     <div>
       <PageHeader
-        title="Характеристики"
-        subtitle="Справочник характеристик товаров: цвет, размер и т.п. Значения select собираются в словарь."
-        breadcrumbs={[{ label: 'Каталог', href: '/admin/catalog' }, { label: 'Характеристики' }]}
+        title={t('catalog.list.nav.attributes')}
+        subtitle={t('catalog.attribute.pageSubtitle')}
+        breadcrumbs={[{ label: t('nav.catalog'), href: '/admin/catalog' }, { label: t('catalog.list.nav.attributes') }]}
         backHref="/admin/catalog"
-        backLabel="К каталогу"
+        backLabel={t('catalog.common.backToCatalog')}
         action={
           <Link
             href="/admin/catalog/attributes/new"
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
-            + Создать характеристику
+            {t('catalog.attribute.createLink')}
           </Link>
         }
       />
