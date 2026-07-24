@@ -92,9 +92,13 @@ export interface RequestMeta {
  * (без секретов/внутренних деталей).
  */
 export class PublicActionError extends Error {
-  constructor(message: string) {
+  /** Необязательные ICU-параметры для интерполяции перевода (t(message, params)). */
+  readonly params?: Record<string, string | number>;
+
+  constructor(message: string, params?: Record<string, string | number>) {
     super(message);
     this.name = 'PublicActionError';
+    this.params = params;
     Object.setPrototypeOf(this, PublicActionError.prototype);
   }
 }
@@ -120,6 +124,18 @@ export interface ActionDeps {
   revalidate: (path: string) => Promise<void> | void;
   /** Извлечь IP/UA текущего запроса (next/headers). */
   getRequestMeta: () => Promise<RequestMeta>;
+  /**
+   * Локализовать сообщение об ошибке в язык оператора админки (волна 6-Б, подход B).
+   * Вход трактуется как i18n-КЛЮЧ: есть ключ в каталоге → перевод, иначе строка
+   * возвращается КАК ЕСТЬ (безопасный фолбэк для ещё не переведённых сообщений).
+   * Дефолт — next-intl getTranslations (defaultTranslate); в юнит-тестах
+   * переопределяется. Необязательна: если не задана, defineAction берёт
+   * defaultTranslate — существующие тесты с частичным набором deps не ломаются.
+   */
+  translate?: (
+    key: string,
+    params?: Record<string, string | number>,
+  ) => Promise<string>;
 }
 
 // -----------------------------------------------------------------------------
@@ -158,12 +174,34 @@ async function defaultGetRequestMeta(): Promise<RequestMeta> {
   return { ip, userAgent };
 }
 
+/**
+ * Перевод по умолчанию — next-intl getTranslations в языке оператора (cookie
+ * NEXT_LOCALE → users.ui_locale, см. i18n/request.ts). Best-effort: вне
+ * реквест-контекста или для несуществующего ключа возвращает вход БЕЗ изменений
+ * — поэтому ещё не переведённые (сырые) сообщения показываются как прежде, и
+ * пайплайн ничего не ломает при частичной миграции. next-intl/server
+ * импортируется ДИНАМИЧЕСКИ — чтобы юнит-импорт action.ts не тянул серверный API.
+ */
+async function defaultTranslate(
+  key: string,
+  params?: Record<string, string | number>,
+): Promise<string> {
+  try {
+    const { getTranslations } = await import('next-intl/server');
+    const t = await getTranslations();
+    return t.has(key) ? t(key, params) : key;
+  } catch {
+    return key;
+  }
+}
+
 /** Набор зависимостей по умолчанию (продакшен-окружение). */
 export const defaultDeps: ActionDeps = {
   getCurrentUser: defaultGetCurrentUser,
   writeAudit: defaultWriteAudit,
   revalidate: defaultRevalidate,
   getRequestMeta: defaultGetRequestMeta,
+  translate: defaultTranslate,
 };
 
 // -----------------------------------------------------------------------------
@@ -199,6 +237,7 @@ export function defineAction<I, O>(
   opts: DefineActionOptions<I, O>,
 ): (raw: unknown) => Promise<ActionResult<O>> {
   const deps: ActionDeps = { ...defaultDeps, ...opts.deps };
+  const translate = deps.translate ?? defaultTranslate;
 
   return async function action(raw: unknown): Promise<ActionResult<O>> {
     try {
@@ -221,14 +260,20 @@ export function defineAction<I, O>(
       }
 
       // (3) Zod — валидация входа. Ошибка → структурированные fieldErrors.
+      // Сообщения трактуются как i18n-ключи и локализуются в язык оператора
+      // (подход B); не-ключи проходят как есть (безопасный фолбэк).
       const parsed = opts.input.safeParse(raw);
       if (!parsed.success) {
         const { fieldErrors } = parsed.error.flatten();
-        return {
-          ok: false,
-          error: 'validation',
-          fieldErrors: fieldErrors as Record<string, string[]>,
-        };
+        const localized: Record<string, string[]> = {};
+        for (const [field, msgs] of Object.entries(
+          fieldErrors as Record<string, string[]>,
+        )) {
+          localized[field] = await Promise.all(
+            (msgs ?? []).map((m) => translate(m)),
+          );
+        }
+        return { ok: false, error: 'validation', fieldErrors: localized };
       }
 
       // Контекст: IP/UA текущего запроса + пользователь.
@@ -266,7 +311,8 @@ export function defineAction<I, O>(
       // Это НЕ «внутренняя» ошибка: бизнес-правило сознательно отклонило ввод
       // (дубликат email, защита владельца и т.п.), сообщение безопасно для UI.
       if (error instanceof PublicActionError) {
-        return { ok: false, error: 'validation', message: error.message };
+        const message = await translate(error.message, error.params);
+        return { ok: false, error: 'validation', message };
       }
       // Любая неожиданная ошибка → 'internal'; детали только в лог сервера.
       // Структурный JSON-лог (наблюдаемость, §6.3): permission/action — контекст,

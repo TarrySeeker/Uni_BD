@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import {
   defineAction,
+  PublicActionError,
   type ActionCtx,
   type ActionDeps,
   type ActionHandlerOutput,
@@ -260,5 +261,107 @@ describe('defineAction — guard → Zod → БД → invalidate → audit (юн
 
     expect(res).toEqual({ ok: true, data: 'no-perm-needed' });
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+});
+
+// =============================================================================
+// i18n серверной локализации ошибок (волна 6-Б, подход B). translate инъектится
+// зависимостью — сообщения об ошибках трактуются как i18n-ключи и переводятся в
+// язык оператора ВНУТРИ defineAction; контракт ActionResult не меняется.
+// =============================================================================
+
+describe('defineAction — серверная локализация ошибок (translate-dep)', () => {
+  it('fieldErrors прогоняются через translate (ключ → перевод оператора)', async () => {
+    // Схема с сообщением-КЛЮЧОМ, как будет после миграции схем на ключи.
+    const schema = z.object({ name: z.string().min(1, 'errors.validation.required') });
+    const translate = vi.fn<NonNullable<ActionDeps['translate']>>(async (key) =>
+      key === 'errors.validation.required' ? 'Обязательное поле' : key,
+    );
+    const deps = { ...makeDeps(makeUser(['users.manage'])), translate };
+
+    const action = defineAction({
+      permission: 'users.manage',
+      input: schema,
+      handler: vi.fn(async () => ({ result: 'ok' })),
+      deps,
+    });
+
+    const res = await action({ name: '' });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+    expect(res.fieldErrors?.name).toEqual(['Обязательное поле']);
+    expect(translate).toHaveBeenCalledWith('errors.validation.required');
+  });
+
+  it('PublicActionError.message переводится, params прокидываются в translate', async () => {
+    const translate = vi.fn<NonNullable<ActionDeps['translate']>>(async (key, params) =>
+      key === 'errors.emailTaken'
+        ? `Email ${params?.email as string} уже занят`
+        : key,
+    );
+    const deps = { ...makeDeps(makeUser(['users.manage'])), translate };
+
+    const action = defineAction({
+      permission: 'users.manage',
+      input: inputSchema,
+      handler: vi.fn(async () => {
+        throw new PublicActionError('errors.emailTaken', { email: 'a@b.io' });
+      }),
+      deps,
+    });
+
+    const res = await action({ name: 'Ok' });
+
+    expect(res).toEqual({
+      ok: false,
+      error: 'validation',
+      message: 'Email a@b.io уже занят',
+    });
+    expect(translate).toHaveBeenCalledWith('errors.emailTaken', { email: 'a@b.io' });
+  });
+
+  it('ФОЛБЭК: не-ключ проходит как есть (translate возвращает вход) — частичная миграция безопасна', async () => {
+    // translate имитирует дефолт: неизвестный ключ → вход без изменений.
+    const translate = vi.fn<NonNullable<ActionDeps['translate']>>(async (key) => key);
+    const deps = { ...makeDeps(makeUser(['users.manage'])), translate };
+
+    const action = defineAction({
+      permission: 'users.manage',
+      input: inputSchema,
+      handler: vi.fn(async () => {
+        throw new PublicActionError('Сырое русское сообщение (ещё не ключ)');
+      }),
+      deps,
+    });
+
+    const res = await action({ name: 'Ok' });
+
+    expect(res).toEqual({
+      ok: false,
+      error: 'validation',
+      message: 'Сырое русское сообщение (ещё не ключ)',
+    });
+  });
+
+  it('дефолтный translate (без инъекции) вне реквест-контекста не бросает и отдаёт сырое сообщение', async () => {
+    // deps без translate → используется defaultTranslate (best-effort passthrough).
+    const deps = makeDeps(makeUser(['users.manage']));
+
+    const action = defineAction({
+      permission: 'users.manage',
+      input: inputSchema,
+      handler: vi.fn(async () => ({ result: 'ok' })),
+      deps,
+    });
+
+    const res = await action({ name: '' });
+
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.error).toBe('validation');
+    // Zod-сообщение по умолчанию доехало без падения (перевод — no-op вне запроса).
+    expect(res.fieldErrors?.name?.length).toBeGreaterThan(0);
   });
 });
