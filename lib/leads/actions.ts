@@ -25,6 +25,7 @@ import {
 } from '@/lib/server/action';
 
 import { LeadStatusInputSchema, LeadIdInputSchema, LeadAnswerInputSchema } from './schemas';
+import { adminTranslator } from '@/lib/i18n/admin-translate';
 import { canLeadTransition, leadStatusLabel } from './status';
 import {
   getLeadStatus as dbGetLeadStatus,
@@ -85,9 +86,10 @@ export function createLeadActions(deps: LeadActionDeps) {
         throw new PublicActionError('errors.leadsActions.leadNotFound');
       }
       if (!canLeadTransition(current, data.status)) {
+        const t = await adminTranslator();
         throw new PublicActionError('errors.leadsActions.invalidTransition', {
-          from: leadStatusLabel(current),
-          to: leadStatusLabel(data.status),
+          from: leadStatusLabel(current, t),
+          to: leadStatusLabel(data.status, t),
         });
       }
 

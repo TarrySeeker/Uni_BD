@@ -1706,6 +1706,11 @@
     },
     "ratingStars": {
       "ariaLabel": "Рейтинг {n} из 5"
+    },
+    "statuses": {
+      "pending": "На модерации",
+      "approved": "Одобрен",
+      "rejected": "Отклонён"
     }
   },
   "users": {
@@ -1825,6 +1830,12 @@
     "leadAnswerForm": {
       "answerPlaceholder": "Ответ оператора…",
       "saveAnswer": "Сохранить ответ"
+    },
+    "statuses": {
+      "new": "Новая",
+      "inProgress": "В работе",
+      "done": "Обработана",
+      "spam": "В архиве"
     }
   },
   "customers": {

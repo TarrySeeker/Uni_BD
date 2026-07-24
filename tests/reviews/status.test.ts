@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,6 +9,17 @@ import {
   isReviewStatus,
   reviewStatusLabel,
 } from '@/lib/reviews/status';
+
+// После i18n-переноса значения мап — ключи; reviewStatusLabel принимает переводчик.
+const ru = JSON.parse(
+  readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8'),
+) as Record<string, unknown>;
+const t = (key: string): string => {
+  let o: unknown = ru;
+  for (const k of key.split('.'))
+    o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  return typeof o === 'string' ? o : key;
+};
 
 /**
  * ЮНИТ (без БД): машина статусов модерации отзывов (docs/24 §4).
@@ -44,7 +58,7 @@ describe('reviews/status — машина модерации', () => {
   it('isReviewStatus / reviewStatusLabel', () => {
     expect(isReviewStatus('pending')).toBe(true);
     expect(isReviewStatus('nope')).toBe(false);
-    expect(reviewStatusLabel('approved')).toBe('Одобрен');
-    expect(reviewStatusLabel('mystery')).toBe('mystery');
+    expect(reviewStatusLabel('approved', t)).toBe('Одобрен');
+    expect(reviewStatusLabel('mystery', t)).toBe('mystery');
   });
 });

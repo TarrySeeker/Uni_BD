@@ -1,3 +1,7 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+
 import { isReviewStatus, reviewStatusLabel } from '@/lib/reviews/status';
 import type { ReviewStatus } from '@/lib/reviews/types';
 
@@ -12,12 +16,13 @@ const CLASSES: Record<ReviewStatus, string> = {
 };
 
 export function ReviewStatusBadge({ status }: { status: string }) {
+  const t = useTranslations();
   const cls = isReviewStatus(status) ? CLASSES[status] : 'bg-gray-100 text-gray-600';
   return (
     <span
       className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${cls}`}
     >
-      {reviewStatusLabel(status)}
+      {reviewStatusLabel(status, t)}
     </span>
   );
 }

@@ -1,3 +1,7 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+
 import { isLeadStatus, leadStatusLabel, type LeadStatus } from '@/lib/leads/status';
 
 /**
@@ -12,10 +16,11 @@ const CLASSES: Record<LeadStatus, string> = {
 };
 
 export function LeadStatusBadge({ status }: { status: string }) {
+  const t = useTranslations();
   const cls = isLeadStatus(status) ? CLASSES[status] : 'bg-gray-100 text-gray-600';
   return (
     <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {leadStatusLabel(status)}
+      {leadStatusLabel(status, t)}
     </span>
   );
 }

@@ -38,6 +38,7 @@ import {
 
 import { REVIEW_TRANSLATABLE_FIELDS } from './fields';
 import { ReviewError } from './errors';
+import { adminTranslator } from '@/lib/i18n/admin-translate';
 import { canReviewTransition, reviewStatusLabel } from './status';
 import { sanitizeReviewBody } from './sanitize';
 import {
@@ -135,9 +136,10 @@ export function createReviewActions(deps: ReviewActionDeps) {
       // X→X запрещён (нулевой переход) — модерация в тот же статус бессмысленна
       // (машина статусов, docs/24 §4; образец leads canLeadTransition).
       if (!canReviewTransition(before.status, target)) {
+        const t = await adminTranslator();
         throw new PublicActionError('errors.reviewsAction.invalidTransition', {
-          from: reviewStatusLabel(before.status),
-          to: reviewStatusLabel(target),
+          from: reviewStatusLabel(before.status, t),
+          to: reviewStatusLabel(target, t),
         });
       }
 

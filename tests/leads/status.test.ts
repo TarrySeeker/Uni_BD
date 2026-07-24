@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -8,6 +11,18 @@ import {
   nextLeadStatuses,
   canLeadTransition,
 } from '@/lib/leads/status';
+
+// После i18n-переноса (волна 6-Б) значения мап — ключи; leadStatusLabel принимает
+// переводчик. Строим t из ru.json — инвариант (читаемая русская подпись) сохранён.
+const ru = JSON.parse(
+  readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8'),
+) as Record<string, unknown>;
+const t = (key: string): string => {
+  let o: unknown = ru;
+  for (const k of key.split('.'))
+    o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  return typeof o === 'string' ? o : key;
+};
 
 /**
  * G-09 (обработка заявок): чистая статус-машина заявок. Whitelist переходов —
@@ -71,10 +86,10 @@ describe('статус-машина заявок', () => {
   });
 
   it('leadStatusLabel даёт человекочитаемую подпись, фолбэк — строка', () => {
-    expect(leadStatusLabel('new')).toBe('Новая');
-    expect(leadStatusLabel('in_progress')).toBe('В работе');
-    expect(leadStatusLabel('done')).toBe('Обработана');
-    expect(leadStatusLabel('spam')).toBe('В архиве');
-    expect(leadStatusLabel('weird')).toBe('weird');
+    expect(leadStatusLabel('new', t)).toBe('Новая');
+    expect(leadStatusLabel('in_progress', t)).toBe('В работе');
+    expect(leadStatusLabel('done', t)).toBe('Обработана');
+    expect(leadStatusLabel('spam', t)).toBe('В архиве');
+    expect(leadStatusLabel('weird', t)).toBe('weird');
   });
 });

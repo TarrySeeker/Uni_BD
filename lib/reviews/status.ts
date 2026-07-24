@@ -21,10 +21,11 @@ export const REVIEW_STATUS_TRANSITIONS: Readonly<
 };
 
 /** Человекочитаемые подписи статусов (для бейджей/кнопок админки). */
+// Значения — i18n-КЛЮЧИ (волна 6-Б); русские подписи живут в messages/ru.json.
 export const REVIEW_STATUS_LABELS: Readonly<Record<ReviewStatus, string>> = {
-  pending: 'На модерации',
-  approved: 'Одобрен',
-  rejected: 'Отклонён',
+  pending: 'reviews.statuses.pending',
+  approved: 'reviews.statuses.approved',
+  rejected: 'reviews.statuses.rejected',
 };
 
 /** True, если строка — известный статус отзыва. */
@@ -36,8 +37,11 @@ export function isReviewStatus(value: unknown): value is ReviewStatus {
 }
 
 /** Подпись статуса (фолбэк — сама строка, если статус неизвестен). */
-export function reviewStatusLabel(status: string): string {
-  return isReviewStatus(status) ? REVIEW_STATUS_LABELS[status] : status;
+export function reviewStatusLabel(
+  status: string,
+  t: (key: string) => string,
+): string {
+  return isReviewStatus(status) ? t(REVIEW_STATUS_LABELS[status]) : status;
 }
 
 /** true, если переход from→to допустим машиной статусов (X→X запрещён). */

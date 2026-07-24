@@ -1706,6 +1706,11 @@
     },
     "ratingStars": {
       "ariaLabel": "Note {n} sur 5"
+    },
+    "statuses": {
+      "pending": "En modération",
+      "approved": "Approuvé",
+      "rejected": "Rejeté"
     }
   },
   "users": {
@@ -1825,6 +1830,12 @@
     "leadAnswerForm": {
       "answerPlaceholder": "Réponse de l'opérateur…",
       "saveAnswer": "Enregistrer la réponse"
+    },
+    "statuses": {
+      "new": "Nouvelle",
+      "inProgress": "En cours",
+      "done": "Traitée",
+      "spam": "Archivée"
     }
   },
   "customers": {

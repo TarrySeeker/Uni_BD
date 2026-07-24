@@ -33,11 +33,13 @@ export const LEAD_STATUS_TRANSITIONS: Readonly<
 };
 
 /** Человекочитаемые подписи статусов (для бейджей/кнопок админки). */
+// Значения — i18n-КЛЮЧИ (волна 6-Б); русские подписи живут в messages/ru.json.
+// leadStatusLabel принимает переводчик t и резолвит ключ → текст оператора.
 export const LEAD_STATUS_LABELS: Readonly<Record<LeadStatus, string>> = {
-  new: 'Новая',
-  in_progress: 'В работе',
-  done: 'Обработана',
-  spam: 'В архиве',
+  new: 'leads.statuses.new',
+  in_progress: 'leads.statuses.inProgress',
+  done: 'leads.statuses.done',
+  spam: 'leads.statuses.spam',
 };
 
 /** True, если строка — известный статус заявки. */
@@ -46,8 +48,11 @@ export function isLeadStatus(value: unknown): value is LeadStatus {
 }
 
 /** Подпись статуса (фолбэк — сама строка, если статус неизвестен). */
-export function leadStatusLabel(status: string): string {
-  return isLeadStatus(status) ? LEAD_STATUS_LABELS[status] : status;
+export function leadStatusLabel(
+  status: string,
+  t: (key: string) => string,
+): string {
+  return isLeadStatus(status) ? t(LEAD_STATUS_LABELS[status]) : status;
 }
 
 /** Список статусов, в которые можно перейти из текущего (для кнопок UI). */

@@ -61,9 +61,9 @@ export function LeadRowActions({ id, status }: { id: string; status: string }) {
                   ? 'border border-gray-300 text-gray-600 hover:bg-gray-100'
                   : 'bg-gray-900 text-white hover:bg-gray-700'
               }`}
-              title={t('leads.leadRowActions.changeStatusTo', { status: leadStatusLabel(to) })}
+              title={t('leads.leadRowActions.changeStatusTo', { status: leadStatusLabel(to, t) })}
             >
-              {leadStatusLabel(to)}
+              {leadStatusLabel(to, t)}
             </button>
           );
         })}

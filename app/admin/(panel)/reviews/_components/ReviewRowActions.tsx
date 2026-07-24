@@ -68,10 +68,10 @@ export function ReviewRowActions({
                   : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
               }`}
               title={t('reviews.reviewRowActions.changeStatusTo', {
-                status: reviewStatusLabel(to),
+                status: reviewStatusLabel(to, t),
               })}
             >
-              {reviewStatusLabel(to)}
+              {reviewStatusLabel(to, t)}
             </button>
           );
         })}
