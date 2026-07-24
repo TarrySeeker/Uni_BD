@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getLocaleConfig } from '@/lib/i18n/config';
 
 import { Forbidden } from '../../_components/Forbidden';
@@ -32,6 +34,7 @@ export default async function LanguagesSettingsPage() {
     return <Forbidden permission={guard.permission} />;
   }
 
+  const t = await getTranslations();
   const config = await getLocaleConfig();
   const secondary = config.locales.filter((l) => l !== config.defaultLocale);
   const entries = await loadTranslationCoverage(secondary);
@@ -40,27 +43,25 @@ export default async function LanguagesSettingsPage() {
   return (
     <div className="max-w-4xl">
       <PageHeader
-        title="Языки"
-        subtitle="Какие языки доступны в магазине и насколько заполнены переводы."
-        breadcrumbs={[{ label: 'Настройки', href: '/admin/settings' }, { label: 'Языки' }]}
+        title={t('nav.languages')}
+        subtitle={t('settings.languagesPage.subtitle')}
+        breadcrumbs={[{ label: t('nav.settings'), href: '/admin/settings' }, { label: t('nav.languages') }]}
         backHref="/admin/settings"
-        backLabel="К настройкам"
+        backLabel={t('settings.languagesPage.backToSettings')}
       />
 
       <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Языки магазина</h2>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">{t('settings.languagesPage.shopLanguagesHeading')}</h2>
         <LanguagesForm config={config} />
         <div className="mt-4">
-          <ResetSettingButton settingKey="i18n" label="Сбросить языки" />
+          <ResetSettingButton settingKey="i18n" label={t('settings.languagesPage.resetLanguages')} />
         </div>
       </section>
 
       <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-1 text-lg font-semibold text-gray-900">Заполненность переводов</h2>
+        <h2 className="mb-1 text-lg font-semibold text-gray-900">{t('settings.languagesPage.coverageHeading')}</h2>
         <p className="mb-4 text-sm text-gray-600">
-          Доля заполненных переводимых полей по каждому языку. Пустое поле не
-          ошибка: на сайте вместо него показывается текст на языке по умолчанию (
-          {localeLabel(config.defaultLocale)}).
+          {t('settings.languagesPage.coverageIntro', { defaultLocale: localeLabel(config.defaultLocale) })}
         </p>
         <CoverageTable matrix={matrix} locales={secondary} />
       </section>
@@ -69,22 +70,23 @@ export default async function LanguagesSettingsPage() {
 }
 
 /** Таблица «сущность × язык» с процентом заполненности переводов. */
-function CoverageTable({
+async function CoverageTable({
   matrix,
   locales,
 }: {
   matrix: CoverageRow[];
   locales: readonly string[];
 }) {
+  const t = await getTranslations();
   if (locales.length === 0) {
     return (
       <p className="text-sm text-gray-600">
-        Дополнительных языков нет — переводить нечего.
+        {t('settings.languagesPage.coverageNoSecondary')}
       </p>
     );
   }
   if (matrix.length === 0) {
-    return <p className="text-sm text-gray-600">Пока нет данных для подсчёта.</p>;
+    return <p className="text-sm text-gray-600">{t('settings.languagesPage.coverageNoData')}</p>;
   }
 
   return (
@@ -92,8 +94,8 @@ function CoverageTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-left text-gray-600">
-            <th className="py-2 pr-4 font-medium">Раздел</th>
-            <th className="py-2 pr-4 font-medium">Записей</th>
+            <th className="py-2 pr-4 font-medium">{t('settings.languagesPage.colSection')}</th>
+            <th className="py-2 pr-4 font-medium">{t('settings.languagesPage.colRecords')}</th>
             {locales.map((locale) => (
               <th key={locale} className="py-2 pr-4 font-medium">
                 {localeLabel(locale)} ({locale})
@@ -112,7 +114,7 @@ function CoverageTable({
                     {formatPercent(cell.ratio)}
                   </span>
                   <span className="ml-2 text-xs text-gray-500">
-                    не переведено: {cell.missing}
+                    {t('settings.languagesPage.notTranslated', { missing: cell.missing })}
                   </span>
                 </td>
               ))}

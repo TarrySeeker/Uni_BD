@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -54,6 +55,7 @@ export function HomeContentForm({
   translations?: TranslationsMap;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   // Дескрипторы переводимых полей разворачиваются по фактической длине базовых
   // массивов «главной» (read-path мержит перевод по индексу).
   const trFields = buildHomeTrFieldDefs(home as unknown as Record<string, unknown>);
@@ -337,7 +339,7 @@ export function HomeContentForm({
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Контент главной сохранён.');
+      setSuccess(t('settings.homeContentForm.savedToast'));
       router.refresh();
     } else {
       setError(result);
@@ -369,81 +371,80 @@ export function HomeContentForm({
       ) : null}
 
       <p className="mb-5 text-sm text-gray-600">
-        Контент главной страницы витрины. Пустое поле — вернётся значение по умолчанию.
-        В списках — по одному пункту на строку.
+        {t('settings.homeContentForm.intro')}
       </p>
 
       {/* Hero / обложка */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Обложка (hero)</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.hero.legend')}</legend>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <label htmlFor="home-hero-cta" className={labelCls}>Текст кнопки</label>
+            <label htmlFor="home-hero-cta" className={labelCls}>{t('settings.homeContentForm.hero.ctaLabel')}</label>
             <input id="home-hero-cta" value={heroCtaLabel} onChange={(e) => setHeroCtaLabel(e.target.value)}
-              placeholder="Смотреть коллекцию" className={inputCls} />
+              placeholder={t('settings.homeContentForm.hero.ctaPlaceholder')} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-hero-href" className={labelCls}>Ссылка кнопки</label>
+            <label htmlFor="home-hero-href" className={labelCls}>{t('settings.homeContentForm.hero.hrefLabel')}</label>
             <input id="home-hero-href" value={heroCtaHref} onChange={(e) => setHeroCtaHref(e.target.value)}
               placeholder="/catalog" className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-hero-title" className={labelCls}>Заголовок (необязательно)</label>
+            <label htmlFor="home-hero-title" className={labelCls}>{t('settings.homeContentForm.hero.titleLabel')}</label>
             <input id="home-hero-title" value={heroTitle} onChange={(e) => setHeroTitle(e.target.value)} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-hero-sub" className={labelCls}>Подзаголовок (необязательно)</label>
+            <label htmlFor="home-hero-sub" className={labelCls}>{t('settings.homeContentForm.hero.subtitleLabel')}</label>
             <input id="home-hero-sub" value={heroSubtitle} onChange={(e) => setHeroSubtitle(e.target.value)} className={inputCls} />
           </div>
           <div className="lg:col-span-2">
-            <label htmlFor="home-hero-img" className={labelCls}>Фон обложки</label>
+            <label htmlFor="home-hero-img" className={labelCls}>{t('settings.homeContentForm.hero.imageLabel')}</label>
             <input id="home-hero-img" value={heroImageKey} onChange={(e) => setHeroImageKey(e.target.value)}
               placeholder="home/hero.webp" className={inputCls} />
-            <ImageUploadButton label="Загрузить фон обложки" onUploaded={(key) => setHeroImageKey(key)} />
-            <p className={hintCls}>Загрузите файл или укажите адрес уже загруженного. Пусто — фон витрины по умолчанию.</p>
+            <ImageUploadButton label={t('settings.homeContentForm.hero.uploadBg')} onUploaded={(key) => setHeroImageKey(key)} />
+            <p className={hintCls}>{t('settings.homeContentForm.hero.imageHint')}</p>
           </div>
         </div>
       </fieldset>
 
       {/* О бренде */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «О бренде»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.about.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label htmlFor="home-about-title" className={labelCls}>Заголовок</label>
+            <label htmlFor="home-about-title" className={labelCls}>{t('fields.title')}</label>
             <input id="home-about-title" value={aboutTitle} onChange={(e) => setAboutTitle(e.target.value)}
-              placeholder="О бренде" className={inputCls} />
+              placeholder={t('settings.homeContentForm.about.titlePlaceholder')} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-about-p" className={labelCls}>Абзацы (по одному на строку)</label>
+            <label htmlFor="home-about-p" className={labelCls}>{t('settings.homeContentForm.about.paragraphsLabel')}</label>
             <textarea id="home-about-p" value={aboutParagraphs} onChange={(e) => setAboutParagraphs(e.target.value)}
               rows={4} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-about-v" className={labelCls}>Ценности / теги (по одному на строку)</label>
+            <label htmlFor="home-about-v" className={labelCls}>{t('settings.homeContentForm.about.valuesLabel')}</label>
             <textarea id="home-about-v" value={aboutValues} onChange={(e) => setAboutValues(e.target.value)}
               rows={3} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-about-img" className={labelCls}>Фото галереи «О бренде» (по одному адресу на строку)</label>
+            <label htmlFor="home-about-img" className={labelCls}>{t('settings.homeContentForm.about.imagesLabel')}</label>
             <textarea id="home-about-img" value={aboutImageKeys} onChange={(e) => setAboutImageKeys(e.target.value)}
               rows={2} className={inputCls} />
-            <ImageUploadButton label="Загрузить фото" onUploaded={(key) => setAboutImageKeys((p) => (p ? `${p}\n${key}` : key))} />
+            <ImageUploadButton label={t('settings.homeContentForm.about.uploadPhoto')} onUploaded={(key) => setAboutImageKeys((p) => (p ? `${p}\n${key}` : key))} />
           </div>
         </div>
       </fieldset>
 
       {/* Качество ткани */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Качество ткани»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.quality.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label htmlFor="home-q-title" className={labelCls}>Заголовок</label>
+            <label htmlFor="home-q-title" className={labelCls}>{t('fields.title')}</label>
             <input id="home-q-title" value={qualityTitle} onChange={(e) => setQualityTitle(e.target.value)}
-              placeholder="Качество ткани" className={inputCls} />
+              placeholder={t('settings.homeContentForm.quality.titlePlaceholder')} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-q-items" className={labelCls}>Пункты (по одному на строку)</label>
+            <label htmlFor="home-q-items" className={labelCls}>{t('settings.homeContentForm.quality.itemsLabel')}</label>
             <textarea id="home-q-items" value={qualityItems} onChange={(e) => setQualityItems(e.target.value)}
               rows={4} className={inputCls} />
           </div>
@@ -452,18 +453,18 @@ export function HomeContentForm({
 
       {/* Доставка и оплата */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Доставка и оплата»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.delivery.legend')}</legend>
         <div>
-          <label htmlFor="home-delivery" className={labelCls}>Пункты: «Заголовок | Описание» (по одному на строку)</label>
+          <label htmlFor="home-delivery" className={labelCls}>{t('settings.homeContentForm.delivery.itemsLabel')}</label>
           <textarea id="home-delivery" value={deliveryItems} onChange={(e) => setDeliveryItems(e.target.value)}
-            rows={4} className={inputCls} placeholder={'СДЭК | Доставка по всей России…\nСроки | Москва — 1–2 дня…'} />
-          <p className={hintCls}>Например: <code>СДЭК | Доставка по всей России. Пункты выдачи и курьер.</code></p>
+            rows={4} className={inputCls} placeholder={t('settings.homeContentForm.delivery.itemsPlaceholder')} />
+          <p className={hintCls}>{t.rich('settings.homeContentForm.delivery.hint', { code: (chunks) => <code>{chunks}</code> })}</p>
         </div>
       </fieldset>
 
       {/* Лента ценностей (B1) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Лента ценностей</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.valuesStrip.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -472,46 +473,46 @@ export function HomeContentForm({
               onChange={(e) => setValuesStripEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            Показывать ленту на главной
+            {t('settings.homeContentForm.valuesStrip.showToggle')}
           </label>
           <div>
             <label htmlFor="home-values-strip" className={labelCls}>
-              Пункты: «Заголовок | Описание» (по одному на строку)
+              {t('settings.homeContentForm.delivery.itemsLabel')}
             </label>
             <textarea id="home-values-strip" value={valuesStripItems} onChange={(e) => setValuesStripItems(e.target.value)}
-              rows={4} className={inputCls} placeholder={'Форма | Структурные силуэты…\nФункция | Продуманный крой…'} />
-            <p className={hintCls}>Лента показывается, только если включён флажок выше. Пусто — пункты по умолчанию.</p>
+              rows={4} className={inputCls} placeholder={t('settings.homeContentForm.valuesStrip.itemsPlaceholder')} />
+            <p className={hintCls}>{t('settings.homeContentForm.valuesStrip.hint')}</p>
           </div>
         </div>
       </fieldset>
 
       {/* Философия (B3) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Философия»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.philosophy.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <label htmlFor="home-phil-eyebrow" className={labelCls}>Надзаголовок</label>
+            <label htmlFor="home-phil-eyebrow" className={labelCls}>{t('settings.homeContentForm.philosophy.eyebrowLabel')}</label>
             <input id="home-phil-eyebrow" value={philEyebrow} onChange={(e) => setPhilEyebrow(e.target.value)}
-              placeholder="Философия" className={inputCls} />
+              placeholder={t('settings.homeContentForm.philosophy.eyebrowPlaceholder')} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-phil-title" className={labelCls}>Заголовок</label>
+            <label htmlFor="home-phil-title" className={labelCls}>{t('fields.title')}</label>
             <input id="home-phil-title" value={philTitle} onChange={(e) => setPhilTitle(e.target.value)}
-              placeholder="Например: качество, забота, стиль" className={inputCls} />
+              placeholder={t('settings.homeContentForm.philosophy.titlePlaceholder')} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="home-phil-text" className={labelCls}>Абзац</label>
+            <label htmlFor="home-phil-text" className={labelCls}>{t('settings.homeContentForm.philosophy.textLabel')}</label>
             <textarea id="home-phil-text" value={philText} onChange={(e) => setPhilText(e.target.value)}
               rows={3} className={inputCls} />
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div>
-              <label htmlFor="home-phil-link-label" className={labelCls}>Текст ссылки</label>
+              <label htmlFor="home-phil-link-label" className={labelCls}>{t('settings.homeContentForm.philosophy.linkTextLabel')}</label>
               <input id="home-phil-link-label" value={philLinkLabel} onChange={(e) => setPhilLinkLabel(e.target.value)}
-                placeholder="О бренде" className={inputCls} />
+                placeholder={t('settings.homeContentForm.about.titlePlaceholder')} className={inputCls} />
             </div>
             <div>
-              <label htmlFor="home-phil-link-href" className={labelCls}>Адрес ссылки</label>
+              <label htmlFor="home-phil-link-href" className={labelCls}>{t('settings.homeContentForm.philosophy.linkHrefLabel')}</label>
               <input id="home-phil-link-href" value={philLinkHref} onChange={(e) => setPhilLinkHref(e.target.value)}
                 placeholder="/#about" className={inputCls} />
             </div>
@@ -521,7 +522,7 @@ export function HomeContentForm({
 
       {/* Образы (lookbook, ТЗ_2) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Образы»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.looks.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -530,43 +531,43 @@ export function HomeContentForm({
               onChange={(e) => setLooksEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            Показывать «Образы» на главной
+            {t('settings.homeContentForm.looks.showToggle')}
           </label>
           <div>
-            <label htmlFor="home-looks-title" className={labelCls}>Заголовок блока (необязательно)</label>
+            <label htmlFor="home-looks-title" className={labelCls}>{t('settings.homeContentForm.blockTitleOptional')}</label>
             <input id="home-looks-title" value={looksTitle} onChange={(e) => setLooksTitle(e.target.value)}
-              placeholder="Образы" className={inputCls} />
+              placeholder={t('settings.homeContentForm.looks.titlePlaceholder')} className={inputCls} />
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             {looksCategories.map((cat, i) => (
               <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-600">Категория {i + 1}</span>
+                  <span className="text-xs font-semibold text-gray-600">{t('settings.homeContentForm.looks.categoryN', { n: i + 1 })}</span>
                   <button type="button" onClick={() => removeLookCategory(i)}
                     className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                    Удалить
+                    {t('common.actions.delete')}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label htmlFor={`home-looks-title-${i}`} className={labelCls}>Заголовок</label>
+                    <label htmlFor={`home-looks-title-${i}`} className={labelCls}>{t('fields.title')}</label>
                     <input id={`home-looks-title-${i}`} value={cat.title}
                       onChange={(e) => setLookCategory(i, 'title', e.target.value)}
-                      placeholder="Название образа" className={inputCls} />
+                      placeholder={t('settings.homeContentForm.looks.catTitlePlaceholder')} className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-looks-text-${i}`} className={labelCls}>Текст</label>
+                    <label htmlFor={`home-looks-text-${i}`} className={labelCls}>{t('settings.homeContentForm.looks.catTextLabel')}</label>
                     <textarea id={`home-looks-text-${i}`} value={cat.text}
                       onChange={(e) => setLookCategory(i, 'text', e.target.value)}
                       rows={3} className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-looks-img-${i}`} className={labelCls}>Фото</label>
+                    <label htmlFor={`home-looks-img-${i}`} className={labelCls}>{t('settings.homeContentForm.photoLabel')}</label>
                     <input id={`home-looks-img-${i}`} value={cat.imageKey}
                       onChange={(e) => setLookCategory(i, 'imageKey', e.target.value)}
                       placeholder="home/looks/1.webp" className={inputCls} />
-                    <ImageUploadButton label="Загрузить фото образа" onUploaded={(key) => setLookCategory(i, 'imageKey', key)} />
+                    <ImageUploadButton label={t('settings.homeContentForm.looks.uploadPhoto')} onUploaded={(key) => setLookCategory(i, 'imageKey', key)} />
                   </div>
                 </div>
               </div>
@@ -576,16 +577,16 @@ export function HomeContentForm({
           <div>
             <button type="button" onClick={addLookCategory}
               className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-              + Добавить категорию
+              {t('settings.homeContentForm.looks.addCategory')}
             </button>
-            <p className={hintCls}>Каждая категория — фото, заголовок и текст. Неполные категории не сохраняются.</p>
+            <p className={hintCls}>{t('settings.homeContentForm.looks.hint')}</p>
           </div>
         </div>
       </fieldset>
 
       {/* Плитки категорий (M4) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Плитки категорий»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.tiles.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -594,38 +595,38 @@ export function HomeContentForm({
               onChange={(e) => setTilesEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            Показывать «Плитки категорий» на главной
+            {t('settings.homeContentForm.tiles.showToggle')}
           </label>
 
           <div className="grid grid-cols-1 gap-4">
             {tilesItems.map((tile, i) => (
               <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-600">Плитка {i + 1}</span>
+                  <span className="text-xs font-semibold text-gray-600">{t('settings.homeContentForm.tileN', { n: i + 1 })}</span>
                   <button type="button" onClick={() => removeTile(i)}
                     className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                    Удалить
+                    {t('common.actions.delete')}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label htmlFor={`home-tiles-title-${i}`} className={labelCls}>Заголовок</label>
+                    <label htmlFor={`home-tiles-title-${i}`} className={labelCls}>{t('fields.title')}</label>
                     <input id={`home-tiles-title-${i}`} value={tile.title}
                       onChange={(e) => setTile(i, 'title', e.target.value)}
-                      placeholder="Название категории" className={inputCls} />
+                      placeholder={t('settings.homeContentForm.tiles.titlePlaceholder')} className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-tiles-href-${i}`} className={labelCls}>Ссылка</label>
+                    <label htmlFor={`home-tiles-href-${i}`} className={labelCls}>{t('settings.homeContentForm.linkLabel')}</label>
                     <input id={`home-tiles-href-${i}`} value={tile.href}
                       onChange={(e) => setTile(i, 'href', e.target.value)}
                       placeholder="/catalog/scarves" className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-tiles-img-${i}`} className={labelCls}>Фото</label>
+                    <label htmlFor={`home-tiles-img-${i}`} className={labelCls}>{t('settings.homeContentForm.photoLabel')}</label>
                     <input id={`home-tiles-img-${i}`} value={tile.imageKey}
                       onChange={(e) => setTile(i, 'imageKey', e.target.value)}
                       placeholder="home/tiles/1.webp" className={inputCls} />
-                    <ImageUploadButton label="Загрузить фото плитки" onUploaded={(key) => setTile(i, 'imageKey', key)} />
+                    <ImageUploadButton label={t('settings.homeContentForm.uploadTilePhoto')} onUploaded={(key) => setTile(i, 'imageKey', key)} />
                   </div>
                 </div>
               </div>
@@ -635,16 +636,16 @@ export function HomeContentForm({
           <div>
             <button type="button" onClick={addTile}
               className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-              + Добавить плитку
+              {t('settings.homeContentForm.addTile')}
             </button>
-            <p className={hintCls}>Каждая плитка — фото, заголовок и ссылка. Неполные плитки не сохраняются.</p>
+            <p className={hintCls}>{t('settings.homeContentForm.tiles.hint')}</p>
           </div>
         </div>
       </fieldset>
 
       {/* Видео (M4) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Видео»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.video.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -653,15 +654,15 @@ export function HomeContentForm({
               onChange={(e) => setVideoEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            Показывать «Видео» на главной
+            {t('settings.homeContentForm.video.showToggle')}
           </label>
           <div>
-            <label htmlFor="home-video-embed" className={labelCls}>Ссылка на видео (embed)</label>
+            <label htmlFor="home-video-embed" className={labelCls}>{t('settings.homeContentForm.video.embedLabel')}</label>
             <input id="home-video-embed" type="url" value={videoEmbedUrl}
               onChange={(e) => setVideoEmbedUrl(e.target.value)}
               placeholder="https://player.vimeo.com/video/12345" className={inputCls} />
             <p className={hintCls}>
-              Только адрес вида <code>https://…</code> (embed-ссылка Vimeo/YouTube). Пусто — видео не показывается.
+              {t.rich('settings.homeContentForm.video.hint', { code: (chunks) => <code>{chunks}</code> })}
             </p>
           </div>
         </div>
@@ -669,7 +670,7 @@ export function HomeContentForm({
 
       {/* Дизайнеры (M4) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Дизайнеры»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.designers.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -678,60 +679,60 @@ export function HomeContentForm({
               onChange={(e) => setDesignersEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            Показывать «Дизайнеры» на главной
+            {t('settings.homeContentForm.designers.showToggle')}
           </label>
           <div>
-            <label htmlFor="home-designers-title" className={labelCls}>Заголовок блока (необязательно)</label>
+            <label htmlFor="home-designers-title" className={labelCls}>{t('settings.homeContentForm.blockTitleOptional')}</label>
             <input id="home-designers-title" value={designersTitle} onChange={(e) => setDesignersTitle(e.target.value)}
-              placeholder="Дизайнеры" className={inputCls} />
+              placeholder={t('settings.homeContentForm.designers.titlePlaceholder')} className={inputCls} />
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             {designersItems.map((d, i) => (
               <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-600">Дизайнер {i + 1}</span>
+                  <span className="text-xs font-semibold text-gray-600">{t('settings.homeContentForm.designers.designerN', { n: i + 1 })}</span>
                   <button type="button" onClick={() => removeDesigner(i)}
                     className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                    Удалить
+                    {t('common.actions.delete')}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label htmlFor={`home-designers-name-${i}`} className={labelCls}>Имя</label>
+                    <label htmlFor={`home-designers-name-${i}`} className={labelCls}>{t('fields.name')}</label>
                     <input id={`home-designers-name-${i}`} value={d.name}
                       onChange={(e) => setDesigner(i, 'name', e.target.value)}
-                      placeholder="Имя дизайнера" className={inputCls} />
+                      placeholder={t('settings.homeContentForm.designers.namePlaceholder')} className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-designers-href-${i}`} className={labelCls}>Ссылка</label>
+                    <label htmlFor={`home-designers-href-${i}`} className={labelCls}>{t('settings.homeContentForm.linkLabel')}</label>
                     <input id={`home-designers-href-${i}`} value={d.href}
                       onChange={(e) => setDesigner(i, 'href', e.target.value)}
                       placeholder="/designers/ivanov" className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-designers-avatar-${i}`} className={labelCls}>Аватар</label>
+                    <label htmlFor={`home-designers-avatar-${i}`} className={labelCls}>{t('settings.homeContentForm.designers.avatarLabel')}</label>
                     <input id={`home-designers-avatar-${i}`} value={d.avatarImageKey}
                       onChange={(e) => setDesigner(i, 'avatarImageKey', e.target.value)}
                       placeholder="home/designers/1-avatar.webp" className={inputCls} />
-                    <ImageUploadButton label="Загрузить аватар" onUploaded={(key) => setDesigner(i, 'avatarImageKey', key)} />
+                    <ImageUploadButton label={t('settings.homeContentForm.designers.uploadAvatar')} onUploaded={(key) => setDesigner(i, 'avatarImageKey', key)} />
                   </div>
                   <div>
-                    <label htmlFor={`home-designers-work-${i}`} className={labelCls}>Фото работы</label>
+                    <label htmlFor={`home-designers-work-${i}`} className={labelCls}>{t('settings.homeContentForm.designers.workLabel')}</label>
                     <input id={`home-designers-work-${i}`} value={d.workImageKey}
                       onChange={(e) => setDesigner(i, 'workImageKey', e.target.value)}
                       placeholder="home/designers/1-work.webp" className={inputCls} />
-                    <ImageUploadButton label="Загрузить фото работы" onUploaded={(key) => setDesigner(i, 'workImageKey', key)} />
+                    <ImageUploadButton label={t('settings.homeContentForm.designers.uploadWork')} onUploaded={(key) => setDesigner(i, 'workImageKey', key)} />
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label htmlFor={`home-designers-avatartop-${i}`} className={labelCls}>Позиция аватара (0–100)</label>
+                      <label htmlFor={`home-designers-avatartop-${i}`} className={labelCls}>{t('settings.homeContentForm.designers.avatarTopLabel')}</label>
                       <input id={`home-designers-avatartop-${i}`} type="number" min={0} max={100} value={d.avatarTop}
                         onChange={(e) => setDesigner(i, 'avatarTop', e.target.value)}
                         placeholder="50" className={inputCls} />
                     </div>
                     <div>
-                      <label htmlFor={`home-designers-worktop-${i}`} className={labelCls}>Позиция работы (0–100)</label>
+                      <label htmlFor={`home-designers-worktop-${i}`} className={labelCls}>{t('settings.homeContentForm.designers.workTopLabel')}</label>
                       <input id={`home-designers-worktop-${i}`} type="number" min={0} max={100} value={d.workTop}
                         onChange={(e) => setDesigner(i, 'workTop', e.target.value)}
                         placeholder="50" className={inputCls} />
@@ -745,11 +746,10 @@ export function HomeContentForm({
           <div>
             <button type="button" onClick={addDesigner}
               className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-              + Добавить дизайнера
+              {t('settings.homeContentForm.designers.addDesigner')}
             </button>
             <p className={hintCls}>
-              Каждая запись — имя, ссылка и два фото (аватар и работа). Позиции фото (0–100) — по вертикали,
-              пусто — по центру. Неполные записи не сохраняются.
+              {t('settings.homeContentForm.designers.hint')}
             </p>
           </div>
         </div>
@@ -757,7 +757,7 @@ export function HomeContentForm({
 
       {/* Промо-слайдер (M5) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Промо-слайдер»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.slider.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -766,44 +766,44 @@ export function HomeContentForm({
               onChange={(e) => setSliderEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            Показывать «Промо-слайдер» на главной
+            {t('settings.homeContentForm.slider.showToggle')}
           </label>
 
           <div className="grid grid-cols-1 gap-4">
             {sliderSlides.map((sl, i) => (
               <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-600">Слайд {i + 1}</span>
+                  <span className="text-xs font-semibold text-gray-600">{t('settings.homeContentForm.slider.slideN', { n: i + 1 })}</span>
                   <button type="button" onClick={() => removeSlide(i)}
                     className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                    Удалить
+                    {t('common.actions.delete')}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label htmlFor={`home-slider-img-${i}`} className={labelCls}>Фон слайда</label>
+                    <label htmlFor={`home-slider-img-${i}`} className={labelCls}>{t('settings.homeContentForm.slider.imageLabel')}</label>
                     <input id={`home-slider-img-${i}`} value={sl.imageKey}
                       onChange={(e) => setSlide(i, 'imageKey', e.target.value)}
                       placeholder="home/slider/1.webp" className={inputCls} />
-                    <ImageUploadButton label="Загрузить фон слайда" onUploaded={(key) => setSlide(i, 'imageKey', key)} />
+                    <ImageUploadButton label={t('settings.homeContentForm.slider.uploadBg')} onUploaded={(key) => setSlide(i, 'imageKey', key)} />
                   </div>
                   <div>
-                    <label htmlFor={`home-slider-href-${i}`} className={labelCls}>Ссылка</label>
+                    <label htmlFor={`home-slider-href-${i}`} className={labelCls}>{t('settings.homeContentForm.linkLabel')}</label>
                     <input id={`home-slider-href-${i}`} value={sl.href}
                       onChange={(e) => setSlide(i, 'href', e.target.value)}
                       placeholder="/search?q=caviar" className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-slider-name-${i}`} className={labelCls}>Название (необязательно)</label>
+                    <label htmlFor={`home-slider-name-${i}`} className={labelCls}>{t('settings.homeContentForm.slider.nameLabel')}</label>
                     <input id={`home-slider-name-${i}`} value={sl.name}
                       onChange={(e) => setSlide(i, 'name', e.target.value)}
                       placeholder="" className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-slider-caption-${i}`} className={labelCls}>Подпись (необязательно)</label>
+                    <label htmlFor={`home-slider-caption-${i}`} className={labelCls}>{t('settings.homeContentForm.slider.captionLabel')}</label>
                     <input id={`home-slider-caption-${i}`} value={sl.caption}
                       onChange={(e) => setSlide(i, 'caption', e.target.value)}
-                      placeholder="Всем по икре" className={inputCls} />
+                      placeholder={t('settings.homeContentForm.slider.captionPlaceholder')} className={inputCls} />
                   </div>
                 </div>
               </div>
@@ -813,11 +813,10 @@ export function HomeContentForm({
           <div>
             <button type="button" onClick={addSlide}
               className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-              + Добавить слайд
+              {t('settings.homeContentForm.slider.addSlide')}
             </button>
             <p className={hintCls}>
-              Каждый слайд — фон и ссылка (путь от «/» или https://…), плюс необязательные название и подпись.
-              Слайды без фона или ссылки не сохраняются.
+              {t('settings.homeContentForm.slider.hint')}
             </p>
           </div>
         </div>
@@ -825,7 +824,7 @@ export function HomeContentForm({
 
       {/* Корпоративным / сертификаты (M5) */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Блок «Корпоративным / сертификаты»</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.homeContentForm.corpCert.legend')}</legend>
         <div className="grid grid-cols-1 gap-4">
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -834,38 +833,38 @@ export function HomeContentForm({
               onChange={(e) => setCorpCertEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
-            Показывать блок «Корпоративным / сертификаты» на главной
+            {t('settings.homeContentForm.corpCert.showToggle')}
           </label>
 
           <div className="grid grid-cols-1 gap-4">
-            {corpCertTiles.map((t, i) => (
+            {corpCertTiles.map((tile, i) => (
               <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-600">Плитка {i + 1}</span>
+                  <span className="text-xs font-semibold text-gray-600">{t('settings.homeContentForm.tileN', { n: i + 1 })}</span>
                   <button type="button" onClick={() => removeCorpCertTile(i)}
                     className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                    Удалить
+                    {t('common.actions.delete')}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label htmlFor={`home-corpcert-title-${i}`} className={labelCls}>Заголовок</label>
-                    <input id={`home-corpcert-title-${i}`} value={t.title}
+                    <label htmlFor={`home-corpcert-title-${i}`} className={labelCls}>{t('fields.title')}</label>
+                    <input id={`home-corpcert-title-${i}`} value={tile.title}
                       onChange={(e) => setCorpCertTile(i, 'title', e.target.value)}
-                      placeholder="Корпоративным клиентам" className={inputCls} />
+                      placeholder={t('settings.homeContentForm.corpCert.titlePlaceholder')} className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-corpcert-href-${i}`} className={labelCls}>Ссылка</label>
-                    <input id={`home-corpcert-href-${i}`} value={t.href}
+                    <label htmlFor={`home-corpcert-href-${i}`} className={labelCls}>{t('settings.homeContentForm.linkLabel')}</label>
+                    <input id={`home-corpcert-href-${i}`} value={tile.href}
                       onChange={(e) => setCorpCertTile(i, 'href', e.target.value)}
                       placeholder="/corporate" className={inputCls} />
                   </div>
                   <div>
-                    <label htmlFor={`home-corpcert-img-${i}`} className={labelCls}>Фото</label>
-                    <input id={`home-corpcert-img-${i}`} value={t.imageKey}
+                    <label htmlFor={`home-corpcert-img-${i}`} className={labelCls}>{t('settings.homeContentForm.photoLabel')}</label>
+                    <input id={`home-corpcert-img-${i}`} value={tile.imageKey}
                       onChange={(e) => setCorpCertTile(i, 'imageKey', e.target.value)}
                       placeholder="home/corpcert/1.webp" className={inputCls} />
-                    <ImageUploadButton label="Загрузить фото плитки" onUploaded={(key) => setCorpCertTile(i, 'imageKey', key)} />
+                    <ImageUploadButton label={t('settings.homeContentForm.uploadTilePhoto')} onUploaded={(key) => setCorpCertTile(i, 'imageKey', key)} />
                   </div>
                 </div>
               </div>
@@ -875,10 +874,10 @@ export function HomeContentForm({
           <div>
             <button type="button" onClick={addCorpCertTile}
               className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-              + Добавить плитку
+              {t('settings.homeContentForm.addTile')}
             </button>
             <p className={hintCls}>
-              Каждая плитка — фото, заголовок и ссылка (путь от «/» или https://…). Неполные плитки не сохраняются.
+              {t('settings.homeContentForm.corpCert.hint')}
             </p>
           </div>
         </div>
@@ -887,7 +886,7 @@ export function HomeContentForm({
       <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить контент главной'}
+          {pending ? t('common.form.saving') : t('settings.homeContentForm.saveButton')}
         </button>
       </div>
     </div>

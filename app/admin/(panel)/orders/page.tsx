@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { sql } from '@/lib/db/client';
 import { can } from '@/lib/auth/rbac';
@@ -169,10 +170,11 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations();
   const guard = await guardOrders('orders.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="orders (модуль выключен)" />;
+      return <Forbidden permission={t('orders.page.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -192,9 +194,9 @@ export default async function OrdersPage({
   return (
     <div>
       <PageHeader
-        title="Заказы"
-        subtitle={`Найдено заказов: ${total}. Суммы в ${currency}.`}
-        breadcrumbs={[{ label: 'Заказы' }]}
+        title={t('nav.orders')}
+        subtitle={t('orders.page.subtitle', { total, currency })}
+        breadcrumbs={[{ label: t('nav.orders') }]}
         action={
           <>
             {canWrite ? (
@@ -202,14 +204,14 @@ export default async function OrdersPage({
                 href="/admin/orders/new"
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
-                Создать заказ
+                {t('orders.page.createOrder')}
               </Link>
             ) : null}
             <Link
               href="/admin/promo"
               className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
-              Промокоды
+              {t('nav.promo')}
             </Link>
           </>
         }
@@ -223,14 +225,14 @@ export default async function OrdersPage({
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Номер</th>
-              <th scope="col" className="px-4 py-2 font-medium">Дата</th>
-              <th scope="col" className="px-4 py-2 font-medium">Покупатель</th>
-              <th scope="col" className="px-4 py-2 font-medium">Сумма</th>
-              <th scope="col" className="px-4 py-2 font-medium">Статус</th>
-              <th scope="col" className="px-4 py-2 font-medium">Оплата</th>
-              <th scope="col" className="px-4 py-2 font-medium">Доставка</th>
-              <th scope="col" className="px-4 py-2 font-medium">Способ</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.number')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.date')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.customer')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.total')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.status')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.payment')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.delivery')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('orders.page.columns.method')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -238,16 +240,16 @@ export default async function OrdersPage({
               <tr>
                 <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
                   {hasActiveOrderFilters(filter) ? (
-                    'По заданным фильтрам ничего не найдено. Сбросьте фильтры.'
+                    t('orders.page.emptyFiltered')
                   ) : (
                     <span>
-                      Заказов пока нет.{' '}
+                      {t('orders.page.emptyNoOrders')}{' '}
                       {canWrite ? (
                         <Link
                           href="/admin/orders/new"
                           className="font-medium text-blue-700 hover:underline"
                         >
-                          Создать заказ
+                          {t('orders.page.createOrder')}
                         </Link>
                       ) : null}
                     </span>
@@ -295,10 +297,10 @@ export default async function OrdersPage({
       {totalPages > 1 ? (
         <nav
           className="mt-4 flex items-center justify-between text-sm"
-          aria-label="Пагинация"
+          aria-label={t('orders.page.paginationAria')}
         >
           <span className="text-gray-500">
-            Страница {currentPage} из {totalPages}
+            {t('common.pagination.page', { page: currentPage, total: totalPages })}
           </span>
           <div className="flex gap-2">
             {currentPage > 1 ? (
@@ -306,7 +308,7 @@ export default async function OrdersPage({
                 href={pageHref(sp, currentPage - 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Назад
+                {t('common.pagination.prev')}
               </Link>
             ) : null}
             {currentPage < totalPages ? (
@@ -314,7 +316,7 @@ export default async function OrdersPage({
                 href={pageHref(sp, currentPage + 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Вперёд
+                {t('common.pagination.next')}
               </Link>
             ) : null}
           </div>

@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { getTranslations } from 'next-intl/server';
+
 import { sql } from '@/lib/db/client';
 import { getEnv } from '@/lib/config/env';
 import { formatPrice } from '@/lib/admin/format';
@@ -83,18 +85,19 @@ function limitText(total: number | null, perCustomer: number | null): string {
 }
 
 /** Текст срока действия. */
-function periodText(starts: Date | null, ends: Date | null): string {
-  if (!starts && !ends) return 'бессрочно';
+function periodText(starts: Date | null, ends: Date | null, unlimitedLabel: string): string {
+  if (!starts && !ends) return unlimitedLabel;
   const from = starts ? formatDateTime(starts) : '…';
   const to = ends ? formatDateTime(ends) : '…';
   return `${from} — ${to}`;
 }
 
 export default async function PromoPage() {
+  const t = await getTranslations();
   const guard = await guardOrders('orders.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="orders (модуль выключен)" />;
+      return <Forbidden permission={t('promo.page.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -106,22 +109,22 @@ export default async function PromoPage() {
   return (
     <div>
       <PageHeader
-        title="Промокоды"
-        subtitle={`Всего промокодов: ${promos.length}.`}
-        breadcrumbs={[{ label: 'Промокоды' }]}
+        title={t('nav.promo')}
+        subtitle={t('promo.page.subtitle', { count: promos.length })}
+        breadcrumbs={[{ label: t('nav.promo') }]}
         action={
           <>
             <Link
               href="/admin/orders"
               className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
-              К заказам
+              {t('promo.page.backToOrders')}
             </Link>
             <Link
               href="/admin/promo/new"
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
             >
-              + Создать промокод
+              {t('promo.page.createButton')}
             </Link>
           </>
         }
@@ -131,25 +134,25 @@ export default async function PromoPage() {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Код</th>
-              <th scope="col" className="px-4 py-2 font-medium">Тип</th>
-              <th scope="col" className="px-4 py-2 font-medium">Значение</th>
-              <th scope="col" className="px-4 py-2 font-medium">Scope</th>
-              <th scope="col" className="px-4 py-2 font-medium">Приоритет</th>
-              <th scope="col" className="px-4 py-2 font-medium">Мин. сумма</th>
-              <th scope="col" className="px-4 py-2 font-medium">Мин. кол-во</th>
-              <th scope="col" className="px-4 py-2 font-medium">Лимит (всего/на чел.)</th>
-              <th scope="col" className="px-4 py-2 font-medium">Использован</th>
-              <th scope="col" className="px-4 py-2 font-medium">Срок</th>
-              <th scope="col" className="px-4 py-2 font-medium">Активность</th>
-              <th scope="col" className="px-4 py-2 font-medium">Действия</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colCode')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colKind')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colValue')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colScope')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colPriority')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colMinTotal')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colMinQty')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colLimit')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colUsed')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colPeriod')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('promo.page.colActive')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('common.table.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {promos.length === 0 ? (
               <tr>
                 <td colSpan={12} className="px-4 py-6 text-center text-gray-400">
-                  Промокодов пока нет. Создайте первый.
+                  {t('promo.page.empty')}
                 </td>
               </tr>
             ) : (
@@ -173,11 +176,11 @@ export default async function PromoPage() {
                     {formatScopeWithTargets(p.applyScope, labelsByPromo.get(p.id) ?? [])}
                     {p.stackable ? (
                       <span className="ml-1 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                        суммируемая
+                        {t('promo.page.stackableBadge')}
                       </span>
                     ) : (
                       <span className="ml-1 inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                        эксклюзивная
+                        {t('promo.page.exclusiveBadge')}
                       </span>
                     )}
                   </td>
@@ -191,16 +194,16 @@ export default async function PromoPage() {
                   </td>
                   <td className="px-4 py-2 text-gray-700">{p.usedCount}</td>
                   <td className="px-4 py-2 text-xs text-gray-500">
-                    {periodText(p.startsAt, p.endsAt)}
+                    {periodText(p.startsAt, p.endsAt, t('promo.page.unlimited'))}
                   </td>
                   <td className="px-4 py-2">
                     {p.isActive ? (
                       <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                        Активен
+                        {t('common.states.active')}
                       </span>
                     ) : (
                       <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                        Выключен
+                        {t('common.states.disabled')}
                       </span>
                     )}
                   </td>

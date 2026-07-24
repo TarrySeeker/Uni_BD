@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import {
   PROMO_KINDS,
   PROMO_APPLY_SCOPES,
@@ -77,13 +79,6 @@ function rowToTargetPayload(r: TargetRow): Record<string, unknown> {
   return base;
 }
 
-const TARGET_TYPE_LABEL: Record<PromoTargetType, string> = {
-  category: 'Категория',
-  brand: 'Бренд',
-  product: 'Товар',
-  variant: 'Вариант',
-};
-
 /** Списки сущностей для выбора таргета по названию (вместо ввода UUID). */
 export type PromoPickerData = Partial<
   Record<PromoTargetType, { id: string; name: string }[]>
@@ -99,7 +94,15 @@ export function PromoForm({
   pickerData?: PromoPickerData;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const isEdit = promo !== null;
+
+  const targetTypeLabel: Record<PromoTargetType, string> = {
+    category: t('promo.promoForm.targetType.category'),
+    brand: t('promo.promoForm.targetType.brand'),
+    product: t('promo.promoForm.targetType.product'),
+    variant: t('promo.promoForm.targetType.variant'),
+  };
 
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -214,7 +217,7 @@ export function PromoForm({
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Изменения сохранены.');
+        setSuccess(t('promo.promoForm.savedChanges'));
         router.refresh();
       } else {
         router.push('/admin/promo');
@@ -247,14 +250,14 @@ export function PromoForm({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="p-code" className="block text-sm font-medium text-gray-700">Код*</label>
+          <label htmlFor="p-code" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.codeLabel')}</label>
           <input id="p-code" value={code} onChange={(e) => setCode(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" required />
           {fe('code') ? <p className="mt-1 text-xs text-red-600">{fe('code')}</p> : null}
         </div>
 
         <div>
-          <label htmlFor="p-kind" className="block text-sm font-medium text-gray-700">Тип*</label>
+          <label htmlFor="p-kind" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.kindLabel')}</label>
           <select id="p-kind" value={kind} onChange={(e) => setKind(e.target.value as PromoCode['kind'])}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm">
             {PROMO_KINDS.map((k) => (
@@ -266,7 +269,7 @@ export function PromoForm({
 
         <div>
           <label htmlFor="p-value" className="block text-sm font-medium text-gray-700">
-            Значение {showPercentHint ? '(проценты 0..100)' : kind === 'fixed' ? '(сумма)' : ''}
+            {t('promo.promoForm.valueLabel')} {showPercentHint ? t('promo.promoForm.valueHintPercent') : kind === 'fixed' ? t('promo.promoForm.valueHintFixed') : ''}
           </label>
           <input id="p-value" value={value} onChange={(e) => setValue(e.target.value)}
             inputMode="decimal" disabled={kind === 'free_delivery'}
@@ -275,33 +278,33 @@ export function PromoForm({
         </div>
 
         <div>
-          <label htmlFor="p-min" className="block text-sm font-medium text-gray-700">Мин. сумма заказа</label>
+          <label htmlFor="p-min" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.minOrderTotalLabel')}</label>
           <input id="p-min" value={minOrderTotal} onChange={(e) => setMinOrderTotal(e.target.value)}
             inputMode="decimal"
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('minOrderTotal') ? <p className="mt-1 text-xs text-red-600">{fe('minOrderTotal')}</p> : null}
           <p className="mt-1 text-xs text-gray-500">
-            Минимальная сумма заказа для срабатывания акции. Пусто — без порога.
+            {t('promo.promoForm.minOrderTotalHelp')}
           </p>
         </div>
 
         <div>
-          <label htmlFor="p-maxdisc" className="block text-sm font-medium text-gray-700">Потолок скидки (для percent)</label>
+          <label htmlFor="p-maxdisc" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.maxDiscountLabel')}</label>
           <input id="p-maxdisc" value={maxDiscount} onChange={(e) => setMaxDiscount(e.target.value)}
-            inputMode="decimal" placeholder="без потолка"
+            inputMode="decimal" placeholder={t('promo.promoForm.maxDiscountPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('maxDiscount') ? <p className="mt-1 text-xs text-red-600">{fe('maxDiscount')}</p> : null}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="p-usage" className="block text-sm font-medium text-gray-700">Лимит всего</label>
+            <label htmlFor="p-usage" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.usageLimitLabel')}</label>
             <input id="p-usage" value={usageLimit} onChange={(e) => setUsageLimit(e.target.value)}
               inputMode="numeric" placeholder="∞"
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label htmlFor="p-percust" className="block text-sm font-medium text-gray-700">На покупателя</label>
+            <label htmlFor="p-percust" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.perCustomerLimitLabel')}</label>
             <input id="p-percust" value={perCustomerLimit} onChange={(e) => setPerCustomerLimit(e.target.value)}
               inputMode="numeric" placeholder="∞"
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
@@ -309,12 +312,12 @@ export function PromoForm({
         </div>
 
         <div>
-          <label htmlFor="p-starts" className="block text-sm font-medium text-gray-700">Начало</label>
+          <label htmlFor="p-starts" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.startsAtLabel')}</label>
           <input id="p-starts" type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label htmlFor="p-ends" className="block text-sm font-medium text-gray-700">Окончание</label>
+          <label htmlFor="p-ends" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.endsAtLabel')}</label>
           <input id="p-ends" type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('endsAt') ? <p className="mt-1 text-xs text-red-600">{fe('endsAt')}</p> : null}
@@ -323,29 +326,29 @@ export function PromoForm({
         {showBogo ? (
           <div className="grid grid-cols-2 gap-3 sm:col-span-2">
             <div>
-              <label htmlFor="p-bogo-buy" className="block text-sm font-medium text-gray-700">Купи N</label>
+              <label htmlFor="p-bogo-buy" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.bogoBuyLabel')}</label>
               <input id="p-bogo-buy" value={bogoBuyQty} onChange={(e) => setBogoBuyQty(e.target.value)}
                 inputMode="numeric"
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
               {fe('bogoBuyQty') ? <p className="mt-1 text-xs text-red-600">{fe('bogoBuyQty')}</p> : null}
             </div>
             <div>
-              <label htmlFor="p-bogo-pay" className="block text-sm font-medium text-gray-700">Плати за M</label>
+              <label htmlFor="p-bogo-pay" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.bogoPayLabel')}</label>
               <input id="p-bogo-pay" value={bogoPayQty} onChange={(e) => setBogoPayQty(e.target.value)}
                 inputMode="numeric"
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
               {fe('bogoPayQty') ? <p className="mt-1 text-xs text-red-600">{fe('bogoPayQty')}</p> : null}
             </div>
             <p className="text-xs text-gray-500 sm:col-span-2">
-              Например «3 по 2»: купи N=3, плати за M=2 → 1 самая дешёвая бесплатно.
+              {t('promo.promoForm.bogoHelp')}
             </p>
           </div>
         ) : null}
 
         {/* ---- N×M: scope / приоритет / комбинируемость / minQty ---- */}
         <fieldset className="rounded border border-gray-200 p-3 sm:col-span-2">
-          <legend className="px-1 text-sm font-medium text-gray-700">Область применения</legend>
-          <div role="radiogroup" aria-label="Область применения" className="flex flex-wrap gap-4">
+          <legend className="px-1 text-sm font-medium text-gray-700">{t('promo.promoForm.applyScopeLegend')}</legend>
+          <div role="radiogroup" aria-label={t('promo.promoForm.applyScopeLegend')} className="flex flex-wrap gap-4">
             {PROMO_APPLY_SCOPES.map((s) => (
               <label key={s} className="flex items-center gap-2 text-sm text-gray-700">
                 <input
@@ -363,18 +366,17 @@ export function PromoForm({
 
           {showTargets ? (
             <div className="mt-3">
-              <p className="text-sm font-medium text-gray-700">Таргеты акции</p>
+              <p className="text-sm font-medium text-gray-700">{t('promo.promoForm.targetsTitle')}</p>
               <p className="mb-2 text-xs text-gray-500">
-                Выберите, к чему применяется акция: тип (категория / бренд / товар) и саму
-                сущность из списка.
+                {t('promo.promoForm.targetsHelp')}
               </p>
               {targetRows.length === 0 ? (
-                <p className="text-xs text-gray-400">Таргетов нет — добавьте хотя бы один.</p>
+                <p className="text-xs text-gray-400">{t('promo.promoForm.targetsEmpty')}</p>
               ) : null}
               <ul className="space-y-2">
                 {targetRows.map((row, i) => (
                   <li key={i} className="flex flex-wrap items-center gap-2">
-                    <label className="sr-only" htmlFor={`tgt-type-${i}`}>Тип таргета {i + 1}</label>
+                    <label className="sr-only" htmlFor={`tgt-type-${i}`}>{t('promo.promoForm.targetTypeSrLabel', { n: i + 1 })}</label>
                     <select
                       id={`tgt-type-${i}`}
                       value={row.targetType}
@@ -382,10 +384,10 @@ export function PromoForm({
                       className="rounded border border-gray-300 px-2 py-1.5 text-sm"
                     >
                       {allowedTargetTypes.map((tt) => (
-                        <option key={tt} value={tt}>{TARGET_TYPE_LABEL[tt]}</option>
+                        <option key={tt} value={tt}>{targetTypeLabel[tt]}</option>
                       ))}
                     </select>
-                    <label className="sr-only" htmlFor={`tgt-id-${i}`}>Сущность таргета {i + 1}</label>
+                    <label className="sr-only" htmlFor={`tgt-id-${i}`}>{t('promo.promoForm.targetEntitySrLabel', { n: i + 1 })}</label>
                     {pickerData[row.targetType] ? (
                       <select
                         id={`tgt-id-${i}`}
@@ -393,7 +395,7 @@ export function PromoForm({
                         onChange={(e) => updateTargetRow(i, { id: e.target.value })}
                         className="min-w-[18rem] flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm"
                       >
-                        <option value="">— выберите —</option>
+                        <option value="">{t('promo.promoForm.selectOption')}</option>
                         {pickerData[row.targetType]!.map((o) => (
                           <option key={o.id} value={o.id}>
                             {o.name}
@@ -405,7 +407,7 @@ export function PromoForm({
                         id={`tgt-id-${i}`}
                         value={row.id}
                         onChange={(e) => updateTargetRow(i, { id: e.target.value })}
-                        placeholder="идентификатор"
+                        placeholder={t('promo.promoForm.identifierPlaceholder')}
                         className="min-w-[18rem] flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm"
                       />
                     )}
@@ -413,9 +415,9 @@ export function PromoForm({
                       type="button"
                       onClick={() => removeTargetRow(i)}
                       className="text-sm text-red-600 hover:underline"
-                      aria-label={`Удалить таргет ${i + 1}`}
+                      aria-label={t('promo.promoForm.removeTargetAria', { n: i + 1 })}
                     >
-                      Удалить
+                      {t('common.actions.delete')}
                     </button>
                   </li>
                 ))}
@@ -425,7 +427,7 @@ export function PromoForm({
                 onClick={addTargetRow}
                 className="mt-2 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
               >
-                + Добавить таргет
+                {t('promo.promoForm.addTarget')}
               </button>
               {fe('targets') ? <p className="mt-1 text-xs text-red-600">{fe('targets')}</p> : null}
             </div>
@@ -434,7 +436,7 @@ export function PromoForm({
 
         <div>
           <label htmlFor="p-priority" className="block text-sm font-medium text-gray-700">
-            Очерёдность применения (меньше — раньше)
+            {t('promo.promoForm.priorityLabel')}
           </label>
           <input id="p-priority" value={priority} onChange={(e) => setPriority(e.target.value)}
             inputMode="numeric"
@@ -444,35 +446,33 @@ export function PromoForm({
 
         <div>
           <label htmlFor="p-minqty" className="block text-sm font-medium text-gray-700">
-            Мин. количество единиц
+            {t('promo.promoForm.minQtyLabel')}
           </label>
           <input id="p-minqty" value={minQty} onChange={(e) => setMinQty(e.target.value)}
-            inputMode="numeric" placeholder="без порога"
+            inputMode="numeric" placeholder={t('promo.promoForm.minQtyPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('minQty') ? <p className="mt-1 text-xs text-red-600">{fe('minQty')}</p> : null}
           <p className="mt-1 text-xs text-gray-500">
-            Скидка применится, только если в корзине набрано не меньше указанного числа
-            единиц товаров из «Области применения». Оставьте пусто — без ограничения по
-            количеству.
+            {t('promo.promoForm.minQtyHelp')}
           </p>
         </div>
 
         {SHOW_GIFT_BLOCK ? (
           <fieldset className="rounded border border-gray-200 p-3 sm:col-span-2">
-            <legend className="px-1 text-sm font-medium text-gray-700">Подарок (задел)</legend>
+            <legend className="px-1 text-sm font-medium text-gray-700">{t('promo.promoForm.giftLegend')}</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <label htmlFor="p-gift-prod" className="block text-sm text-gray-700">Товар-подарок (UUID)</label>
+                <label htmlFor="p-gift-prod" className="block text-sm text-gray-700">{t('promo.promoForm.giftProductLabel')}</label>
                 <input id="p-gift-prod" value={giftProductId} onChange={(e) => setGiftProductId(e.target.value)}
                   className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
               </div>
               <div>
-                <label htmlFor="p-gift-var" className="block text-sm text-gray-700">Вариант-подарок (UUID)</label>
+                <label htmlFor="p-gift-var" className="block text-sm text-gray-700">{t('promo.promoForm.giftVariantLabel')}</label>
                 <input id="p-gift-var" value={giftVariantId} onChange={(e) => setGiftVariantId(e.target.value)}
                   className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
               </div>
               <div>
-                <label htmlFor="p-gift-qty" className="block text-sm text-gray-700">Кол-во</label>
+                <label htmlFor="p-gift-qty" className="block text-sm text-gray-700">{t('promo.promoForm.giftQtyLabel')}</label>
                 <input id="p-gift-qty" value={giftQty} onChange={(e) => setGiftQty(e.target.value)}
                   inputMode="numeric"
                   className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
@@ -482,30 +482,30 @@ export function PromoForm({
         ) : null}
 
         <div className="sm:col-span-2">
-          <label htmlFor="p-comment" className="block text-sm font-medium text-gray-700">Комментарий</label>
+          <label htmlFor="p-comment" className="block text-sm font-medium text-gray-700">{t('promo.promoForm.commentLabel')}</label>
           <textarea id="p-comment" value={comment} onChange={(e) => setComment(e.target.value)} rows={2}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
 
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          Активен
+          {t('common.states.active')}
         </label>
 
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={stackable} onChange={(e) => setStackable(e.target.checked)} />
-          Суммируемая (комбинируется с другими)
+          {t('promo.promoForm.stackableLabel')}
         </label>
       </div>
 
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать промокод'}
+          {pending ? t('common.form.saving') : isEdit ? t('common.actions.save') : t('promo.promoForm.createButton')}
         </button>
         <button type="button" onClick={() => router.push('/admin/promo')}
           className="text-sm text-gray-600 hover:underline">
-          Отмена
+          {t('common.actions.cancel')}
         </button>
       </div>
     </div>

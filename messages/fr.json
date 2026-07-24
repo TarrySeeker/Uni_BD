@@ -617,5 +617,1233 @@
     "badges": {
       "featured": "Top"
     }
+  },
+  "settings": {
+    "homeContentForm": {
+      "savedToast": "Contenu de la page d'accueil enregistré.",
+      "intro": "Contenu de la page d'accueil de la boutique. Un champ vide rétablit la valeur par défaut. Dans les listes — un élément par ligne.",
+      "saveButton": "Enregistrer le contenu de l'accueil",
+      "photoLabel": "Photo",
+      "linkLabel": "Lien",
+      "blockTitleOptional": "Titre du bloc (facultatif)",
+      "tileN": "Tuile {n}",
+      "uploadTilePhoto": "Téléverser la photo de la tuile",
+      "addTile": "+ Ajouter une tuile",
+      "hero": {
+        "legend": "Couverture (hero)",
+        "ctaLabel": "Texte du bouton",
+        "ctaPlaceholder": "Voir la collection",
+        "hrefLabel": "Lien du bouton",
+        "titleLabel": "Titre (facultatif)",
+        "subtitleLabel": "Sous-titre (facultatif)",
+        "imageLabel": "Arrière-plan de la couverture",
+        "uploadBg": "Téléverser l'arrière-plan de la couverture",
+        "imageHint": "Téléversez un fichier ou indiquez l'adresse d'un fichier déjà téléversé. Vide — arrière-plan par défaut de la boutique."
+      },
+      "about": {
+        "legend": "Bloc « À propos de la marque »",
+        "titlePlaceholder": "À propos de la marque",
+        "paragraphsLabel": "Paragraphes (un par ligne)",
+        "valuesLabel": "Valeurs / tags (un par ligne)",
+        "imagesLabel": "Photos de la galerie « À propos de la marque » (une adresse par ligne)",
+        "uploadPhoto": "Téléverser une photo"
+      },
+      "quality": {
+        "legend": "Bloc « Qualité du tissu »",
+        "titlePlaceholder": "Qualité du tissu",
+        "itemsLabel": "Éléments (un par ligne)"
+      },
+      "delivery": {
+        "legend": "Bloc « Livraison et paiement »",
+        "itemsLabel": "Éléments : « Titre | Description » (un par ligne)",
+        "itemsPlaceholder": "CDEK | Livraison dans toute la Russie…\nDélais | Moscou — 1 à 2 jours…",
+        "hint": "Par exemple : <code>CDEK | Livraison dans toute la Russie. Points de retrait et coursier.</code>"
+      },
+      "valuesStrip": {
+        "legend": "Bandeau de valeurs",
+        "showToggle": "Afficher le bandeau sur l'accueil",
+        "itemsPlaceholder": "Forme | Silhouettes structurées…\nFonction | Coupe réfléchie…",
+        "hint": "Le bandeau ne s'affiche que si la case ci-dessus est cochée. Vide — éléments par défaut."
+      },
+      "philosophy": {
+        "legend": "Bloc « Philosophie »",
+        "eyebrowLabel": "Surtitre",
+        "eyebrowPlaceholder": "Philosophie",
+        "titlePlaceholder": "Par exemple : qualité, soin, style",
+        "textLabel": "Paragraphe",
+        "linkTextLabel": "Texte du lien",
+        "linkHrefLabel": "Adresse du lien"
+      },
+      "looks": {
+        "legend": "Bloc « Looks »",
+        "showToggle": "Afficher « Looks » sur l'accueil",
+        "titlePlaceholder": "Looks",
+        "categoryN": "Catégorie {n}",
+        "catTitlePlaceholder": "Nom du look",
+        "catTextLabel": "Texte",
+        "uploadPhoto": "Téléverser la photo du look",
+        "addCategory": "+ Ajouter une catégorie",
+        "hint": "Chaque catégorie — photo, titre et texte. Les catégories incomplètes ne sont pas enregistrées."
+      },
+      "tiles": {
+        "legend": "Bloc « Tuiles de catégories »",
+        "showToggle": "Afficher « Tuiles de catégories » sur l'accueil",
+        "titlePlaceholder": "Nom de la catégorie",
+        "hint": "Chaque tuile — photo, titre et lien. Les tuiles incomplètes ne sont pas enregistrées."
+      },
+      "video": {
+        "legend": "Bloc « Vidéo »",
+        "showToggle": "Afficher « Vidéo » sur l'accueil",
+        "embedLabel": "Lien de la vidéo (embed)",
+        "hint": "Uniquement une adresse de la forme <code>https://…</code> (lien embed Vimeo/YouTube). Vide — la vidéo n'est pas affichée."
+      },
+      "designers": {
+        "legend": "Bloc « Designers »",
+        "showToggle": "Afficher « Designers » sur l'accueil",
+        "titlePlaceholder": "Designers",
+        "designerN": "Designer {n}",
+        "namePlaceholder": "Nom du designer",
+        "avatarLabel": "Avatar",
+        "uploadAvatar": "Téléverser l'avatar",
+        "workLabel": "Photo de l'œuvre",
+        "uploadWork": "Téléverser la photo de l'œuvre",
+        "avatarTopLabel": "Position de l'avatar (0–100)",
+        "workTopLabel": "Position de l'œuvre (0–100)",
+        "addDesigner": "+ Ajouter un designer",
+        "hint": "Chaque entrée — nom, lien et deux photos (avatar et œuvre). Positions des photos (0–100) — verticales, vide — centrées. Les entrées incomplètes ne sont pas enregistrées."
+      },
+      "slider": {
+        "legend": "Bloc « Slider promo »",
+        "showToggle": "Afficher « Slider promo » sur l'accueil",
+        "slideN": "Diapositive {n}",
+        "imageLabel": "Arrière-plan de la diapositive",
+        "uploadBg": "Téléverser l'arrière-plan de la diapositive",
+        "nameLabel": "Nom (facultatif)",
+        "captionLabel": "Légende (facultatif)",
+        "captionPlaceholder": "Du caviar pour tous",
+        "addSlide": "+ Ajouter une diapositive",
+        "hint": "Chaque diapositive — arrière-plan et lien (un chemin commençant par « / » ou https://…), plus un nom et une légende facultatifs. Les diapositives sans arrière-plan ni lien ne sont pas enregistrées."
+      },
+      "corpCert": {
+        "legend": "Bloc « Clients pro / certificats »",
+        "showToggle": "Afficher le bloc « Clients pro / certificats » sur l'accueil",
+        "titlePlaceholder": "Clients professionnels",
+        "hint": "Chaque tuile — photo, titre et lien (un chemin commençant par « / » ou https://…). Les tuiles incomplètes ne sont pas enregistrées."
+      }
+    },
+    "brandingForm": {
+      "uploading": "Téléversement…",
+      "uploadFileDefault": "Téléverser un fichier",
+      "uploadDone": "✓ fichier téléversé, l'adresse a été insérée dans le champ",
+      "saved": "Image de marque enregistrée.",
+      "shopName": "Nom de la boutique",
+      "logo": "Logo",
+      "urlOrUploadPlaceholder": "https://… ou téléversez un fichier",
+      "uploadLogo": "Téléverser le logo",
+      "favicon": "Favicon",
+      "uploadFavicon": "Téléverser le favicon",
+      "theme": "Thème",
+      "themeSystem": "Système",
+      "themeLight": "Clair",
+      "themeDark": "Sombre",
+      "primaryColor": "Couleur principale (HEX)",
+      "accentColor": "Couleur d'accent (HEX)",
+      "supportEmail": "E-mail d'assistance",
+      "supportPhone": "Téléphone d'assistance",
+      "saveButton": "Enregistrer l'image de marque"
+    },
+    "navigationForm": {
+      "saved": "Navigation enregistrée.",
+      "intro": "Le menu d'en-tête et les colonnes de pied de page de la vitrine. Vide — la vitrine affiche sa navigation par défaut. L'adresse d'un lien est un chemin depuis « / » (par exemple <code>/catalog</code>) ou une URL complète / <code>mailto:</code> / <code>tel:</code>.",
+      "headerLegend": "Menu d'en-tête",
+      "headerItemsLabel": "Éléments : « Libellé | Lien » (un par ligne)",
+      "headerPlaceholder": "Catalogue | /catalog\nLivraison | /#delivery\nContacts | /contacts",
+      "headerHint": "Par exemple : <code>Catalogue | /catalog</code>",
+      "footerLegend": "Colonnes du pied de page",
+      "footerColumnsLabel": "Les colonnes sont séparées par une ligne vide. La première ligne d'une colonne est son titre, puis « Libellé | Lien »",
+      "footerPlaceholder": "Boutique\nCatalogue | /catalog\nLivraison | /#delivery\n\nContact\nE-mail | mailto:info@example.com",
+      "footerHint": "Chaque bloc jusqu'à une ligne vide constitue une colonne de pied de page distincte.",
+      "saveButton": "Enregistrer la navigation",
+      "resetButton": "Réinitialiser la navigation"
+    },
+    "seoSettingsForm": {
+      "saved": "Paramètres SEO enregistrés.",
+      "siteName": "Nom du site",
+      "siteUrl": "Domaine du site (site_url)",
+      "titleTemplate": "Modèle de titre des pages",
+      "titleTemplatePlaceholder": "%s — Ma boutique",
+      "titleTemplateHint": "<code>%s</code> est remplacé par le nom de la page. Exemple : <code>%s — Ma boutique</code> → « Veste — Ma boutique ».",
+      "twitterSite": "Twitter @site",
+      "defaultDescription": "Description par défaut",
+      "defaultOgImage": "Image par défaut pour les réseaux sociaux (chemin du fichier)",
+      "defaultOgImagePlaceholder": "defaults/og.webp ou téléversez un fichier",
+      "uploadImage": "Téléverser l'image",
+      "robotsExtra": "Règles supplémentaires pour les robots d'indexation (pour spécialistes, facultatif)",
+      "noindexSite": "Masquer tout le site de l'indexation (noindex pour la préproduction)",
+      "saveButton": "Enregistrer le SEO"
+    },
+    "languagesPage": {
+      "subtitle": "Quelles langues sont disponibles dans la boutique et dans quelle mesure les traductions sont complètes.",
+      "backToSettings": "Retour aux paramètres",
+      "shopLanguagesHeading": "Langues de la boutique",
+      "resetLanguages": "Réinitialiser les langues",
+      "coverageHeading": "Couverture des traductions",
+      "coverageIntro": "La proportion de champs traduisibles remplis pour chaque langue. Un champ vide n'est pas une erreur : le site affiche à la place le texte dans la langue par défaut ({defaultLocale}).",
+      "coverageNoSecondary": "Aucune langue supplémentaire — rien à traduire.",
+      "coverageNoData": "Pas encore de données à calculer.",
+      "colSection": "Section",
+      "colRecords": "Enregistrements",
+      "notTranslated": "non traduit : {missing}"
+    },
+    "modulesForm": {
+      "confirmTurnOff": "Désactiver les modules : {modules} ? Les sections d'administration et les fonctionnalités du site correspondantes deviendront indisponibles. Continuer ?",
+      "saved": "Ensemble des modules mis à jour.",
+      "warningCmsPublished": "Le module « Contenu » comporte des pages publiées. Elles ne sont pas supprimées — seulement masquées jusqu'à sa réactivation.",
+      "systemNote": "« Paramètres » est une section système toujours disponible (elle ne peut pas être désactivée).",
+      "defaultState": "par défaut : {state}",
+      "stateEnabled": "activé",
+      "stateDisabled": "désactivé",
+      "moduleStateAria": "État du module : {label}",
+      "optInherit": "Par défaut",
+      "optOn": "Activer",
+      "optOff": "Désactiver",
+      "saveButton": "Enregistrer l'ensemble des modules"
+    },
+    "accessForm": {
+      "saved": "Mode d'accès enregistré.",
+      "singleUserModeLabel": "Mode mono-utilisateur",
+      "singleUserModeHelp": "Masquer et bloquer les sections « Utilisateurs » et « Rôles ». Convient à une boutique avec un seul administrateur : les sections superflues ne gênent pas et la création accidentelle d'un deuxième compte ou rôle est exclue. Désactivé par défaut.",
+      "saveButton": "Enregistrer le mode d'accès"
+    },
+    "giftGiftSettingsForm": {
+      "savedSuccess": "Paramètres des chèques-cadeaux enregistrés.",
+      "autoIssueLabel": "Générer le code automatiquement au paiement",
+      "autoIssueHelp": "Lorsqu'un client paie une commande contenant un chèque-cadeau, le code est généré automatiquement : il apparaît dans la section « Chèques-cadeaux » et est présenté au client après la validation. Si cette option est désactivée, le code devra être émis manuellement depuis la fiche de commande.",
+      "validDaysLabel": "Durée de validité du code (jours)",
+      "validDaysPlaceholder": "Par exemple, 365",
+      "validDaysHelp": "Laissez le champ vide pour que le code n'expire jamais. Le délai court à partir du jour d'émission du code.",
+      "categoriesLabel": "Rubriques du catalogue contenant des chèques-cadeaux",
+      "categoriesHelp1": "Adresses des rubriques telles qu'elles apparaissent dans le lien du site (ce qui suit /catalog/). Séparez-les par des virgules ou des retours à la ligne. Lors de la validation de la commande, les produits de ces rubriques sont marqués dans la commande elle-même comme chèques-cadeaux, et le code est ensuite créé d'après ce marquage. Les commandes déjà passées ne sont pas modifiées : si vous renommez ou supprimez une rubrique, le code sera tout de même émis, car le marquage est conservé dans la commande.",
+      "categoriesHelp2": "Si vous laissez le champ vide, rien ne sera marqué par rubrique. Les codes seront tout de même créés pour les produits dont l'indicateur de chèque-cadeau est défini directement dans leur fiche. Le seul moyen de désactiver complètement l'émission des codes est la case « Générer le code automatiquement au paiement » ci-dessus.",
+      "allowIssueLabel": "Générer le code même si la commande est payée avec un autre chèque",
+      "allowIssueHelp": "Un client peut payer un nouveau chèque avec le solde d'un ancien, échangeant ainsi sa valeur. Désactivez cette option si votre boutique n'autorise pas ce type d'échange.",
+      "saveButton": "Enregistrer les paramètres des chèques"
+    },
+    "legalContactsForm": {
+      "savedSuccess": "Coordonnées juridiques et contacts enregistrés.",
+      "legalEntityHeading": "Coordonnées de l'entité juridique",
+      "innLabel": "NIF (10 ou 12 chiffres)",
+      "kppLabel": "Code de motif d'immatriculation (9 chiffres)",
+      "ogrnLabel": "Numéro d'immatriculation d'État (13 ou 15 chiffres)",
+      "legalAddressLabel": "Adresse du siège social",
+      "bankDetailsLabel": "Coordonnées bancaires",
+      "bankDetailsPrivate": "(privé, non publié)",
+      "offerDocKeyLabel": "Document d'offre (clé de stockage)",
+      "offerDocKeyPlaceholder": "p. ex. docs/offer.pdf",
+      "emailDesignersLabel": "E-mail pour les candidatures de créateurs",
+      "publicContactsHeading": "Contacts publics",
+      "phoneLabel": "Téléphone",
+      "addressLabel": "Adresse",
+      "workingHoursLabel": "Heures d'ouverture",
+      "socialsHeading": "Réseaux sociaux",
+      "socialsHelp": "Liens dans le pied de page de la boutique. Le type est le libellé (Instagram, Telegram…), l'adresse est le lien.",
+      "socialTypeAria": "Réseau social {n} — type",
+      "socialUrlAria": "Réseau social {n} — adresse",
+      "addSocial": "+ Ajouter un réseau social"
+    },
+    "catalogOrdersForm": {
+      "savedSuccess": "Paramètres enregistrés.",
+      "newProductDaysLabel": "« Nouveauté » d'un produit (jours)",
+      "freeThresholdLabel": "Seuil de livraison gratuite (₽)",
+      "freeThresholdPlaceholder": "0 = désactivé",
+      "freeThresholdHelp": "Montant de commande à partir duquel la livraison est gratuite. 0 — pas de livraison gratuite.",
+      "orderPrefixLabel": "Préfixe du numéro de commande",
+      "orderPrefixPlaceholder": "p. ex. GA",
+      "zonesHeading": "Zones de livraison",
+      "zonesHelp": "Prix de livraison pour la zone choisie par le client. Le seuil est facultatif : le montant de commande à partir duquel la livraison vers cette zone est gratuite.",
+      "addZone": "+ Ajouter une zone",
+      "zonesEmpty": "Aucune zone définie — le calcul de livraison standard est utilisé.",
+      "zoneLabelPlaceholder": "p. ex. À l'intérieur du périphérique",
+      "zonePriceLabel": "Prix (₽)",
+      "zoneFreeThresholdLabel": "Seuil ₽ (fac.)"
+    },
+    "currencyUnitsForm": {
+      "refreshSuccess": "Taux mis à jour depuis la Banque centrale de Russie. Les devises à taux manuel n'ont pas été modifiées.",
+      "saveSuccess": "Devise, taux et unités enregistrés.",
+      "baseCurrencyCode": "Code de la devise de base",
+      "baseCurrencyCodeHelp": "Devise de stockage et de paiement. Trois lettres latines : RUB — rouble, USD — dollar, EUR — euro.",
+      "symbol": "Symbole",
+      "numberFormat": "Format des nombres",
+      "numberFormatHelp": "Comment séparer les groupes de chiffres et la partie décimale. <code>ru-RU</code> — la convention utilisée en Russie.",
+      "fractionDigitsLabel": "Décimales",
+      "weightUnit": "Unité de poids",
+      "weightGrams": "grammes (g)",
+      "weightKilograms": "kilogrammes (kg)",
+      "dimensionUnit": "Unité de dimensions",
+      "dimCentimeters": "centimètres (cm)",
+      "dimMillimeters": "millimètres (mm)",
+      "additionalCurrenciesTitle": "Devises supplémentaires (affichage seul, au taux de change)",
+      "additionalCurrenciesHelp": "Les prix sont stockés et le paiement se fait dans la devise de base. Voici les devises du sélecteur de la vitrine. Le taux correspond au nombre d'unités de base pour 1 unité de cette devise (par ex. 100 → 1 € = 100 ₽ ; le prix affiché est prix ₽ / taux).",
+      "autoRateLabel": "Mettre à jour le taux automatiquement depuis la Banque centrale de Russie (sinon le taux saisi manuellement ci-dessous est utilisé)",
+      "rateUpdatedAt": "Taux mis à jour : {date}",
+      "currencyCodeAria": "Code de la devise",
+      "rateAria": "Taux",
+      "ratePlaceholder": "Taux (100)",
+      "fractionPlaceholder": "Décimales (2)",
+      "manualRateAria": "Taux de {code} défini manuellement",
+      "manualRateAriaFallback": "devise",
+      "manualRateLabel": "Taux défini manuellement — les mises à jour automatiques de la Banque centrale n'affectent pas cette devise",
+      "addCurrencyAria": "Devise à ajouter",
+      "addOption": "{code} — {label}",
+      "addCurrencyButton": "+ Ajouter une devise",
+      "refreshRatesButton": "Mettre à jour les taux depuis la Banque centrale maintenant",
+      "refreshRatesHelp": "Le bouton de mise à jour est utile juste après avoir décoché « taux défini manuellement » — le taux sera récupéré sans attendre la mise à jour nocturne."
+    },
+    "languagesForm": {
+      "saveSuccess": "Ensemble de langues enregistré.",
+      "storefrontNoticeTitle": "Note importante sur la vitrine.",
+      "storefrontNoticeBody": "Le site utilise actuellement sa propre liste de langues et ne lit pas encore cet ensemble : une langue désactivée ici ne disparaîtra pas de la vitrine — ses pages seront simplement affichées dans la langue par défaut ({defaultLabel}). Dans l'interface d'administration, l'ensemble prend effet immédiatement : il détermine les onglets de traduction dans les formulaires du catalogue et du contenu.",
+      "defaultLocaleLabel": "Langue par défaut",
+      "defaultLocaleHelp": "Non modifiable. Tout le contenu principal (noms, descriptions, textes des pages) est stocké dans la base de données dans cette langue, les traductions venant s'y superposer. Changer la langue par défaut nécessiterait la migration de toutes les données et modifierait les URL des pages du site ; cela se fait donc séparément, manuellement.",
+      "defaultRowNote": "langue par défaut — toujours activée",
+      "localeToggleAria": "Langue {label}",
+      "enabledState": "Activée",
+      "disabledState": "Désactivée",
+      "addManualLabel": "Ajouter une langue manuellement",
+      "customPlaceholder": "par ex. pt-br",
+      "customHelp": "Code de langue standard : deux ou trois lettres latines, éventuellement avec une région après un tiret.",
+      "saveButton": "Enregistrer les langues"
+    },
+    "page": {
+      "header": {
+        "title": "Paramètres de la boutique",
+        "subtitle": "Nom, devise, contacts, livraison et autres paramètres de la boutique."
+      },
+      "tocAriaLabel": "Sections des paramètres",
+      "sections": {
+        "branding": "Image de marque",
+        "home": "Page d'accueil",
+        "currency": "Devise et unités de mesure",
+        "contacts": "Coordonnées légales et contacts",
+        "catalog": "Catalogue, livraison, commandes",
+        "modules": "Modules",
+        "navigation": "Navigation (menu et pied de page)",
+        "access": "Accès",
+        "seo": "SEO et recherche"
+      },
+      "reset": {
+        "branding": "Réinitialiser l'image de marque",
+        "homeContent": "Réinitialiser le contenu de la page d'accueil",
+        "currency": "Réinitialiser la devise",
+        "exchange": "Réinitialiser les taux de change",
+        "units": "Réinitialiser les unités",
+        "contacts": "Réinitialiser les contacts",
+        "legalEntity": "Réinitialiser les coordonnées légales",
+        "catalog": "Réinitialiser le catalogue",
+        "delivery": "Réinitialiser la livraison",
+        "orders": "Réinitialiser les commandes",
+        "giftSettings": "Réinitialiser les paramètres des certificats",
+        "modules": "Réinitialiser les modules",
+        "access": "Réinitialiser le mode d'accès",
+        "languages": "Réinitialiser les langues",
+        "seo": "Réinitialiser le SEO"
+      },
+      "gift": {
+        "description": "Générer ou non un code de certificat automatiquement au paiement, sa durée de validité en jours et quelles sections du catalogue sont considérées comme des certificats — dans une section dédiée.",
+        "openLink": "Ouvrir les paramètres des certificats →"
+      },
+      "languages": {
+        "description": "Quelles langues sont disponibles dans la boutique et l'état d'avancement des traductions — dans une section dédiée. La langue par défaut ne peut pas être modifiée : elle contient tout le contenu principal.",
+        "openLink": "Ouvrir les paramètres des langues →"
+      },
+      "seo": {
+        "description": "Titres des pages, descriptions pour les moteurs de recherche, adresse du site, plan du site (sitemap) et robots — dans une section dédiée.",
+        "openLink": "Ouvrir les paramètres SEO →"
+      }
+    },
+    "giftPage": {
+      "subtitle": "Quand l'acheteur reçoit le code du certificat et sa durée de validité.",
+      "backToSettings": "Retour aux paramètres",
+      "resetLabel": "Réinitialiser les paramètres des certificats"
+    },
+    "seoPage": {
+      "title": "Paramètres SEO",
+      "subtitle": "Domaine, titres et descriptions pour les moteurs de recherche et les réseaux sociaux.",
+      "backToSettings": "Retour aux paramètres"
+    },
+    "resetSettingButton": {
+      "confirm": "Réinitialiser cette section aux valeurs par défaut ? Les surcharges seront supprimées.",
+      "success": "Réinitialisé aux valeurs par défaut.",
+      "pending": "Réinitialisation…",
+      "default": "Réinitialiser par défaut"
+    },
+    "imageUploadButton": {
+      "default": "Téléverser un fichier",
+      "pending": "Téléversement…",
+      "done": "✓ fichier téléversé, adresse insérée dans le champ"
+    },
+    "settingsTranslationTabs": {
+      "saved": "Traductions enregistrées."
+    }
+  },
+  "promo": {
+    "promoForm": {
+      "targetType": {
+        "category": "Catégorie",
+        "brand": "Marque",
+        "product": "Produit",
+        "variant": "Variante"
+      },
+      "savedChanges": "Modifications enregistrées.",
+      "codeLabel": "Code*",
+      "kindLabel": "Type*",
+      "valueLabel": "Valeur",
+      "valueHintPercent": "(pourcentage 0..100)",
+      "valueHintFixed": "(montant)",
+      "minOrderTotalLabel": "Montant min. de commande",
+      "minOrderTotalHelp": "Montant minimum de commande pour déclencher la promotion. Vide — sans seuil.",
+      "maxDiscountLabel": "Plafond de remise (pour percent)",
+      "maxDiscountPlaceholder": "sans plafond",
+      "usageLimitLabel": "Limite totale",
+      "perCustomerLimitLabel": "Par client",
+      "startsAtLabel": "Début",
+      "endsAtLabel": "Fin",
+      "bogoBuyLabel": "Achetez N",
+      "bogoPayLabel": "Payez M",
+      "bogoHelp": "Par exemple « 3 pour 2 » : achetez N=3, payez M=2 → le moins cher est gratuit.",
+      "applyScopeLegend": "Périmètre d'application",
+      "targetsTitle": "Cibles de la promotion",
+      "targetsHelp": "Choisissez ce à quoi s'applique la promotion : le type (catégorie / marque / produit) et l'entité elle-même dans la liste.",
+      "targetsEmpty": "Aucune cible — ajoutez-en au moins une.",
+      "targetTypeSrLabel": "Type de cible {n}",
+      "targetEntitySrLabel": "Entité cible {n}",
+      "selectOption": "— sélectionner —",
+      "identifierPlaceholder": "identifiant",
+      "removeTargetAria": "Supprimer la cible {n}",
+      "addTarget": "+ Ajouter une cible",
+      "priorityLabel": "Ordre d'application (plus petit — plus tôt)",
+      "minQtyLabel": "Nombre min. d'unités",
+      "minQtyPlaceholder": "sans seuil",
+      "minQtyHelp": "La remise s'applique uniquement si le panier contient au moins le nombre indiqué d'unités de produits du « Périmètre d'application ». Laissez vide — sans limite de quantité.",
+      "giftLegend": "Cadeau (à venir)",
+      "giftProductLabel": "Produit cadeau (UUID)",
+      "giftVariantLabel": "Variante cadeau (UUID)",
+      "giftQtyLabel": "Qté",
+      "commentLabel": "Commentaire",
+      "stackableLabel": "Cumulable (se combine avec d'autres)",
+      "createButton": "Créer un code promo"
+    },
+    "page": {
+      "moduleDisabled": "commandes (module désactivé)",
+      "subtitle": "Total des codes promo : {count}.",
+      "backToOrders": "Vers les commandes",
+      "createButton": "+ Créer un code promo",
+      "colCode": "Code",
+      "colKind": "Type",
+      "colValue": "Valeur",
+      "colScope": "Périmètre",
+      "colPriority": "Priorité",
+      "colMinTotal": "Montant min.",
+      "colMinQty": "Qté min.",
+      "colLimit": "Limite (total/par pers.)",
+      "colUsed": "Utilisé",
+      "colPeriod": "Période",
+      "colActive": "Actif",
+      "empty": "Aucun code promo pour l'instant. Créez le premier.",
+      "stackableBadge": "cumulable",
+      "exclusiveBadge": "exclusive",
+      "unlimited": "illimité"
+    },
+    "detailPage": {
+      "moduleDisabled": "commandes (module désactivé)",
+      "notFoundTitle": "Code promo introuvable",
+      "backToList": "Retour aux codes promo",
+      "title": "Code promo {code}",
+      "subtitle": "Utilisé : {count} fois",
+      "backLabel": "Retour aux codes promo"
+    },
+    "promoRowActions": {
+      "deactivate": "Désactiver",
+      "confirmDeactivate": "Désactiver le code promo «{code}» ? Il cessera de s'appliquer mais restera dans la liste (vous pourrez le réactiver via «Modifier»).",
+      "confirmDelete": "Supprimer définitivement le code promo «{code}» ? L'historique des commandes sera conservé."
+    },
+    "newPage": {
+      "title": "Nouveau code promo",
+      "breadcrumbNew": "Nouveau",
+      "backToList": "Retour aux codes promo",
+      "moduleDisabled": "commandes (module désactivé)"
+    }
+  },
+  "cms": {
+    "page": {
+      "moduleDisabled": "cms (module désactivé)",
+      "title": "Contenu — pages",
+      "subtitle": "Pages trouvées : {total}.",
+      "createButton": "+ Créer une page",
+      "searchLabel": "Recherche",
+      "searchPlaceholder": "Nom ou slug",
+      "statusLabel": "Statut",
+      "statusAll": "Tous",
+      "statusArchived": "Archivée",
+      "colSlug": "Slug",
+      "colPublished": "Publiée",
+      "colUpdated": "Modifiée",
+      "empty": "Aucune page trouvée. Modifiez les filtres ou créez une page.",
+      "paginationAria": "Pagination",
+      "forward": "Suivant"
+    },
+    "newPage": {
+      "moduleDisabled": "cms (module désactivé)",
+      "breadcrumbCurrent": "Nouvelle page",
+      "title": "Nouvelle page",
+      "subtitle": "Renseignez le titre et le SEO, puis créez la page. Les sections (hero, texte, bannières, grille de produits, etc.) deviennent disponibles après la création."
+    },
+    "pageForm": {
+      "savedChanges": "Modifications enregistrées.",
+      "savedAndPublished": "Page enregistrée et publiée.",
+      "confirmDelete": "Supprimer la page avec toutes ses sections ? Cette action est irréversible.",
+      "unpublished": "Dépubliée.",
+      "noWriteWarning": "Vous n'avez pas l'autorisation de modifier cette page (l'autorisation « cms.write » est requise). Les champs sont en lecture seule — les modifications ne peuvent pas être enregistrées. Contactez l'administrateur pour obtenir cette autorisation.",
+      "slugLabel": "Slug d'URL",
+      "slugPlaceholder": "auto depuis le titre",
+      "statusLabel": "Statut",
+      "statusArchived": "Archivée",
+      "sitemapPriority": "Priorité sitemap (0–1)",
+      "sitemapChangefreq": "Fréquence de changement sitemap",
+      "canonicalPlaceholder": "Auto : /pages/{slug}",
+      "slugFallback": "slug-page",
+      "uploadImage": "Téléverser une image",
+      "createButton": "Créer la page",
+      "saveAndPublish": "Enregistrer et publier",
+      "unpublish": "Dépublier",
+      "backToList": "Retour à la liste",
+      "deletePage": "Supprimer la page",
+      "sectionsAfterCreate": "Les sections de la page deviennent disponibles après sa création.",
+      "sectionEditorNoWrite": "L'éditeur de sections n'est disponible qu'avec l'autorisation « cms.write »."
+    },
+    "sectionEditor": {
+      "confirmDelete": "Supprimer la section « {key} » ?",
+      "title": "Sections de la page",
+      "typeAriaLabel": "Type de section",
+      "addSection": "Ajouter une section",
+      "newSection": "Nouvelle section : {type}",
+      "empty": "Aucune section pour l'instant. Ajoutez la première.",
+      "dragTitle": "Glissez pour réordonner",
+      "hiddenBadge": "masquée",
+      "visibleLabel": "Visible",
+      "collapse": "Réduire"
+    },
+    "sectionForm": {
+      "localeAriaLabel": "Langue de la section",
+      "translationHint": "Traduction de la section en <strong>{locale}</strong>. Un champ vide — le texte principal ({defaultLocale}) s'affiche sur la vitrine. Les liens, images et paramètres de sélection ne sont pas traduits — ils sont communs à toutes les langues.",
+      "noTranslatableText": "Ce type de section n'a pas de texte traduisible.",
+      "saveButton": "Enregistrer la section",
+      "uploadAndAddImage": "Téléverser et ajouter une image",
+      "uploadImage": "Téléverser une image"
+    },
+    "richTextEditor": {
+      "toolbarAriaLabel": "Mise en forme",
+      "bold": "G",
+      "italic": "I",
+      "bulletList": "• Liste"
+    },
+    "detailPage": {
+      "moduleDisabled": "cms (module désactivé)",
+      "slugLabel": "Slug :"
+    },
+    "cmsImageUploadButton": {
+      "uploadFile": "Téléverser un fichier",
+      "uploading": "Téléversement…",
+      "done": "✓ fichier téléversé, clé insérée dans le champ"
+    },
+    "statusBadge": {
+      "archived": "Archivée"
+    }
+  },
+  "giftCertificates": {
+    "giftCertificateForm": {
+      "termsLabel": "Conditions d'utilisation",
+      "savedChanges": "Modifications enregistrées.",
+      "summary": {
+        "nominal": "Valeur nominale",
+        "spent": "Dépensé",
+        "remaining": "Solde",
+        "status": "Statut"
+      },
+      "codeLabel": "Code*",
+      "codePlaceholder": "p. ex. GIFT2026",
+      "codeLocked": "Le code ne peut pas être modifié.",
+      "nameLabel": "Nom",
+      "namePlaceholder": "étiquette interne (non publiée)",
+      "faceTopUp": "Valeur nominale (recharge uniquement)",
+      "faceRequired": "Valeur nominale*",
+      "facePlaceholder": "p. ex. 5000.00",
+      "faceTopUpHelp": "Laissez tel quel ou augmentez (pas en dessous du montant dépensé). Impossible de diminuer.",
+      "validUntilLabel": "Valable jusqu'au",
+      "validUntilHelp": "Vide — sans expiration.",
+      "descriptionLabel": "Description (publique)",
+      "purchaserLegend": "Acheteur",
+      "emailLabel": "E-mail",
+      "phoneLabel": "Téléphone",
+      "purchaserSnapshotHelp": "Instantané au moment de l'émission : modifier la fiche client ne le changera pas.",
+      "recipientLegend": "Destinataire",
+      "commentLabel": "Commentaire (interne)",
+      "submitIssue": "Émettre"
+    },
+    "detailPage": {
+      "moduleDisabled": "Commandes (module désactivé)",
+      "issueSource": {
+        "order": "par un administrateur depuis une ligne de commande",
+        "auto": "automatiquement",
+        "manual": "manuellement",
+        "none": "sans source indiquée"
+      },
+      "notFound": {
+        "title": "Certificat introuvable",
+        "backLink": "Retour à la liste des certificats"
+      },
+      "title": "Certificat {code}",
+      "subtitle": "Solde : {remaining} {currency} sur {initial}",
+      "breadcrumb": "Certificats",
+      "backLabel": "Retour aux certificats",
+      "origin": {
+        "title": "Origine de l'émission",
+        "text": "Émis {source} pour la commande <link>{orderId}…</link>. La valeur nominale correspond au montant réellement payé pour la ligne de commande."
+      },
+      "redemptions": {
+        "title": "Historique des utilisations",
+        "empty": "Aucune utilisation pour l'instant.",
+        "colDate": "Date",
+        "colOrder": "Commande",
+        "colAmount": "Montant",
+        "colState": "État",
+        "reversed": "annulé {date}",
+        "redeemed": "utilisé"
+      }
+    },
+    "page": {
+      "moduleDisabled": "Commandes (module désactivé)",
+      "subtitle": "Certificats à solde : la valeur nominale est utilisée partiellement sur plusieurs commandes et le solde restant est conservé. Total : {total}.",
+      "breadcrumb": "Certificats",
+      "issue": "Émettre",
+      "empty": "Aucun certificat pour le moment.",
+      "cols": {
+        "code": "Code",
+        "name": "Nom",
+        "purchaser": "Acheteur",
+        "recipient": "Destinataire",
+        "nominal": "Valeur nominale",
+        "spent": "Dépensé",
+        "remaining": "Solde",
+        "validUntil": "Valable jusqu'au",
+        "status": "Statut"
+      },
+      "byOrder": "depuis la commande",
+      "unlimited": "sans expiration"
+    },
+    "giftRowActions": {
+      "open": "Ouvrir",
+      "activateTitle": "Réactiver le certificat",
+      "activate": "Activer",
+      "disableConfirm": "Désactiver le certificat ? Les utilisations ne seront plus possibles.",
+      "disableTitle": "Désactiver le certificat",
+      "disable": "Désactiver"
+    },
+    "giftStatusBadge": {
+      "depleted": "Épuisé",
+      "expired": "Expiré"
+    },
+    "newPage": {
+      "title": "Nouveau certificat",
+      "breadcrumbNew": "Nouveau",
+      "backLabel": "Retour aux certificats",
+      "moduleDisabled": "commandes (module désactivé)"
+    }
+  },
+  "orders": {
+    "orderActionsPanel": {
+      "heading": "Gestion des statuts",
+      "intro": "Les statuts de commande, de paiement et de livraison sont gérés indépendamment.",
+      "contradictionsTitle": "Incohérence de statut possible :",
+      "giftTitle": "Cartes-cadeaux de cette commande :",
+      "commentLabel": "Commentaire (ajouté à l'historique des statuts)",
+      "commentPlaceholder": "Facultatif",
+      "orderStatusHeading": "Statut de la commande",
+      "paymentStatusHeading": "Statut du paiement",
+      "deliveryStatusHeading": "Statut de la livraison",
+      "terminalNoTransitions": "Statut final — aucune transition.",
+      "noTransitions": "Aucune transition.",
+      "actionDone": "{label} : effectué.",
+      "labels": {
+        "cancelOrder": "Annulation de la commande",
+        "refund": "Remboursement",
+        "changeStatus": "Changement de statut",
+        "changePaymentStatus": "Changement du statut de paiement",
+        "changeDeliveryStatus": "Changement du statut de livraison"
+      },
+      "confirmCancel": "Annuler la commande ? La réservation de stock sera libérée.",
+      "confirmRefund": "Effectuer un remboursement ? Le statut du paiement passera à « Remboursé »."
+    },
+    "page": {
+      "moduleDisabled": "commandes (module désactivé)",
+      "subtitle": "Commandes trouvées : {total}. Montants en {currency}.",
+      "createOrder": "Créer une commande",
+      "columns": {
+        "number": "Numéro",
+        "date": "Date",
+        "customer": "Client",
+        "total": "Montant",
+        "status": "Statut",
+        "payment": "Paiement",
+        "delivery": "Livraison",
+        "method": "Méthode"
+      },
+      "emptyFiltered": "Aucun résultat pour les filtres sélectionnés. Réinitialisez les filtres.",
+      "emptyNoOrders": "Aucune commande pour l'instant.",
+      "paginationAria": "Pagination"
+    },
+    "detailGiftIssueBlock": {
+      "heading": "Cartes-cadeaux",
+      "issuedSuccess": "Carte {code} d'un montant de {amount} émise.",
+      "forAmount": "d'un montant de {amount}",
+      "recipientLine": "au nom de : {recipient}",
+      "spentLine": "dépensé : {spent}",
+      "noneIssued": "Aucune carte n'a encore été émise pour cette commande.",
+      "needWritePermission": "L'autorisation gift.write est requise pour émettre des cartes.",
+      "looksLikeCertificate": "ressemble à une carte-cadeau",
+      "faceValue": "valeur {value}",
+      "alreadyIssued": "carte déjà émise",
+      "issueButton": "Émettre une carte pour cette commande",
+      "faceValueHint": "La valeur sera égale au montant réellement payé pour l'article ({value}). Le client est repris des données de la commande.",
+      "recipientNameLabel": "Nom du destinataire",
+      "recipientEmailLabel": "E-mail du destinataire",
+      "issuing": "Émission…",
+      "issueConfirm": "Émettre"
+    },
+    "orderFilters": {
+      "ariaLabel": "Filtres des commandes",
+      "searchLabel": "Recherche (numéro / e-mail / téléphone)",
+      "searchPlaceholder": "ex. : 2026-000123 ou e-mail",
+      "orderStatusLabel": "Statut de la commande",
+      "any": "Tous",
+      "paymentStatusLabel": "Statut du paiement",
+      "deliveryTypeLabel": "Type de livraison",
+      "promoCodeLabel": "Code promo",
+      "promoCodePlaceholder": "Code promo",
+      "dateFromLabel": "Date de début",
+      "dateToLabel": "Date de fin"
+    },
+    "manualOrderForm": {
+      "itemsHeading": "Produits",
+      "searchLabel": "Recherche de produit (nom ou référence)",
+      "searchPlaceholder": "Ex. : t-shirt ou TC-001",
+      "searching": "Recherche…",
+      "searchButton": "Rechercher",
+      "searchingProducts": "Recherche de produits…",
+      "searchEmpty": "Aucun résultat. Modifiez votre recherche.",
+      "variantsCount": "Variantes : {count}",
+      "priceAvailable": "{price} · {stock} disponible",
+      "colProduct": "Produit",
+      "colVariant": "Variante",
+      "colQty": "Qté",
+      "colPrice": "Prix",
+      "colSum": "Montant",
+      "selectProductHint": "— sélectionnez un produit via la recherche —",
+      "variantAria": "Variante du produit",
+      "qtyAria": "Quantité",
+      "addEmptyLine": "+ Ajouter une ligne vide",
+      "subtotalPreview": "Sous-total (aperçu) :",
+      "serverCalcNote": "Le serveur calcule le total, les remises et la livraison lors de la création de la commande.",
+      "customerHeading": "Client",
+      "phoneLabel": "Téléphone",
+      "emailLabel": "E-mail",
+      "deliveryHeading": "Livraison",
+      "deliveryMethodLabel": "Mode de livraison",
+      "cityLabel": "Ville",
+      "addressLabel": "Adresse",
+      "pvzCodeLabel": "Code du point relais (CDEK)",
+      "pickupNote": "Retrait : l'adresse et le point relais ne sont pas nécessaires.",
+      "paymentCommentHeading": "Paiement et commentaire",
+      "paymentMethodLabel": "Mode de paiement",
+      "commentLabel": "Commentaire (facultatif)",
+      "creatingOrder": "Création de la commande…",
+      "createOrder": "Créer la commande",
+      "addAtLeastOne": "Ajoutez au moins un produit."
+    },
+    "detailCdekBlock": {
+      "title": "Livraison CDEK",
+      "pickupNote": "Retrait — aucune expédition CDEK n'est créée.",
+      "statusLabel": "Statut",
+      "noShipment": "— aucune expédition —",
+      "trackLabel": "Suivi",
+      "pvzLabel": "Point relais",
+      "errorLabel": "Erreur",
+      "awaitPaymentNote": "L'expédition CDEK et le bordereau sont créés <strong>après réception du paiement</strong> — automatiquement, sans intervention manuelle. Ainsi, aucune commande impayée n'est expédiée.",
+      "createShipment": "Créer l'expédition",
+      "refreshStatus": "Actualiser le statut",
+      "printWaybill": "Imprimer le bordereau",
+      "printBarcode": "Imprimer le code-barres",
+      "cancelShipment": "Annuler l'expédition",
+      "historyTitle": "Historique des statuts CDEK",
+      "confirmCancel": "Annuler l'expédition CDEK ?",
+      "actionDone": "{label} : terminé.",
+      "action": {
+        "createShipment": "Création de l'expédition",
+        "refreshStatus": "Actualisation du statut",
+        "printWaybill": "Impression du bordereau",
+        "printBarcode": "Impression du code-barres",
+        "cancelShipment": "Annulation de l'expédition"
+      }
+    },
+    "detailPage": {
+      "moduleDisabled": "orders (module désactivé)",
+      "notFoundTitle": "Commande introuvable",
+      "notFoundText": "Elle a peut-être été supprimée.",
+      "backToList": "Retour aux commandes",
+      "title": "Commande {number}",
+      "createdLine": "Créée le {date} · source : {source}",
+      "sourceAdmin": "panneau d'administration",
+      "sourceStorefront": "boutique",
+      "itemsHeading": "Articles",
+      "columns": {
+        "product": "Produit",
+        "sku": "Référence",
+        "quantity": "Qté",
+        "price": "Prix",
+        "total": "Total"
+      },
+      "giftBadge": "Cadeau",
+      "summary": {
+        "items": "Articles",
+        "grandTotal": "Total"
+      },
+      "labelDiscount": "Remise",
+      "deliveryHeading": "Livraison",
+      "historyHeading": "Historique des statuts",
+      "historyEmpty": "Aucun historique.",
+      "customerHeading": "Client",
+      "customer": {
+        "email": "E-mail",
+        "phone": "Téléphone",
+        "comment": "Commentaire"
+      },
+      "delivery": {
+        "type": "Type",
+        "postamatSuffix": "{type} · Consigne automatique",
+        "zone": "Zone",
+        "city": "Ville",
+        "address": "Adresse",
+        "pvz": "Point relais",
+        "cost": "Coût",
+        "track": "Suivi"
+      },
+      "labelStatus": "Statut",
+      "paymentHeading": "Paiement",
+      "payment": {
+        "method": "Méthode",
+        "paidAt": "Payée le"
+      },
+      "promoHeading": "Code promo",
+      "promo": {
+        "code": "Code"
+      }
+    },
+    "newPage": {
+      "title": "Nouvelle commande",
+      "subtitle": "Ajoutez des produits, renseignez le client et la livraison. Le serveur vérifiera le total, les stocks et les prix à la création.",
+      "backLabel": "Retour aux commandes",
+      "moduleDisabled": "commandes (module désactivé)"
+    }
+  },
+  "news": {
+    "newsForm": {
+      "fields": {
+        "title": "Titre",
+        "titleRequired": "Titre*",
+        "group": "Rubrique",
+        "excerpt": "Résumé",
+        "body": "Texte",
+        "bodyHtml": "Texte (HTML)",
+        "slug": "Slug (URL)",
+        "status": "Statut",
+        "cover": "Image de couverture (chemin du fichier)",
+        "publishedAt": "Date de publication",
+        "sortOrder": "Ordre"
+      },
+      "slugPlaceholder": "auto d'après le titre",
+      "status": {
+        "draft": "Brouillon",
+        "published": "Publiée",
+        "archived": "Archivée"
+      },
+      "bodyHelp": "Le balisage HTML est nettoyé côté serveur (p/strong/em/a/listes/titres autorisés).",
+      "uploadCover": "Téléverser la couverture",
+      "uploadImage": "Téléverser l'image",
+      "seo": {
+        "canonicalPlaceholder": "Auto : /news/{slug}",
+        "slugFallback": "slug-actualite"
+      },
+      "createButton": "Créer l'actualité",
+      "saveAndPublish": "Enregistrer et publier",
+      "unpublish": "Dépublier",
+      "archive": "Archiver",
+      "backToList": "Retour à la liste",
+      "deleteButton": "Supprimer l'actualité",
+      "confirmDelete": "Supprimer cette actualité ? Cette action est irréversible.",
+      "noWriteWarning": "Vous n'avez pas la permission de modifier les actualités (la permission « news.write » est requise). Les champs sont en lecture seule.",
+      "toast": {
+        "saved": "Modifications enregistrées.",
+        "published": "Actualité publiée.",
+        "unpublished": "Dépubliée.",
+        "archived": "Actualité archivée."
+      }
+    },
+    "page": {
+      "title": "Actualités",
+      "subtitle": "Actualités trouvées : {total}.",
+      "createButton": "+ Créer une actualité",
+      "moduleDisabled": "news (module désactivé)",
+      "searchLabel": "Recherche",
+      "searchPlaceholder": "Titre, slug ou rubrique",
+      "statusLabel": "Statut",
+      "statusAll": "Tous",
+      "status": {
+        "draft": "Brouillon",
+        "published": "Publiée",
+        "archived": "Archivée"
+      },
+      "columns": {
+        "title": "Titre",
+        "group": "Rubrique",
+        "status": "Statut",
+        "publishedAt": "Publiée",
+        "sortOrder": "Ordre"
+      },
+      "empty": "Aucune actualité trouvée. Modifiez les filtres ou créez une actualité.",
+      "paginationAria": "Pagination",
+      "forward": "Suivant"
+    },
+    "newPage": {
+      "title": "Nouvelle actualité",
+      "subtitle": "Renseignez le titre, le texte et le SEO, puis créez l'actualité. Les traductions (EN/FR) et la publication seront disponibles après la création.",
+      "breadcrumbsAria": "Fil d'Ariane",
+      "breadcrumbNews": "Actualités",
+      "breadcrumbCurrent": "Nouvelle actualité",
+      "moduleDisabled": "news (module désactivé)"
+    },
+    "detailPage": {
+      "breadcrumbsAria": "Fil d'Ariane",
+      "breadcrumbNews": "Actualités",
+      "slugLabel": "Slug :",
+      "moduleDisabled": "news (module désactivé)"
+    },
+    "newsStatusBadge": {
+      "draft": "Brouillon",
+      "published": "Publiée",
+      "archived": "Archivée"
+    },
+    "newsImageUploadButton": {
+      "defaultLabel": "Téléverser un fichier",
+      "uploading": "Téléversement…",
+      "done": "✓ fichier téléversé, clé renseignée"
+    }
+  },
+  "reviews": {
+    "page": {
+      "moduleDisabled": "reviews (module désactivé)",
+      "subtitle": "Modération des avis clients. En attente : {pending}. Total : {total}.",
+      "statusLabel": "Statut",
+      "statusAll": "Tous",
+      "statusPending": "En attente de modération",
+      "statusApproved": "Approuvés",
+      "statusRejected": "Rejetés",
+      "colDate": "Date",
+      "colProduct": "Produit",
+      "colAuthor": "Auteur",
+      "colRating": "Note",
+      "colText": "Texte",
+      "empty": "Aucun avis trouvé.",
+      "replyPrefix": "Réponse : {reply}",
+      "paginationAria": "Pagination"
+    },
+    "detailPage": {
+      "moduleDisabled": "reviews (module désactivé)",
+      "title": "Avis de {author}",
+      "dateLabel": "Date",
+      "productLabel": "Produit",
+      "reviewTextLabel": "Texte de l'avis",
+      "moderationHeading": "Modération",
+      "replyHeading": "Réponse de la boutique",
+      "replyHelp": "La réponse est affichée sur la vitrine sous l'avis. Les traductions (EN/FR) sont dans les onglets ; le texte de l'avis du client n'est pas traduit."
+    },
+    "reviewReplyForm": {
+      "replyFieldLabel": "Réponse de la boutique",
+      "baseReplyLabel": "Réponse de la boutique ({locale})",
+      "replyPlaceholder": "Réponse publique à l'avis (affichée sur la vitrine)",
+      "saveReply": "Enregistrer la réponse"
+    },
+    "reviewRowActions": {
+      "changeStatusTo": "Changer le statut en « {status} »",
+      "confirmDelete": "Supprimer définitivement l'avis ?",
+      "deleteTitle": "Supprimer l'avis"
+    },
+    "ratingStars": {
+      "ariaLabel": "Note {n} sur 5"
+    }
+  },
+  "users": {
+    "userForm": {
+      "toast": {
+        "passwordUpdated": "Mot de passe mis à jour."
+      },
+      "emailLabel": "Email*",
+      "emailReadonlyHint": "L'e-mail (identifiant) ne peut pas être modifié.",
+      "passwordLabel": "Mot de passe*",
+      "passwordPlaceholder": "au moins 8 caractères",
+      "statusLabel": "Statut",
+      "noRolesHint": "Aucun rôle pour le moment — créez-en dans la section « Rôles ».",
+      "createButton": "Créer un utilisateur",
+      "resetPassword": "Réinitialiser le mot de passe",
+      "resetPasswordHint": "Définissez un nouveau mot de passe de connexion pour l'employé. L'ancien cessera de fonctionner.",
+      "newPasswordLabel": "Nouveau mot de passe"
+    },
+    "page": {
+      "statusInvited": "Invité",
+      "subtitle": "Employés ayant accès au panneau d'administration et leurs rôles.",
+      "createButton": "+ Créer un utilisateur",
+      "colEmail": "E-mail",
+      "colStatus": "Statut",
+      "colLastLogin": "Dernière connexion",
+      "colOwner": "Propriétaire",
+      "empty": "Aucun utilisateur pour le moment.",
+      "yes": "oui",
+      "protected": "protégé"
+    },
+    "detailPage": {
+      "backToList": "Retour à la liste",
+      "ownerNotice": "Il s'agit du compte du propriétaire de la boutique. Il ne peut être ni modifié ni désactivé."
+    },
+    "newPage": {
+      "title": "Nouvel utilisateur",
+      "subtitle": "Créez un compte employé et attribuez des rôles.",
+      "backToList": "Retour à la liste"
+    }
+  },
+  "roles": {
+    "roleForm": {
+      "modules": {
+        "core": "Général",
+        "catalog": "Catalogue",
+        "orders": "Commandes",
+        "cdek": "Livraison CDEK",
+        "cms": "Contenu"
+      },
+      "codeLabel": "Code*",
+      "codePlaceholder": "ex. : support",
+      "codeReadonlyHint": "Le code du rôle ne peut pas être modifié.",
+      "systemRoleNote": "Il s'agit d'un rôle système.",
+      "codeHint": "Lettres latines minuscules, sans espaces (ex. : support, content).",
+      "titleLabel": "Nom*",
+      "titlePlaceholder": "ex. : Support",
+      "permissionsLegend": "Autorisations",
+      "permissionsHint": "Cochez ce qui est autorisé pour les employés ayant ce rôle.",
+      "createButton": "Créer le rôle"
+    },
+    "page": {
+      "subtitle": "Ensembles d'autorisations pour les employés. Les rôles système ne peuvent pas être supprimés.",
+      "createButton": "+ Créer un rôle",
+      "colPermissions": "Autorisations",
+      "colType": "Type",
+      "empty": "Aucun rôle pour le moment.",
+      "typeSystem": "système",
+      "typeCustom": "personnalisé",
+      "protected": "protégé"
+    },
+    "newPage": {
+      "title": "Nouveau rôle",
+      "subtitle": "Définissez l'ensemble des autorisations dont bénéficieront les employés ayant ce rôle.",
+      "backToList": "Retour à la liste"
+    },
+    "detailPage": {
+      "systemRoleSubtitle": "Rôle système",
+      "backToList": "Retour à la liste"
+    },
+    "roleDeleteButton": {
+      "confirm": "Supprimer le rôle «{title}» ? Cette action est irréversible.",
+      "deleting": "Suppression…"
+    }
+  },
+  "leads": {
+    "page": {
+      "subtitle": "Messages du formulaire de contact de la boutique (/contacts). Modifiez le statut ou supprimez les messages traités. Total : {total}.",
+      "truncationHint": "{notice}. Utilisez l'export pour obtenir la liste complète.",
+      "empty": "Aucune demande pour le moment.",
+      "columns": {
+        "date": "Date",
+        "contact": "Contact",
+        "source": "Source",
+        "details": "Détails",
+        "message": "Message",
+        "answer": "Réponse de l'opérateur",
+        "status": "Statut"
+      },
+      "details": {
+        "company": "Organisation : {value}",
+        "city": "Ville : {value}",
+        "subject": "Sujet : {value}"
+      },
+      "downloadAttachment": "Télécharger la pièce jointe"
+    },
+    "leadRowActions": {
+      "changeStatusTo": "Changer le statut en « {status} »",
+      "confirmDelete": "Supprimer définitivement cette demande ?",
+      "deleteTitle": "Supprimer la demande"
+    },
+    "exportToolbar": {
+      "copyManually": "Copiez les contacts manuellement :",
+      "copied": "Copié",
+      "copyContacts": "Copier les contacts",
+      "downloadCsv": "Télécharger le CSV"
+    },
+    "leadAnswerForm": {
+      "answerPlaceholder": "Réponse de l'opérateur…",
+      "saveAnswer": "Enregistrer la réponse"
+    }
+  },
+  "customers": {
+    "page": {
+      "subtitle": "Comptes clients et contacts invités de la boutique. Total : {total}.",
+      "searchPlaceholder": "Rechercher par e-mail, nom, téléphone",
+      "searchButton": "Rechercher",
+      "emptyState": "Aucun client trouvé.",
+      "colEmail": "E-mail",
+      "colStatus": "Statut",
+      "colOrders": "Commandes",
+      "colTotal": "Total",
+      "colLastLogin": "Dernière connexion",
+      "colRegistered": "Inscription"
+    },
+    "detailPage": {
+      "subtitle": "Compte client — consultation",
+      "profileHeading": "Profil",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "status": "Statut",
+      "emailVerified": "E-mail vérifié",
+      "language": "Langue",
+      "lastLogin": "Dernière connexion",
+      "registered": "Inscription",
+      "ordersAndTotal": "Commandes / total",
+      "ordersEmpty": "Ce client n'a pas encore de commandes associées.",
+      "colNumber": "Numéro",
+      "colDate": "Date",
+      "colPayment": "Paiement",
+      "colTotal": "Total"
+    }
+  },
+  "cdek": {
+    "page": {
+      "title": "Livraison (CDEK)",
+      "subtitle": "Envois trouvés : {total}.",
+      "moduleDisabledPermission": "livraison CDEK (module désactivé)",
+      "searchPlaceholder": "Recherche : numéro de suivi ou numéro de commande",
+      "searchButton": "Rechercher",
+      "empty": "Aucun envoi. Les bordereaux CDEK sont créés depuis la fiche de commande (bloc « Livraison CDEK ») après un paiement réussi.",
+      "printWaybill": "Bordereau",
+      "mockPrintTitle": "MOCK : un bordereau réel apparaîtra en mode production (avec les clés CDEK de production)",
+      "paginationAria": "Pagination",
+      "columns": {
+        "trackNumber": "Numéro de suivi",
+        "order": "Commande",
+        "customer": "Client",
+        "method": "Méthode",
+        "destination": "Destination",
+        "cdekStatus": "Statut CDEK",
+        "updated": "Mis à jour",
+        "print": "Impression"
+      },
+      "mode": {
+        "mockLabel": "MOCK",
+        "mockHint": "Les clés de production ne sont pas définies — aucun envoi réel n'est créé.",
+        "testLabel": "Environnement de test (edu)",
+        "testHint": "Les requêtes sont envoyées au bac à sable CDEK (api.edu.cdek.ru). Les envois sont des tests.",
+        "prodLabel": "Environnement de production",
+        "prodHint": "Les requêtes sont envoyées à l'API CDEK de production. De vrais envois sont créés."
+      }
+    }
+  },
+  "audit": {
+    "page": {
+      "title": "Journal d'audit",
+      "subtitle": "Total des événements : {total}. Page {currentPage} sur {totalPages}.",
+      "columns": {
+        "time": "Heure (MSK)",
+        "actor": "Initiateur",
+        "action": "Action",
+        "entity": "Entité",
+        "changes": "Modifications"
+      },
+      "empty": "Aucun enregistrement pour le moment.",
+      "details": "Détails ({count})",
+      "diff": {
+        "field": "Champ",
+        "before": "Avant",
+        "after": "Après"
+      },
+      "paginationAria": "Pagination"
+    },
+    "auditFilters": {
+      "ariaLabel": "Filtres du journal d'audit",
+      "dateFrom": "Date de début",
+      "dateTo": "Date de fin",
+      "actor": "Initiateur (e-mail)",
+      "actorPlaceholder": "Ex. : admin@shop.ru",
+      "action": "Action",
+      "anyAction": "Toute",
+      "entityType": "Type d'entité",
+      "anyEntity": "Tout"
+    }
+  },
+  "account": {
+    "changePasswordForm": {
+      "passwordsMismatch": "Les mots de passe ne correspondent pas",
+      "doneTitle": "Mot de passe modifié.",
+      "doneMessage": "Pour des raisons de sécurité, toutes vos sessions ont été fermées. Reconnectez-vous avec votre nouveau mot de passe.",
+      "loginAgain": "Se reconnecter",
+      "currentPasswordLabel": "Mot de passe actuel",
+      "newPasswordLabel": "Nouveau mot de passe",
+      "newPasswordPlaceholder": "au moins {min} caractères",
+      "confirmPasswordLabel": "Confirmer le nouveau mot de passe",
+      "submit": "Changer le mot de passe"
+    },
+    "page": {
+      "title": "Profil",
+      "subtitle": "Gérez votre compte et changez votre mot de passe.",
+      "loginLabel": "Identifiant (e-mail)",
+      "changePasswordHeading": "Changer le mot de passe",
+      "changePasswordHint": "Saisissez votre mot de passe actuel et un nouveau. Après le changement, toutes vos sessions seront fermées — vous devrez vous reconnecter."
+    }
+  },
+  "subscribers": {
+    "page": {
+      "subtitle": "Abonnés e-mail à la newsletter (formulaire dans le pied de page de la boutique). Total : {total}.",
+      "truncationHint": "Utilisez l’export pour obtenir la liste complète.",
+      "empty": "Aucun abonné pour le moment.",
+      "columns": {
+        "date": "Date",
+        "email": "E-mail",
+        "status": "Statut"
+      }
+    },
+    "exportToolbar": {
+      "copyManualPrompt": "Copiez les adresses manuellement :",
+      "copied": "Copié",
+      "copyAddresses": "Copier les adresses",
+      "downloadCsv": "Télécharger le CSV"
+    },
+    "subscriberRowActions": {
+      "confirmUnsubscribe": "Désabonner « {email} » de la newsletter ?",
+      "unsubscribe": "Désabonner"
+    }
   }
 }

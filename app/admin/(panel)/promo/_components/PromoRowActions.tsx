@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -29,6 +30,7 @@ export function PromoRowActions({
   code: string;
   isActive: boolean;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [pending, setPending] = useState(false);
@@ -56,7 +58,7 @@ export function PromoRowActions({
           href={`/admin/promo/${id}`}
           className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
         >
-          Редактировать
+          {t('common.actions.edit')}
         </Link>
         {isActive ? (
           <button
@@ -65,12 +67,12 @@ export function PromoRowActions({
             onClick={() =>
               run(
                 () => deactivatePromoCodeAction({ id }),
-                `Деактивировать промокод «${code}»? Он перестанет применяться, но останется в списке (включить обратно можно через «Редактировать»).`,
+                t('promo.promoRowActions.confirmDeactivate', { code }),
               )
             }
             className="rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
           >
-            Деактивировать
+            {t('promo.promoRowActions.deactivate')}
           </button>
         ) : null}
         <button
@@ -79,12 +81,12 @@ export function PromoRowActions({
           onClick={() =>
             run(
               () => deletePromoCodeAction({ id }),
-              `Удалить промокод «${code}» безвозвратно? История заказов сохранится.`,
+              t('promo.promoRowActions.confirmDelete', { code }),
             )
           }
           className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
         >
-          Удалить
+          {t('common.actions.delete')}
         </button>
       </div>
       {error ? (

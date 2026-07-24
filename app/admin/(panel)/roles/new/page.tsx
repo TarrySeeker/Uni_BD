@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 import { isSingleUserModeEnabled } from '@/lib/config/settings';
@@ -25,17 +27,19 @@ export default async function NewRolePage() {
     return <SingleUserModeNotice kind="roles" />;
   }
 
+  const t = await getTranslations();
+
   return (
     <div>
       <PageHeader
-        title="Новая роль"
-        subtitle="Задайте набор прав, который получат сотрудники с этой ролью."
+        title={t('roles.newPage.title')}
+        subtitle={t('roles.newPage.subtitle')}
         breadcrumbs={[
-          { label: 'Роли', href: '/admin/roles' },
-          { label: 'Новая роль' },
+          { label: t('nav.roles'), href: '/admin/roles' },
+          { label: t('roles.newPage.title') },
         ]}
         backHref="/admin/roles"
-        backLabel="К списку"
+        backLabel={t('roles.newPage.backToList')}
       />
 
       <div className="mt-6">

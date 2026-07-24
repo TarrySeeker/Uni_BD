@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 import { listRolesWithPermissionCounts } from '@/lib/auth/admin-repository';
@@ -17,6 +19,7 @@ import { UserForm } from '../_components/UserForm';
 export const dynamic = 'force-dynamic';
 
 export default async function NewUserPage() {
+  const t = await getTranslations();
   const user = await requireUser();
   if (!can(user, 'users.manage')) {
     return <Forbidden permission="users.manage" />;
@@ -31,14 +34,14 @@ export default async function NewUserPage() {
   return (
     <div>
       <PageHeader
-        title="Новый пользователь"
-        subtitle="Заведите учётную запись сотрудника и назначьте роли."
+        title={t('users.newPage.title')}
+        subtitle={t('users.newPage.subtitle')}
         breadcrumbs={[
-          { label: 'Пользователи', href: '/admin/users' },
-          { label: 'Новый пользователь' },
+          { label: t('nav.users'), href: '/admin/users' },
+          { label: t('users.newPage.title') },
         ]}
         backHref="/admin/users"
-        backLabel="К списку"
+        backLabel={t('users.newPage.backToList')}
       />
 
       <div className="mt-6">

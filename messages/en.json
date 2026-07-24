@@ -617,5 +617,1233 @@
     "badges": {
       "featured": "Hit"
     }
+  },
+  "settings": {
+    "homeContentForm": {
+      "savedToast": "Home page content saved.",
+      "intro": "Content of the storefront home page. An empty field reverts to the default value. In lists — one item per line.",
+      "saveButton": "Save home page content",
+      "photoLabel": "Photo",
+      "linkLabel": "Link",
+      "blockTitleOptional": "Block title (optional)",
+      "tileN": "Tile {n}",
+      "uploadTilePhoto": "Upload tile photo",
+      "addTile": "+ Add tile",
+      "hero": {
+        "legend": "Cover (hero)",
+        "ctaLabel": "Button text",
+        "ctaPlaceholder": "View collection",
+        "hrefLabel": "Button link",
+        "titleLabel": "Title (optional)",
+        "subtitleLabel": "Subtitle (optional)",
+        "imageLabel": "Cover background",
+        "uploadBg": "Upload cover background",
+        "imageHint": "Upload a file or enter the address of an already uploaded one. Empty — the default storefront background."
+      },
+      "about": {
+        "legend": "«About the brand» block",
+        "titlePlaceholder": "About the brand",
+        "paragraphsLabel": "Paragraphs (one per line)",
+        "valuesLabel": "Values / tags (one per line)",
+        "imagesLabel": "«About the brand» gallery photos (one address per line)",
+        "uploadPhoto": "Upload photo"
+      },
+      "quality": {
+        "legend": "«Fabric quality» block",
+        "titlePlaceholder": "Fabric quality",
+        "itemsLabel": "Items (one per line)"
+      },
+      "delivery": {
+        "legend": "«Delivery and payment» block",
+        "itemsLabel": "Items: «Title | Description» (one per line)",
+        "itemsPlaceholder": "CDEK | Delivery across Russia…\nTimes | Moscow — 1–2 days…",
+        "hint": "For example: <code>CDEK | Delivery across Russia. Pickup points and courier.</code>"
+      },
+      "valuesStrip": {
+        "legend": "Values strip",
+        "showToggle": "Show the strip on the home page",
+        "itemsPlaceholder": "Form | Structured silhouettes…\nFunction | Thoughtful cut…",
+        "hint": "The strip is shown only if the checkbox above is enabled. Empty — default items."
+      },
+      "philosophy": {
+        "legend": "«Philosophy» block",
+        "eyebrowLabel": "Eyebrow",
+        "eyebrowPlaceholder": "Philosophy",
+        "titlePlaceholder": "For example: quality, care, style",
+        "textLabel": "Paragraph",
+        "linkTextLabel": "Link text",
+        "linkHrefLabel": "Link address"
+      },
+      "looks": {
+        "legend": "«Looks» block",
+        "showToggle": "Show «Looks» on the home page",
+        "titlePlaceholder": "Looks",
+        "categoryN": "Category {n}",
+        "catTitlePlaceholder": "Look name",
+        "catTextLabel": "Text",
+        "uploadPhoto": "Upload look photo",
+        "addCategory": "+ Add category",
+        "hint": "Each category — photo, title and text. Incomplete categories are not saved."
+      },
+      "tiles": {
+        "legend": "«Category tiles» block",
+        "showToggle": "Show «Category tiles» on the home page",
+        "titlePlaceholder": "Category name",
+        "hint": "Each tile — photo, title and link. Incomplete tiles are not saved."
+      },
+      "video": {
+        "legend": "«Video» block",
+        "showToggle": "Show «Video» on the home page",
+        "embedLabel": "Video link (embed)",
+        "hint": "Only an address like <code>https://…</code> (Vimeo/YouTube embed link). Empty — the video is not shown."
+      },
+      "designers": {
+        "legend": "«Designers» block",
+        "showToggle": "Show «Designers» on the home page",
+        "titlePlaceholder": "Designers",
+        "designerN": "Designer {n}",
+        "namePlaceholder": "Designer name",
+        "avatarLabel": "Avatar",
+        "uploadAvatar": "Upload avatar",
+        "workLabel": "Work photo",
+        "uploadWork": "Upload work photo",
+        "avatarTopLabel": "Avatar position (0–100)",
+        "workTopLabel": "Work position (0–100)",
+        "addDesigner": "+ Add designer",
+        "hint": "Each entry — name, link and two photos (avatar and work). Photo positions (0–100) — vertical, empty — centered. Incomplete entries are not saved."
+      },
+      "slider": {
+        "legend": "«Promo slider» block",
+        "showToggle": "Show «Promo slider» on the home page",
+        "slideN": "Slide {n}",
+        "imageLabel": "Slide background",
+        "uploadBg": "Upload slide background",
+        "nameLabel": "Name (optional)",
+        "captionLabel": "Caption (optional)",
+        "captionPlaceholder": "Caviar for everyone",
+        "addSlide": "+ Add slide",
+        "hint": "Each slide — background and link (a path starting with «/» or https://…), plus an optional name and caption. Slides without a background or link are not saved."
+      },
+      "corpCert": {
+        "legend": "«For corporate clients / certificates» block",
+        "showToggle": "Show the «For corporate clients / certificates» block on the home page",
+        "titlePlaceholder": "For corporate clients",
+        "hint": "Each tile — photo, title and link (a path starting with «/» or https://…). Incomplete tiles are not saved."
+      }
+    },
+    "brandingForm": {
+      "uploading": "Uploading…",
+      "uploadFileDefault": "Upload file",
+      "uploadDone": "✓ file uploaded, the address has been filled into the field",
+      "saved": "Branding saved.",
+      "shopName": "Store name",
+      "logo": "Logo",
+      "urlOrUploadPlaceholder": "https://… or upload a file",
+      "uploadLogo": "Upload logo",
+      "favicon": "Favicon",
+      "uploadFavicon": "Upload favicon",
+      "theme": "Theme",
+      "themeSystem": "System",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "primaryColor": "Primary color (HEX)",
+      "accentColor": "Accent color (HEX)",
+      "supportEmail": "Support email",
+      "supportPhone": "Support phone",
+      "saveButton": "Save branding"
+    },
+    "navigationForm": {
+      "saved": "Navigation saved.",
+      "intro": "The storefront header menu and footer columns. Empty — the storefront shows its default navigation. A link address is a path from «/» (e.g. <code>/catalog</code>) or a full URL / <code>mailto:</code> / <code>tel:</code>.",
+      "headerLegend": "Header menu",
+      "headerItemsLabel": "Items: «Label | Link» (one per line)",
+      "headerPlaceholder": "Catalog | /catalog\nDelivery | /#delivery\nContacts | /contacts",
+      "headerHint": "For example: <code>Catalog | /catalog</code>",
+      "footerLegend": "Footer columns",
+      "footerColumnsLabel": "Columns are separated by a blank line. The first line of a column is its title, then «Label | Link»",
+      "footerPlaceholder": "Store\nCatalog | /catalog\nDelivery | /#delivery\n\nContact\nEmail | mailto:info@example.com",
+      "footerHint": "Each block up to a blank line is a separate footer column.",
+      "saveButton": "Save navigation",
+      "resetButton": "Reset navigation"
+    },
+    "seoSettingsForm": {
+      "saved": "SEO settings saved.",
+      "siteName": "Site name",
+      "siteUrl": "Site domain (site_url)",
+      "titleTemplate": "Page title template",
+      "titleTemplatePlaceholder": "%s — My store",
+      "titleTemplateHint": "<code>%s</code> is replaced by the page name. Example: <code>%s — My store</code> → «Jacket — My store».",
+      "twitterSite": "Twitter @site",
+      "defaultDescription": "Default description",
+      "defaultOgImage": "Default social image (file path)",
+      "defaultOgImagePlaceholder": "defaults/og.webp or upload a file",
+      "uploadImage": "Upload image",
+      "robotsExtra": "Extra rules for search robots (for specialists, optional)",
+      "noindexSite": "Hide the entire site from indexing (noindex for staging)",
+      "saveButton": "Save SEO"
+    },
+    "languagesPage": {
+      "subtitle": "Which languages are available in the store and how complete the translations are.",
+      "backToSettings": "Back to settings",
+      "shopLanguagesHeading": "Store languages",
+      "resetLanguages": "Reset languages",
+      "coverageHeading": "Translation coverage",
+      "coverageIntro": "The share of filled translatable fields for each language. An empty field is not an error: the site shows the default-language text instead ({defaultLocale}).",
+      "coverageNoSecondary": "No additional languages — nothing to translate.",
+      "coverageNoData": "No data to calculate yet.",
+      "colSection": "Section",
+      "colRecords": "Records",
+      "notTranslated": "not translated: {missing}"
+    },
+    "modulesForm": {
+      "confirmTurnOff": "Turn off modules: {modules}? The corresponding admin sections and site features will become unavailable. Continue?",
+      "saved": "Module set updated.",
+      "warningCmsPublished": "The «Content» module has published pages. They are not deleted — only hidden until it is re-enabled.",
+      "systemNote": "«Settings» is a system section and is always available (it cannot be disabled).",
+      "defaultState": "default: {state}",
+      "stateEnabled": "enabled",
+      "stateDisabled": "disabled",
+      "moduleStateAria": "Module state: {label}",
+      "optInherit": "As default",
+      "optOn": "Enable",
+      "optOff": "Disable",
+      "saveButton": "Save module set"
+    },
+    "accessForm": {
+      "saved": "Access mode saved.",
+      "singleUserModeLabel": "Single-user mode",
+      "singleUserModeHelp": "Hide and block the «Users» and «Roles» sections. Suitable for a store with a single administrator: extra sections don't get in the way, and accidentally creating a second account or role is ruled out. Disabled by default.",
+      "saveButton": "Save access mode"
+    },
+    "giftGiftSettingsForm": {
+      "savedSuccess": "Gift certificate settings saved.",
+      "autoIssueLabel": "Create the code automatically upon payment",
+      "autoIssueHelp": "When a customer pays for an order containing a gift certificate, the code is created automatically: it appears in the «Gift certificates» section and is shown to the customer after checkout. If disabled, the code has to be issued manually from the order card.",
+      "validDaysLabel": "How many days the code is valid",
+      "validDaysPlaceholder": "For example, 365",
+      "validDaysHelp": "Leave the field empty and the code never expires. The term is counted from the day the code is issued.",
+      "categoriesLabel": "Catalog sections containing gift certificates",
+      "categoriesHelp1": "Section addresses as they appear in the site link (the part after /catalog/). Separate them with commas or new lines. At checkout, products from these sections are flagged in the order itself as gift certificates, and the code is later created based on that flag. Already placed orders are not affected: even if you rename or delete a section, the code will still be issued because the flag is stored in the order.",
+      "categoriesHelp2": "If you leave the field empty, nothing is flagged by section. Codes will still be created for products whose gift-certificate flag is set on the product card itself. The only way to disable code issuance entirely is the «Create the code automatically upon payment» checkbox above.",
+      "allowIssueLabel": "Create the code even when the order is paid with another certificate",
+      "allowIssueHelp": "A customer can pay for a new certificate with the balance of an old one — effectively exchanging its value. Disable this if your store does not allow such exchanges.",
+      "saveButton": "Save certificate settings"
+    },
+    "legalContactsForm": {
+      "savedSuccess": "Legal details and contacts saved.",
+      "legalEntityHeading": "Legal entity details",
+      "innLabel": "TIN (10 or 12 digits)",
+      "kppLabel": "Tax registration reason code (9 digits)",
+      "ogrnLabel": "State registration number (13 or 15 digits)",
+      "legalAddressLabel": "Registered address",
+      "bankDetailsLabel": "Bank details",
+      "bankDetailsPrivate": "(private, not published)",
+      "offerDocKeyLabel": "Offer document (storage key)",
+      "offerDocKeyPlaceholder": "e.g. docs/offer.pdf",
+      "emailDesignersLabel": "E-mail for designer applications",
+      "publicContactsHeading": "Public contacts",
+      "phoneLabel": "Phone",
+      "addressLabel": "Address",
+      "workingHoursLabel": "Business hours",
+      "socialsHeading": "Social networks",
+      "socialsHelp": "Links in the storefront footer. Type is the label (Instagram, Telegram…), address is the URL.",
+      "socialTypeAria": "Social network {n} — type",
+      "socialUrlAria": "Social network {n} — address",
+      "addSocial": "+ Add social network"
+    },
+    "catalogOrdersForm": {
+      "savedSuccess": "Settings saved.",
+      "newProductDaysLabel": "Product «newness» (days)",
+      "freeThresholdLabel": "Free delivery threshold (₽)",
+      "freeThresholdPlaceholder": "0 = disabled",
+      "freeThresholdHelp": "Order amount from which delivery is free. 0 — no free delivery.",
+      "orderPrefixLabel": "Order number prefix",
+      "orderPrefixPlaceholder": "e.g. GA",
+      "zonesHeading": "Delivery zones",
+      "zonesHelp": "Delivery price for the zone the customer selects. The threshold is optional: the order amount from which delivery to this zone is free.",
+      "addZone": "+ Add zone",
+      "zonesEmpty": "No zones defined — the standard delivery calculation is used.",
+      "zoneLabelPlaceholder": "e.g. Within the city ring road",
+      "zonePriceLabel": "Price (₽)",
+      "zoneFreeThresholdLabel": "Threshold ₽ (opt.)"
+    },
+    "currencyUnitsForm": {
+      "refreshSuccess": "Rates updated from the Central Bank of Russia. Currencies with a manual rate were left untouched.",
+      "saveSuccess": "Currency, rates and units saved.",
+      "baseCurrencyCode": "Base currency code",
+      "baseCurrencyCodeHelp": "The currency used for storage and payment. Three Latin letters: RUB — ruble, USD — dollar, EUR — euro.",
+      "symbol": "Symbol",
+      "numberFormat": "Number format",
+      "numberFormatHelp": "How to separate digit groups and the decimal part. <code>ru-RU</code> — the convention used in Russia.",
+      "fractionDigitsLabel": "Decimal places",
+      "weightUnit": "Weight unit",
+      "weightGrams": "grams (g)",
+      "weightKilograms": "kilograms (kg)",
+      "dimensionUnit": "Dimension unit",
+      "dimCentimeters": "centimeters (cm)",
+      "dimMillimeters": "millimeters (mm)",
+      "additionalCurrenciesTitle": "Additional currencies (display only, by exchange rate)",
+      "additionalCurrenciesHelp": "Prices are stored and payment is taken in the base currency. Here are the currencies for the storefront switcher. The rate is how many base units equal 1 unit of this currency (e.g. 100 → 1 € = 100 ₽; the price is shown as price ₽ / rate).",
+      "autoRateLabel": "Update the rate automatically from the Central Bank of Russia (otherwise the manually entered rate below is used)",
+      "rateUpdatedAt": "Rate updated: {date}",
+      "currencyCodeAria": "Currency code",
+      "rateAria": "Rate",
+      "ratePlaceholder": "Rate (100)",
+      "fractionPlaceholder": "Decimals (2)",
+      "manualRateAria": "Rate for {code} is set manually",
+      "manualRateAriaFallback": "currency",
+      "manualRateLabel": "Rate set manually — automatic updates from the Central Bank do not affect this currency",
+      "addCurrencyAria": "Currency to add",
+      "addOption": "{code} — {label}",
+      "addCurrencyButton": "+ Add currency",
+      "refreshRatesButton": "Update rates from the Central Bank now",
+      "refreshRatesHelp": "The update button is handy right after unchecking «rate set manually» — the rate will be fetched without waiting for the nightly update."
+    },
+    "languagesForm": {
+      "saveSuccess": "Language set saved.",
+      "storefrontNoticeTitle": "Important note about the storefront.",
+      "storefrontNoticeBody": "The site currently uses its own list of languages and does not yet read this set: a language disabled here will not disappear from the storefront — its pages will simply be shown in the default language ({defaultLabel}). In the admin panel the set takes effect immediately: it determines the translation tabs in the catalog and content forms.",
+      "defaultLocaleLabel": "Default language",
+      "defaultLocaleHelp": "Cannot be changed. All primary content (names, descriptions, page texts) is stored in the database in this language, with translations layered on top. Changing the default language would require migrating all data and would change the site's page URLs, so it is done separately, by hand.",
+      "defaultRowNote": "default language — always enabled",
+      "localeToggleAria": "Language {label}",
+      "enabledState": "Enabled",
+      "disabledState": "Disabled",
+      "addManualLabel": "Add a language manually",
+      "customPlaceholder": "e.g. pt-br",
+      "customHelp": "Standard language code: two or three Latin letters, optionally with a region after a hyphen.",
+      "saveButton": "Save languages"
+    },
+    "page": {
+      "header": {
+        "title": "Store settings",
+        "subtitle": "Store name, currency, contacts, delivery and other store parameters."
+      },
+      "tocAriaLabel": "Settings sections",
+      "sections": {
+        "branding": "Branding",
+        "home": "Home page",
+        "currency": "Currency and units",
+        "contacts": "Legal details and contacts",
+        "catalog": "Catalog, delivery, orders",
+        "modules": "Modules",
+        "navigation": "Navigation (menu and footer)",
+        "access": "Access",
+        "seo": "SEO and search"
+      },
+      "reset": {
+        "branding": "Reset branding",
+        "homeContent": "Reset home page content",
+        "currency": "Reset currency",
+        "exchange": "Reset exchange rates",
+        "units": "Reset units",
+        "contacts": "Reset contacts",
+        "legalEntity": "Reset legal details",
+        "catalog": "Reset catalog",
+        "delivery": "Reset delivery",
+        "orders": "Reset orders",
+        "giftSettings": "Reset certificate settings",
+        "modules": "Reset modules",
+        "access": "Reset access mode",
+        "languages": "Reset languages",
+        "seo": "Reset SEO"
+      },
+      "gift": {
+        "description": "Whether to generate a certificate code automatically on payment, how many days it stays valid and which catalog sections count as certificates — in a separate section.",
+        "openLink": "Open certificate settings →"
+      },
+      "languages": {
+        "description": "Which languages are available in the store and how complete the translations are — in a separate section. The default language cannot be changed: it stores all the main content.",
+        "openLink": "Open language settings →"
+      },
+      "seo": {
+        "description": "Page titles, search engine descriptions, site address, sitemap and robots — in a separate section.",
+        "openLink": "Open SEO settings →"
+      }
+    },
+    "giftPage": {
+      "subtitle": "When the buyer receives the certificate code and how long it stays valid.",
+      "backToSettings": "Back to settings",
+      "resetLabel": "Reset certificate settings"
+    },
+    "seoPage": {
+      "title": "SEO settings",
+      "subtitle": "Domain, titles and descriptions for search engines and social networks.",
+      "backToSettings": "Back to settings"
+    },
+    "resetSettingButton": {
+      "confirm": "Reset this section to default values? Overrides will be removed.",
+      "success": "Reset to default values.",
+      "pending": "Resetting…",
+      "default": "Reset to defaults"
+    },
+    "imageUploadButton": {
+      "default": "Upload file",
+      "pending": "Uploading…",
+      "done": "✓ file uploaded, address filled into the field"
+    },
+    "settingsTranslationTabs": {
+      "saved": "Translations saved."
+    }
+  },
+  "promo": {
+    "promoForm": {
+      "targetType": {
+        "category": "Category",
+        "brand": "Brand",
+        "product": "Product",
+        "variant": "Variant"
+      },
+      "savedChanges": "Changes saved.",
+      "codeLabel": "Code*",
+      "kindLabel": "Type*",
+      "valueLabel": "Value",
+      "valueHintPercent": "(percent 0..100)",
+      "valueHintFixed": "(amount)",
+      "minOrderTotalLabel": "Min. order amount",
+      "minOrderTotalHelp": "Minimum order amount for the promo to apply. Empty — no threshold.",
+      "maxDiscountLabel": "Discount cap (for percent)",
+      "maxDiscountPlaceholder": "no cap",
+      "usageLimitLabel": "Total limit",
+      "perCustomerLimitLabel": "Per customer",
+      "startsAtLabel": "Start",
+      "endsAtLabel": "End",
+      "bogoBuyLabel": "Buy N",
+      "bogoPayLabel": "Pay for M",
+      "bogoHelp": "For example «3 for 2»: buy N=3, pay for M=2 → the cheapest one is free.",
+      "applyScopeLegend": "Apply scope",
+      "targetsTitle": "Promo targets",
+      "targetsHelp": "Choose what the promo applies to: the type (category / brand / product) and the entity itself from the list.",
+      "targetsEmpty": "No targets — add at least one.",
+      "targetTypeSrLabel": "Target type {n}",
+      "targetEntitySrLabel": "Target entity {n}",
+      "selectOption": "— select —",
+      "identifierPlaceholder": "identifier",
+      "removeTargetAria": "Remove target {n}",
+      "addTarget": "+ Add target",
+      "priorityLabel": "Application order (lower — earlier)",
+      "minQtyLabel": "Min. number of units",
+      "minQtyPlaceholder": "no threshold",
+      "minQtyHelp": "The discount applies only if the cart contains at least the specified number of product units from the «Apply scope». Leave empty — no quantity limit.",
+      "giftLegend": "Gift (placeholder)",
+      "giftProductLabel": "Gift product (UUID)",
+      "giftVariantLabel": "Gift variant (UUID)",
+      "giftQtyLabel": "Qty",
+      "commentLabel": "Comment",
+      "stackableLabel": "Stackable (combines with others)",
+      "createButton": "Create promo code"
+    },
+    "page": {
+      "moduleDisabled": "orders (module disabled)",
+      "subtitle": "Total promo codes: {count}.",
+      "backToOrders": "To orders",
+      "createButton": "+ Create promo code",
+      "colCode": "Code",
+      "colKind": "Type",
+      "colValue": "Value",
+      "colScope": "Scope",
+      "colPriority": "Priority",
+      "colMinTotal": "Min. amount",
+      "colMinQty": "Min. qty",
+      "colLimit": "Limit (total/per person)",
+      "colUsed": "Used",
+      "colPeriod": "Period",
+      "colActive": "Active",
+      "empty": "No promo codes yet. Create the first one.",
+      "stackableBadge": "stackable",
+      "exclusiveBadge": "exclusive",
+      "unlimited": "unlimited"
+    },
+    "detailPage": {
+      "moduleDisabled": "orders (module disabled)",
+      "notFoundTitle": "Promo code not found",
+      "backToList": "Back to promo codes",
+      "title": "Promo code {code}",
+      "subtitle": "Used: {count} times",
+      "backLabel": "Back to promo codes"
+    },
+    "promoRowActions": {
+      "deactivate": "Deactivate",
+      "confirmDeactivate": "Deactivate promo code «{code}»? It will stop applying but stay in the list (you can re-enable it via «Edit»).",
+      "confirmDelete": "Delete promo code «{code}» permanently? Order history will be kept."
+    },
+    "newPage": {
+      "title": "New promo code",
+      "breadcrumbNew": "New",
+      "backToList": "Back to promo codes",
+      "moduleDisabled": "orders (module disabled)"
+    }
+  },
+  "cms": {
+    "page": {
+      "moduleDisabled": "cms (module disabled)",
+      "title": "Content — pages",
+      "subtitle": "Pages found: {total}.",
+      "createButton": "+ Create page",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Name or slug",
+      "statusLabel": "Status",
+      "statusAll": "All",
+      "statusArchived": "Archived",
+      "colSlug": "Slug",
+      "colPublished": "Published",
+      "colUpdated": "Updated",
+      "empty": "No pages found. Change the filters or create a page.",
+      "paginationAria": "Pagination",
+      "forward": "Forward"
+    },
+    "newPage": {
+      "moduleDisabled": "cms (module disabled)",
+      "breadcrumbCurrent": "New page",
+      "title": "New page",
+      "subtitle": "Fill in the title and SEO, then create the page. Sections (hero, text, banners, product grid, etc.) become available after creation."
+    },
+    "pageForm": {
+      "savedChanges": "Changes saved.",
+      "savedAndPublished": "Page saved and published.",
+      "confirmDelete": "Delete the page with all its sections? This action cannot be undone.",
+      "unpublished": "Unpublished.",
+      "noWriteWarning": "You don't have permission to edit this page (the «cms.write» permission is required). The fields are read-only — changes cannot be saved. Contact the administrator to be granted this permission.",
+      "slugLabel": "URL slug",
+      "slugPlaceholder": "auto from title",
+      "statusLabel": "Status",
+      "statusArchived": "Archived",
+      "sitemapPriority": "Sitemap priority (0–1)",
+      "sitemapChangefreq": "Sitemap changefreq",
+      "canonicalPlaceholder": "Auto: /pages/{slug}",
+      "slugFallback": "page-slug",
+      "uploadImage": "Upload image",
+      "createButton": "Create page",
+      "saveAndPublish": "Save and publish",
+      "unpublish": "Unpublish",
+      "backToList": "Back to list",
+      "deletePage": "Delete page",
+      "sectionsAfterCreate": "Page sections become available after it is created.",
+      "sectionEditorNoWrite": "The section editor is available only with the «cms.write» permission."
+    },
+    "sectionEditor": {
+      "confirmDelete": "Delete section «{key}»?",
+      "title": "Page sections",
+      "typeAriaLabel": "Section type",
+      "addSection": "Add section",
+      "newSection": "New section: {type}",
+      "empty": "No sections yet. Add the first one.",
+      "dragTitle": "Drag to reorder",
+      "hiddenBadge": "hidden",
+      "visibleLabel": "Visible",
+      "collapse": "Collapse"
+    },
+    "sectionForm": {
+      "localeAriaLabel": "Section language",
+      "translationHint": "Section translation to <strong>{locale}</strong>. An empty field — the primary ({defaultLocale}) text is shown on the storefront. Links, images and collection settings are not translated — they are shared across all languages.",
+      "noTranslatableText": "This section type has no translatable text.",
+      "saveButton": "Save section",
+      "uploadAndAddImage": "Upload and add image",
+      "uploadImage": "Upload image"
+    },
+    "richTextEditor": {
+      "toolbarAriaLabel": "Formatting",
+      "bold": "B",
+      "italic": "I",
+      "bulletList": "• List"
+    },
+    "detailPage": {
+      "moduleDisabled": "cms (module disabled)",
+      "slugLabel": "Slug:"
+    },
+    "cmsImageUploadButton": {
+      "uploadFile": "Upload file",
+      "uploading": "Uploading…",
+      "done": "✓ file uploaded, key inserted into the field"
+    },
+    "statusBadge": {
+      "archived": "Archived"
+    }
+  },
+  "giftCertificates": {
+    "giftCertificateForm": {
+      "termsLabel": "Terms of use",
+      "savedChanges": "Changes saved.",
+      "summary": {
+        "nominal": "Face value",
+        "spent": "Spent",
+        "remaining": "Balance",
+        "status": "Status"
+      },
+      "codeLabel": "Code*",
+      "codePlaceholder": "e.g. GIFT2026",
+      "codeLocked": "The code cannot be changed.",
+      "nameLabel": "Name",
+      "namePlaceholder": "internal label (not published)",
+      "faceTopUp": "Face value (top-up only)",
+      "faceRequired": "Face value*",
+      "facePlaceholder": "e.g. 5000.00",
+      "faceTopUpHelp": "Leave as is or increase (not below the amount spent). It cannot be decreased.",
+      "validUntilLabel": "Valid until",
+      "validUntilHelp": "Empty — no expiry.",
+      "descriptionLabel": "Description (public)",
+      "purchaserLegend": "Purchaser",
+      "emailLabel": "Email",
+      "phoneLabel": "Phone",
+      "purchaserSnapshotHelp": "Snapshot taken at issue time: editing the customer record will not change it.",
+      "recipientLegend": "Recipient",
+      "commentLabel": "Comment (internal)",
+      "submitIssue": "Issue"
+    },
+    "detailPage": {
+      "moduleDisabled": "Orders (module disabled)",
+      "issueSource": {
+        "order": "by an administrator from an order line",
+        "auto": "automatically",
+        "manual": "manually",
+        "none": "with no source specified"
+      },
+      "notFound": {
+        "title": "Certificate not found",
+        "backLink": "Back to the certificate list"
+      },
+      "title": "Certificate {code}",
+      "subtitle": "Balance: {remaining} {currency} of {initial}",
+      "breadcrumb": "Certificates",
+      "backLabel": "Back to certificates",
+      "origin": {
+        "title": "Issue origin",
+        "text": "Issued {source} for order <link>{orderId}…</link>. The face value equals the amount actually paid for the order line."
+      },
+      "redemptions": {
+        "title": "Redemption history",
+        "empty": "No redemptions yet.",
+        "colDate": "Date",
+        "colOrder": "Order",
+        "colAmount": "Amount",
+        "colState": "State",
+        "reversed": "reversed {date}",
+        "redeemed": "redeemed"
+      }
+    },
+    "page": {
+      "moduleDisabled": "Orders (module disabled)",
+      "subtitle": "Balance certificates: the face value is redeemed partially across several orders and the remaining balance is stored. Total: {total}.",
+      "breadcrumb": "Certificates",
+      "issue": "Issue",
+      "empty": "No certificates yet.",
+      "cols": {
+        "code": "Code",
+        "name": "Name",
+        "purchaser": "Purchaser",
+        "recipient": "Recipient",
+        "nominal": "Face value",
+        "spent": "Spent",
+        "remaining": "Balance",
+        "validUntil": "Valid until",
+        "status": "Status"
+      },
+      "byOrder": "from order",
+      "unlimited": "no expiry"
+    },
+    "giftRowActions": {
+      "open": "Open",
+      "activateTitle": "Reactivate the certificate",
+      "activate": "Activate",
+      "disableConfirm": "Disable the certificate? Redemptions from it will no longer be possible.",
+      "disableTitle": "Disable the certificate",
+      "disable": "Disable"
+    },
+    "giftStatusBadge": {
+      "depleted": "Depleted",
+      "expired": "Expired"
+    },
+    "newPage": {
+      "title": "New certificate",
+      "breadcrumbNew": "New",
+      "backLabel": "Back to certificates",
+      "moduleDisabled": "orders (module disabled)"
+    }
+  },
+  "orders": {
+    "orderActionsPanel": {
+      "heading": "Status management",
+      "intro": "Order, payment and delivery statuses are managed independently.",
+      "contradictionsTitle": "Possible status mismatch:",
+      "giftTitle": "Gift certificates for this order:",
+      "commentLabel": "Comment (added to the status history)",
+      "commentPlaceholder": "Optional",
+      "orderStatusHeading": "Order status",
+      "paymentStatusHeading": "Payment status",
+      "deliveryStatusHeading": "Delivery status",
+      "terminalNoTransitions": "Terminal status — no transitions.",
+      "noTransitions": "No transitions.",
+      "actionDone": "{label}: done.",
+      "labels": {
+        "cancelOrder": "Order cancellation",
+        "refund": "Refund",
+        "changeStatus": "Status change",
+        "changePaymentStatus": "Payment status change",
+        "changeDeliveryStatus": "Delivery status change"
+      },
+      "confirmCancel": "Cancel the order? The stock reservation will be released.",
+      "confirmRefund": "Issue a refund? The payment status will change to «Refunded»."
+    },
+    "page": {
+      "moduleDisabled": "orders (module disabled)",
+      "subtitle": "Orders found: {total}. Amounts in {currency}.",
+      "createOrder": "Create order",
+      "columns": {
+        "number": "Number",
+        "date": "Date",
+        "customer": "Customer",
+        "total": "Total",
+        "status": "Status",
+        "payment": "Payment",
+        "delivery": "Delivery",
+        "method": "Method"
+      },
+      "emptyFiltered": "Nothing found for the selected filters. Reset the filters.",
+      "emptyNoOrders": "No orders yet.",
+      "paginationAria": "Pagination"
+    },
+    "detailGiftIssueBlock": {
+      "heading": "Gift certificates",
+      "issuedSuccess": "Certificate {code} for {amount} issued.",
+      "forAmount": "for {amount}",
+      "recipientLine": "recipient: {recipient}",
+      "spentLine": "spent: {spent}",
+      "noneIssued": "No certificates have been issued for this order yet.",
+      "needWritePermission": "The gift.write permission is required to issue certificates.",
+      "looksLikeCertificate": "looks like a certificate",
+      "faceValue": "face value {value}",
+      "alreadyIssued": "certificate already issued",
+      "issueButton": "Issue certificate for this order",
+      "faceValueHint": "The face value will equal the amount actually paid for the item ({value}). The customer is taken from the order data.",
+      "recipientNameLabel": "Recipient name",
+      "recipientEmailLabel": "Recipient e-mail",
+      "issuing": "Issuing…",
+      "issueConfirm": "Issue"
+    },
+    "orderFilters": {
+      "ariaLabel": "Order filters",
+      "searchLabel": "Search (number / email / phone)",
+      "searchPlaceholder": "e.g. 2026-000123 or email",
+      "orderStatusLabel": "Order status",
+      "any": "Any",
+      "paymentStatusLabel": "Payment status",
+      "deliveryTypeLabel": "Delivery type",
+      "promoCodeLabel": "Promo code",
+      "promoCodePlaceholder": "Promo code",
+      "dateFromLabel": "Date from",
+      "dateToLabel": "Date to"
+    },
+    "manualOrderForm": {
+      "itemsHeading": "Products",
+      "searchLabel": "Product search (name or SKU)",
+      "searchPlaceholder": "e.g. t-shirt or TC-001",
+      "searching": "Searching…",
+      "searchButton": "Search",
+      "searchingProducts": "Searching products…",
+      "searchEmpty": "Nothing found. Change your query.",
+      "variantsCount": "Variants: {count}",
+      "priceAvailable": "{price} · {stock} available",
+      "colProduct": "Product",
+      "colVariant": "Variant",
+      "colQty": "Qty",
+      "colPrice": "Price",
+      "colSum": "Amount",
+      "selectProductHint": "— select a product via search —",
+      "variantAria": "Product variant",
+      "qtyAria": "Quantity",
+      "addEmptyLine": "+ Add empty row",
+      "subtotalPreview": "Subtotal (preview):",
+      "serverCalcNote": "The server calculates the total, discounts and delivery when the order is created.",
+      "customerHeading": "Customer",
+      "phoneLabel": "Phone",
+      "emailLabel": "Email",
+      "deliveryHeading": "Delivery",
+      "deliveryMethodLabel": "Delivery method",
+      "cityLabel": "City",
+      "addressLabel": "Address",
+      "pvzCodeLabel": "Pickup point code (CDEK)",
+      "pickupNote": "Pickup: address and pickup point are not required.",
+      "paymentCommentHeading": "Payment and comment",
+      "paymentMethodLabel": "Payment method",
+      "commentLabel": "Comment (optional)",
+      "creatingOrder": "Creating order…",
+      "createOrder": "Create order",
+      "addAtLeastOne": "Add at least one product."
+    },
+    "detailCdekBlock": {
+      "title": "CDEK delivery",
+      "pickupNote": "Pickup — no CDEK shipment is created.",
+      "statusLabel": "Status",
+      "noShipment": "— no shipment —",
+      "trackLabel": "Tracking",
+      "pvzLabel": "Pickup point",
+      "errorLabel": "Error",
+      "awaitPaymentNote": "The CDEK shipment and waybill are created <strong>after payment is received</strong> — automatically, with no manual steps. This keeps unpaid orders from shipping.",
+      "createShipment": "Create shipment",
+      "refreshStatus": "Refresh status",
+      "printWaybill": "Print waybill",
+      "printBarcode": "Print barcode",
+      "cancelShipment": "Cancel shipment",
+      "historyTitle": "CDEK status history",
+      "confirmCancel": "Cancel the CDEK shipment?",
+      "actionDone": "{label}: done.",
+      "action": {
+        "createShipment": "Creating shipment",
+        "refreshStatus": "Refreshing status",
+        "printWaybill": "Printing waybill",
+        "printBarcode": "Printing barcode",
+        "cancelShipment": "Cancelling shipment"
+      }
+    },
+    "detailPage": {
+      "moduleDisabled": "orders (module disabled)",
+      "notFoundTitle": "Order not found",
+      "notFoundText": "It may have been deleted.",
+      "backToList": "Back to orders",
+      "title": "Order {number}",
+      "createdLine": "Created {date} · source: {source}",
+      "sourceAdmin": "admin panel",
+      "sourceStorefront": "storefront",
+      "itemsHeading": "Items",
+      "columns": {
+        "product": "Product",
+        "sku": "SKU",
+        "quantity": "Qty",
+        "price": "Price",
+        "total": "Total"
+      },
+      "giftBadge": "Gift",
+      "summary": {
+        "items": "Items",
+        "grandTotal": "Total"
+      },
+      "labelDiscount": "Discount",
+      "deliveryHeading": "Delivery",
+      "historyHeading": "Status history",
+      "historyEmpty": "No history yet.",
+      "customerHeading": "Customer",
+      "customer": {
+        "email": "Email",
+        "phone": "Phone",
+        "comment": "Comment"
+      },
+      "delivery": {
+        "type": "Type",
+        "postamatSuffix": "{type} · Parcel locker",
+        "zone": "Zone",
+        "city": "City",
+        "address": "Address",
+        "pvz": "Pickup point",
+        "cost": "Cost",
+        "track": "Tracking"
+      },
+      "labelStatus": "Status",
+      "paymentHeading": "Payment",
+      "payment": {
+        "method": "Method",
+        "paidAt": "Paid at"
+      },
+      "promoHeading": "Promo code",
+      "promo": {
+        "code": "Code"
+      }
+    },
+    "newPage": {
+      "title": "New order",
+      "subtitle": "Add products, specify the customer and delivery. The server will verify the total, stock and prices on creation.",
+      "backLabel": "Back to orders",
+      "moduleDisabled": "orders (module disabled)"
+    }
+  },
+  "news": {
+    "newsForm": {
+      "fields": {
+        "title": "Title",
+        "titleRequired": "Title*",
+        "group": "Section",
+        "excerpt": "Excerpt",
+        "body": "Body",
+        "bodyHtml": "Body (HTML)",
+        "slug": "URL slug",
+        "status": "Status",
+        "cover": "Cover image (file path)",
+        "publishedAt": "Publication date",
+        "sortOrder": "Order"
+      },
+      "slugPlaceholder": "auto from title",
+      "status": {
+        "draft": "Draft",
+        "published": "Published",
+        "archived": "Archived"
+      },
+      "bodyHelp": "HTML markup is sanitized on the server (p/strong/em/a/lists/headings are allowed).",
+      "uploadCover": "Upload cover",
+      "uploadImage": "Upload image",
+      "seo": {
+        "canonicalPlaceholder": "Auto: /news/{slug}",
+        "slugFallback": "news-slug"
+      },
+      "createButton": "Create article",
+      "saveAndPublish": "Save and publish",
+      "unpublish": "Unpublish",
+      "archive": "Archive",
+      "backToList": "Back to list",
+      "deleteButton": "Delete article",
+      "confirmDelete": "Delete this article? This action cannot be undone.",
+      "noWriteWarning": "You don't have permission to edit news (the «news.write» permission is required). Fields are read-only.",
+      "toast": {
+        "saved": "Changes saved.",
+        "published": "Article published.",
+        "unpublished": "Unpublished.",
+        "archived": "Article archived."
+      }
+    },
+    "page": {
+      "title": "News",
+      "subtitle": "Articles found: {total}.",
+      "createButton": "+ Create article",
+      "moduleDisabled": "news (module disabled)",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Title, slug or section",
+      "statusLabel": "Status",
+      "statusAll": "All",
+      "status": {
+        "draft": "Draft",
+        "published": "Published",
+        "archived": "Archived"
+      },
+      "columns": {
+        "title": "Title",
+        "group": "Section",
+        "status": "Status",
+        "publishedAt": "Published",
+        "sortOrder": "Order"
+      },
+      "empty": "No articles found. Change the filters or create an article.",
+      "paginationAria": "Pagination",
+      "forward": "Forward"
+    },
+    "newPage": {
+      "title": "New article",
+      "subtitle": "Fill in the title, body and SEO, then create the article. Translations (EN/FR) and publishing become available after creation.",
+      "breadcrumbsAria": "Breadcrumbs",
+      "breadcrumbNews": "News",
+      "breadcrumbCurrent": "New article",
+      "moduleDisabled": "news (module disabled)"
+    },
+    "detailPage": {
+      "breadcrumbsAria": "Breadcrumbs",
+      "breadcrumbNews": "News",
+      "slugLabel": "Slug:",
+      "moduleDisabled": "news (module disabled)"
+    },
+    "newsStatusBadge": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "newsImageUploadButton": {
+      "defaultLabel": "Upload file",
+      "uploading": "Uploading…",
+      "done": "✓ file uploaded, key filled in"
+    }
+  },
+  "reviews": {
+    "page": {
+      "moduleDisabled": "reviews (module disabled)",
+      "subtitle": "Moderation of customer reviews. Pending: {pending}. Total: {total}.",
+      "statusLabel": "Status",
+      "statusAll": "All",
+      "statusPending": "Pending moderation",
+      "statusApproved": "Approved",
+      "statusRejected": "Rejected",
+      "colDate": "Date",
+      "colProduct": "Product",
+      "colAuthor": "Author",
+      "colRating": "Rating",
+      "colText": "Text",
+      "empty": "No reviews found.",
+      "replyPrefix": "Reply: {reply}",
+      "paginationAria": "Pagination"
+    },
+    "detailPage": {
+      "moduleDisabled": "reviews (module disabled)",
+      "title": "Review by {author}",
+      "dateLabel": "Date",
+      "productLabel": "Product",
+      "reviewTextLabel": "Review text",
+      "moderationHeading": "Moderation",
+      "replyHeading": "Store reply",
+      "replyHelp": "The reply is shown on the storefront below the review. Translations (EN/FR) are on the tabs; the customer's review text is not translated."
+    },
+    "reviewReplyForm": {
+      "replyFieldLabel": "Store reply",
+      "baseReplyLabel": "Store reply ({locale})",
+      "replyPlaceholder": "Public reply to the review (shown on the storefront)",
+      "saveReply": "Save reply"
+    },
+    "reviewRowActions": {
+      "changeStatusTo": "Change status to «{status}»",
+      "confirmDelete": "Delete the review permanently?",
+      "deleteTitle": "Delete review"
+    },
+    "ratingStars": {
+      "ariaLabel": "Rating {n} of 5"
+    }
+  },
+  "users": {
+    "userForm": {
+      "toast": {
+        "passwordUpdated": "Password updated."
+      },
+      "emailLabel": "Email*",
+      "emailReadonlyHint": "The email (login) cannot be changed.",
+      "passwordLabel": "Password*",
+      "passwordPlaceholder": "at least 8 characters",
+      "statusLabel": "Status",
+      "noRolesHint": "No roles yet — create them in the «Roles» section.",
+      "createButton": "Create user",
+      "resetPassword": "Reset password",
+      "resetPasswordHint": "Set a new sign-in password for the employee. The old one will stop working.",
+      "newPasswordLabel": "New password"
+    },
+    "page": {
+      "statusInvited": "Invited",
+      "subtitle": "Employees with admin panel access and their roles.",
+      "createButton": "+ Create user",
+      "colEmail": "Email",
+      "colStatus": "Status",
+      "colLastLogin": "Last login",
+      "colOwner": "Owner",
+      "empty": "No users yet.",
+      "yes": "yes",
+      "protected": "protected"
+    },
+    "detailPage": {
+      "backToList": "Back to list",
+      "ownerNotice": "This is the store owner's account. It cannot be modified or disabled."
+    },
+    "newPage": {
+      "title": "New user",
+      "subtitle": "Create an employee account and assign roles.",
+      "backToList": "Back to list"
+    }
+  },
+  "roles": {
+    "roleForm": {
+      "modules": {
+        "core": "Core",
+        "catalog": "Catalog",
+        "orders": "Orders",
+        "cdek": "CDEK delivery",
+        "cms": "Content"
+      },
+      "codeLabel": "Code*",
+      "codePlaceholder": "e.g. support",
+      "codeReadonlyHint": "The role code cannot be changed.",
+      "systemRoleNote": "This is a system role.",
+      "codeHint": "Lowercase Latin letters, no spaces (e.g. support, content).",
+      "titleLabel": "Name*",
+      "titlePlaceholder": "e.g. Support",
+      "permissionsLegend": "Permissions",
+      "permissionsHint": "Check what employees with this role are allowed to do.",
+      "createButton": "Create role"
+    },
+    "page": {
+      "subtitle": "Permission sets for employees. System roles cannot be deleted.",
+      "createButton": "+ Create role",
+      "colPermissions": "Permissions",
+      "colType": "Type",
+      "empty": "No roles yet.",
+      "typeSystem": "system",
+      "typeCustom": "custom",
+      "protected": "protected"
+    },
+    "newPage": {
+      "title": "New role",
+      "subtitle": "Define the set of permissions employees with this role will get.",
+      "backToList": "Back to list"
+    },
+    "detailPage": {
+      "systemRoleSubtitle": "System role",
+      "backToList": "Back to list"
+    },
+    "roleDeleteButton": {
+      "confirm": "Delete role «{title}»? This action cannot be undone.",
+      "deleting": "Deleting…"
+    }
+  },
+  "leads": {
+    "page": {
+      "subtitle": "Messages from the storefront feedback form (/contacts). Change the status or delete processed ones. Total: {total}.",
+      "truncationHint": "{notice}. Use export to get the full list.",
+      "empty": "No leads yet.",
+      "columns": {
+        "date": "Date",
+        "contact": "Contact",
+        "source": "Source",
+        "details": "Details",
+        "message": "Message",
+        "answer": "Operator reply",
+        "status": "Status"
+      },
+      "details": {
+        "company": "Company: {value}",
+        "city": "City: {value}",
+        "subject": "Subject: {value}"
+      },
+      "downloadAttachment": "Download attachment"
+    },
+    "leadRowActions": {
+      "changeStatusTo": "Change status to «{status}»",
+      "confirmDelete": "Delete this lead permanently?",
+      "deleteTitle": "Delete lead"
+    },
+    "exportToolbar": {
+      "copyManually": "Copy the contacts manually:",
+      "copied": "Copied",
+      "copyContacts": "Copy contacts",
+      "downloadCsv": "Download CSV"
+    },
+    "leadAnswerForm": {
+      "answerPlaceholder": "Operator reply…",
+      "saveAnswer": "Save reply"
+    }
+  },
+  "customers": {
+    "page": {
+      "subtitle": "Storefront accounts and guest contacts. Total: {total}.",
+      "searchPlaceholder": "Search by email, name, phone",
+      "searchButton": "Search",
+      "emptyState": "No customers found.",
+      "colEmail": "Email",
+      "colStatus": "Status",
+      "colOrders": "Orders",
+      "colTotal": "Total",
+      "colLastLogin": "Last login",
+      "colRegistered": "Registered"
+    },
+    "detailPage": {
+      "subtitle": "Customer account — view",
+      "profileHeading": "Profile",
+      "email": "Email",
+      "phone": "Phone",
+      "status": "Status",
+      "emailVerified": "Email verified",
+      "language": "Language",
+      "lastLogin": "Last login",
+      "registered": "Registered",
+      "ordersAndTotal": "Orders / total",
+      "ordersEmpty": "This customer has no linked orders yet.",
+      "colNumber": "Number",
+      "colDate": "Date",
+      "colPayment": "Payment",
+      "colTotal": "Total"
+    }
+  },
+  "cdek": {
+    "page": {
+      "title": "Delivery (CDEK)",
+      "subtitle": "Shipments found: {total}.",
+      "moduleDisabledPermission": "CDEK delivery (module disabled)",
+      "searchPlaceholder": "Search: tracking number or order number",
+      "searchButton": "Search",
+      "empty": "No shipments yet. CDEK waybills are created from the order card (the «CDEK delivery» block) after successful payment.",
+      "printWaybill": "Waybill",
+      "mockPrintTitle": "MOCK: a real waybill will appear in production mode (with production CDEK keys)",
+      "paginationAria": "Pagination",
+      "columns": {
+        "trackNumber": "Tracking number",
+        "order": "Order",
+        "customer": "Customer",
+        "method": "Method",
+        "destination": "Destination",
+        "cdekStatus": "CDEK status",
+        "updated": "Updated",
+        "print": "Print"
+      },
+      "mode": {
+        "mockLabel": "MOCK",
+        "mockHint": "Production keys are not set — no real shipments are created.",
+        "testLabel": "Test environment (edu)",
+        "testHint": "Requests go to the CDEK sandbox (api.edu.cdek.ru). Shipments are test ones.",
+        "prodLabel": "Production environment",
+        "prodHint": "Requests go to the production CDEK API. Real shipments are created."
+      }
+    }
+  },
+  "audit": {
+    "page": {
+      "title": "Audit log",
+      "subtitle": "Total events: {total}. Page {currentPage} of {totalPages}.",
+      "columns": {
+        "time": "Time (MSK)",
+        "actor": "Actor",
+        "action": "Action",
+        "entity": "Entity",
+        "changes": "Changes"
+      },
+      "empty": "No records yet.",
+      "details": "Details ({count})",
+      "diff": {
+        "field": "Field",
+        "before": "Before",
+        "after": "After"
+      },
+      "paginationAria": "Pagination"
+    },
+    "auditFilters": {
+      "ariaLabel": "Audit log filters",
+      "dateFrom": "Date from",
+      "dateTo": "Date to",
+      "actor": "Actor (email)",
+      "actorPlaceholder": "e.g. admin@shop.ru",
+      "action": "Action",
+      "anyAction": "Any",
+      "entityType": "Entity type",
+      "anyEntity": "Any"
+    }
+  },
+  "account": {
+    "changePasswordForm": {
+      "passwordsMismatch": "Passwords do not match",
+      "doneTitle": "Password changed.",
+      "doneMessage": "For security reasons, all your sessions have been ended. Sign in again with your new password.",
+      "loginAgain": "Sign in again",
+      "currentPasswordLabel": "Current password",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "at least {min} characters",
+      "confirmPasswordLabel": "Confirm new password",
+      "submit": "Change password"
+    },
+    "page": {
+      "title": "Profile",
+      "subtitle": "Manage your account and change your password.",
+      "loginLabel": "Login (email)",
+      "changePasswordHeading": "Change password",
+      "changePasswordHint": "Enter your current password and a new one. After the change, all your sessions will end — you will need to sign in again."
+    }
+  },
+  "subscribers": {
+    "page": {
+      "subtitle": "Newsletter email subscribers (form in the storefront footer). Total: {total}.",
+      "truncationHint": "Use the export to get the full list.",
+      "empty": "No subscribers yet.",
+      "columns": {
+        "date": "Date",
+        "email": "Email",
+        "status": "Status"
+      }
+    },
+    "exportToolbar": {
+      "copyManualPrompt": "Copy the addresses manually:",
+      "copied": "Copied",
+      "copyAddresses": "Copy addresses",
+      "downloadCsv": "Download CSV"
+    },
+    "subscriberRowActions": {
+      "confirmUnsubscribe": "Unsubscribe «{email}» from the newsletter?",
+      "unsubscribe": "Unsubscribe"
+    }
   }
 }

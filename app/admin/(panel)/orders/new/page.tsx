@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getEnv } from '@/lib/config/env';
 import { paymentMethodLabel, deliveryTypeLabel } from '@/lib/admin/order-format';
 import { PAYMENT_METHODS, DELIVERY_TYPES } from '@/lib/orders/types';
@@ -20,10 +22,11 @@ import { ManualOrderForm } from '../_components/ManualOrderForm';
 export const dynamic = 'force-dynamic';
 
 export default async function NewOrderPage() {
+  const t = await getTranslations();
   const guard = await guardOrders('orders.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="orders (модуль выключен)" />;
+      return <Forbidden permission={t('orders.newPage.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -44,11 +47,11 @@ export default async function NewOrderPage() {
   return (
     <div>
       <PageHeader
-        title="Новый заказ"
-        subtitle="Добавьте товары, укажите покупателя и доставку. Итог, остатки и цены проверит сервер при создании."
-        breadcrumbs={[{ label: 'Заказы', href: '/admin/orders' }, { label: 'Новый заказ' }]}
+        title={t('orders.newPage.title')}
+        subtitle={t('orders.newPage.subtitle')}
+        breadcrumbs={[{ label: t('nav.orders'), href: '/admin/orders' }, { label: t('orders.newPage.title') }]}
         backHref="/admin/orders"
-        backLabel="К списку заказов"
+        backLabel={t('orders.newPage.backLabel')}
       />
 
       <div className="mt-6">

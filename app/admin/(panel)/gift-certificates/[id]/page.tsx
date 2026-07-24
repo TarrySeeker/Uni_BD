@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { can } from '@/lib/auth/rbac';
 import { getLocaleConfig } from '@/lib/i18n';
@@ -20,12 +21,12 @@ import { GiftCertificateForm } from '../_components/GiftCertificateForm';
  */
 export const dynamic = 'force-dynamic';
 
-/** Подпись источника выпуска (issue_source, миграция 0054). */
-function issueSourceLabel(src: string | null): string {
-  if (src === 'order') return 'администратором по позиции заказа';
-  if (src === 'auto') return 'автоматически';
-  if (src === 'manual') return 'вручную';
-  return 'без указания источника';
+/** Ключ подписи источника выпуска (issue_source, миграция 0054). */
+function issueSourceKey(src: string | null): string {
+  if (src === 'order') return 'giftCertificates.detailPage.issueSource.order';
+  if (src === 'auto') return 'giftCertificates.detailPage.issueSource.auto';
+  if (src === 'manual') return 'giftCertificates.detailPage.issueSource.manual';
+  return 'giftCertificates.detailPage.issueSource.none';
 }
 
 export default async function EditGiftCertificatePage({
@@ -33,10 +34,11 @@ export default async function EditGiftCertificatePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const guard = await guardGift('gift.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="orders (модуль выключен)" />;
+      return <Forbidden permission={t('giftCertificates.detailPage.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -47,10 +49,10 @@ export default async function EditGiftCertificatePage({
   if (!cert) {
     return (
       <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-6">
-        <h1 className="text-xl font-semibold text-amber-800">Сертификат не найден</h1>
+        <h1 className="text-xl font-semibold text-amber-800">{t('giftCertificates.detailPage.notFound.title')}</h1>
         <p className="mt-2 text-sm text-amber-700">
           <Link href="/admin/gift-certificates" className="text-blue-700 hover:underline">
-            К списку сертификатов
+            {t('giftCertificates.detailPage.notFound.backLink')}
           </Link>
         </p>
       </div>
@@ -63,22 +65,30 @@ export default async function EditGiftCertificatePage({
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title={`Сертификат ${cert.code}`}
-        subtitle={`Остаток: ${cert.remaining} ${cert.currency} из ${cert.initialAmount}`}
-        breadcrumbs={[{ label: 'Сертификаты', href: '/admin/gift-certificates' }, { label: cert.code }]}
+        title={t('giftCertificates.detailPage.title', { code: cert.code })}
+        subtitle={t('giftCertificates.detailPage.subtitle', {
+          remaining: cert.remaining,
+          currency: cert.currency,
+          initial: cert.initialAmount,
+        })}
+        breadcrumbs={[{ label: t('giftCertificates.detailPage.breadcrumb'), href: '/admin/gift-certificates' }, { label: cert.code }]}
         backHref="/admin/gift-certificates"
-        backLabel="К сертификатам"
+        backLabel={t('giftCertificates.detailPage.backLabel')}
       />
 
       {cert.issuedOrderId ? (
         <section className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
-          <h2 className="font-semibold text-gray-900">Происхождение выпуска</h2>
+          <h2 className="font-semibold text-gray-900">{t('giftCertificates.detailPage.origin.title')}</h2>
           <p className="mt-1 text-gray-700">
-            Выпущен {issueSourceLabel(cert.issueSource)} по заказу{' '}
-            <Link href={`/admin/orders/${cert.issuedOrderId}`} className="text-blue-700 hover:underline">
-              {cert.issuedOrderId.slice(0, 8)}…
-            </Link>
-            . Номинал — фактически уплаченная сумма позиции заказа.
+            {t.rich('giftCertificates.detailPage.origin.text', {
+              source: t(issueSourceKey(cert.issueSource)),
+              orderId: cert.issuedOrderId.slice(0, 8),
+              link: (chunks) => (
+                <Link href={`/admin/orders/${cert.issuedOrderId}`} className="text-blue-700 hover:underline">
+                  {chunks}
+                </Link>
+              ),
+            })}
           </p>
         </section>
       ) : null}
@@ -92,18 +102,18 @@ export default async function EditGiftCertificatePage({
       </div>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-gray-900">История списаний</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{t('giftCertificates.detailPage.redemptions.title')}</h2>
         {redemptions.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-600">Списаний ещё не было.</p>
+          <p className="mt-2 text-sm text-gray-600">{t('giftCertificates.detailPage.redemptions.empty')}</p>
         ) : (
           <div className="mt-3 overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-gray-500">
-                  <th className="px-4 py-2 font-medium">Дата</th>
-                  <th className="px-4 py-2 font-medium">Заказ</th>
-                  <th className="px-4 py-2 font-medium">Сумма</th>
-                  <th className="px-4 py-2 font-medium">Состояние</th>
+                  <th className="px-4 py-2 font-medium">{t('giftCertificates.detailPage.redemptions.colDate')}</th>
+                  <th className="px-4 py-2 font-medium">{t('giftCertificates.detailPage.redemptions.colOrder')}</th>
+                  <th className="px-4 py-2 font-medium">{t('giftCertificates.detailPage.redemptions.colAmount')}</th>
+                  <th className="px-4 py-2 font-medium">{t('giftCertificates.detailPage.redemptions.colState')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -117,7 +127,9 @@ export default async function EditGiftCertificatePage({
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-900">{r.amount}</td>
                     <td className="px-4 py-2 text-gray-600">
-                      {r.reversedAt ? `возвращено ${formatDateTime(r.reversedAt)}` : 'списано'}
+                      {r.reversedAt
+                        ? t('giftCertificates.detailPage.redemptions.reversed', { date: formatDateTime(r.reversedAt) })
+                        : t('giftCertificates.detailPage.redemptions.redeemed')}
                     </td>
                   </tr>
                 ))}

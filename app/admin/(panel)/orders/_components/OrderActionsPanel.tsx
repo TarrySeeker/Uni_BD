@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import {
   nextStatuses,
@@ -56,6 +57,7 @@ export function OrderActionsPanel({
   giftWarnings?: readonly string[];
 }) {
   const router = useRouter();
+  const t = useTranslations();
 
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export function OrderActionsPanel({
     const result = await fn();
     setPending(false);
     if (result.ok) {
-      setSuccess(`${label}: выполнено.`);
+      setSuccess(t('orders.orderActionsPanel.actionDone', { label }));
       setComment('');
       router.refresh();
     } else {
@@ -97,11 +99,11 @@ export function OrderActionsPanel({
   return (
     <section
       className="rounded-lg border border-gray-200 bg-white p-4"
-      aria-label="Управление статусами"
+      aria-label={t('orders.orderActionsPanel.heading')}
     >
-      <h2 className="text-sm font-semibold text-gray-800">Управление статусами</h2>
+      <h2 className="text-sm font-semibold text-gray-800">{t('orders.orderActionsPanel.heading')}</h2>
       <p className="mt-1 text-xs text-gray-500">
-        Статусы заказа, оплаты и доставки управляются независимо.
+        {t('orders.orderActionsPanel.intro')}
       </p>
 
       {contradictions.length > 0 ? (
@@ -109,7 +111,7 @@ export function OrderActionsPanel({
           role="status"
           className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
         >
-          <p className="font-medium">Возможное рассогласование статусов:</p>
+          <p className="font-medium">{t('orders.orderActionsPanel.contradictionsTitle')}</p>
           <ul className="mt-1 list-disc pl-5">
             {contradictions.map((msg) => (
               <li key={msg}>{msg}</li>
@@ -123,7 +125,7 @@ export function OrderActionsPanel({
           role="status"
           className="mt-3 rounded border border-violet-200 bg-violet-50 p-3 text-sm text-violet-900"
         >
-          <p className="font-medium">Подарочные сертификаты по этому заказу:</p>
+          <p className="font-medium">{t('orders.orderActionsPanel.giftTitle')}</p>
           <ul className="mt-1 list-disc pl-5">
             {giftWarnings.map((msg) => (
               <li key={msg}>{msg}</li>
@@ -151,14 +153,14 @@ export function OrderActionsPanel({
 
       <div className="mt-3">
         <label htmlFor="oa-comment" className="block text-xs font-medium text-gray-600">
-          Комментарий (попадёт в историю статусов)
+          {t('orders.orderActionsPanel.commentLabel')}
         </label>
         <input
           id="oa-comment"
           type="text"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Необязательно"
+          placeholder={t('orders.orderActionsPanel.commentPlaceholder')}
           className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
         />
       </div>
@@ -166,11 +168,11 @@ export function OrderActionsPanel({
       {/* --- Переходы статуса заказа --- */}
       <div className="mt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Статус заказа
+          {t('orders.orderActionsPanel.orderStatusHeading')}
         </h3>
         <div className="mt-2 flex flex-wrap gap-2">
           {orderNext.length === 0 ? (
-            <span className="text-sm text-gray-400">Терминальный статус — переходов нет.</span>
+            <span className="text-sm text-gray-400">{t('orders.orderActionsPanel.terminalNoTransitions')}</span>
           ) : (
             orderNext.map((to) => {
               const isCancel = to === 'cancelled';
@@ -183,17 +185,17 @@ export function OrderActionsPanel({
                   onClick={() =>
                     isCancel
                       ? run(
-                          'Отмена заказа',
+                          t('orders.orderActionsPanel.labels.cancelOrder'),
                           () => cancelOrderAction({ id: orderId, reason: comment || undefined }),
-                          'Отменить заказ? Резерв остатков будет возвращён.',
+                          t('orders.orderActionsPanel.confirmCancel'),
                         )
                       : isRefund
                         ? run(
-                            'Возврат',
+                            t('orders.orderActionsPanel.labels.refund'),
                             () => refundOrderAction({ id: orderId, reason: comment || undefined }),
-                            'Оформить возврат? Статус оплаты станет «Возврат».',
+                            t('orders.orderActionsPanel.confirmRefund'),
                           )
-                        : run('Смена статуса', () =>
+                        : run(t('orders.orderActionsPanel.labels.changeStatus'), () =>
                             changeOrderStatusAction({
                               id: orderId,
                               to,
@@ -218,11 +220,11 @@ export function OrderActionsPanel({
       {/* --- Переходы статуса оплаты --- */}
       <div className="mt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Статус оплаты
+          {t('orders.orderActionsPanel.paymentStatusHeading')}
         </h3>
         <div className="mt-2 flex flex-wrap gap-2">
           {paymentNext.length === 0 ? (
-            <span className="text-sm text-gray-400">Переходов нет.</span>
+            <span className="text-sm text-gray-400">{t('orders.orderActionsPanel.noTransitions')}</span>
           ) : (
             paymentNext.map((to) => (
               <button
@@ -230,7 +232,7 @@ export function OrderActionsPanel({
                 type="button"
                 disabled={pending}
                 onClick={() =>
-                  run('Смена статуса оплаты', () =>
+                  run(t('orders.orderActionsPanel.labels.changePaymentStatus'), () =>
                     setPaymentStatusAction({ id: orderId, to, comment: comment || undefined }),
                   )
                 }
@@ -246,11 +248,11 @@ export function OrderActionsPanel({
       {/* --- Переходы статуса доставки --- */}
       <div className="mt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Статус доставки
+          {t('orders.orderActionsPanel.deliveryStatusHeading')}
         </h3>
         <div className="mt-2 flex flex-wrap gap-2">
           {deliveryNext.length === 0 ? (
-            <span className="text-sm text-gray-400">Переходов нет.</span>
+            <span className="text-sm text-gray-400">{t('orders.orderActionsPanel.noTransitions')}</span>
           ) : (
             deliveryNext.map((to) => (
               <button
@@ -258,7 +260,7 @@ export function OrderActionsPanel({
                 type="button"
                 disabled={pending}
                 onClick={() =>
-                  run('Смена статуса доставки', () =>
+                  run(t('orders.orderActionsPanel.labels.changeDeliveryStatus'), () =>
                     setDeliveryStatusAction({ id: orderId, to, comment: comment || undefined }),
                   )
                 }

@@ -617,5 +617,1233 @@
     "badges": {
       "featured": "Хит"
     }
+  },
+  "settings": {
+    "homeContentForm": {
+      "savedToast": "Контент главной сохранён.",
+      "intro": "Контент главной страницы витрины. Пустое поле — вернётся значение по умолчанию. В списках — по одному пункту на строку.",
+      "saveButton": "Сохранить контент главной",
+      "photoLabel": "Фото",
+      "linkLabel": "Ссылка",
+      "blockTitleOptional": "Заголовок блока (необязательно)",
+      "tileN": "Плитка {n}",
+      "uploadTilePhoto": "Загрузить фото плитки",
+      "addTile": "+ Добавить плитку",
+      "hero": {
+        "legend": "Обложка (hero)",
+        "ctaLabel": "Текст кнопки",
+        "ctaPlaceholder": "Смотреть коллекцию",
+        "hrefLabel": "Ссылка кнопки",
+        "titleLabel": "Заголовок (необязательно)",
+        "subtitleLabel": "Подзаголовок (необязательно)",
+        "imageLabel": "Фон обложки",
+        "uploadBg": "Загрузить фон обложки",
+        "imageHint": "Загрузите файл или укажите адрес уже загруженного. Пусто — фон витрины по умолчанию."
+      },
+      "about": {
+        "legend": "Блок «О бренде»",
+        "titlePlaceholder": "О бренде",
+        "paragraphsLabel": "Абзацы (по одному на строку)",
+        "valuesLabel": "Ценности / теги (по одному на строку)",
+        "imagesLabel": "Фото галереи «О бренде» (по одному адресу на строку)",
+        "uploadPhoto": "Загрузить фото"
+      },
+      "quality": {
+        "legend": "Блок «Качество ткани»",
+        "titlePlaceholder": "Качество ткани",
+        "itemsLabel": "Пункты (по одному на строку)"
+      },
+      "delivery": {
+        "legend": "Блок «Доставка и оплата»",
+        "itemsLabel": "Пункты: «Заголовок | Описание» (по одному на строку)",
+        "itemsPlaceholder": "СДЭК | Доставка по всей России…\nСроки | Москва — 1–2 дня…",
+        "hint": "Например: <code>СДЭК | Доставка по всей России. Пункты выдачи и курьер.</code>"
+      },
+      "valuesStrip": {
+        "legend": "Лента ценностей",
+        "showToggle": "Показывать ленту на главной",
+        "itemsPlaceholder": "Форма | Структурные силуэты…\nФункция | Продуманный крой…",
+        "hint": "Лента показывается, только если включён флажок выше. Пусто — пункты по умолчанию."
+      },
+      "philosophy": {
+        "legend": "Блок «Философия»",
+        "eyebrowLabel": "Надзаголовок",
+        "eyebrowPlaceholder": "Философия",
+        "titlePlaceholder": "Например: качество, забота, стиль",
+        "textLabel": "Абзац",
+        "linkTextLabel": "Текст ссылки",
+        "linkHrefLabel": "Адрес ссылки"
+      },
+      "looks": {
+        "legend": "Блок «Образы»",
+        "showToggle": "Показывать «Образы» на главной",
+        "titlePlaceholder": "Образы",
+        "categoryN": "Категория {n}",
+        "catTitlePlaceholder": "Название образа",
+        "catTextLabel": "Текст",
+        "uploadPhoto": "Загрузить фото образа",
+        "addCategory": "+ Добавить категорию",
+        "hint": "Каждая категория — фото, заголовок и текст. Неполные категории не сохраняются."
+      },
+      "tiles": {
+        "legend": "Блок «Плитки категорий»",
+        "showToggle": "Показывать «Плитки категорий» на главной",
+        "titlePlaceholder": "Название категории",
+        "hint": "Каждая плитка — фото, заголовок и ссылка. Неполные плитки не сохраняются."
+      },
+      "video": {
+        "legend": "Блок «Видео»",
+        "showToggle": "Показывать «Видео» на главной",
+        "embedLabel": "Ссылка на видео (embed)",
+        "hint": "Только адрес вида <code>https://…</code> (embed-ссылка Vimeo/YouTube). Пусто — видео не показывается."
+      },
+      "designers": {
+        "legend": "Блок «Дизайнеры»",
+        "showToggle": "Показывать «Дизайнеры» на главной",
+        "titlePlaceholder": "Дизайнеры",
+        "designerN": "Дизайнер {n}",
+        "namePlaceholder": "Имя дизайнера",
+        "avatarLabel": "Аватар",
+        "uploadAvatar": "Загрузить аватар",
+        "workLabel": "Фото работы",
+        "uploadWork": "Загрузить фото работы",
+        "avatarTopLabel": "Позиция аватара (0–100)",
+        "workTopLabel": "Позиция работы (0–100)",
+        "addDesigner": "+ Добавить дизайнера",
+        "hint": "Каждая запись — имя, ссылка и два фото (аватар и работа). Позиции фото (0–100) — по вертикали, пусто — по центру. Неполные записи не сохраняются."
+      },
+      "slider": {
+        "legend": "Блок «Промо-слайдер»",
+        "showToggle": "Показывать «Промо-слайдер» на главной",
+        "slideN": "Слайд {n}",
+        "imageLabel": "Фон слайда",
+        "uploadBg": "Загрузить фон слайда",
+        "nameLabel": "Название (необязательно)",
+        "captionLabel": "Подпись (необязательно)",
+        "captionPlaceholder": "Всем по икре",
+        "addSlide": "+ Добавить слайд",
+        "hint": "Каждый слайд — фон и ссылка (путь от «/» или https://…), плюс необязательные название и подпись. Слайды без фона или ссылки не сохраняются."
+      },
+      "corpCert": {
+        "legend": "Блок «Корпоративным / сертификаты»",
+        "showToggle": "Показывать блок «Корпоративным / сертификаты» на главной",
+        "titlePlaceholder": "Корпоративным клиентам",
+        "hint": "Каждая плитка — фото, заголовок и ссылка (путь от «/» или https://…). Неполные плитки не сохраняются."
+      }
+    },
+    "brandingForm": {
+      "uploading": "Загрузка…",
+      "uploadFileDefault": "Загрузить файл",
+      "uploadDone": "✓ файл загружен, адрес подставлен в поле",
+      "saved": "Брендинг сохранён.",
+      "shopName": "Название магазина",
+      "logo": "Логотип",
+      "urlOrUploadPlaceholder": "https://… или загрузите файл",
+      "uploadLogo": "Загрузить логотип",
+      "favicon": "Favicon",
+      "uploadFavicon": "Загрузить favicon",
+      "theme": "Тема",
+      "themeSystem": "Системная",
+      "themeLight": "Светлая",
+      "themeDark": "Тёмная",
+      "primaryColor": "Основной цвет (HEX)",
+      "accentColor": "Акцентный цвет (HEX)",
+      "supportEmail": "Email поддержки",
+      "supportPhone": "Телефон поддержки",
+      "saveButton": "Сохранить брендинг"
+    },
+    "navigationForm": {
+      "saved": "Навигация сохранена.",
+      "intro": "Меню шапки и колонки футера витрины. Пусто — витрина покажет навигацию по умолчанию. Адрес ссылки — путь от «/» (например <code>/catalog</code>) либо полный URL / <code>mailto:</code> / <code>tel:</code>.",
+      "headerLegend": "Меню шапки",
+      "headerItemsLabel": "Пункты: «Метка | Ссылка» (по одному на строку)",
+      "headerPlaceholder": "Каталог | /catalog\nДоставка | /#delivery\nКонтакты | /contacts",
+      "headerHint": "Например: <code>Каталог | /catalog</code>",
+      "footerLegend": "Колонки футера",
+      "footerColumnsLabel": "Колонки разделяются пустой строкой. Первая строка колонки — заголовок, далее «Метка | Ссылка»",
+      "footerPlaceholder": "Магазин\nКаталог | /catalog\nДоставка | /#delivery\n\nСвязь\nПочта | mailto:info@example.com",
+      "footerHint": "Каждый блок до пустой строки — отдельная колонка футера.",
+      "saveButton": "Сохранить навигацию",
+      "resetButton": "Сбросить навигацию"
+    },
+    "seoSettingsForm": {
+      "saved": "SEO-настройки сохранены.",
+      "siteName": "Название сайта",
+      "siteUrl": "Домен сайта (site_url)",
+      "titleTemplate": "Шаблон заголовка страниц",
+      "titleTemplatePlaceholder": "%s — Мой магазин",
+      "titleTemplateHint": "<code>%s</code> заменится названием страницы. Пример: <code>%s — Мой магазин</code> → «Куртка — Мой магазин».",
+      "twitterSite": "Twitter @site",
+      "defaultDescription": "Описание по умолчанию",
+      "defaultOgImage": "Картинка для соцсетей по умолчанию (адрес файла)",
+      "defaultOgImagePlaceholder": "defaults/og.webp или загрузите файл",
+      "uploadImage": "Загрузить картинку",
+      "robotsExtra": "Доп. правила для поисковых роботов (для специалистов, необязательно)",
+      "noindexSite": "Закрыть весь сайт от индексации (noindex для staging)",
+      "saveButton": "Сохранить SEO"
+    },
+    "languagesPage": {
+      "subtitle": "Какие языки доступны в магазине и насколько заполнены переводы.",
+      "backToSettings": "К настройкам",
+      "shopLanguagesHeading": "Языки магазина",
+      "resetLanguages": "Сбросить языки",
+      "coverageHeading": "Заполненность переводов",
+      "coverageIntro": "Доля заполненных переводимых полей по каждому языку. Пустое поле не ошибка: на сайте вместо него показывается текст на языке по умолчанию ({defaultLocale}).",
+      "coverageNoSecondary": "Дополнительных языков нет — переводить нечего.",
+      "coverageNoData": "Пока нет данных для подсчёта.",
+      "colSection": "Раздел",
+      "colRecords": "Записей",
+      "notTranslated": "не переведено: {missing}"
+    },
+    "modulesForm": {
+      "confirmTurnOff": "Выключить модули: {modules}? Соответствующие разделы админки и функции на сайте станут недоступны. Продолжить?",
+      "saved": "Состав модулей обновлён.",
+      "warningCmsPublished": "У модуля «Контент» есть опубликованные страницы. Они не удалены — лишь скрыты до повторного включения.",
+      "systemNote": "«Настройки» — системный раздел и всегда доступен (его нельзя отключить).",
+      "defaultState": "по умолчанию: {state}",
+      "stateEnabled": "включён",
+      "stateDisabled": "выключен",
+      "moduleStateAria": "Состояние модуля {label}",
+      "optInherit": "Как по умолчанию",
+      "optOn": "Включить",
+      "optOff": "Выключить",
+      "saveButton": "Сохранить состав модулей"
+    },
+    "accessForm": {
+      "saved": "Режим доступа сохранён.",
+      "singleUserModeLabel": "Однопользовательский режим",
+      "singleUserModeHelp": "Скрыть и заблокировать разделы «Пользователи» и «Роли». Подходит магазину с единственным администратором: лишние разделы не мешают, а случайное создание второй учётной записи или роли исключено. По умолчанию выключено.",
+      "saveButton": "Сохранить режим доступа"
+    },
+    "giftGiftSettingsForm": {
+      "savedSuccess": "Настройки подарочных сертификатов сохранены.",
+      "autoIssueLabel": "Создавать код автоматически при оплате",
+      "autoIssueHelp": "Когда покупатель оплатил заказ с подарочным сертификатом, код создаётся сам: попадает в раздел «Подарочные сертификаты» и показывается покупателю после оформления. Если выключить — код придётся выпускать вручную из карточки заказа.",
+      "validDaysLabel": "Сколько дней действует код",
+      "validDaysPlaceholder": "Например, 365",
+      "validDaysHelp": "Оставьте поле пустым — код будет бессрочным. Срок отсчитывается от дня выпуска кода.",
+      "categoriesLabel": "Разделы каталога с подарочными сертификатами",
+      "categoriesHelp1": "Адреса разделов, как они выглядят в ссылке на сайте (то, что идёт после /catalog/). Через запятую или с новой строки. В момент оформления заказа товары из этих разделов помечаются в самом заказе как подарочные сертификаты, и позже код создаётся именно по этой пометке. Уже оформленные заказы не меняются: переименуете или удалите раздел — код всё равно выпустится, потому что пометка сохранена в заказе.",
+      "categoriesHelp2": "Если оставить поле пустым, по разделам помечать никто не будет. Коды всё равно создадутся для товаров, у которых признак подарочного сертификата задан в самой карточке товара. Полностью отключить выдачу кодов можно только галочкой «Создавать код автоматически при оплате» выше.",
+      "allowIssueLabel": "Создавать код, если заказ оплачен другим сертификатом",
+      "allowIssueHelp": "Покупатель может оплатить новый сертификат остатком старого — фактически обменять номинал. Выключите, если такой обмен в магазине не нужен.",
+      "saveButton": "Сохранить настройки сертификатов"
+    },
+    "legalContactsForm": {
+      "savedSuccess": "Реквизиты и контакты сохранены.",
+      "legalEntityHeading": "Реквизиты юрлица",
+      "innLabel": "ИНН (10 или 12 цифр)",
+      "kppLabel": "КПП (9 цифр)",
+      "ogrnLabel": "ОГРН (13 или 15 цифр)",
+      "legalAddressLabel": "Юридический адрес",
+      "bankDetailsLabel": "Банковские реквизиты",
+      "bankDetailsPrivate": "(приватно, не публикуется)",
+      "offerDocKeyLabel": "Файл оферты (ключ в хранилище)",
+      "offerDocKeyPlaceholder": "напр. docs/offer.pdf",
+      "emailDesignersLabel": "E-mail для заявок дизайнеров",
+      "publicContactsHeading": "Публичные контакты",
+      "phoneLabel": "Телефон",
+      "addressLabel": "Адрес",
+      "workingHoursLabel": "Часы работы",
+      "socialsHeading": "Соцсети",
+      "socialsHelp": "Ссылки в футере витрины. Тип — подпись (Instagram, Telegram…), адрес — ссылка.",
+      "socialTypeAria": "Соцсеть {n} — тип",
+      "socialUrlAria": "Соцсеть {n} — адрес",
+      "addSocial": "+ Добавить соцсеть"
+    },
+    "catalogOrdersForm": {
+      "savedSuccess": "Настройки сохранены.",
+      "newProductDaysLabel": "«Новизна» товара (дней)",
+      "freeThresholdLabel": "Порог бесплатной доставки (₽)",
+      "freeThresholdPlaceholder": "0 = выключено",
+      "freeThresholdHelp": "Сумма заказа, с которой доставка бесплатна. 0 — бесплатной доставки нет.",
+      "orderPrefixLabel": "Префикс номера заказа",
+      "orderPrefixPlaceholder": "например GA",
+      "zonesHeading": "Зоны доставки",
+      "zonesHelp": "Цена доставки для выбранной покупателем зоны. Порог — необязательный: сумма заказа, с которой доставка в эту зону бесплатна.",
+      "addZone": "+ Добавить зону",
+      "zonesEmpty": "Зоны не заданы — используется обычный расчёт доставки.",
+      "zoneLabelPlaceholder": "например В пределах МКАД",
+      "zonePriceLabel": "Цена (₽)",
+      "zoneFreeThresholdLabel": "Порог ₽ (опц.)"
+    },
+    "currencyUnitsForm": {
+      "refreshSuccess": "Курсы обновлены с ЦБ РФ. Валюты с ручным курсом не тронуты.",
+      "saveSuccess": "Валюта, курсы и единицы сохранены.",
+      "baseCurrencyCode": "Код базовой валюты",
+      "baseCurrencyCodeHelp": "Валюта хранения и оплаты. 3 латинские буквы: RUB — рубль, USD — доллар, EUR — евро.",
+      "symbol": "Символ",
+      "numberFormat": "Формат чисел",
+      "numberFormatHelp": "Как разделять разряды и дробную часть. <code>ru-RU</code> — как принято в России.",
+      "fractionDigitsLabel": "Знаков после запятой",
+      "weightUnit": "Единица веса",
+      "weightGrams": "граммы (g)",
+      "weightKilograms": "килограммы (kg)",
+      "dimensionUnit": "Единица габаритов",
+      "dimCentimeters": "сантиметры (cm)",
+      "dimMillimeters": "миллиметры (mm)",
+      "additionalCurrenciesTitle": "Дополнительные валюты (только показ по курсу)",
+      "additionalCurrenciesHelp": "Цены хранятся и оплата идёт в базовой валюте. Здесь — валюты для переключателя на витрине. Курс — сколько единиц базовой за 1 единицу этой валюты (например 100 → 1 € = 100 ₽; цена показывается как цена ₽ / курс).",
+      "autoRateLabel": "Обновлять курс автоматически с ЦБ РФ (иначе используется курс, введённый вручную ниже)",
+      "rateUpdatedAt": "Курс обновлён: {date}",
+      "currencyCodeAria": "Код валюты",
+      "rateAria": "Курс",
+      "ratePlaceholder": "Курс (100)",
+      "fractionPlaceholder": "Знаков (2)",
+      "manualRateAria": "Курс {code} задан вручную",
+      "manualRateAriaFallback": "валюты",
+      "manualRateLabel": "Курс задан вручную — автообновление с ЦБ эту валюту не трогает",
+      "addCurrencyAria": "Валюта для добавления",
+      "addOption": "{code} — {label}",
+      "addCurrencyButton": "+ Добавить валюту",
+      "refreshRatesButton": "Обновить курсы с ЦБ сейчас",
+      "refreshRatesHelp": "Кнопка обновления пригодится сразу после снятия галочки «курс задан вручную» — курс подтянется, не дожидаясь ночного обновления."
+    },
+    "languagesForm": {
+      "saveSuccess": "Набор языков сохранён.",
+      "storefrontNoticeTitle": "Важно про витрину.",
+      "storefrontNoticeBody": "Сейчас сайт использует собственный список языков и этот набор ещё не читает: выключенный здесь язык не исчезнет с витрины — страницы на нём просто будут показываться на языке по умолчанию ({defaultLabel}). В админке набор действует сразу: он определяет вкладки перевода в формах каталога и контента.",
+      "defaultLocaleLabel": "Язык по умолчанию",
+      "defaultLocaleHelp": "Изменить нельзя. Весь основной контент (названия, описания, тексты страниц) хранится в базе именно на этом языке, а переводы — надстройкой над ним. Смена языка по умолчанию потребовала бы миграции всех данных и сменила бы адреса страниц сайта, поэтому выполняется отдельно, вручную.",
+      "defaultRowNote": "язык по умолчанию — всегда включён",
+      "localeToggleAria": "Язык {label}",
+      "enabledState": "Включён",
+      "disabledState": "Выключен",
+      "addManualLabel": "Добавить язык вручную",
+      "customPlaceholder": "например pt-br",
+      "customHelp": "Код языка по стандарту: две-три латинские буквы, при необходимости с регионом через дефис.",
+      "saveButton": "Сохранить языки"
+    },
+    "page": {
+      "header": {
+        "title": "Настройки магазина",
+        "subtitle": "Название, валюта, контакты, доставка и другие параметры магазина."
+      },
+      "tocAriaLabel": "Разделы настроек",
+      "sections": {
+        "branding": "Брендинг",
+        "home": "Главная страница",
+        "currency": "Валюта и единицы измерения",
+        "contacts": "Реквизиты и контакты",
+        "catalog": "Каталог, доставка, заказы",
+        "modules": "Модули",
+        "navigation": "Навигация (меню и футер)",
+        "access": "Доступ",
+        "seo": "SEO и поиск"
+      },
+      "reset": {
+        "branding": "Сбросить брендинг",
+        "homeContent": "Сбросить контент главной",
+        "currency": "Сбросить валюту",
+        "exchange": "Сбросить курсы валют",
+        "units": "Сбросить единицы",
+        "contacts": "Сбросить контакты",
+        "legalEntity": "Сбросить реквизиты",
+        "catalog": "Сбросить каталог",
+        "delivery": "Сбросить доставку",
+        "orders": "Сбросить заказы",
+        "giftSettings": "Сбросить настройки сертификатов",
+        "modules": "Сбросить модули",
+        "access": "Сбросить режим доступа",
+        "languages": "Сбросить языки",
+        "seo": "Сбросить SEO"
+      },
+      "gift": {
+        "description": "Создавать ли код сертификата автоматически при оплате, сколько дней он действует и какие разделы каталога считаются сертификатами — в отдельном разделе.",
+        "openLink": "Открыть настройки сертификатов →"
+      },
+      "languages": {
+        "description": "Какие языки доступны в магазине и насколько заполнены переводы — в отдельном разделе. Язык по умолчанию сменить нельзя: на нём хранится весь основной контент.",
+        "openLink": "Открыть настройки языков →"
+      },
+      "seo": {
+        "description": "Заголовки страниц, описания для поисковиков, адрес сайта, карта сайта (sitemap) и robots — в отдельном разделе.",
+        "openLink": "Открыть SEO-настройки →"
+      }
+    },
+    "giftPage": {
+      "subtitle": "Когда покупателю выдаётся код сертификата и сколько он действует.",
+      "backToSettings": "К настройкам",
+      "resetLabel": "Сбросить настройки сертификатов"
+    },
+    "seoPage": {
+      "title": "SEO-настройки",
+      "subtitle": "Домен, заголовки и описания для поисковиков и соцсетей.",
+      "backToSettings": "К настройкам"
+    },
+    "resetSettingButton": {
+      "confirm": "Сбросить раздел к значениям по умолчанию? Переопределения будут удалены.",
+      "success": "Сброшено к значениям по умолчанию.",
+      "pending": "Сброс…",
+      "default": "Сбросить к умолчаниям"
+    },
+    "imageUploadButton": {
+      "default": "Загрузить файл",
+      "pending": "Загрузка…",
+      "done": "✓ файл загружен, адрес подставлен в поле"
+    },
+    "settingsTranslationTabs": {
+      "saved": "Переводы сохранены."
+    }
+  },
+  "promo": {
+    "promoForm": {
+      "targetType": {
+        "category": "Категория",
+        "brand": "Бренд",
+        "product": "Товар",
+        "variant": "Вариант"
+      },
+      "savedChanges": "Изменения сохранены.",
+      "codeLabel": "Код*",
+      "kindLabel": "Тип*",
+      "valueLabel": "Значение",
+      "valueHintPercent": "(проценты 0..100)",
+      "valueHintFixed": "(сумма)",
+      "minOrderTotalLabel": "Мин. сумма заказа",
+      "minOrderTotalHelp": "Минимальная сумма заказа для срабатывания акции. Пусто — без порога.",
+      "maxDiscountLabel": "Потолок скидки (для percent)",
+      "maxDiscountPlaceholder": "без потолка",
+      "usageLimitLabel": "Лимит всего",
+      "perCustomerLimitLabel": "На покупателя",
+      "startsAtLabel": "Начало",
+      "endsAtLabel": "Окончание",
+      "bogoBuyLabel": "Купи N",
+      "bogoPayLabel": "Плати за M",
+      "bogoHelp": "Например «3 по 2»: купи N=3, плати за M=2 → 1 самая дешёвая бесплатно.",
+      "applyScopeLegend": "Область применения",
+      "targetsTitle": "Таргеты акции",
+      "targetsHelp": "Выберите, к чему применяется акция: тип (категория / бренд / товар) и саму сущность из списка.",
+      "targetsEmpty": "Таргетов нет — добавьте хотя бы один.",
+      "targetTypeSrLabel": "Тип таргета {n}",
+      "targetEntitySrLabel": "Сущность таргета {n}",
+      "selectOption": "— выберите —",
+      "identifierPlaceholder": "идентификатор",
+      "removeTargetAria": "Удалить таргет {n}",
+      "addTarget": "+ Добавить таргет",
+      "priorityLabel": "Очерёдность применения (меньше — раньше)",
+      "minQtyLabel": "Мин. количество единиц",
+      "minQtyPlaceholder": "без порога",
+      "minQtyHelp": "Скидка применится, только если в корзине набрано не меньше указанного числа единиц товаров из «Области применения». Оставьте пусто — без ограничения по количеству.",
+      "giftLegend": "Подарок (задел)",
+      "giftProductLabel": "Товар-подарок (UUID)",
+      "giftVariantLabel": "Вариант-подарок (UUID)",
+      "giftQtyLabel": "Кол-во",
+      "commentLabel": "Комментарий",
+      "stackableLabel": "Суммируемая (комбинируется с другими)",
+      "createButton": "Создать промокод"
+    },
+    "page": {
+      "moduleDisabled": "orders (модуль выключен)",
+      "subtitle": "Всего промокодов: {count}.",
+      "backToOrders": "К заказам",
+      "createButton": "+ Создать промокод",
+      "colCode": "Код",
+      "colKind": "Тип",
+      "colValue": "Значение",
+      "colScope": "Scope",
+      "colPriority": "Приоритет",
+      "colMinTotal": "Мин. сумма",
+      "colMinQty": "Мин. кол-во",
+      "colLimit": "Лимит (всего/на чел.)",
+      "colUsed": "Использован",
+      "colPeriod": "Срок",
+      "colActive": "Активность",
+      "empty": "Промокодов пока нет. Создайте первый.",
+      "stackableBadge": "суммируемая",
+      "exclusiveBadge": "эксклюзивная",
+      "unlimited": "бессрочно"
+    },
+    "detailPage": {
+      "moduleDisabled": "orders (модуль выключен)",
+      "notFoundTitle": "Промокод не найден",
+      "backToList": "К списку промокодов",
+      "title": "Промокод {code}",
+      "subtitle": "Использован: {count} раз",
+      "backLabel": "К промокодам"
+    },
+    "promoRowActions": {
+      "deactivate": "Деактивировать",
+      "confirmDeactivate": "Деактивировать промокод «{code}»? Он перестанет применяться, но останется в списке (включить обратно можно через «Редактировать»).",
+      "confirmDelete": "Удалить промокод «{code}» безвозвратно? История заказов сохранится."
+    },
+    "newPage": {
+      "title": "Новый промокод",
+      "breadcrumbNew": "Новый",
+      "backToList": "К промокодам",
+      "moduleDisabled": "orders (модуль выключен)"
+    }
+  },
+  "cms": {
+    "page": {
+      "moduleDisabled": "cms (модуль выключен)",
+      "title": "Контент — страницы",
+      "subtitle": "Найдено страниц: {total}.",
+      "createButton": "+ Создать страницу",
+      "searchLabel": "Поиск",
+      "searchPlaceholder": "Название или slug",
+      "statusLabel": "Статус",
+      "statusAll": "Все",
+      "statusArchived": "В архиве",
+      "colSlug": "Slug",
+      "colPublished": "Опубликована",
+      "colUpdated": "Изменена",
+      "empty": "Страницы не найдены. Измените фильтры или создайте страницу.",
+      "paginationAria": "Пагинация",
+      "forward": "Вперёд"
+    },
+    "newPage": {
+      "moduleDisabled": "cms (модуль выключен)",
+      "breadcrumbCurrent": "Новая страница",
+      "title": "Новая страница",
+      "subtitle": "Заполните заголовок и SEO, затем создайте страницу. Секции (hero, текст, баннеры, сетка товаров и др.) станут доступны после создания."
+    },
+    "pageForm": {
+      "savedChanges": "Изменения сохранены.",
+      "savedAndPublished": "Страница сохранена и опубликована.",
+      "confirmDelete": "Удалить страницу со всеми секциями? Действие необратимо.",
+      "unpublished": "Снято с публикации.",
+      "noWriteWarning": "У вас нет права на редактирование этой страницы (нужно «cms.write»). Поля доступны только для просмотра — изменения сохранить нельзя. Обратитесь к администратору, чтобы получить право.",
+      "slugLabel": "ЧПУ (slug)",
+      "slugPlaceholder": "авто из заголовка",
+      "statusLabel": "Статус",
+      "statusArchived": "В архиве",
+      "sitemapPriority": "Sitemap priority (0–1)",
+      "sitemapChangefreq": "Sitemap changefreq",
+      "canonicalPlaceholder": "Авто: /pages/{slug}",
+      "slugFallback": "slug-страницы",
+      "uploadImage": "Загрузить картинку",
+      "createButton": "Создать страницу",
+      "saveAndPublish": "Сохранить и опубликовать",
+      "unpublish": "Снять с публикации",
+      "backToList": "Назад к списку",
+      "deletePage": "Удалить страницу",
+      "sectionsAfterCreate": "Секции страницы станут доступны после её создания.",
+      "sectionEditorNoWrite": "Редактор секций доступен только с правом «cms.write»."
+    },
+    "sectionEditor": {
+      "confirmDelete": "Удалить секцию «{key}»?",
+      "title": "Секции страницы",
+      "typeAriaLabel": "Тип секции",
+      "addSection": "Добавить секцию",
+      "newSection": "Новая секция: {type}",
+      "empty": "Секций пока нет. Добавьте первую.",
+      "dragTitle": "Перетащите для изменения порядка",
+      "hiddenBadge": "скрыта",
+      "visibleLabel": "Видима",
+      "collapse": "Свернуть"
+    },
+    "sectionForm": {
+      "localeAriaLabel": "Язык секции",
+      "translationHint": "Перевод секции на <strong>{locale}</strong>. Пустое поле — на витрине покажется основной ({defaultLocale}) текст. Ссылки, изображения и настройки подборки не переводятся — они общие для всех языков.",
+      "noTranslatableText": "У секции этого типа нет переводимого текста.",
+      "saveButton": "Сохранить секцию",
+      "uploadAndAddImage": "Загрузить и добавить изображение",
+      "uploadImage": "Загрузить изображение"
+    },
+    "richTextEditor": {
+      "toolbarAriaLabel": "Форматирование",
+      "bold": "Ж",
+      "italic": "К",
+      "bulletList": "• Список"
+    },
+    "detailPage": {
+      "moduleDisabled": "cms (модуль выключен)",
+      "slugLabel": "Slug:"
+    },
+    "cmsImageUploadButton": {
+      "uploadFile": "Загрузить файл",
+      "uploading": "Загрузка…",
+      "done": "✓ файл загружен, ключ подставлен в поле"
+    },
+    "statusBadge": {
+      "archived": "В архиве"
+    }
+  },
+  "giftCertificates": {
+    "giftCertificateForm": {
+      "termsLabel": "Условия использования",
+      "savedChanges": "Изменения сохранены.",
+      "summary": {
+        "nominal": "Номинал",
+        "spent": "Потрачено",
+        "remaining": "Остаток",
+        "status": "Статус"
+      },
+      "codeLabel": "Код*",
+      "codePlaceholder": "напр. GIFT2026",
+      "codeLocked": "Код изменить нельзя.",
+      "nameLabel": "Наименование",
+      "namePlaceholder": "служебная метка (не публикуется)",
+      "faceTopUp": "Номинал (только пополнение вверх)",
+      "faceRequired": "Номинал*",
+      "facePlaceholder": "напр. 5000.00",
+      "faceTopUpHelp": "Оставьте как есть или увеличьте (не ниже потраченного). Уменьшать нельзя.",
+      "validUntilLabel": "Действует до",
+      "validUntilHelp": "Пусто — бессрочно.",
+      "descriptionLabel": "Описание (публичное)",
+      "purchaserLegend": "Кто купил",
+      "emailLabel": "E-mail",
+      "phoneLabel": "Телефон",
+      "purchaserSnapshotHelp": "Снимок на момент выпуска: правка карточки клиента его не изменит.",
+      "recipientLegend": "На чьё имя",
+      "commentLabel": "Комментарий (внутренний)",
+      "submitIssue": "Выпустить"
+    },
+    "detailPage": {
+      "moduleDisabled": "orders (модуль выключен)",
+      "issueSource": {
+        "order": "администратором по позиции заказа",
+        "auto": "автоматически",
+        "manual": "вручную",
+        "none": "без указания источника"
+      },
+      "notFound": {
+        "title": "Сертификат не найден",
+        "backLink": "К списку сертификатов"
+      },
+      "title": "Сертификат {code}",
+      "subtitle": "Остаток: {remaining} {currency} из {initial}",
+      "breadcrumb": "Сертификаты",
+      "backLabel": "К сертификатам",
+      "origin": {
+        "title": "Происхождение выпуска",
+        "text": "Выпущен {source} по заказу <link>{orderId}…</link>. Номинал — фактически уплаченная сумма позиции заказа."
+      },
+      "redemptions": {
+        "title": "История списаний",
+        "empty": "Списаний ещё не было.",
+        "colDate": "Дата",
+        "colOrder": "Заказ",
+        "colAmount": "Сумма",
+        "colState": "Состояние",
+        "reversed": "возвращено {date}",
+        "redeemed": "списано"
+      }
+    },
+    "page": {
+      "moduleDisabled": "orders (модуль выключен)",
+      "subtitle": "Балансовые сертификаты: номинал списывается частично по нескольким заказам, хранится остаток. Всего: {total}.",
+      "breadcrumb": "Сертификаты",
+      "issue": "Выпустить",
+      "empty": "Пока нет сертификатов.",
+      "cols": {
+        "code": "Код",
+        "name": "Наименование",
+        "purchaser": "Кто купил",
+        "recipient": "На чьё имя",
+        "nominal": "Номинал",
+        "spent": "Потрачено",
+        "remaining": "Остаток",
+        "validUntil": "Действует до",
+        "status": "Статус"
+      },
+      "byOrder": "по заказу",
+      "unlimited": "бессрочно"
+    },
+    "giftRowActions": {
+      "open": "Открыть",
+      "activateTitle": "Снова активировать сертификат",
+      "activate": "Активировать",
+      "disableConfirm": "Отключить сертификат? Списания с него станут невозможны.",
+      "disableTitle": "Отключить сертификат",
+      "disable": "Отключить"
+    },
+    "giftStatusBadge": {
+      "depleted": "Исчерпан",
+      "expired": "Истёк"
+    },
+    "newPage": {
+      "title": "Новый сертификат",
+      "breadcrumbNew": "Новый",
+      "backLabel": "К сертификатам",
+      "moduleDisabled": "orders (модуль выключен)"
+    }
+  },
+  "orders": {
+    "orderActionsPanel": {
+      "heading": "Управление статусами",
+      "intro": "Статусы заказа, оплаты и доставки управляются независимо.",
+      "contradictionsTitle": "Возможное рассогласование статусов:",
+      "giftTitle": "Подарочные сертификаты по этому заказу:",
+      "commentLabel": "Комментарий (попадёт в историю статусов)",
+      "commentPlaceholder": "Необязательно",
+      "orderStatusHeading": "Статус заказа",
+      "paymentStatusHeading": "Статус оплаты",
+      "deliveryStatusHeading": "Статус доставки",
+      "terminalNoTransitions": "Терминальный статус — переходов нет.",
+      "noTransitions": "Переходов нет.",
+      "actionDone": "{label}: выполнено.",
+      "labels": {
+        "cancelOrder": "Отмена заказа",
+        "refund": "Возврат",
+        "changeStatus": "Смена статуса",
+        "changePaymentStatus": "Смена статуса оплаты",
+        "changeDeliveryStatus": "Смена статуса доставки"
+      },
+      "confirmCancel": "Отменить заказ? Резерв остатков будет возвращён.",
+      "confirmRefund": "Оформить возврат? Статус оплаты станет «Возврат»."
+    },
+    "page": {
+      "moduleDisabled": "orders (модуль выключен)",
+      "subtitle": "Найдено заказов: {total}. Суммы в {currency}.",
+      "createOrder": "Создать заказ",
+      "columns": {
+        "number": "Номер",
+        "date": "Дата",
+        "customer": "Покупатель",
+        "total": "Сумма",
+        "status": "Статус",
+        "payment": "Оплата",
+        "delivery": "Доставка",
+        "method": "Способ"
+      },
+      "emptyFiltered": "По заданным фильтрам ничего не найдено. Сбросьте фильтры.",
+      "emptyNoOrders": "Заказов пока нет.",
+      "paginationAria": "Пагинация"
+    },
+    "detailGiftIssueBlock": {
+      "heading": "Подарочные сертификаты",
+      "issuedSuccess": "Сертификат {code} на {amount} выпущен.",
+      "forAmount": "на {amount}",
+      "recipientLine": "на чьё имя: {recipient}",
+      "spentLine": "потрачено: {spent}",
+      "noneIssued": "По этому заказу сертификаты ещё не выпускались.",
+      "needWritePermission": "Для выпуска нужно право gift.write.",
+      "looksLikeCertificate": "похоже на сертификат",
+      "faceValue": "номинал {value}",
+      "alreadyIssued": "сертификат уже выпущен",
+      "issueButton": "Выпустить сертификат по заказу",
+      "faceValueHint": "Номинал будет равен фактически уплаченной сумме позиции ({value}). Покупатель подставится из данных заказа.",
+      "recipientNameLabel": "На чьё имя",
+      "recipientEmailLabel": "E-mail получателя",
+      "issuing": "Выпуск…",
+      "issueConfirm": "Выпустить"
+    },
+    "orderFilters": {
+      "ariaLabel": "Фильтры заказов",
+      "searchLabel": "Поиск (номер / email / телефон)",
+      "searchPlaceholder": "Например: 2026-000123 или почта",
+      "orderStatusLabel": "Статус заказа",
+      "any": "Любой",
+      "paymentStatusLabel": "Статус оплаты",
+      "deliveryTypeLabel": "Тип доставки",
+      "promoCodeLabel": "Промокод",
+      "promoCodePlaceholder": "Код промокода",
+      "dateFromLabel": "Дата с",
+      "dateToLabel": "Дата по"
+    },
+    "manualOrderForm": {
+      "itemsHeading": "Товары",
+      "searchLabel": "Поиск товара (название или артикул)",
+      "searchPlaceholder": "Например: футболка или TC-001",
+      "searching": "Поиск…",
+      "searchButton": "Найти",
+      "searchingProducts": "Ищем товары…",
+      "searchEmpty": "Ничего не найдено. Измените запрос.",
+      "variantsCount": "Вариантов: {count}",
+      "priceAvailable": "{price} · доступно {stock}",
+      "colProduct": "Товар",
+      "colVariant": "Вариант",
+      "colQty": "Кол-во",
+      "colPrice": "Цена",
+      "colSum": "Сумма",
+      "selectProductHint": "— выберите товар через поиск —",
+      "variantAria": "Вариант товара",
+      "qtyAria": "Количество",
+      "addEmptyLine": "+ Добавить пустую строку",
+      "subtotalPreview": "Промежуточный итог (предпросмотр):",
+      "serverCalcNote": "Итог, скидки и доставку рассчитает сервер при создании заказа.",
+      "customerHeading": "Покупатель",
+      "phoneLabel": "Телефон",
+      "emailLabel": "Email",
+      "deliveryHeading": "Доставка",
+      "deliveryMethodLabel": "Способ доставки",
+      "cityLabel": "Город",
+      "addressLabel": "Адрес",
+      "pvzCodeLabel": "Код ПВЗ (СДЭК)",
+      "pickupNote": "Самовывоз: адрес и ПВЗ не требуются.",
+      "paymentCommentHeading": "Оплата и комментарий",
+      "paymentMethodLabel": "Способ оплаты",
+      "commentLabel": "Комментарий (необязательно)",
+      "creatingOrder": "Создаём заказ…",
+      "createOrder": "Создать заказ",
+      "addAtLeastOne": "Добавьте хотя бы один товар."
+    },
+    "detailCdekBlock": {
+      "title": "Доставка СДЭК",
+      "pickupNote": "Самовывоз — отправление СДЭК не создаётся.",
+      "statusLabel": "Статус",
+      "noShipment": "— нет отправления —",
+      "trackLabel": "Трек",
+      "pvzLabel": "ПВЗ",
+      "errorLabel": "Ошибка",
+      "awaitPaymentNote": "Отправление СДЭК и накладная создаются <strong>после поступления оплаты</strong> — автоматически, без ручных действий. Так заказ не уедет неоплаченным.",
+      "createShipment": "Создать отправление",
+      "refreshStatus": "Обновить статус",
+      "printWaybill": "Печать накладной",
+      "printBarcode": "Печать ШК",
+      "cancelShipment": "Отменить отправление",
+      "historyTitle": "История статусов СДЭК",
+      "confirmCancel": "Отменить отправление СДЭК?",
+      "actionDone": "{label}: выполнено.",
+      "action": {
+        "createShipment": "Создание отправления",
+        "refreshStatus": "Обновление статуса",
+        "printWaybill": "Печать накладной",
+        "printBarcode": "Печать ШК",
+        "cancelShipment": "Отмена отправления"
+      }
+    },
+    "detailPage": {
+      "moduleDisabled": "orders (модуль выключен)",
+      "notFoundTitle": "Заказ не найден",
+      "notFoundText": "Возможно, он был удалён.",
+      "backToList": "К списку заказов",
+      "title": "Заказ {number}",
+      "createdLine": "Создан {date} · источник: {source}",
+      "sourceAdmin": "админка",
+      "sourceStorefront": "витрина",
+      "itemsHeading": "Позиции",
+      "columns": {
+        "product": "Товар",
+        "sku": "Артикул",
+        "quantity": "Кол-во",
+        "price": "Цена",
+        "total": "Сумма"
+      },
+      "giftBadge": "Подарок",
+      "summary": {
+        "items": "Товары",
+        "grandTotal": "Итого"
+      },
+      "labelDiscount": "Скидка",
+      "deliveryHeading": "Доставка",
+      "historyHeading": "История статусов",
+      "historyEmpty": "История пуста.",
+      "customerHeading": "Покупатель",
+      "customer": {
+        "email": "Email",
+        "phone": "Телефон",
+        "comment": "Комментарий"
+      },
+      "delivery": {
+        "type": "Тип",
+        "postamatSuffix": "{type} · Постамат",
+        "zone": "Зона",
+        "city": "Город",
+        "address": "Адрес",
+        "pvz": "ПВЗ",
+        "cost": "Стоимость",
+        "track": "Трек"
+      },
+      "labelStatus": "Статус",
+      "paymentHeading": "Оплата",
+      "payment": {
+        "method": "Способ",
+        "paidAt": "Оплачен"
+      },
+      "promoHeading": "Промокод",
+      "promo": {
+        "code": "Код"
+      }
+    },
+    "newPage": {
+      "title": "Новый заказ",
+      "subtitle": "Добавьте товары, укажите покупателя и доставку. Итог, остатки и цены проверит сервер при создании.",
+      "backLabel": "К списку заказов",
+      "moduleDisabled": "orders (модуль выключен)"
+    }
+  },
+  "news": {
+    "newsForm": {
+      "fields": {
+        "title": "Заголовок",
+        "titleRequired": "Заголовок*",
+        "group": "Раздел",
+        "excerpt": "Анонс",
+        "body": "Текст",
+        "bodyHtml": "Текст (HTML)",
+        "slug": "ЧПУ (slug)",
+        "status": "Статус",
+        "cover": "Обложка (адрес файла)",
+        "publishedAt": "Дата публикации",
+        "sortOrder": "Порядок"
+      },
+      "slugPlaceholder": "авто из заголовка",
+      "status": {
+        "draft": "Черновик",
+        "published": "Опубликована",
+        "archived": "В архиве"
+      },
+      "bodyHelp": "HTML-разметка санитайзится на сервере (разрешены p/strong/em/a/списки/заголовки).",
+      "uploadCover": "Загрузить обложку",
+      "uploadImage": "Загрузить картинку",
+      "seo": {
+        "canonicalPlaceholder": "Авто: /news/{slug}",
+        "slugFallback": "slug-новости"
+      },
+      "createButton": "Создать новость",
+      "saveAndPublish": "Сохранить и опубликовать",
+      "unpublish": "Снять с публикации",
+      "archive": "В архив",
+      "backToList": "Назад к списку",
+      "deleteButton": "Удалить новость",
+      "confirmDelete": "Удалить новость? Действие необратимо.",
+      "noWriteWarning": "У вас нет права на редактирование новостей (нужно «news.write»). Поля доступны только для просмотра.",
+      "toast": {
+        "saved": "Изменения сохранены.",
+        "published": "Новость опубликована.",
+        "unpublished": "Снято с публикации.",
+        "archived": "Новость в архиве."
+      }
+    },
+    "page": {
+      "title": "Новости",
+      "subtitle": "Найдено новостей: {total}.",
+      "createButton": "+ Создать новость",
+      "moduleDisabled": "news (модуль выключен)",
+      "searchLabel": "Поиск",
+      "searchPlaceholder": "Заголовок, slug или раздел",
+      "statusLabel": "Статус",
+      "statusAll": "Все",
+      "status": {
+        "draft": "Черновик",
+        "published": "Опубликована",
+        "archived": "В архиве"
+      },
+      "columns": {
+        "title": "Заголовок",
+        "group": "Раздел",
+        "status": "Статус",
+        "publishedAt": "Опубликована",
+        "sortOrder": "Порядок"
+      },
+      "empty": "Новости не найдены. Измените фильтры или создайте новость.",
+      "paginationAria": "Пагинация",
+      "forward": "Вперёд"
+    },
+    "newPage": {
+      "title": "Новая новость",
+      "subtitle": "Заполните заголовок, текст и SEO, затем создайте новость. Переводы (EN/FR) и публикация станут доступны после создания.",
+      "breadcrumbsAria": "Хлебные крошки",
+      "breadcrumbNews": "Новости",
+      "breadcrumbCurrent": "Новая новость",
+      "moduleDisabled": "news (модуль выключен)"
+    },
+    "detailPage": {
+      "breadcrumbsAria": "Хлебные крошки",
+      "breadcrumbNews": "Новости",
+      "slugLabel": "Slug:",
+      "moduleDisabled": "news (модуль выключен)"
+    },
+    "newsStatusBadge": {
+      "draft": "Черновик",
+      "published": "Опубликована",
+      "archived": "В архиве"
+    },
+    "newsImageUploadButton": {
+      "defaultLabel": "Загрузить файл",
+      "uploading": "Загрузка…",
+      "done": "✓ файл загружен, ключ подставлен"
+    }
+  },
+  "reviews": {
+    "page": {
+      "moduleDisabled": "reviews (модуль выключен)",
+      "subtitle": "Модерация отзывов покупателей. На модерации: {pending}. Всего: {total}.",
+      "statusLabel": "Статус",
+      "statusAll": "Все",
+      "statusPending": "На модерации",
+      "statusApproved": "Одобрены",
+      "statusRejected": "Отклонены",
+      "colDate": "Дата",
+      "colProduct": "Товар",
+      "colAuthor": "Автор",
+      "colRating": "Рейтинг",
+      "colText": "Текст",
+      "empty": "Отзывы не найдены.",
+      "replyPrefix": "Ответ: {reply}",
+      "paginationAria": "Пагинация"
+    },
+    "detailPage": {
+      "moduleDisabled": "reviews (модуль выключен)",
+      "title": "Отзыв от {author}",
+      "dateLabel": "Дата",
+      "productLabel": "Товар",
+      "reviewTextLabel": "Текст отзыва",
+      "moderationHeading": "Модерация",
+      "replyHeading": "Ответ магазина",
+      "replyHelp": "Ответ виден на витрине под отзывом. Переводы (EN/FR) — на вкладках; текст отзыва покупателя не переводится."
+    },
+    "reviewReplyForm": {
+      "replyFieldLabel": "Ответ магазина",
+      "baseReplyLabel": "Ответ магазина ({locale})",
+      "replyPlaceholder": "Публичный ответ на отзыв (виден на витрине)",
+      "saveReply": "Сохранить ответ"
+    },
+    "reviewRowActions": {
+      "changeStatusTo": "Сменить статус на «{status}»",
+      "confirmDelete": "Удалить отзыв без возможности восстановления?",
+      "deleteTitle": "Удалить отзыв"
+    },
+    "ratingStars": {
+      "ariaLabel": "Рейтинг {n} из 5"
+    }
+  },
+  "users": {
+    "userForm": {
+      "toast": {
+        "passwordUpdated": "Пароль обновлён."
+      },
+      "emailLabel": "Email*",
+      "emailReadonlyHint": "Email (логин) изменить нельзя.",
+      "passwordLabel": "Пароль*",
+      "passwordPlaceholder": "не короче 8 символов",
+      "statusLabel": "Статус",
+      "noRolesHint": "Ролей пока нет — создайте их в разделе «Роли».",
+      "createButton": "Создать пользователя",
+      "resetPassword": "Сбросить пароль",
+      "resetPasswordHint": "Задайте новый пароль для входа сотрудника. Старый перестанет работать.",
+      "newPasswordLabel": "Новый пароль"
+    },
+    "page": {
+      "statusInvited": "Приглашён",
+      "subtitle": "Сотрудники с доступом в админку и их роли.",
+      "createButton": "+ Создать пользователя",
+      "colEmail": "Email",
+      "colStatus": "Статус",
+      "colLastLogin": "Последний вход",
+      "colOwner": "Владелец",
+      "empty": "Пользователей пока нет.",
+      "yes": "да",
+      "protected": "защищён"
+    },
+    "detailPage": {
+      "backToList": "К списку",
+      "ownerNotice": "Это учётная запись владельца магазина. Её нельзя изменять или отключать."
+    },
+    "newPage": {
+      "title": "Новый пользователь",
+      "subtitle": "Заведите учётную запись сотрудника и назначьте роли.",
+      "backToList": "К списку"
+    }
+  },
+  "roles": {
+    "roleForm": {
+      "modules": {
+        "core": "Основное",
+        "catalog": "Каталог",
+        "orders": "Заказы",
+        "cdek": "Доставка СДЭК",
+        "cms": "Контент"
+      },
+      "codeLabel": "Код*",
+      "codePlaceholder": "например: support",
+      "codeReadonlyHint": "Код роли изменить нельзя.",
+      "systemRoleNote": "Это системная роль.",
+      "codeHint": "Латиница в нижнем регистре, без пробелов (например: support, content).",
+      "titleLabel": "Название*",
+      "titlePlaceholder": "например: Поддержка",
+      "permissionsLegend": "Права",
+      "permissionsHint": "Отметьте, что разрешено сотрудникам с этой ролью.",
+      "createButton": "Создать роль"
+    },
+    "page": {
+      "subtitle": "Наборы прав для сотрудников. Системные роли удалить нельзя.",
+      "createButton": "+ Создать роль",
+      "colPermissions": "Прав",
+      "colType": "Тип",
+      "empty": "Ролей пока нет.",
+      "typeSystem": "системная",
+      "typeCustom": "пользовательская",
+      "protected": "защищена"
+    },
+    "newPage": {
+      "title": "Новая роль",
+      "subtitle": "Задайте набор прав, который получат сотрудники с этой ролью.",
+      "backToList": "К списку"
+    },
+    "detailPage": {
+      "systemRoleSubtitle": "Системная роль",
+      "backToList": "К списку"
+    },
+    "roleDeleteButton": {
+      "confirm": "Удалить роль «{title}»? Действие необратимо.",
+      "deleting": "Удаление…"
+    }
+  },
+  "leads": {
+    "page": {
+      "subtitle": "Сообщения с формы обратной связи витрины (/contacts). Меняйте статус или удаляйте обработанные. Всего: {total}.",
+      "truncationHint": "{notice}. Используйте экспорт, чтобы получить полный список.",
+      "empty": "Пока нет заявок.",
+      "columns": {
+        "date": "Дата",
+        "contact": "Контакт",
+        "source": "Источник",
+        "details": "Детали",
+        "message": "Сообщение",
+        "answer": "Ответ оператора",
+        "status": "Статус"
+      },
+      "details": {
+        "company": "Организация: {value}",
+        "city": "Город: {value}",
+        "subject": "Тема: {value}"
+      },
+      "downloadAttachment": "Скачать вложение"
+    },
+    "leadRowActions": {
+      "changeStatusTo": "Сменить статус на «{status}»",
+      "confirmDelete": "Удалить заявку без возможности восстановления?",
+      "deleteTitle": "Удалить заявку"
+    },
+    "exportToolbar": {
+      "copyManually": "Скопируйте контакты вручную:",
+      "copied": "Скопировано",
+      "copyContacts": "Скопировать контакты",
+      "downloadCsv": "Скачать CSV"
+    },
+    "leadAnswerForm": {
+      "answerPlaceholder": "Ответ оператора…",
+      "saveAnswer": "Сохранить ответ"
+    }
+  },
+  "customers": {
+    "page": {
+      "subtitle": "Аккаунты и гостевые контакты витрины. Всего: {total}.",
+      "searchPlaceholder": "Поиск по email, имени, телефону",
+      "searchButton": "Найти",
+      "emptyState": "Покупателей не найдено.",
+      "colEmail": "Email",
+      "colStatus": "Статус",
+      "colOrders": "Заказов",
+      "colTotal": "Сумма",
+      "colLastLogin": "Последний вход",
+      "colRegistered": "Регистрация"
+    },
+    "detailPage": {
+      "subtitle": "Аккаунт покупателя — просмотр",
+      "profileHeading": "Профиль",
+      "email": "Email",
+      "phone": "Телефон",
+      "status": "Статус",
+      "emailVerified": "Email подтверждён",
+      "language": "Язык",
+      "lastLogin": "Последний вход",
+      "registered": "Регистрация",
+      "ordersAndTotal": "Заказов / сумма",
+      "ordersEmpty": "У покупателя пока нет привязанных заказов.",
+      "colNumber": "Номер",
+      "colDate": "Дата",
+      "colPayment": "Оплата",
+      "colTotal": "Сумма"
+    }
+  },
+  "cdek": {
+    "page": {
+      "title": "Доставка (СДЭК)",
+      "subtitle": "Найдено отправлений: {total}.",
+      "moduleDisabledPermission": "доставка СДЭК (модуль выключен)",
+      "searchPlaceholder": "Поиск: трек-номер или номер заказа",
+      "searchButton": "Найти",
+      "empty": "Отправлений нет. Накладные СДЭК создаются из карточки заказа (блок «Доставка СДЭК») после успешной оплаты.",
+      "printWaybill": "Накладная",
+      "mockPrintTitle": "MOCK: реальная накладная появится в боевом режиме (с боевыми ключами СДЭК)",
+      "paginationAria": "Пагинация",
+      "columns": {
+        "trackNumber": "Трек-номер",
+        "order": "Заказ",
+        "customer": "Покупатель",
+        "method": "Способ",
+        "destination": "Назначение",
+        "cdekStatus": "Статус СДЭК",
+        "updated": "Обновлён",
+        "print": "Печать"
+      },
+      "mode": {
+        "mockLabel": "MOCK",
+        "mockHint": "Боевые ключи не заданы — реальные отправления не создаются.",
+        "testLabel": "Тестовый контур (edu)",
+        "testHint": "Запросы идут на sandbox СДЭК (api.edu.cdek.ru). Отправления — тестовые.",
+        "prodLabel": "Боевой контур",
+        "prodHint": "Запросы идут на боевой API СДЭК. Создаются реальные отправления."
+      }
+    }
+  },
+  "audit": {
+    "page": {
+      "title": "Журнал аудита",
+      "subtitle": "Всего событий: {total}. Страница {currentPage} из {totalPages}.",
+      "columns": {
+        "time": "Время (МСК)",
+        "actor": "Инициатор",
+        "action": "Действие",
+        "entity": "Сущность",
+        "changes": "Изменения"
+      },
+      "empty": "Записей пока нет.",
+      "details": "Подробнее ({count})",
+      "diff": {
+        "field": "Поле",
+        "before": "Было",
+        "after": "Стало"
+      },
+      "paginationAria": "Пагинация"
+    },
+    "auditFilters": {
+      "ariaLabel": "Фильтры журнала аудита",
+      "dateFrom": "Дата с",
+      "dateTo": "Дата по",
+      "actor": "Инициатор (email)",
+      "actorPlaceholder": "Например: admin@shop.ru",
+      "action": "Действие",
+      "anyAction": "Любое",
+      "entityType": "Тип сущности",
+      "anyEntity": "Любой"
+    }
+  },
+  "account": {
+    "changePasswordForm": {
+      "passwordsMismatch": "Пароли не совпадают",
+      "doneTitle": "Пароль изменён.",
+      "doneMessage": "В целях безопасности все ваши сессии завершены. Войдите заново с новым паролем.",
+      "loginAgain": "Войти заново",
+      "currentPasswordLabel": "Текущий пароль",
+      "newPasswordLabel": "Новый пароль",
+      "newPasswordPlaceholder": "не короче {min} символов",
+      "confirmPasswordLabel": "Подтверждение нового пароля",
+      "submit": "Сменить пароль"
+    },
+    "page": {
+      "title": "Профиль",
+      "subtitle": "Управление учётной записью и смена пароля.",
+      "loginLabel": "Логин (email)",
+      "changePasswordHeading": "Сменить пароль",
+      "changePasswordHint": "Введите текущий пароль и новый. После смены все ваши сессии завершатся — потребуется войти заново."
+    }
+  },
+  "subscribers": {
+    "page": {
+      "subtitle": "Email-подписчики рассылки (форма в футере витрины). Всего: {total}.",
+      "truncationHint": "Используйте экспорт, чтобы получить полный список.",
+      "empty": "Пока нет подписчиков.",
+      "columns": {
+        "date": "Дата",
+        "email": "Email",
+        "status": "Статус"
+      }
+    },
+    "exportToolbar": {
+      "copyManualPrompt": "Скопируйте адреса вручную:",
+      "copied": "Скопировано",
+      "copyAddresses": "Скопировать адреса",
+      "downloadCsv": "Скачать CSV"
+    },
+    "subscriberRowActions": {
+      "confirmUnsubscribe": "Отписать «{email}» от рассылки?",
+      "unsubscribe": "Отписать"
+    }
   }
 }

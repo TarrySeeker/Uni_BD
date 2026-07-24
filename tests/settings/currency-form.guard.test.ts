@@ -22,10 +22,20 @@ const FORM = resolve(
 );
 const source = readFileSync(FORM, 'utf8');
 
+// После i18n-переноса подписи формы живут в messages/ru.json (форма рендерит t(...)).
+// GUARD сторожит СУТЬ: форма ссылается на нужный ключ И ru-значение несёт инвариант.
+const ru = JSON.parse(readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8')) as Record<string, unknown>;
+function ruVal(dot: string): string {
+  let o: unknown = ru;
+  for (const k of dot.split('.')) o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  return typeof o === 'string' ? o : '';
+}
+
 describe('CurrencyUnitsForm — пер-валютный ручной курс', () => {
   it('у строки валюты есть чекбокс manualRate', () => {
     expect(source).toContain('setRow(i, { manualRate: e.target.checked })');
-    expect(source).toContain('Курс задан вручную');
+    expect(source).toContain('settings.currencyUnitsForm.manualRateLabel');
+    expect(ruVal('settings.currencyUnitsForm.manualRateLabel')).toContain('Курс задан вручную');
   });
 
   it('признак уходит в действие сохранения (иначе галочка ничего не делает)', () => {
@@ -55,7 +65,8 @@ describe('CurrencyUnitsForm — добавление валюты без хар�
 describe('CurrencyUnitsForm — ручное обновление курсов', () => {
   it('форма зовёт действие обновления курсов', () => {
     expect(source).toContain('refreshExchangeRatesAction');
-    expect(source).toContain('Обновить курсы с ЦБ сейчас');
+    expect(source).toContain('settings.currencyUnitsForm.refreshRatesButton');
+    expect(ruVal('settings.currencyUnitsForm.refreshRatesButton')).toContain('Обновить курсы с ЦБ сейчас');
   });
 
   it('АНТИПАТТЕРН: обновление не дёргает cron-роут напрямую с секретом', () => {

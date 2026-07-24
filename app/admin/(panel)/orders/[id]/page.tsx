@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { sql } from '@/lib/db/client';
 import { can } from '@/lib/auth/rbac';
@@ -147,10 +148,11 @@ export default async function OrderDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const guard = await guardOrders('orders.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="orders (модуль выключен)" />;
+      return <Forbidden permission={t('orders.detailPage.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -160,11 +162,11 @@ export default async function OrderDetailPage({
   if (!detail) {
     return (
       <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-6">
-        <h1 className="text-xl font-semibold text-amber-800">Заказ не найден</h1>
+        <h1 className="text-xl font-semibold text-amber-800">{t('orders.detailPage.notFoundTitle')}</h1>
         <p className="mt-2 text-sm text-amber-700">
-          Возможно, он был удалён.{' '}
+          {t('orders.detailPage.notFoundText')}{' '}
           <Link href="/admin/orders" className="text-blue-700 hover:underline">
-            К списку заказов
+            {t('orders.detailPage.backToList')}
           </Link>
         </p>
       </div>
@@ -225,23 +227,30 @@ export default async function OrderDetailPage({
 
   return (
     <div>
-      <nav className="text-sm" aria-label="Хлебные крошки">
+      <nav className="text-sm" aria-label={t('layout.breadcrumbs.ariaLabel')}>
         <Link href="/admin/orders" className="text-blue-700 hover:underline">
-          Заказы
+          {t('nav.orders')}
         </Link>
         <span className="mx-1 text-gray-400">/</span>
         <span className="text-gray-600">{order.number}</span>
       </nav>
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-gray-900">Заказ {order.number}</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">
+          {t('orders.detailPage.title', { number: order.number })}
+        </h1>
         <OrderStatusBadge status={order.status} />
         <PaymentStatusBadge status={order.paymentStatus} />
         <DeliveryStatusBadge status={order.deliveryStatus} />
       </div>
       <p className="mt-1 text-sm text-gray-500">
-        Создан {formatDateTime(order.createdAt)} · источник:{' '}
-        {order.source === 'admin' ? 'админка' : 'витрина'}
+        {t('orders.detailPage.createdLine', {
+          date: formatDateTime(order.createdAt),
+          source:
+            order.source === 'admin'
+              ? t('orders.detailPage.sourceAdmin')
+              : t('orders.detailPage.sourceStorefront'),
+        })}
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -249,17 +258,17 @@ export default async function OrderDetailPage({
         <div className="lg:col-span-2">
           <section className="rounded-lg border border-gray-200 bg-white">
             <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">
-              Позиции
+              {t('orders.detailPage.itemsHeading')}
             </h2>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50 text-left text-gray-500">
                   <tr>
-                    <th scope="col" className="px-4 py-2 font-medium">Товар</th>
-                    <th scope="col" className="px-4 py-2 font-medium">Артикул</th>
-                    <th scope="col" className="px-4 py-2 font-medium">Кол-во</th>
-                    <th scope="col" className="px-4 py-2 font-medium">Цена</th>
-                    <th scope="col" className="px-4 py-2 font-medium">Сумма</th>
+                    <th scope="col" className="px-4 py-2 font-medium">{t('orders.detailPage.columns.product')}</th>
+                    <th scope="col" className="px-4 py-2 font-medium">{t('orders.detailPage.columns.sku')}</th>
+                    <th scope="col" className="px-4 py-2 font-medium">{t('orders.detailPage.columns.quantity')}</th>
+                    <th scope="col" className="px-4 py-2 font-medium">{t('orders.detailPage.columns.price')}</th>
+                    <th scope="col" className="px-4 py-2 font-medium">{t('orders.detailPage.columns.total')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -272,7 +281,7 @@ export default async function OrderDetailPage({
                             {item.nameSnapshot}
                             {item.isGift ? (
                               <span className="ml-2 rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
-                                Подарок
+                                {t('orders.detailPage.giftBadge')}
                               </span>
                             ) : null}
                           </div>
@@ -300,15 +309,15 @@ export default async function OrderDetailPage({
             </div>
 
             <dl className="border-t border-gray-200 px-4 py-3">
-              <Row label="Товары" value={formatPrice(order.itemsTotal, order.currency)} />
+              <Row label={t('orders.detailPage.summary.items')} value={formatPrice(order.itemsTotal, order.currency)} />
               <Row
-                label="Скидка"
+                label={t('orders.detailPage.labelDiscount')}
                 value={`− ${formatPrice(order.discountTotal, order.currency)}`}
               />
-              <Row label="Доставка" value={formatPrice(order.deliveryTotal, order.currency)} />
+              <Row label={t('orders.detailPage.deliveryHeading')} value={formatPrice(order.deliveryTotal, order.currency)} />
               <div className="mt-1 border-t border-gray-200 pt-2">
                 <div className="flex justify-between text-base font-semibold">
-                  <span>Итого</span>
+                  <span>{t('orders.detailPage.summary.grandTotal')}</span>
                   <span>{formatPrice(order.grandTotal, order.currency)}</span>
                 </div>
               </div>
@@ -328,11 +337,11 @@ export default async function OrderDetailPage({
           {/* --- История статусов --- */}
           <section className="mt-6 rounded-lg border border-gray-200 bg-white">
             <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">
-              История статусов
+              {t('orders.detailPage.historyHeading')}
             </h2>
             <ul className="divide-y divide-gray-100">
               {history.length === 0 ? (
-                <li className="px-4 py-3 text-sm text-gray-400">История пуста.</li>
+                <li className="px-4 py-3 text-sm text-gray-400">{t('orders.detailPage.historyEmpty')}</li>
               ) : (
                 history.map((h) => (
                   <li key={h.id} className="px-4 py-2 text-sm">
@@ -361,56 +370,58 @@ export default async function OrderDetailPage({
         {/* --- Правая колонка: покупатель/доставка/оплата + действия --- */}
         <div className="space-y-6">
           <section className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-gray-800">Покупатель</h2>
+            <h2 className="text-sm font-semibold text-gray-800">{t('orders.detailPage.customerHeading')}</h2>
             <dl className="mt-2">
-              <Row label="Имя" value={order.customerName} />
-              <Row label="Email" value={order.customerEmail} />
-              <Row label="Телефон" value={order.customerPhone} />
-              {order.comment ? <Row label="Комментарий" value={order.comment} /> : null}
+              <Row label={t('fields.name')} value={order.customerName} />
+              <Row label={t('orders.detailPage.customer.email')} value={order.customerEmail} />
+              <Row label={t('orders.detailPage.customer.phone')} value={order.customerPhone} />
+              {order.comment ? <Row label={t('orders.detailPage.customer.comment')} value={order.comment} /> : null}
             </dl>
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-gray-800">Доставка</h2>
+            <h2 className="text-sm font-semibold text-gray-800">{t('orders.detailPage.deliveryHeading')}</h2>
             <dl className="mt-2">
               <Row
-                label="Тип"
+                label={t('orders.detailPage.delivery.type')}
                 value={
                   order.isPostamat
-                    ? `${deliveryTypeLabel(order.deliveryType)} · Постамат`
+                    ? t('orders.detailPage.delivery.postamatSuffix', {
+                        type: deliveryTypeLabel(order.deliveryType),
+                      })
                     : deliveryTypeLabel(order.deliveryType)
                 }
               />
-              <Row label="Статус" value={<DeliveryStatusBadge status={order.deliveryStatus} />} />
+              <Row label={t('orders.detailPage.labelStatus')} value={<DeliveryStatusBadge status={order.deliveryStatus} />} />
               {order.deliveryZoneLabel || order.deliveryZoneId ? (
-                <Row label="Зона" value={order.deliveryZoneLabel ?? order.deliveryZoneId ?? ''} />
+                <Row label={t('orders.detailPage.delivery.zone')} value={order.deliveryZoneLabel ?? order.deliveryZoneId ?? ''} />
               ) : null}
-              {order.deliveryCity ? <Row label="Город" value={order.deliveryCity} /> : null}
-              {order.deliveryAddress ? <Row label="Адрес" value={order.deliveryAddress} /> : null}
-              {order.deliveryPvzCode ? <Row label="ПВЗ" value={order.deliveryPvzCode} /> : null}
+              {order.deliveryCity ? <Row label={t('orders.detailPage.delivery.city')} value={order.deliveryCity} /> : null}
+              {order.deliveryAddress ? <Row label={t('orders.detailPage.delivery.address')} value={order.deliveryAddress} /> : null}
+              {order.deliveryPvzCode ? <Row label={t('orders.detailPage.delivery.pvz')} value={order.deliveryPvzCode} /> : null}
               {order.deliveryCost ? (
-                <Row label="Стоимость" value={formatPrice(order.deliveryCost, order.currency)} />
+                <Row label={t('orders.detailPage.delivery.cost')} value={formatPrice(order.deliveryCost, order.currency)} />
               ) : null}
-              {order.cdekTrack ? <Row label="Трек" value={order.cdekTrack} /> : null}
+              {order.cdekTrack ? <Row label={t('orders.detailPage.delivery.track')} value={order.cdekTrack} /> : null}
             </dl>
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-gray-800">Оплата</h2>
+            <h2 className="text-sm font-semibold text-gray-800">{t('orders.detailPage.paymentHeading')}</h2>
             <dl className="mt-2">
-              <Row label="Способ" value={paymentMethodLabel(order.paymentMethod)} />
-              <Row label="Статус" value={<PaymentStatusBadge status={order.paymentStatus} />} />
-              {order.paidAt ? <Row label="Оплачен" value={formatDateTime(order.paidAt)} /> : null}
+              <Row label={t('orders.detailPage.payment.method')} value={paymentMethodLabel(order.paymentMethod)} />
+              <Row label={t('orders.detailPage.labelStatus')} value={<PaymentStatusBadge status={order.paymentStatus} />} />
+              {order.paidAt ? <Row label={t('orders.detailPage.payment.paidAt')} value={formatDateTime(order.paidAt)} /> : null}
             </dl>
           </section>
 
           {order.promoCode ? (
             <section className="rounded-lg border border-gray-200 bg-white p-4">
-              <h2 className="text-sm font-semibold text-gray-800">Промокод</h2>
+              <h2 className="text-sm font-semibold text-gray-800">{t('orders.detailPage.promoHeading')}</h2>
               <dl className="mt-2">
-                <Row label="Код" value={<code className="text-xs">{order.promoCode}</code>} />
+                <Row label={t('orders.detailPage.promo.code')} value={<code className="text-xs">{order.promoCode}</code>} />
                 <Row
-                  label="Скидка"
+                  label={t('orders.detailPage.labelDiscount')}
                   value={formatPrice(order.discountTotal, order.currency)}
                 />
               </dl>

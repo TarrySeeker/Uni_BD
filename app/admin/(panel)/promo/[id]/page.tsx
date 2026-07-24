@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { getTranslations } from 'next-intl/server';
+
 import { sql } from '@/lib/db/client';
 import { mapPromoCode } from '@/lib/orders/repository';
 import type { PromoCode, PromoTarget } from '@/lib/orders/types';
@@ -55,10 +57,11 @@ export default async function EditPromoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const guard = await guardOrders('orders.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="orders (модуль выключен)" />;
+      return <Forbidden permission={t('promo.detailPage.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -70,10 +73,10 @@ export default async function EditPromoPage({
   if (!promo) {
     return (
       <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-6">
-        <h1 className="text-xl font-semibold text-amber-800">Промокод не найден</h1>
+        <h1 className="text-xl font-semibold text-amber-800">{t('promo.detailPage.notFoundTitle')}</h1>
         <p className="mt-2 text-sm text-amber-700">
           <Link href="/admin/promo" className="text-blue-700 hover:underline">
-            К списку промокодов
+            {t('promo.detailPage.backToList')}
           </Link>
         </p>
       </div>
@@ -83,11 +86,11 @@ export default async function EditPromoPage({
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title={`Промокод ${promo.code}`}
-        subtitle={`Использован: ${promo.usedCount} раз`}
-        breadcrumbs={[{ label: 'Промокоды', href: '/admin/promo' }, { label: promo.code }]}
+        title={t('promo.detailPage.title', { code: promo.code })}
+        subtitle={t('promo.detailPage.subtitle', { count: promo.usedCount })}
+        breadcrumbs={[{ label: t('nav.promo'), href: '/admin/promo' }, { label: promo.code }]}
         backHref="/admin/promo"
-        backLabel="К промокодам"
+        backLabel={t('promo.detailPage.backLabel')}
       />
       <div className="mt-6">
         <PromoForm promo={promo} targets={targets} pickerData={pickerData} />

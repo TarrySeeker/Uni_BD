@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getEffectiveSettings } from '@/lib/config/settings';
 
 import { Forbidden } from '../../_components/Forbidden';
@@ -17,6 +19,7 @@ import { SeoSettingsForm } from '../_components/SeoSettingsForm';
 export const dynamic = 'force-dynamic';
 
 export default async function SeoSettingsPage() {
+  const t = await getTranslations();
   const guard = await guardSettings('settings.manage');
   if (!guard.ok) {
     return <Forbidden permission={guard.permission} />;
@@ -27,14 +30,14 @@ export default async function SeoSettingsPage() {
   return (
     <div className="max-w-4xl">
       <PageHeader
-        title="SEO-настройки"
-        subtitle="Домен, заголовки и описания для поисковиков и соцсетей."
+        title={t('settings.seoPage.title')}
+        subtitle={t('settings.seoPage.subtitle')}
         breadcrumbs={[
-          { label: 'Настройки', href: '/admin/settings' },
-          { label: 'SEO' },
+          { label: t('nav.settings'), href: '/admin/settings' },
+          { label: t('seo.legend') },
         ]}
         backHref="/admin/settings"
-        backLabel="К настройкам"
+        backLabel={t('settings.seoPage.backToSettings')}
       />
 
       <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">

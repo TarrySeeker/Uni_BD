@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
@@ -19,14 +20,14 @@ import { PageHeader } from '../_components/PageHeader';
  */
 export const dynamic = 'force-dynamic';
 
-/** Подпись статуса для владельца магазина (без тех-жаргона). */
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Активен',
-  disabled: 'Отключён',
-  invited: 'Приглашён',
-};
-
 export default async function UsersPage() {
+  const t = await getTranslations();
+  const statusLabel = (status: string) => {
+    if (status === 'active') return t('common.states.active');
+    if (status === 'disabled') return t('common.states.disabled');
+    if (status === 'invited') return t('users.page.statusInvited');
+    return status;
+  };
   const user = await requireUser();
   if (!can(user, 'users.read')) {
     return <Forbidden permission="users.read" />;
@@ -42,16 +43,16 @@ export default async function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="Пользователи"
-        subtitle="Сотрудники с доступом в админку и их роли."
-        breadcrumbs={[{ label: 'Пользователи' }]}
+        title={t('nav.users')}
+        subtitle={t('users.page.subtitle')}
+        breadcrumbs={[{ label: t('nav.users') }]}
         action={
           canManage ? (
             <Link
               href="/admin/users/new"
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
             >
-              + Создать пользователя
+              {t('users.page.createButton')}
             </Link>
           ) : null
         }
@@ -61,12 +62,12 @@ export default async function UsersPage() {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Email</th>
-              <th scope="col" className="px-4 py-2 font-medium">Имя</th>
-              <th scope="col" className="px-4 py-2 font-medium">Статус</th>
-              <th scope="col" className="px-4 py-2 font-medium">Роли</th>
-              <th scope="col" className="px-4 py-2 font-medium">Последний вход</th>
-              <th scope="col" className="px-4 py-2 font-medium">Владелец</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('users.page.colEmail')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('fields.name')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('users.page.colStatus')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('nav.roles')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('users.page.colLastLogin')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('users.page.colOwner')}</th>
               {canManage ? <th scope="col" className="px-4 py-2 font-medium" /> : null}
             </tr>
           </thead>
@@ -74,7 +75,7 @@ export default async function UsersPage() {
             {users.length === 0 ? (
               <tr>
                 <td colSpan={canManage ? 7 : 6} className="px-4 py-6 text-center text-gray-400">
-                  Пользователей пока нет.
+                  {t('users.page.empty')}
                 </td>
               </tr>
             ) : (
@@ -83,7 +84,7 @@ export default async function UsersPage() {
                   <td className="px-4 py-2 text-gray-800">{row.email}</td>
                   <td className="px-4 py-2 text-gray-600">{row.displayName || '—'}</td>
                   <td className="px-4 py-2 text-gray-600">
-                    {STATUS_LABELS[row.status] ?? row.status}
+                    {statusLabel(row.status)}
                   </td>
                   <td className="px-4 py-2 text-gray-600">
                     {row.roles.length === 0 ? '—' : row.roles.map((r) => r.title).join(', ')}
@@ -91,17 +92,17 @@ export default async function UsersPage() {
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">
                     {formatDateTime(row.lastLoginAt)}
                   </td>
-                  <td className="px-4 py-2 text-gray-600">{row.isOwner ? 'да' : '—'}</td>
+                  <td className="px-4 py-2 text-gray-600">{row.isOwner ? t('users.page.yes') : '—'}</td>
                   {canManage ? (
                     <td className="px-4 py-2 text-right">
                       {row.isOwner ? (
-                        <span className="text-xs text-gray-400">защищён</span>
+                        <span className="text-xs text-gray-400">{t('users.page.protected')}</span>
                       ) : (
                         <Link
                           href={`/admin/users/${row.id}`}
                           className="text-sm text-blue-700 hover:underline"
                         >
-                          Редактировать
+                          {t('common.actions.edit')}
                         </Link>
                       )}
                     </td>

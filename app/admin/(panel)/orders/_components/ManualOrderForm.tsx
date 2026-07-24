@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 
@@ -89,6 +90,7 @@ export function ManualOrderForm({
   paymentOptions: Option[];
   deliveryOptions: Option[];
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const baseId = useId();
   const [pending, startTransition] = useTransition();
@@ -227,13 +229,13 @@ export function ManualOrderForm({
       {/* ---- Поиск и подбор товаров ------------------------------------------ */}
       <section aria-labelledby={`${baseId}-items`} className="rounded-lg border border-gray-200 p-4">
         <h2 id={`${baseId}-items`} className="text-lg font-semibold text-gray-900">
-          Товары
+          {t('orders.manualOrderForm.itemsHeading')}
         </h2>
 
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[240px]">
             <label htmlFor={`${baseId}-search`} className="block text-sm font-medium text-gray-700">
-              Поиск товара (название или артикул)
+              {t('orders.manualOrderForm.searchLabel')}
             </label>
             <input
               id={`${baseId}-search`}
@@ -246,7 +248,7 @@ export function ManualOrderForm({
                   runSearch();
                 }
               }}
-              placeholder="Например: футболка или TC-001"
+              placeholder={t('orders.manualOrderForm.searchPlaceholder')}
               className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
@@ -256,7 +258,7 @@ export function ManualOrderForm({
             disabled={pending || searching}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {searching ? 'Поиск…' : 'Найти'}
+            {searching ? t('orders.manualOrderForm.searching') : t('orders.manualOrderForm.searchButton')}
           </button>
         </div>
 
@@ -264,7 +266,7 @@ export function ManualOrderForm({
           <div className="mt-3">
             {results.length === 0 ? (
               <p className="text-sm text-gray-400">
-                {searching ? 'Ищем товары…' : 'Ничего не найдено. Измените запрос.'}
+                {searching ? t('orders.manualOrderForm.searchingProducts') : t('orders.manualOrderForm.searchEmpty')}
               </p>
             ) : (
               <ul className="divide-y divide-gray-100 rounded-md border border-gray-200">
@@ -275,8 +277,11 @@ export function ManualOrderForm({
                       <span className="text-gray-400">({p.sku})</span>
                       <div className="text-xs text-gray-500">
                         {p.variants.length > 0
-                          ? `Вариантов: ${p.variants.length}`
-                          : `${formatPrice(p.unitPrice, currency)} · доступно ${p.availableStock}`}
+                          ? t('orders.manualOrderForm.variantsCount', { count: p.variants.length })
+                          : t('orders.manualOrderForm.priceAvailable', {
+                              price: formatPrice(p.unitPrice, currency),
+                              stock: p.availableStock,
+                            })}
                       </div>
                     </div>
                     <button
@@ -284,7 +289,7 @@ export function ManualOrderForm({
                       onClick={() => addProduct(p)}
                       className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
                     >
-                      Добавить
+                      {t('common.actions.add')}
                     </button>
                   </li>
                 ))}
@@ -298,12 +303,12 @@ export function ManualOrderForm({
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="text-left text-gray-500">
               <tr>
-                <th scope="col" className="py-2 font-medium">Товар</th>
-                <th scope="col" className="py-2 font-medium">Вариант</th>
-                <th scope="col" className="py-2 font-medium">Кол-во</th>
-                <th scope="col" className="py-2 font-medium">Цена</th>
-                <th scope="col" className="py-2 font-medium">Сумма</th>
-                <th scope="col" className="py-2 font-medium" aria-label="Действия" />
+                <th scope="col" className="py-2 font-medium">{t('orders.manualOrderForm.colProduct')}</th>
+                <th scope="col" className="py-2 font-medium">{t('orders.manualOrderForm.colVariant')}</th>
+                <th scope="col" className="py-2 font-medium">{t('orders.manualOrderForm.colQty')}</th>
+                <th scope="col" className="py-2 font-medium">{t('orders.manualOrderForm.colPrice')}</th>
+                <th scope="col" className="py-2 font-medium">{t('orders.manualOrderForm.colSum')}</th>
+                <th scope="col" className="py-2 font-medium" aria-label={t('common.table.actions')} />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -320,13 +325,13 @@ export function ManualOrderForm({
                           <div className="text-xs text-gray-400">{line.product.sku}</div>
                         </div>
                       ) : (
-                        <span className="text-gray-400">— выберите товар через поиск —</span>
+                        <span className="text-gray-400">{t('orders.manualOrderForm.selectProductHint')}</span>
                       )}
                     </td>
                     <td className="py-2 pr-3 align-top">
                       {line.product && line.product.variants.length > 0 ? (
                         <select
-                          aria-label="Вариант товара"
+                          aria-label={t('orders.manualOrderForm.variantAria')}
                           value={line.variantId}
                           onChange={(e) => updateLine(line.key, { variantId: e.target.value })}
                           className="rounded-md border border-gray-300 px-2 py-1 text-sm"
@@ -347,7 +352,7 @@ export function ManualOrderForm({
                         min={1}
                         max={10000}
                         step={1}
-                        aria-label="Количество"
+                        aria-label={t('orders.manualOrderForm.qtyAria')}
                         value={line.qty}
                         onChange={(e) =>
                           updateLine(line.key, {
@@ -369,7 +374,7 @@ export function ManualOrderForm({
                         onClick={() => removeLine(line.key)}
                         className="text-xs text-red-600 hover:underline"
                       >
-                        Удалить
+                        {t('common.actions.delete')}
                       </button>
                     </td>
                   </tr>
@@ -385,15 +390,15 @@ export function ManualOrderForm({
             onClick={() => setLines((prev) => [...prev, newLine()])}
             className="text-sm text-blue-700 hover:underline"
           >
-            + Добавить пустую строку
+            {t('orders.manualOrderForm.addEmptyLine')}
           </button>
           <div className="text-sm text-gray-600">
-            Промежуточный итог (предпросмотр):{' '}
+            {t('orders.manualOrderForm.subtotalPreview')}{' '}
             <span className="font-semibold text-gray-900">{formatPrice(estimate, currency)}</span>
           </div>
         </div>
         <p className="mt-1 text-xs text-gray-400">
-          Итог, скидки и доставку рассчитает сервер при создании заказа.
+          {t('orders.manualOrderForm.serverCalcNote')}
         </p>
         {fe('items') ? <p className="mt-1 text-sm text-red-600">{fe('items')}</p> : null}
       </section>
@@ -401,12 +406,12 @@ export function ManualOrderForm({
       {/* ---- Покупатель ----------------------------------------------------- */}
       <section aria-labelledby={`${baseId}-customer`} className="rounded-lg border border-gray-200 p-4">
         <h2 id={`${baseId}-customer`} className="text-lg font-semibold text-gray-900">
-          Покупатель
+          {t('orders.manualOrderForm.customerHeading')}
         </h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <Field
             id={`${baseId}-name`}
-            label="Имя"
+            label={t('fields.name')}
             value={name}
             onChange={setName}
             error={fe('customer.name')}
@@ -414,7 +419,7 @@ export function ManualOrderForm({
           />
           <Field
             id={`${baseId}-phone`}
-            label="Телефон"
+            label={t('orders.manualOrderForm.phoneLabel')}
             value={phone}
             onChange={setPhone}
             error={fe('customer.phone')}
@@ -422,7 +427,7 @@ export function ManualOrderForm({
           />
           <Field
             id={`${baseId}-email`}
-            label="Email"
+            label={t('orders.manualOrderForm.emailLabel')}
             type="email"
             value={email}
             onChange={setEmail}
@@ -435,12 +440,12 @@ export function ManualOrderForm({
       {/* ---- Доставка ------------------------------------------------------- */}
       <section aria-labelledby={`${baseId}-delivery`} className="rounded-lg border border-gray-200 p-4">
         <h2 id={`${baseId}-delivery`} className="text-lg font-semibold text-gray-900">
-          Доставка
+          {t('orders.manualOrderForm.deliveryHeading')}
         </h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor={`${baseId}-dtype`} className="block text-sm font-medium text-gray-700">
-              Способ доставки
+              {t('orders.manualOrderForm.deliveryMethodLabel')}
             </label>
             <select
               id={`${baseId}-dtype`}
@@ -459,7 +464,7 @@ export function ManualOrderForm({
           {deliveryType !== 'pickup' ? (
             <Field
               id={`${baseId}-city`}
-              label="Город"
+              label={t('orders.manualOrderForm.cityLabel')}
               value={city}
               onChange={setCity}
               error={fe('delivery.city')}
@@ -469,7 +474,7 @@ export function ManualOrderForm({
           {deliveryType === 'courier' ? (
             <Field
               id={`${baseId}-address`}
-              label="Адрес"
+              label={t('orders.manualOrderForm.addressLabel')}
               value={address}
               onChange={setAddress}
               error={fe('delivery.address')}
@@ -480,7 +485,7 @@ export function ManualOrderForm({
           {deliveryType === 'pvz' ? (
             <Field
               id={`${baseId}-pvz`}
-              label="Код ПВЗ (СДЭК)"
+              label={t('orders.manualOrderForm.pvzCodeLabel')}
               value={pvzCode}
               onChange={setPvzCode}
               error={fe('delivery.pvzCode')}
@@ -489,19 +494,19 @@ export function ManualOrderForm({
           ) : null}
         </div>
         {deliveryType === 'pickup' ? (
-          <p className="mt-2 text-sm text-gray-500">Самовывоз: адрес и ПВЗ не требуются.</p>
+          <p className="mt-2 text-sm text-gray-500">{t('orders.manualOrderForm.pickupNote')}</p>
         ) : null}
       </section>
 
       {/* ---- Оплата и комментарий ------------------------------------------ */}
       <section aria-labelledby={`${baseId}-payment`} className="rounded-lg border border-gray-200 p-4">
         <h2 id={`${baseId}-payment`} className="text-lg font-semibold text-gray-900">
-          Оплата и комментарий
+          {t('orders.manualOrderForm.paymentCommentHeading')}
         </h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor={`${baseId}-pay`} className="block text-sm font-medium text-gray-700">
-              Способ оплаты
+              {t('orders.manualOrderForm.paymentMethodLabel')}
             </label>
             <select
               id={`${baseId}-pay`}
@@ -521,7 +526,7 @@ export function ManualOrderForm({
           </div>
           <div>
             <label htmlFor={`${baseId}-comment`} className="block text-sm font-medium text-gray-700">
-              Комментарий (необязательно)
+              {t('orders.manualOrderForm.commentLabel')}
             </label>
             <textarea
               id={`${baseId}-comment`}
@@ -542,10 +547,10 @@ export function ManualOrderForm({
           disabled={pending || !hasAnyItem}
           className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {pending ? 'Создаём заказ…' : 'Создать заказ'}
+          {pending ? t('orders.manualOrderForm.creatingOrder') : t('orders.manualOrderForm.createOrder')}
         </button>
         {!hasAnyItem ? (
-          <span className="text-sm text-gray-400">Добавьте хотя бы один товар.</span>
+          <span className="text-sm text-gray-400">{t('orders.manualOrderForm.addAtLeastOne')}</span>
         ) : null}
       </div>
     </div>

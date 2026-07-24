@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
@@ -27,6 +28,7 @@ export default async function UserDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const current = await requireUser();
   if (!can(current, 'users.manage')) {
     return <Forbidden permission="users.manage" />;
@@ -51,14 +53,14 @@ export default async function UserDetailPage({
         <PageHeader
           title={user.displayName || user.email}
           breadcrumbs={[
-            { label: 'Пользователи', href: '/admin/users' },
+            { label: t('nav.users'), href: '/admin/users' },
             { label: user.email },
           ]}
           backHref="/admin/users"
-          backLabel="К списку"
+          backLabel={t('users.detailPage.backToList')}
         />
         <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
-          Это учётная запись владельца магазина. Её нельзя изменять или отключать.
+          {t('users.detailPage.ownerNotice')}
         </div>
       </div>
     );
@@ -70,11 +72,11 @@ export default async function UserDetailPage({
         title={user.displayName || user.email}
         subtitle={user.email}
         breadcrumbs={[
-          { label: 'Пользователи', href: '/admin/users' },
+          { label: t('nav.users'), href: '/admin/users' },
           { label: user.email },
         ]}
         backHref="/admin/users"
-        backLabel="К списку"
+        backLabel={t('users.detailPage.backToList')}
       />
 
       <div className="mt-6">

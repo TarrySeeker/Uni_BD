@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import {
   listReviewsForModeration,
@@ -69,10 +70,11 @@ export default async function ReviewsListPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations();
   const guard = await guardReviews('reviews.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="reviews (модуль выключен)" />;
+      return <Forbidden permission={t('reviews.page.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -91,9 +93,12 @@ export default async function ReviewsListPage({
   return (
     <div>
       <PageHeader
-        title="Отзывы"
-        subtitle={`Модерация отзывов покупателей. На модерации: ${pendingCount}. Всего: ${totalAll}.`}
-        breadcrumbs={[{ label: 'Отзывы' }]}
+        title={t('nav.reviews')}
+        subtitle={t('reviews.page.subtitle', {
+          pending: pendingCount,
+          total: totalAll,
+        })}
+        breadcrumbs={[{ label: t('nav.reviews') }]}
       />
 
       <form method="get" className="mt-4 flex flex-wrap items-end gap-3">
@@ -102,7 +107,7 @@ export default async function ReviewsListPage({
             htmlFor="reviews-status"
             className="block text-xs font-medium text-gray-600"
           >
-            Статус
+            {t('reviews.page.statusLabel')}
           </label>
           <select
             id="reviews-status"
@@ -110,24 +115,24 @@ export default async function ReviewsListPage({
             defaultValue={filter.status ?? ''}
             className="mt-1 rounded border border-gray-300 px-3 py-2 text-sm"
           >
-            <option value="">Все</option>
-            <option value="pending">На модерации</option>
-            <option value="approved">Одобрены</option>
-            <option value="rejected">Отклонены</option>
+            <option value="">{t('reviews.page.statusAll')}</option>
+            <option value="pending">{t('reviews.page.statusPending')}</option>
+            <option value="approved">{t('reviews.page.statusApproved')}</option>
+            <option value="rejected">{t('reviews.page.statusRejected')}</option>
           </select>
         </div>
         <button
           type="submit"
           className="rounded border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100"
         >
-          Применить
+          {t('common.actions.apply')}
         </button>
         {filter.status ? (
           <Link
             href="/admin/reviews"
             className="px-2 py-2 text-sm text-gray-500 hover:underline"
           >
-            Сбросить
+            {t('common.actions.reset')}
           </Link>
         ) : null}
       </form>
@@ -136,20 +141,20 @@ export default async function ReviewsListPage({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-left text-gray-500">
-              <th className="px-4 py-2 font-medium">Дата</th>
-              <th className="px-4 py-2 font-medium">Товар</th>
-              <th className="px-4 py-2 font-medium">Автор</th>
-              <th className="px-4 py-2 font-medium">Рейтинг</th>
-              <th className="px-4 py-2 font-medium">Текст</th>
-              <th className="px-4 py-2 font-medium">Статус</th>
-              <th className="px-4 py-2 font-medium">Действия</th>
+              <th className="px-4 py-2 font-medium">{t('reviews.page.colDate')}</th>
+              <th className="px-4 py-2 font-medium">{t('reviews.page.colProduct')}</th>
+              <th className="px-4 py-2 font-medium">{t('reviews.page.colAuthor')}</th>
+              <th className="px-4 py-2 font-medium">{t('reviews.page.colRating')}</th>
+              <th className="px-4 py-2 font-medium">{t('reviews.page.colText')}</th>
+              <th className="px-4 py-2 font-medium">{t('reviews.page.statusLabel')}</th>
+              <th className="px-4 py-2 font-medium">{t('common.table.actions')}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
-                  Отзывы не найдены.
+                  {t('reviews.page.empty')}
                 </td>
               </tr>
             ) : (
@@ -174,7 +179,9 @@ export default async function ReviewsListPage({
                     </Link>
                     {r.reply ? (
                       <div className="mt-1 text-xs text-gray-500">
-                        Ответ: {truncate(r.reply, 60)}
+                        {t('reviews.page.replyPrefix', {
+                          reply: truncate(r.reply, 60),
+                        })}
                       </div>
                     ) : null}
                   </td>
@@ -194,10 +201,13 @@ export default async function ReviewsListPage({
       {totalPages > 1 ? (
         <nav
           className="mt-4 flex items-center justify-between text-sm"
-          aria-label="Пагинация"
+          aria-label={t('reviews.page.paginationAria')}
         >
           <span className="text-gray-500">
-            Страница {currentPage} из {totalPages}
+            {t('common.pagination.page', {
+              page: currentPage,
+              total: totalPages,
+            })}
           </span>
           <div className="flex gap-2">
             {currentPage > 1 ? (
@@ -205,7 +215,7 @@ export default async function ReviewsListPage({
                 href={pageHref(sp, currentPage - 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Назад
+                {t('common.pagination.prev')}
               </Link>
             ) : null}
             {currentPage < totalPages ? (
@@ -213,7 +223,7 @@ export default async function ReviewsListPage({
                 href={pageHref(sp, currentPage + 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Вперёд
+                {t('common.pagination.next')}
               </Link>
             ) : null}
           </div>

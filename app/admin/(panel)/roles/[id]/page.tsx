@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
@@ -38,17 +39,19 @@ export default async function RoleDetailPage({
     notFound();
   }
 
+  const t = await getTranslations();
+
   return (
     <div>
       <PageHeader
         title={role.title}
-        subtitle={role.isSystem ? 'Системная роль' : undefined}
+        subtitle={role.isSystem ? t('roles.detailPage.systemRoleSubtitle') : undefined}
         breadcrumbs={[
-          { label: 'Роли', href: '/admin/roles' },
+          { label: t('nav.roles'), href: '/admin/roles' },
           { label: role.title },
         ]}
         backHref="/admin/roles"
-        backLabel="К списку"
+        backLabel={t('roles.detailPage.backToList')}
       />
 
       <div className="mt-6">

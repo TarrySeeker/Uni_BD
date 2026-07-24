@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState, type ReactNode } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -55,6 +56,7 @@ export function SettingsTranslationTabs({
   /** Базовая форма (редактирование значений основного языка). */
   children: ReactNode;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [trState, setTrState] = useState<TranslationsState>(() =>
     initTrState(translations, section),
@@ -78,7 +80,7 @@ export function SettingsTranslationTabs({
       }
     }
     setPending(false);
-    setSuccess('Переводы сохранены.');
+    setSuccess(t('settings.settingsTranslationTabs.saved'));
     router.refresh();
   }
 

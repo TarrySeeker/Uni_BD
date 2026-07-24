@@ -10,6 +10,7 @@ import { leadSourceLabel } from '@/lib/leads/schemas';
 import { formatDateTime } from '@/lib/admin/order-format';
 import { listTruncationNotice } from '@/lib/admin/list-truncation';
 import { getStorage } from '@/lib/storage';
+import { getTranslations } from 'next-intl/server';
 
 /**
  * Раздел «Заявки» (G-09): сообщения с формы обратной связи витрины. Доступ —
@@ -34,6 +35,7 @@ const TH =
   'sticky top-0 z-10 shadow-[inset_0_-1px_0_theme(colors.gray.200)] bg-white px-4 py-2 font-medium';
 
 export default async function LeadsPage() {
+  const t = await getTranslations();
   const guard = await guardLeads();
   if (!guard.ok) {
     return <Forbidden permission={guard.permission} />;
@@ -65,9 +67,9 @@ export default async function LeadsPage() {
   return (
     <div>
       <PageHeader
-        title="Заявки"
-        subtitle={`Сообщения с формы обратной связи витрины (/contacts). Меняйте статус или удаляйте обработанные. Всего: ${total}.`}
-        breadcrumbs={[{ label: 'Заявки' }]}
+        title={t('nav.leads')}
+        subtitle={t('leads.page.subtitle', { total })}
+        breadcrumbs={[{ label: t('nav.leads') }]}
         action={<ExportToolbar rows={exportRows} />}
       />
 
@@ -76,12 +78,12 @@ export default async function LeadsPage() {
           role="status"
           className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
         >
-          {truncation}. Используйте экспорт, чтобы получить полный список.
+          {t('leads.page.truncationHint', { notice: truncation })}
         </p>
       ) : null}
 
       {leads.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-600">Пока нет заявок.</p>
+        <p className="mt-6 text-sm text-gray-600">{t('leads.page.empty')}</p>
       ) : (
         <div className="mt-6 max-h-[70vh] overflow-x-auto overflow-y-auto rounded-lg border border-gray-200 bg-white">
           {/*
@@ -92,15 +94,15 @@ export default async function LeadsPage() {
           <table className="w-full min-w-[72rem] text-sm">
             <thead>
               <tr className="text-left text-gray-500">
-                <th className={TH}>Дата</th>
-                <th className={TH}>Имя</th>
-                <th className={TH}>Контакт</th>
-                <th className={TH}>Источник</th>
-                <th className={TH}>Детали</th>
-                <th className={TH}>Сообщение</th>
-                <th className={TH}>Ответ оператора</th>
-                <th className={TH}>Статус</th>
-                <th className={TH}>Действия</th>
+                <th className={TH}>{t('leads.page.columns.date')}</th>
+                <th className={TH}>{t('fields.name')}</th>
+                <th className={TH}>{t('leads.page.columns.contact')}</th>
+                <th className={TH}>{t('leads.page.columns.source')}</th>
+                <th className={TH}>{t('leads.page.columns.details')}</th>
+                <th className={TH}>{t('leads.page.columns.message')}</th>
+                <th className={TH}>{t('leads.page.columns.answer')}</th>
+                <th className={TH}>{t('leads.page.columns.status')}</th>
+                <th className={TH}>{t('common.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -111,9 +113,9 @@ export default async function LeadsPage() {
                   <td className="px-4 py-2">{l.contact}</td>
                   <td className="px-4 py-2 text-gray-600">{leadSourceLabel(l.source)}</td>
                   <td className="px-4 py-2 text-xs text-gray-600">
-                    {l.company ? <div>Организация: {l.company}</div> : null}
-                    {l.city ? <div>Город: {l.city}</div> : null}
-                    {l.subject ? <div>Тема: {l.subject}</div> : null}
+                    {l.company ? <div>{t('leads.page.details.company', { value: l.company })}</div> : null}
+                    {l.city ? <div>{t('leads.page.details.city', { value: l.city })}</div> : null}
+                    {l.subject ? <div>{t('leads.page.details.subject', { value: l.subject })}</div> : null}
                     {l.attachment_key ? (
                       <a
                         href={storage.url(l.attachment_key)}
@@ -121,7 +123,7 @@ export default async function LeadsPage() {
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline"
                       >
-                        Скачать вложение
+                        {t('leads.page.downloadAttachment')}
                       </a>
                     ) : null}
                     {!l.company && !l.city && !l.subject && !l.attachment_key ? (

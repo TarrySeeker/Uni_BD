@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -22,6 +23,7 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
  * gift-form-state (они покрыты юнитами), здесь только разметка и вызов действия.
  */
 export function GiftSettingsForm({ saved }: { saved: unknown }) {
+  const t = useTranslations();
   const router = useRouter();
   const [state, setState] = useState<GiftFormState>(() => giftFormStateFrom(saved));
   const [error, setError] = useState<Fail | null>(null);
@@ -48,7 +50,7 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
     const result = await updateGiftSettingsAction(payload.value);
     setPending(false);
     if (result.ok) {
-      setSuccess('Настройки подарочных сертификатов сохранены.');
+      setSuccess(t('settings.giftGiftSettingsForm.savedSuccess'));
       router.refresh();
     } else {
       setError(result);
@@ -84,20 +86,17 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
           />
           <span>
             <span className="block text-sm font-medium text-gray-800">
-              Создавать код автоматически при оплате
+              {t('settings.giftGiftSettingsForm.autoIssueLabel')}
             </span>
             <span className="block text-xs text-gray-500">
-              Когда покупатель оплатил заказ с подарочным сертификатом, код создаётся
-              сам: попадает в раздел «Подарочные сертификаты» и показывается покупателю
-              после оформления. Если выключить — код придётся выпускать вручную из
-              карточки заказа.
+              {t('settings.giftGiftSettingsForm.autoIssueHelp')}
             </span>
           </span>
         </label>
 
         <div>
           <label htmlFor="gift-valid-days" className="block text-sm font-medium text-gray-800">
-            Сколько дней действует код
+            {t('settings.giftGiftSettingsForm.validDaysLabel')}
           </label>
           <input
             id="gift-valid-days"
@@ -105,18 +104,17 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
             inputMode="numeric"
             value={state.validDaysText}
             onChange={(e) => patch({ validDaysText: e.target.value })}
-            placeholder="Например, 365"
+            placeholder={t('settings.giftGiftSettingsForm.validDaysPlaceholder')}
             className="mt-1 w-40 rounded-md border border-gray-300 px-3 py-2 text-sm"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Оставьте поле пустым — код будет бессрочным. Срок отсчитывается от дня
-            выпуска кода.
+            {t('settings.giftGiftSettingsForm.validDaysHelp')}
           </p>
         </div>
 
         <div>
           <label htmlFor="gift-categories" className="block text-sm font-medium text-gray-800">
-            Разделы каталога с подарочными сертификатами
+            {t('settings.giftGiftSettingsForm.categoriesLabel')}
           </label>
           <textarea
             id="gift-categories"
@@ -127,18 +125,10 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Адреса разделов, как они выглядят в ссылке на сайте (то, что идёт после
-            /catalog/). Через запятую или с новой строки. В момент оформления заказа
-            товары из этих разделов помечаются в самом заказе как подарочные
-            сертификаты, и позже код создаётся именно по этой пометке. Уже оформленные
-            заказы не меняются: переименуете или удалите раздел — код всё равно
-            выпустится, потому что пометка сохранена в заказе.
+            {t('settings.giftGiftSettingsForm.categoriesHelp1')}
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            Если оставить поле пустым, по разделам помечать никто не будет. Коды всё
-            равно создадутся для товаров, у которых признак подарочного сертификата
-            задан в самой карточке товара. Полностью отключить выдачу кодов можно
-            только галочкой «Создавать код автоматически при оплате» выше.
+            {t('settings.giftGiftSettingsForm.categoriesHelp2')}
           </p>
         </div>
 
@@ -151,11 +141,10 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
           />
           <span>
             <span className="block text-sm font-medium text-gray-800">
-              Создавать код, если заказ оплачен другим сертификатом
+              {t('settings.giftGiftSettingsForm.allowIssueLabel')}
             </span>
             <span className="block text-xs text-gray-500">
-              Покупатель может оплатить новый сертификат остатком старого — фактически
-              обменять номинал. Выключите, если такой обмен в магазине не нужен.
+              {t('settings.giftGiftSettingsForm.allowIssueHelp')}
             </span>
           </span>
         </label>
@@ -168,7 +157,7 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
           disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {pending ? 'Сохранение…' : 'Сохранить настройки сертификатов'}
+          {pending ? t('common.form.saving') : t('settings.giftGiftSettingsForm.saveButton')}
         </button>
       </div>
     </div>

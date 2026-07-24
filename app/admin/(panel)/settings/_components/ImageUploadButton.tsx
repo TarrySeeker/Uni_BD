@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -18,12 +19,13 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
  * админке) — подтверждаем загрузку и подставляем ключ в видимое поле.
  */
 export function ImageUploadButton({
-  label = 'Загрузить файл',
+  label,
   onUploaded,
 }: {
   label?: string;
   onUploaded: (key: string) => void;
 }) {
+  const t = useTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,9 +59,9 @@ export function ImageUploadButton({
         disabled={pending}
         className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
-        {pending ? 'Загрузка…' : label}
+        {pending ? t('settings.imageUploadButton.pending') : (label ?? t('settings.imageUploadButton.default'))}
       </button>
-      {done ? <span className="ml-2 text-xs text-green-700">✓ файл загружен, адрес подставлен в поле</span> : null}
+      {done ? <span className="ml-2 text-xs text-green-700">{t('settings.imageUploadButton.done')}</span> : null}
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
     </div>
   );

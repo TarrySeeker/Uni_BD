@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getSetting } from '@/lib/settings/repository';
 import { parseSettingValue } from '@/lib/settings/schemas';
 
@@ -20,6 +22,7 @@ import { GiftSettingsForm } from './GiftSettingsForm';
 export const dynamic = 'force-dynamic';
 
 export default async function GiftSettingsPage() {
+  const t = await getTranslations();
   const guard = await guardSettings('settings.manage');
   if (!guard.ok) {
     return <Forbidden permission={guard.permission} />;
@@ -31,20 +34,20 @@ export default async function GiftSettingsPage() {
   return (
     <div className="max-w-4xl">
       <PageHeader
-        title="Подарочные сертификаты"
-        subtitle="Когда покупателю выдаётся код сертификата и сколько он действует."
+        title={t('nav.giftCertificates')}
+        subtitle={t('settings.giftPage.subtitle')}
         breadcrumbs={[
-          { label: 'Настройки', href: '/admin/settings' },
-          { label: 'Подарочные сертификаты' },
+          { label: t('nav.settings'), href: '/admin/settings' },
+          { label: t('nav.giftCertificates') },
         ]}
         backHref="/admin/settings"
-        backLabel="К настройкам"
+        backLabel={t('settings.giftPage.backToSettings')}
       />
 
       <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <GiftSettingsForm saved={saved} />
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-200 pt-4">
-          <ResetSettingButton settingKey="gift" label="Сбросить настройки сертификатов" />
+          <ResetSettingButton settingKey="gift" label={t('settings.giftPage.resetLabel')} />
         </div>
       </section>
     </div>

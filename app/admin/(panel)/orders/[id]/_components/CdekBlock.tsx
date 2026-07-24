@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -73,6 +74,7 @@ export function CdekBlock({
    */
   paymentReady: boolean;
 }) {
+  const t = useTranslations();
   const router = useRouter();
 
   const [error, setError] = useState<Fail | null>(null);
@@ -111,7 +113,7 @@ export function CdekBlock({
         }
         setSuccess(outcome.message);
       } else {
-        setSuccess(`${label}: выполнено.`);
+        setSuccess(t('orders.detailCdekBlock.actionDone', { label }));
       }
       router.refresh();
     } else {
@@ -122,10 +124,10 @@ export function CdekBlock({
   return (
     <section
       className="rounded-lg border border-gray-200 bg-white p-4"
-      aria-label="Доставка СДЭК"
+      aria-label={t('orders.detailCdekBlock.title')}
     >
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-gray-800">Доставка СДЭК</h2>
+        <h2 className="text-sm font-semibold text-gray-800">{t('orders.detailCdekBlock.title')}</h2>
         {shipment?.isMock ? (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
             mock
@@ -152,21 +154,21 @@ export function CdekBlock({
 
       {isPickup ? (
         <p className="mt-3 text-sm text-gray-500">
-          Самовывоз — отправление СДЭК не создаётся.
+          {t('orders.detailCdekBlock.pickupNote')}
         </p>
       ) : (
         <>
           {/* --- Сведения об отправлении --- */}
           <dl className="mt-3 space-y-1 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-gray-500">Статус</dt>
+              <dt className="text-gray-500">{t('orders.detailCdekBlock.statusLabel')}</dt>
               <dd className="text-right text-gray-900">
-                {shipment?.statusName ?? shipment?.statusCode ?? '— нет отправления —'}
+                {shipment?.statusName ?? shipment?.statusCode ?? t('orders.detailCdekBlock.noShipment')}
               </dd>
             </div>
             {shipment?.cdekNumber ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-gray-500">Трек</dt>
+                <dt className="text-gray-500">{t('orders.detailCdekBlock.trackLabel')}</dt>
                 <dd className="text-right">
                   <a
                     href={trackUrl(shipment.cdekNumber)}
@@ -181,13 +183,13 @@ export function CdekBlock({
             ) : null}
             {shipment?.pvzCode ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-gray-500">ПВЗ</dt>
+                <dt className="text-gray-500">{t('orders.detailCdekBlock.pvzLabel')}</dt>
                 <dd className="text-right text-gray-900">{shipment.pvzCode}</dd>
               </div>
             ) : null}
             {shipment?.error ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-gray-500">Ошибка</dt>
+                <dt className="text-gray-500">{t('orders.detailCdekBlock.errorLabel')}</dt>
                 <dd className="text-right text-red-600">{shipment.error}</dd>
               </div>
             ) : null}
@@ -197,8 +199,9 @@ export function CdekBlock({
               кнопку создания не показываем, поясняем автоматику. */}
           {!hasShipment && !paymentReady ? (
             <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              Отправление СДЭК и накладная создаются <strong>после поступления оплаты</strong> —
-              автоматически, без ручных действий. Так заказ не уедет неоплаченным.
+              {t.rich('orders.detailCdekBlock.awaitPaymentNote', {
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </p>
           ) : null}
 
@@ -209,11 +212,13 @@ export function CdekBlock({
                 type="button"
                 disabled={pending}
                 onClick={() =>
-                  run('Создание отправления', () => createCdekShipmentAction({ orderId }))
+                  run(t('orders.detailCdekBlock.action.createShipment'), () =>
+                    createCdekShipmentAction({ orderId }),
+                  )
                 }
                 className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
               >
-                Создать отправление
+                {t('orders.detailCdekBlock.createShipment')}
               </button>
             ) : null}
             {hasShipment ? (
@@ -222,53 +227,55 @@ export function CdekBlock({
                   type="button"
                   disabled={pending}
                   onClick={() =>
-                    run('Обновление статуса', () => refreshCdekStatusAction({ orderId }))
+                    run(t('orders.detailCdekBlock.action.refreshStatus'), () =>
+                      refreshCdekStatusAction({ orderId }),
+                    )
                   }
                   className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 >
-                  Обновить статус
+                  {t('orders.detailCdekBlock.refreshStatus')}
                 </button>
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() =>
                     run(
-                      'Печать накладной',
+                      t('orders.detailCdekBlock.action.printWaybill'),
                       () => getCdekLabelAction({ orderId, kind: 'waybill' }),
                       { openUrl: true },
                     )
                   }
                   className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 >
-                  Печать накладной
+                  {t('orders.detailCdekBlock.printWaybill')}
                 </button>
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() =>
                     run(
-                      'Печать ШК',
+                      t('orders.detailCdekBlock.action.printBarcode'),
                       () => getCdekLabelAction({ orderId, kind: 'barcode' }),
                       { openUrl: true },
                     )
                   }
                   className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 >
-                  Печать ШК
+                  {t('orders.detailCdekBlock.printBarcode')}
                 </button>
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() =>
                     run(
-                      'Отмена отправления',
+                      t('orders.detailCdekBlock.action.cancelShipment'),
                       () => cancelCdekShipmentAction({ orderId }),
-                      { confirm: 'Отменить отправление СДЭК?' },
+                      { confirm: t('orders.detailCdekBlock.confirmCancel') },
                     )
                   }
                   className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
                 >
-                  Отменить отправление
+                  {t('orders.detailCdekBlock.cancelShipment')}
                 </button>
               </>
             ) : null}
@@ -278,7 +285,7 @@ export function CdekBlock({
           {history.length > 0 ? (
             <div className="mt-4">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                История статусов СДЭК
+                {t('orders.detailCdekBlock.historyTitle')}
               </h3>
               <ul className="mt-2 divide-y divide-gray-100">
                 {history.map((h) => (

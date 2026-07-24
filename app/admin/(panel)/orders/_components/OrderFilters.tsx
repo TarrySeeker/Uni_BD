@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { useTranslations } from 'next-intl';
 
 import {
   ORDER_STATUSES,
@@ -23,6 +24,7 @@ import {
 export function OrderFilters() {
   const router = useRouter();
   const params = useSearchParams();
+  const t = useTranslations();
 
   const [q, setQ] = useState(params.get('q') ?? '');
   const [status, setStatus] = useState(params.get('status') ?? '');
@@ -60,26 +62,26 @@ export function OrderFilters() {
     <form
       onSubmit={submit}
       className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-      aria-label="Фильтры заказов"
+      aria-label={t('orders.orderFilters.ariaLabel')}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label htmlFor="of-q" className="block text-xs font-medium text-gray-600">
-            Поиск (номер / email / телефон)
+            {t('orders.orderFilters.searchLabel')}
           </label>
           <input
             id="of-q"
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Например: 2026-000123 или почта"
+            placeholder={t('orders.orderFilters.searchPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           />
         </div>
 
         <div>
           <label htmlFor="of-status" className="block text-xs font-medium text-gray-600">
-            Статус заказа
+            {t('orders.orderFilters.orderStatusLabel')}
           </label>
           <select
             id="of-status"
@@ -87,7 +89,7 @@ export function OrderFilters() {
             onChange={(e) => setStatus(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любой</option>
+            <option value="">{t('orders.orderFilters.any')}</option>
             {ORDER_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {orderStatusLabel(s)}
@@ -98,7 +100,7 @@ export function OrderFilters() {
 
         <div>
           <label htmlFor="of-payment" className="block text-xs font-medium text-gray-600">
-            Статус оплаты
+            {t('orders.orderFilters.paymentStatusLabel')}
           </label>
           <select
             id="of-payment"
@@ -106,7 +108,7 @@ export function OrderFilters() {
             onChange={(e) => setPaymentStatus(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любой</option>
+            <option value="">{t('orders.orderFilters.any')}</option>
             {PAYMENT_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {paymentStatusLabel(s)}
@@ -117,7 +119,7 @@ export function OrderFilters() {
 
         <div>
           <label htmlFor="of-delivery" className="block text-xs font-medium text-gray-600">
-            Тип доставки
+            {t('orders.orderFilters.deliveryTypeLabel')}
           </label>
           <select
             id="of-delivery"
@@ -125,7 +127,7 @@ export function OrderFilters() {
             onChange={(e) => setDeliveryType(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любой</option>
+            <option value="">{t('orders.orderFilters.any')}</option>
             {DELIVERY_TYPES.map((t) => (
               <option key={t} value={t}>
                 {deliveryTypeLabel(t)}
@@ -136,21 +138,21 @@ export function OrderFilters() {
 
         <div>
           <label htmlFor="of-promo" className="block text-xs font-medium text-gray-600">
-            Промокод
+            {t('orders.orderFilters.promoCodeLabel')}
           </label>
           <input
             id="of-promo"
             type="text"
             value={promoCode}
             onChange={(e) => setPromoCode(e.target.value)}
-            placeholder="Код промокода"
+            placeholder={t('orders.orderFilters.promoCodePlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           />
         </div>
 
         <div>
           <label htmlFor="of-from" className="block text-xs font-medium text-gray-600">
-            Дата с
+            {t('orders.orderFilters.dateFromLabel')}
           </label>
           <input
             id="of-from"
@@ -163,7 +165,7 @@ export function OrderFilters() {
 
         <div>
           <label htmlFor="of-to" className="block text-xs font-medium text-gray-600">
-            Дата по
+            {t('orders.orderFilters.dateToLabel')}
           </label>
           <input
             id="of-to"
@@ -181,13 +183,13 @@ export function OrderFilters() {
           onClick={reset}
           className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
         >
-          Сбросить
+          {t('common.actions.reset')}
         </button>
         <button
           type="submit"
           className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
         >
-          Применить
+          {t('common.actions.apply')}
         </button>
       </div>
     </form>

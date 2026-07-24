@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { answerLeadAction } from './actions';
 import { errorMessage } from './action-result';
@@ -14,6 +15,7 @@ import { errorMessage } from './action-result';
  */
 export function LeadAnswerForm({ id, answer }: { id: string; answer: string | null }) {
   const router = useRouter();
+  const t = useTranslations();
   const [value, setValue] = useState(answer ?? '');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export function LeadAnswerForm({ id, answer }: { id: string; answer: string | nu
           setSaved(false);
         }}
         rows={2}
-        placeholder="Ответ оператора…"
+        placeholder={t('leads.leadAnswerForm.answerPlaceholder')}
         className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
       />
       <div className="mt-1 flex items-center gap-2">
@@ -52,9 +54,9 @@ export function LeadAnswerForm({ id, answer }: { id: string; answer: string | nu
           disabled={pending}
           className="rounded bg-gray-900 px-2 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {pending ? 'Сохранение…' : 'Сохранить ответ'}
+          {pending ? t('common.form.saving') : t('leads.leadAnswerForm.saveAnswer')}
         </button>
-        {saved ? <span className="text-xs text-green-600">Сохранено</span> : null}
+        {saved ? <span className="text-xs text-green-600">{t('common.form.saved')}</span> : null}
         {error ? <span className="text-xs text-red-600">{error}</span> : null}
       </div>
     </div>

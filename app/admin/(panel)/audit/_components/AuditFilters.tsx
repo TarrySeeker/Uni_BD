@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState, type FormEvent } from 'react';
 
 import {
@@ -16,6 +17,7 @@ import {
  * (мультитенантно, без хардкода под магазин).
  */
 export function AuditFilters() {
+  const t = useTranslations();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -50,12 +52,12 @@ export function AuditFilters() {
     <form
       onSubmit={submit}
       className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-      aria-label="Фильтры журнала аудита"
+      aria-label={t('audit.auditFilters.ariaLabel')}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label htmlFor="af-from" className="block text-xs font-medium text-gray-600">
-            Дата с
+            {t('audit.auditFilters.dateFrom')}
           </label>
           <input
             id="af-from"
@@ -68,7 +70,7 @@ export function AuditFilters() {
 
         <div>
           <label htmlFor="af-to" className="block text-xs font-medium text-gray-600">
-            Дата по
+            {t('audit.auditFilters.dateTo')}
           </label>
           <input
             id="af-to"
@@ -81,21 +83,21 @@ export function AuditFilters() {
 
         <div>
           <label htmlFor="af-actor" className="block text-xs font-medium text-gray-600">
-            Инициатор (email)
+            {t('audit.auditFilters.actor')}
           </label>
           <input
             id="af-actor"
             type="search"
             value={actor}
             onChange={(e) => setActor(e.target.value)}
-            placeholder="Например: admin@shop.ru"
+            placeholder={t('audit.auditFilters.actorPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           />
         </div>
 
         <div>
           <label htmlFor="af-action" className="block text-xs font-medium text-gray-600">
-            Действие
+            {t('audit.auditFilters.action')}
           </label>
           <select
             id="af-action"
@@ -103,7 +105,7 @@ export function AuditFilters() {
             onChange={(e) => setAction(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любое</option>
+            <option value="">{t('audit.auditFilters.anyAction')}</option>
             {Object.entries(AUDIT_ACTION_LABELS).map(([code, label]) => (
               <option key={code} value={code}>
                 {label}
@@ -114,7 +116,7 @@ export function AuditFilters() {
 
         <div>
           <label htmlFor="af-entity" className="block text-xs font-medium text-gray-600">
-            Тип сущности
+            {t('audit.auditFilters.entityType')}
           </label>
           <select
             id="af-entity"
@@ -122,7 +124,7 @@ export function AuditFilters() {
             onChange={(e) => setEntityType(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любой</option>
+            <option value="">{t('audit.auditFilters.anyEntity')}</option>
             {Object.entries(AUDIT_ENTITY_TYPE_LABELS).map(([code, label]) => (
               <option key={code} value={code}>
                 {label}
@@ -138,13 +140,13 @@ export function AuditFilters() {
           onClick={reset}
           className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
         >
-          Сбросить
+          {t('common.actions.reset')}
         </button>
         <button
           type="submit"
           className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
         >
-          Применить
+          {t('common.actions.apply')}
         </button>
       </div>
     </form>

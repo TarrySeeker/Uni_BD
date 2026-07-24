@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { CmsPageWithSections } from '@/lib/cms/types';
 import { SITEMAP_CHANGEFREQS } from '@/lib/cms/types';
@@ -80,6 +81,7 @@ export function PageForm({
   /** Язык по умолчанию (база = обычные колонки). */
   defaultLocale: string;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const isEdit = page !== null;
   const [translations, setTranslations] = useState<TranslationsState>(
@@ -163,7 +165,7 @@ export function PageForm({
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Изменения сохранены.');
+        setSuccess(t('cms.pageForm.savedChanges'));
         router.refresh();
       } else {
         router.push(`/admin/cms/${result.data.id}`);
@@ -197,7 +199,7 @@ export function PageForm({
     const published = await publishCmsPageAction({ id: page!.id });
     setPending(false);
     if (published.ok) {
-      setSuccess('Страница сохранена и опубликована.');
+      setSuccess(t('cms.pageForm.savedAndPublished'));
       router.refresh();
     } else {
       setError(published);
@@ -224,7 +226,7 @@ export function PageForm({
 
   async function remove() {
     if (!isEdit) return;
-    if (!confirm('Удалить страницу со всеми секциями? Действие необратимо.')) return;
+    if (!confirm(t('cms.pageForm.confirmDelete'))) return;
     setPending(true);
     setError(null);
     const result = await deleteCmsPageAction({ id: page!.id });
@@ -264,9 +266,7 @@ export function PageForm({
           role="status"
           className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
         >
-          У вас нет права на редактирование этой страницы (нужно «cms.write»).
-          Поля доступны только для просмотра — изменения сохранить нельзя.
-          Обратитесь к администратору, чтобы получить право.
+          {t('cms.pageForm.noWriteWarning')}
         </div>
       ) : null}
 
@@ -284,7 +284,7 @@ export function PageForm({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <label htmlFor="p-title" className={labelCls}>
-            Заголовок*
+            {t('fields.title')}*
           </label>
           <input
             id="p-title"
@@ -298,7 +298,7 @@ export function PageForm({
         </div>
         <div>
           <label htmlFor="p-slug" className={labelCls}>
-            ЧПУ (slug)
+            {t('cms.pageForm.slugLabel')}
           </label>
           <input
             id="p-slug"
@@ -307,7 +307,7 @@ export function PageForm({
               setSlug(e.target.value);
               setSlugTouched(true);
             }}
-            placeholder="авто из заголовка"
+            placeholder={t('cms.pageForm.slugPlaceholder')}
             className={inputCls}
             disabled={!canWrite}
           />
@@ -316,7 +316,7 @@ export function PageForm({
 
         <div>
           <label htmlFor="p-status" className={labelCls}>
-            Статус
+            {t('cms.pageForm.statusLabel')}
           </label>
           <select
             id="p-status"
@@ -325,24 +325,24 @@ export function PageForm({
             className={inputCls}
             disabled={!canWrite}
           >
-            <option value="draft">Черновик</option>
+            <option value="draft">{t('common.states.draft')}</option>
             {/* «Опубликована» НЕ выбирается вручную (баг B волны 5): публикация —
                 только через кнопку «Опубликовать» (publishCmsPage: published_at +
                 ревизия). Если страница уже опубликована — показываем статус как
                 disabled-вариант, чтобы select не сбрасывался на «Черновик». */}
             {status === 'published' ? (
               <option value="published" disabled>
-                Опубликована
+                {t('common.states.published')}
               </option>
             ) : null}
-            <option value="archived">В архиве</option>
+            <option value="archived">{t('cms.pageForm.statusArchived')}</option>
           </select>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="p-prio" className={labelCls}>
-              Sitemap priority (0–1)
+              {t('cms.pageForm.sitemapPriority')}
             </label>
             <input
               id="p-prio"
@@ -361,7 +361,7 @@ export function PageForm({
           </div>
           <div>
             <label htmlFor="p-cf" className={labelCls}>
-              Sitemap changefreq
+              {t('cms.pageForm.sitemapChangefreq')}
             </label>
             <select
               id="p-cf"
@@ -385,7 +385,9 @@ export function PageForm({
             value={seo}
             onChange={setSeo}
             idPrefix="p-seo"
-            canonicalPlaceholder={`Авто: /pages/${slug || 'slug-страницы'}`}
+            canonicalPlaceholder={t('cms.pageForm.canonicalPlaceholder', {
+              slug: slug || t('cms.pageForm.slugFallback'),
+            })}
             disabled={!canWrite}
             fieldErrors={{
               seoTitle: fe('seoTitle'),
@@ -400,7 +402,7 @@ export function PageForm({
             // og_image_url; витрина резолвит ключ в URL (pageMeta).
             ogImageSlot={
               <CmsImageUploadButton
-                label="Загрузить картинку"
+                label={t('cms.pageForm.uploadImage')}
                 onUploaded={(key) => setSeo((prev) => ({ ...prev, ogImageKey: key }))}
               />
             }
@@ -419,7 +421,11 @@ export function PageForm({
               disabled={pending}
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
             >
-              {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать страницу'}
+              {pending
+                ? t('common.form.saving')
+                : isEdit
+                  ? t('common.actions.save')
+                  : t('cms.pageForm.createButton')}
             </button>
 
             {isEdit && page!.status !== 'published' ? (
@@ -429,17 +435,17 @@ export function PageForm({
                 disabled={pending}
                 className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50"
               >
-                Сохранить и опубликовать
+                {t('cms.pageForm.saveAndPublish')}
               </button>
             ) : null}
             {isEdit && page!.status === 'published' ? (
               <button
                 type="button"
-                onClick={() => runPageAction(unpublishCmsPageAction, 'Снято с публикации.')}
+                onClick={() => runPageAction(unpublishCmsPageAction, t('cms.pageForm.unpublished'))}
                 disabled={pending}
                 className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
-                Снять с публикации
+                {t('cms.pageForm.unpublish')}
               </button>
             ) : null}
           </>
@@ -450,7 +456,7 @@ export function PageForm({
           onClick={() => router.push('/admin/cms')}
           className="text-sm text-gray-600 hover:underline"
         >
-          {canWrite ? 'Отмена' : 'Назад к списку'}
+          {canWrite ? t('common.actions.cancel') : t('cms.pageForm.backToList')}
         </button>
 
         {isEdit && canWrite ? (
@@ -460,7 +466,7 @@ export function PageForm({
             disabled={pending}
             className="ml-auto text-sm text-red-600 hover:underline disabled:opacity-50"
           >
-            Удалить страницу
+            {t('cms.pageForm.deletePage')}
           </button>
         ) : null}
       </div>
@@ -468,7 +474,7 @@ export function PageForm({
 
       {!isEdit ? (
         <p className="mt-4 text-sm text-gray-500">
-          Секции страницы станут доступны после её создания.
+          {t('cms.pageForm.sectionsAfterCreate')}
         </p>
       ) : canWrite ? (
         <SectionEditor
@@ -479,7 +485,7 @@ export function PageForm({
         />
       ) : (
         <p className="mt-6 border-t border-gray-200 pt-4 text-sm text-gray-500">
-          Редактор секций доступен только с правом «cms.write».
+          {t('cms.pageForm.sectionEditorNoWrite')}
         </p>
       )}
     </div>

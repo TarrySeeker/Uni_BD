@@ -18,10 +18,21 @@ const FORM = src('app/admin/(panel)/gift-certificates/_components/GiftCertificat
 const ORDER_PAGE = src('app/admin/(panel)/orders/[id]/page.tsx');
 const GIFT_BLOCK = src('app/admin/(panel)/orders/[id]/_components/GiftIssueBlock.tsx');
 
+// После i18n-переноса подписи колонок/статусов живут в messages/ru.json (компоненты
+// рендерят t(...)). GUARD сторожит суть: исходник ссылается на ключ И ru-значение несёт текст.
+const ru = JSON.parse(src('messages/ru.json')) as Record<string, unknown>;
+function ruVal(dot: string): string {
+  let o: unknown = ru;
+  for (const k of dot.split('.')) o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  return typeof o === 'string' ? o : '';
+}
+
 describe('список сертификатов — колонки «кто купил» / «на чьё имя»', () => {
   it('колонки есть и берут данные из домена, а не из заглушки', () => {
-    expect(LIST).toContain('Кто купил');
-    expect(LIST).toContain('На чьё имя');
+    expect(LIST).toContain('giftCertificates.page.cols.purchaser');
+    expect(LIST).toContain('giftCertificates.page.cols.recipient');
+    expect(ruVal('giftCertificates.page.cols.purchaser')).toContain('Кто купил');
+    expect(ruVal('giftCertificates.page.cols.recipient')).toContain('На чьё имя');
     expect(LIST).toContain('partyLabel(c.purchaser)');
     expect(LIST).toContain('partyLabel(c.recipient)');
   });
@@ -82,6 +93,7 @@ describe('карточка заказа — блок выпуска сертиф
 
   it('повторный выпуск по позиции скрыт в UI (сервер защищён частичным UNIQUE)', () => {
     expect(GIFT_BLOCK).toContain('issuedItemIds');
-    expect(GIFT_BLOCK).toContain('сертификат уже выпущен');
+    expect(GIFT_BLOCK).toContain('orders.detailGiftIssueBlock.alreadyIssued');
+    expect(ruVal('orders.detailGiftIssueBlock.alreadyIssued')).toContain('сертификат уже выпущен');
   });
 });

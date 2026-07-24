@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
 import type { TranslationsMap } from '@/lib/i18n';
@@ -49,6 +51,7 @@ export function NavigationForm({
   i18n: { defaultLocale: string; locales: string[] };
   translations?: TranslationsMap;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   // Дескрипторы переводимых меток разворачиваются по фактической навигации
   // (пункты шапки + заголовки/ссылки колонок футера); href не переводится.
@@ -69,7 +72,7 @@ export function NavigationForm({
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Навигация сохранена.');
+      setSuccess(t('settings.navigationForm.saved'));
       router.refresh();
     } else {
       setError(result);
@@ -101,43 +104,46 @@ export function NavigationForm({
       ) : null}
 
       <p className="mb-5 text-sm text-gray-600">
-        Меню шапки и колонки футера витрины. Пусто — витрина покажет навигацию по
-        умолчанию. Адрес ссылки — путь от «/» (например <code>/catalog</code>) либо
-        полный URL / <code>mailto:</code> / <code>tel:</code>.
+        {t.rich('settings.navigationForm.intro', {
+          code: (chunks) => <code>{chunks}</code>,
+        })}
       </p>
 
       {/* Меню шапки */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Меню шапки</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.navigationForm.headerLegend')}</legend>
         <div>
-          <label htmlFor="nav-header" className={labelCls}>Пункты: «Метка | Ссылка» (по одному на строку)</label>
+          <label htmlFor="nav-header" className={labelCls}>{t('settings.navigationForm.headerItemsLabel')}</label>
           <textarea id="nav-header" value={headerText} onChange={(e) => setHeaderText(e.target.value)}
-            rows={5} className={inputCls} placeholder={'Каталог | /catalog\nДоставка | /#delivery\nКонтакты | /contacts'} />
-          <p className={hintCls}>Например: <code>Каталог | /catalog</code></p>
+            rows={5} className={inputCls} placeholder={t('settings.navigationForm.headerPlaceholder')} />
+          <p className={hintCls}>
+            {t.rich('settings.navigationForm.headerHint', {
+              code: (chunks) => <code>{chunks}</code>,
+            })}
+          </p>
         </div>
       </fieldset>
 
       {/* Футер */}
       <fieldset className="mb-6 rounded border border-gray-200 p-4">
-        <legend className="px-1 text-sm font-semibold text-gray-800">Колонки футера</legend>
+        <legend className="px-1 text-sm font-semibold text-gray-800">{t('settings.navigationForm.footerLegend')}</legend>
         <div>
           <label htmlFor="nav-footer" className={labelCls}>
-            Колонки разделяются пустой строкой. Первая строка колонки — заголовок,
-            далее «Метка | Ссылка»
+            {t('settings.navigationForm.footerColumnsLabel')}
           </label>
           <textarea id="nav-footer" value={footerText} onChange={(e) => setFooterText(e.target.value)}
             rows={8} className={inputCls}
-            placeholder={'Магазин\nКаталог | /catalog\nДоставка | /#delivery\n\nСвязь\nПочта | mailto:info@example.com'} />
-          <p className={hintCls}>Каждый блок до пустой строки — отдельная колонка футера.</p>
+            placeholder={t('settings.navigationForm.footerPlaceholder')} />
+          <p className={hintCls}>{t('settings.navigationForm.footerHint')}</p>
         </div>
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить навигацию'}
+          {pending ? t('common.form.saving') : t('settings.navigationForm.saveButton')}
         </button>
-        <ResetSettingButton settingKey="navigation" label="Сбросить навигацию" />
+        <ResetSettingButton settingKey="navigation" label={t('settings.navigationForm.resetButton')} />
       </div>
     </div>
     </SettingsTranslationTabs>

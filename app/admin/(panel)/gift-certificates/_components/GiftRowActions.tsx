@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ActionResult } from '@/lib/server/action';
 
@@ -29,6 +30,7 @@ export function GiftRowActions({
   status: string;
   canWrite: boolean;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [pending, setPending] = useState(false);
@@ -50,7 +52,7 @@ export function GiftRowActions({
           href={`/admin/gift-certificates/${id}`}
           className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
         >
-          Открыть
+          {t('giftCertificates.giftRowActions.open')}
         </Link>
         {canWrite && status === 'disabled' ? (
           <button
@@ -58,20 +60,20 @@ export function GiftRowActions({
             disabled={pending}
             onClick={() => run('active')}
             className="rounded bg-gray-900 px-2 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-            title="Снова активировать сертификат"
+            title={t('giftCertificates.giftRowActions.activateTitle')}
           >
-            Активировать
+            {t('giftCertificates.giftRowActions.activate')}
           </button>
         ) : null}
         {canWrite && status !== 'disabled' ? (
           <button
             type="button"
             disabled={pending}
-            onClick={() => run('disabled', 'Отключить сертификат? Списания с него станут невозможны.')}
+            onClick={() => run('disabled', t('giftCertificates.giftRowActions.disableConfirm'))}
             className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-            title="Отключить сертификат"
+            title={t('giftCertificates.giftRowActions.disableTitle')}
           >
-            Отключить
+            {t('giftCertificates.giftRowActions.disable')}
           </button>
         ) : null}
       </div>

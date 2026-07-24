@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { requireUser } from '@/lib/auth/session';
 
 import { PageHeader } from '../_components/PageHeader';
@@ -21,27 +23,27 @@ export const dynamic = 'force-dynamic';
 
 export default async function AccountPage() {
   const user = await requireUser();
+  const t = await getTranslations();
 
   return (
     <div className="max-w-2xl">
       <PageHeader
-        title="Профиль"
-        subtitle="Управление учётной записью и смена пароля."
-        breadcrumbs={[{ label: 'Профиль' }]}
+        title={t('account.page.title')}
+        subtitle={t('account.page.subtitle')}
+        breadcrumbs={[{ label: t('account.page.title') }]}
       />
 
       <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-[160px_1fr]">
-          <dt className="font-medium text-gray-500">Логин (email)</dt>
+          <dt className="font-medium text-gray-500">{t('account.page.loginLabel')}</dt>
           <dd className="text-gray-900">{user.email}</dd>
         </dl>
       </section>
 
       <section className="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-1 text-lg font-semibold text-gray-900">Сменить пароль</h2>
+        <h2 className="mb-1 text-lg font-semibold text-gray-900">{t('account.page.changePasswordHeading')}</h2>
         <p className="mb-4 text-sm text-gray-600">
-          Введите текущий пароль и новый. После смены все ваши сессии завершатся —
-          потребуется войти заново.
+          {t('account.page.changePasswordHint')}
         </p>
         <ChangePasswordForm />
       </section>

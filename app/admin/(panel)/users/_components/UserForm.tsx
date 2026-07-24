@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { RoleRef, UserWithRoles } from '@/lib/auth/admin-repository';
@@ -25,13 +26,6 @@ import { errorMessage, fieldError } from './action-result';
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
-/** Подпись статуса для владельца магазина (без тех-жаргона). */
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Активен',
-  disabled: 'Отключён',
-  invited: 'Приглашён',
-};
-
 export function UserForm({
   user,
   roles,
@@ -39,6 +33,7 @@ export function UserForm({
   user: UserWithRoles | null;
   roles: RoleRef[];
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const isEdit = user !== null;
 
@@ -90,7 +85,7 @@ export function UserForm({
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Сохранено.');
+        setSuccess(t('common.form.saved'));
         router.refresh();
       } else {
         router.push('/admin/users');
@@ -111,7 +106,7 @@ export function UserForm({
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Пароль обновлён.');
+      setSuccess(t('users.userForm.toast.passwordUpdated'));
       setNewPassword('');
     } else {
       setError(result);
@@ -143,7 +138,7 @@ export function UserForm({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="u-email" className="block text-sm font-medium text-gray-700">Email*</label>
+          <label htmlFor="u-email" className="block text-sm font-medium text-gray-700">{t('users.userForm.emailLabel')}</label>
           <input
             id="u-email"
             type="email"
@@ -154,13 +149,13 @@ export function UserForm({
             required={!isEdit}
           />
           {isEdit ? (
-            <p className="mt-1 text-xs text-gray-400">Email (логин) изменить нельзя.</p>
+            <p className="mt-1 text-xs text-gray-400">{t('users.userForm.emailReadonlyHint')}</p>
           ) : null}
           {fe('email') ? <p className="mt-1 text-xs text-red-600">{fe('email')}</p> : null}
         </div>
 
         <div>
-          <label htmlFor="u-name" className="block text-sm font-medium text-gray-700">Имя</label>
+          <label htmlFor="u-name" className="block text-sm font-medium text-gray-700">{t('fields.name')}</label>
           <input
             id="u-name"
             value={displayName}
@@ -172,13 +167,13 @@ export function UserForm({
 
         {!isEdit ? (
           <div>
-            <label htmlFor="u-pass" className="block text-sm font-medium text-gray-700">Пароль*</label>
+            <label htmlFor="u-pass" className="block text-sm font-medium text-gray-700">{t('users.userForm.passwordLabel')}</label>
             <input
               id="u-pass"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="не короче 8 символов"
+              placeholder={t('users.userForm.passwordPlaceholder')}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
               required
             />
@@ -187,7 +182,7 @@ export function UserForm({
         ) : null}
 
         <div>
-          <label htmlFor="u-status" className="block text-sm font-medium text-gray-700">Статус</label>
+          <label htmlFor="u-status" className="block text-sm font-medium text-gray-700">{t('users.userForm.statusLabel')}</label>
           <select
             id="u-status"
             value={status}
@@ -195,16 +190,16 @@ export function UserForm({
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           >
             {statusOptions.map((s) => (
-              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+              <option key={s} value={s}>{t(`common.states.${s}`)}</option>
             ))}
           </select>
           {fe('status') ? <p className="mt-1 text-xs text-red-600">{fe('status')}</p> : null}
         </div>
 
         <div className="lg:col-span-2">
-          <span className="block text-sm font-medium text-gray-700">Роли</span>
+          <span className="block text-sm font-medium text-gray-700">{t('nav.roles')}</span>
           {roles.length === 0 ? (
-            <p className="mt-1 text-sm text-gray-400">Ролей пока нет — создайте их в разделе «Роли».</p>
+            <p className="mt-1 text-sm text-gray-400">{t('users.userForm.noRolesHint')}</p>
           ) : (
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {roles.map((role) => (
@@ -225,35 +220,35 @@ export function UserForm({
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать пользователя'}
+          {pending ? t('common.form.saving') : isEdit ? t('common.actions.save') : t('users.userForm.createButton')}
         </button>
         <button type="button" onClick={() => router.push('/admin/users')}
           className="text-sm text-gray-600 hover:underline">
-          Отмена
+          {t('common.actions.cancel')}
         </button>
       </div>
 
       {isEdit ? (
         <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <h2 className="text-sm font-semibold text-gray-800">Сбросить пароль</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{t('users.userForm.resetPassword')}</h2>
           <p className="mt-1 text-xs text-gray-500">
-            Задайте новый пароль для входа сотрудника. Старый перестанет работать.
+            {t('users.userForm.resetPasswordHint')}
           </p>
           <div className="mt-2 flex flex-wrap items-end gap-3">
             <div>
-              <label htmlFor="u-newpass" className="block text-xs font-medium text-gray-600">Новый пароль</label>
+              <label htmlFor="u-newpass" className="block text-xs font-medium text-gray-600">{t('users.userForm.newPasswordLabel')}</label>
               <input
                 id="u-newpass"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="не короче 8 символов"
+                placeholder={t('users.userForm.passwordPlaceholder')}
                 className="mt-1 w-64 rounded border border-gray-300 px-3 py-2 text-sm"
               />
             </div>
             <button type="button" onClick={resetPassword} disabled={pending || newPassword.length < 8}
               className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              Сбросить пароль
+              {t('users.userForm.resetPassword')}
             </button>
           </div>
         </div>

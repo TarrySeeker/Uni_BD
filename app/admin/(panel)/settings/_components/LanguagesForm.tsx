@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ActionResult } from '@/lib/server/action';
 import type { Locale, LocaleConfig } from '@/lib/i18n/types';
@@ -31,6 +32,7 @@ import {
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
 export function LanguagesForm({ config }: { config: LocaleConfig }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
     const result = await updateI18nAction({ i18n: payload });
     setPending(false);
     if (result.ok) {
-      setSuccess('Набор языков сохранён.');
+      setSuccess(t('settings.languagesForm.saveSuccess'));
       router.refresh();
     } else {
       setError(result);
@@ -90,16 +92,13 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
         Убрать это ограничение — отдельная задача по витрине.
       */}
       <div role="note" className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-        <strong>Важно про витрину.</strong> Сейчас сайт использует собственный
-        список языков и этот набор ещё не читает: выключенный здесь язык не
-        исчезнет с витрины — страницы на нём просто будут показываться на языке по
-        умолчанию ({localeLabel(defaultLocale)}). В админке набор действует сразу:
-        он определяет вкладки перевода в формах каталога и контента.
+        <strong>{t('settings.languagesForm.storefrontNoticeTitle')}</strong>{' '}
+        {t('settings.languagesForm.storefrontNoticeBody', { defaultLabel: localeLabel(defaultLocale) })}
       </div>
 
       <div className="mb-5 rounded border border-gray-200 bg-gray-50 p-3">
         <label htmlFor="defaultLocale" className="block text-sm font-medium text-gray-800">
-          Язык по умолчанию
+          {t('settings.languagesForm.defaultLocaleLabel')}
         </label>
         <input
           id="defaultLocale"
@@ -110,10 +109,7 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
           className="mt-1 w-full max-w-sm cursor-not-allowed rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600"
         />
         <p className="mt-2 text-xs text-gray-600">
-          Изменить нельзя. Весь основной контент (названия, описания, тексты
-          страниц) хранится в базе именно на этом языке, а переводы — надстройкой
-          над ним. Смена языка по умолчанию потребовала бы миграции всех данных и
-          сменила бы адреса страниц сайта, поэтому выполняется отдельно, вручную.
+          {t('settings.languagesForm.defaultLocaleHelp')}
         </p>
       </div>
 
@@ -130,7 +126,7 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
               </div>
               {row.isDefault ? (
                 <div className="text-xs text-gray-500">
-                  язык по умолчанию — всегда включён
+                  {t('settings.languagesForm.defaultRowNote')}
                 </div>
               ) : null}
             </div>
@@ -140,10 +136,10 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
                 checked={row.enabled}
                 disabled={row.isDefault}
                 onChange={(e) => onToggle(row.code, e.target.checked)}
-                aria-label={`Язык ${row.label}`}
+                aria-label={t('settings.languagesForm.localeToggleAria', { label: row.label })}
                 className="h-4 w-4"
               />
-              {row.enabled ? 'Включён' : 'Выключен'}
+              {row.enabled ? t('settings.languagesForm.enabledState') : t('settings.languagesForm.disabledState')}
             </label>
           </div>
         ))}
@@ -151,14 +147,14 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
 
       <div className="mt-5 border-t border-gray-200 pt-4">
         <label htmlFor="customLocale" className="block text-sm font-medium text-gray-800">
-          Добавить язык вручную
+          {t('settings.languagesForm.addManualLabel')}
         </label>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <input
             id="customLocale"
             value={customTag}
             onChange={(e) => setCustomTag(e.target.value)}
-            placeholder="например pt-br"
+            placeholder={t('settings.languagesForm.customPlaceholder')}
             className="rounded border border-gray-300 px-3 py-2 text-sm"
           />
           <button
@@ -166,7 +162,7 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
             onClick={onAddCustom}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Добавить
+            {t('common.actions.add')}
           </button>
         </div>
         {notice ? (
@@ -175,8 +171,7 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
           </p>
         ) : null}
         <p className="mt-2 text-xs text-gray-500">
-          Код языка по стандарту: две-три латинские буквы, при необходимости с
-          регионом через дефис.
+          {t('settings.languagesForm.customHelp')}
         </p>
       </div>
 
@@ -187,7 +182,7 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
           disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {pending ? 'Сохранение…' : 'Сохранить языки'}
+          {pending ? t('common.form.saving') : t('settings.languagesForm.saveButton')}
         </button>
       </div>
     </div>

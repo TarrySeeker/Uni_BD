@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -31,17 +32,14 @@ export function ResetSettingButton({
   settingKey: SettingKey;
   label?: string;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function reset() {
-    if (
-      !window.confirm(
-        'Сбросить раздел к значениям по умолчанию? Переопределения будут удалены.',
-      )
-    ) {
+    if (!window.confirm(t('settings.resetSettingButton.confirm'))) {
       return;
     }
     setPending(true);
@@ -50,7 +48,7 @@ export function ResetSettingButton({
     const result = await resetSettingAction({ key: settingKey });
     setPending(false);
     if (result.ok) {
-      setSuccess('Сброшено к значениям по умолчанию.');
+      setSuccess(t('settings.resetSettingButton.success'));
       router.refresh();
     } else {
       setError(result);
@@ -65,7 +63,7 @@ export function ResetSettingButton({
         disabled={pending}
         className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
-        {pending ? 'Сброс…' : (label ?? 'Сбросить к умолчаниям')}
+        {pending ? t('settings.resetSettingButton.pending') : (label ?? t('settings.resetSettingButton.default'))}
       </button>
       {error ? (
         <span role="alert" className="text-sm text-red-700">

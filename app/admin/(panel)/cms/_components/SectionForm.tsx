@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import {
   SECTION_FIELD_SPECS,
@@ -68,6 +69,7 @@ export function SectionForm({
   onCancel,
   pending = false,
 }: SectionFormProps) {
+  const t = useTranslations();
   const [state, setState] = useState<SectionFormState>(() =>
     initialContent ? formStateFromContent(initialContent) : emptyFormStateFor(type),
   );
@@ -104,7 +106,7 @@ export function SectionForm({
       {tabs.length > 1 ? (
         <div
           role="tablist"
-          aria-label="Язык секции"
+          aria-label={t('cms.sectionForm.localeAriaLabel')}
           className="mb-2 flex flex-wrap gap-1 border-b border-gray-200"
         >
           {tabs.map((loc) => (
@@ -120,7 +122,9 @@ export function SectionForm({
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {loc === defaultLocale ? `${loc.toUpperCase()} · основной` : loc.toUpperCase()}
+              {loc === defaultLocale
+                ? t('localeTabs.baseTab', { locale: loc.toUpperCase() })
+                : loc.toUpperCase()}
             </button>
           ))}
         </div>
@@ -139,12 +143,14 @@ export function SectionForm({
       ) : (
         <div className="space-y-3">
           <p className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-            Перевод секции на <strong>{active.toUpperCase()}</strong>. Пустое поле — на
-            витрине покажется основной ({defaultLocale.toUpperCase()}) текст. Ссылки,
-            изображения и настройки подборки не переводятся — они общие для всех языков.
+            {t.rich('cms.sectionForm.translationHint', {
+              locale: active.toUpperCase(),
+              defaultLocale: defaultLocale.toUpperCase(),
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
           {trFields.length === 0 ? (
-            <p className="text-sm text-gray-500">У секции этого типа нет переводимого текста.</p>
+            <p className="text-sm text-gray-500">{t('cms.sectionForm.noTranslatableText')}</p>
           ) : (
             trFields.map((field) => (
               <FieldControl
@@ -165,7 +171,7 @@ export function SectionForm({
           disabled={pending}
           className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {pending ? 'Сохранение…' : 'Сохранить секцию'}
+          {pending ? t('common.form.saving') : t('cms.sectionForm.saveButton')}
         </button>
         {onCancel ? (
           <button
@@ -173,7 +179,7 @@ export function SectionForm({
             onClick={onCancel}
             className="text-sm text-gray-600 hover:underline"
           >
-            Отмена
+            {t('common.actions.cancel')}
           </button>
         ) : null}
       </div>
@@ -270,6 +276,7 @@ function ImageField({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useTranslations();
   const isMulti = field.name === 'images';
 
   /** Добавляет загруженный ключ: для галереи — новой строкой, иначе заменяет. */
@@ -303,7 +310,7 @@ function ImageField({
         />
       )}
       <CmsImageUploadButton
-        label={isMulti ? 'Загрузить и добавить изображение' : 'Загрузить изображение'}
+        label={isMulti ? t('cms.sectionForm.uploadAndAddImage') : t('cms.sectionForm.uploadImage')}
         onUploaded={applyUploadedKey}
       />
       {field.hint ? <p className="mt-1 text-xs text-gray-400">{field.hint}</p> : null}

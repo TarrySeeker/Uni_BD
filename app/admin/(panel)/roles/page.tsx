@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
@@ -29,20 +30,21 @@ export default async function RolesPage() {
     return <SingleUserModeNotice kind="roles" />;
   }
 
+  const t = await getTranslations();
   const roles = await listRolesWithPermissionCounts();
 
   return (
     <div>
       <PageHeader
-        title="Роли"
-        subtitle="Наборы прав для сотрудников. Системные роли удалить нельзя."
-        breadcrumbs={[{ label: 'Роли' }]}
+        title={t('nav.roles')}
+        subtitle={t('roles.page.subtitle')}
+        breadcrumbs={[{ label: t('nav.roles') }]}
         action={
           <Link
             href="/admin/roles/new"
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
-            + Создать роль
+            {t('roles.page.createButton')}
           </Link>
         }
       />
@@ -51,9 +53,9 @@ export default async function RolesPage() {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Название</th>
-              <th scope="col" className="px-4 py-2 font-medium">Прав</th>
-              <th scope="col" className="px-4 py-2 font-medium">Тип</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('fields.name')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('roles.page.colPermissions')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('roles.page.colType')}</th>
               <th scope="col" className="px-4 py-2 font-medium" />
             </tr>
           </thead>
@@ -61,7 +63,7 @@ export default async function RolesPage() {
             {roles.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
-                  Ролей пока нет.
+                  {t('roles.page.empty')}
                 </td>
               </tr>
             ) : (
@@ -73,7 +75,7 @@ export default async function RolesPage() {
                   </td>
                   <td className="px-4 py-2 text-gray-600">{row.permissionCount}</td>
                   <td className="px-4 py-2 text-gray-600">
-                    {row.isSystem ? 'системная' : 'пользовательская'}
+                    {row.isSystem ? t('roles.page.typeSystem') : t('roles.page.typeCustom')}
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center justify-end gap-4">
@@ -81,10 +83,10 @@ export default async function RolesPage() {
                         href={`/admin/roles/${row.id}`}
                         className="text-sm text-blue-700 hover:underline"
                       >
-                        Редактировать
+                        {t('common.actions.edit')}
                       </Link>
                       {row.isSystem ? (
-                        <span className="text-xs text-gray-400">защищена</span>
+                        <span className="text-xs text-gray-400">{t('roles.page.protected')}</span>
                       ) : (
                         <RoleDeleteButton id={row.id} title={row.title} />
                       )}

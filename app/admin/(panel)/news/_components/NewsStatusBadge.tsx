@@ -1,13 +1,15 @@
+import { getTranslations } from 'next-intl/server';
+
 import type { NewsStatus } from '@/lib/news/types';
 
 /**
  * Бейдж статуса новости (триада draft/published/archived). Чистый презентационный
  * компонент — образец cms StatusBadge.
  */
-const LABELS: Record<NewsStatus, string> = {
-  draft: 'Черновик',
-  published: 'Опубликована',
-  archived: 'В архиве',
+const LABEL_KEYS: Record<NewsStatus, string> = {
+  draft: 'news.newsStatusBadge.draft',
+  published: 'news.newsStatusBadge.published',
+  archived: 'news.newsStatusBadge.archived',
 };
 
 const CLASSES: Record<NewsStatus, string> = {
@@ -16,12 +18,13 @@ const CLASSES: Record<NewsStatus, string> = {
   archived: 'bg-amber-100 text-amber-800',
 };
 
-export function NewsStatusBadge({ status }: { status: NewsStatus }) {
+export async function NewsStatusBadge({ status }: { status: NewsStatus }) {
+  const t = await getTranslations();
   return (
     <span
       className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${CLASSES[status]}`}
     >
-      {LABELS[status]}
+      {t(LABEL_KEYS[status])}
     </span>
   );
 }

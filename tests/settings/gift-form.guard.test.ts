@@ -22,6 +22,21 @@ const actions = readFileSync(resolve(BASE, 'gift/actions.ts'), 'utf8');
 const form = readFileSync(resolve(BASE, 'gift/GiftSettingsForm.tsx'), 'utf8');
 const settingsPage = readFileSync(resolve(BASE, 'page.tsx'), 'utf8');
 
+// После i18n-переноса подписи владельца живут в messages/ru.json (форма рендерит t(...)).
+// GUARD сторожит СУТЬ подписей по их ru-значениям под namespace формы.
+const ru = JSON.parse(readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8')) as Record<string, unknown>;
+function ruUnder(prefix: string): string {
+  let o: unknown = ru;
+  for (const k of prefix.split('.')) o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  const out: string[] = [];
+  const walk = (x: unknown): void => {
+    if (typeof x === 'string') out.push(x);
+    else if (x && typeof x === 'object') Object.values(x as Record<string, unknown>).forEach(walk);
+  };
+  walk(o);
+  return out.join('\n');
+}
+
 describe('gift/page.tsx — доступ и рендер', () => {
   it('серверный гвард settings.manage + заглушка Forbidden', () => {
     expect(page).toContain("guardSettings('settings.manage')");
@@ -112,12 +127,14 @@ describe('GiftSettingsForm.tsx — клиентская форма', () => {
   });
 
   it('подписи человеческие: без жаргона slug/JSON/boolean/API', () => {
-    // Текст, который видит владелец, — без технических терминов.
+    // Текст, который видит владелец, — без технических терминов. Подписи после
+    // i18n живут в ru.json под namespace формы — инвариант неизменен.
+    const labels = ruUnder('settings.giftGiftSettingsForm');
     for (const jargon of ['slug', 'JSON', 'boolean', 'API', 'jsonb']) {
-      expect(form.includes(`>${jargon}`), `жаргон «${jargon}» в подписи`).toBe(false);
+      expect(labels.includes(jargon), `жаргон «${jargon}» в подписи`).toBe(false);
     }
-    expect(form).toMatch(/подароч/i);
-    expect(form).toMatch(/бессрочн/i);
+    expect(labels).toMatch(/подароч/i);
+    expect(labels).toMatch(/бессрочн/i);
   });
 
   it('ошибка и успех сохранения показываются владельцу', () => {
@@ -134,13 +151,15 @@ describe('GiftSettingsForm.tsx — клиентская форма', () => {
    * помечен и без разделов, а единственный рубильник — галочка autoIssue.
    */
   it('подпись про разделы описывает реальный механизм: пометка ставится при оформлении заказа', () => {
-    expect(form).toMatch(/помеча/i);
-    expect(form).toMatch(/оформлени/i);
+    const labels = ruUnder('settings.giftGiftSettingsForm');
+    expect(labels).toMatch(/помеча/i);
+    expect(labels).toMatch(/оформлени/i);
   });
 
   it('АНТИПАТТЕРН: форма не обещает, что пустой список разделов отключает выдачу кодов', () => {
-    expect(form).not.toMatch(/пуст[^.]{0,160}(?:код|сертификат)[^.]{0,160}не\s+буд/i);
-    expect(form).not.toMatch(/именно по ним создаётся код/i);
+    const labels = ruUnder('settings.giftGiftSettingsForm');
+    expect(labels).not.toMatch(/пуст[^.]{0,160}(?:код|сертификат)[^.]{0,160}не\s+буд/i);
+    expect(labels).not.toMatch(/именно по ним создаётся код/i);
   });
 });
 

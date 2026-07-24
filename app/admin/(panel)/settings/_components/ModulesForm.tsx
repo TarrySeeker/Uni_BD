@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { ActionResult } from '@/lib/server/action';
 import { type ModuleName } from '@/lib/config/modules';
 import type { ModuleOverrides } from '@/lib/settings/schemas';
@@ -39,6 +41,7 @@ export function ModulesForm({
   /** Какие модули включены БАЗОВЫМ env-набором (для подсказки «env: вкл/выкл»). */
   envEnabled: ModuleName[];
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -54,7 +57,7 @@ export function ModulesForm({
     const turningOff = modulesBeingTurnedOff(state);
     if (turningOff.length > 0) {
       const ok = window.confirm(
-        `Выключить модули: ${turningOff.join(', ')}? Соответствующие разделы админки и функции на сайте станут недоступны. Продолжить?`,
+        t('settings.modulesForm.confirmTurnOff', { modules: turningOff.join(', ') }),
       );
       if (!ok) return;
     }
@@ -67,7 +70,7 @@ export function ModulesForm({
     const result = await updateModulesAction({ moduleOverrides });
     setPending(false);
     if (result.ok) {
-      setSuccess('Состав модулей обновлён.');
+      setSuccess(t('settings.modulesForm.saved'));
       const data = result.data as { warnings?: string[] };
       if (data?.warnings?.length) setWarnings(data.warnings);
       router.refresh();
@@ -78,7 +81,7 @@ export function ModulesForm({
 
   const warningLabel = (code: string): string =>
     code === 'cms_has_published_pages'
-      ? 'У модуля «Контент» есть опубликованные страницы. Они не удалены — лишь скрыты до повторного включения.'
+      ? t('settings.modulesForm.warningCmsPublished')
       : code;
 
   return (
@@ -104,7 +107,7 @@ export function ModulesForm({
       ) : null}
 
       <p className="mb-3 text-sm text-gray-500">
-        «Настройки» — системный раздел и всегда доступен (его нельзя отключить).
+        {t('settings.modulesForm.systemNote')}
       </p>
 
       <div className="space-y-3">
@@ -113,18 +116,22 @@ export function ModulesForm({
             <div>
               <div className="text-sm font-medium text-gray-800">{label}</div>
               <div className="text-xs text-gray-500">
-                по умолчанию: {envSet.has(name) ? 'включён' : 'выключен'}
+                {t('settings.modulesForm.defaultState', {
+                  state: envSet.has(name)
+                    ? t('settings.modulesForm.stateEnabled')
+                    : t('settings.modulesForm.stateDisabled'),
+                })}
               </div>
             </div>
             <select
-              aria-label={`Состояние модуля ${label}`}
+              aria-label={t('settings.modulesForm.moduleStateAria', { label })}
               value={state[name]}
               onChange={(e) => setState((s) => ({ ...s, [name]: e.target.value as TriState }))}
               className="rounded border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="inherit">Как по умолчанию</option>
-              <option value="on">Включить</option>
-              <option value="off">Выключить</option>
+              <option value="inherit">{t('settings.modulesForm.optInherit')}</option>
+              <option value="on">{t('settings.modulesForm.optOn')}</option>
+              <option value="off">{t('settings.modulesForm.optOff')}</option>
             </select>
           </div>
         ))}
@@ -133,7 +140,7 @@ export function ModulesForm({
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить состав модулей'}
+          {pending ? t('common.form.saving') : t('settings.modulesForm.saveButton')}
         </button>
       </div>
     </div>

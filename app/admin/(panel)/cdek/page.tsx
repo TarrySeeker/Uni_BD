@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { sql } from '@/lib/db/client';
 import { isCdekMock, getCdekConfig } from '@/lib/cdek/config';
@@ -25,27 +26,27 @@ export const dynamic = 'force-dynamic';
 const PAGE_SIZE = 25;
 
 /** Режим работы модуля СДЭК для бейджа-шапки (mock / тестовый контур / боевой). */
-function cdekMode(): { label: string; cls: string; hint: string } {
+function cdekMode(): { labelKey: string; cls: string; hintKey: string } {
   if (isCdekMock()) {
     return {
-      label: 'MOCK',
+      labelKey: 'cdek.page.mode.mockLabel',
       cls: 'bg-amber-100 text-amber-800 border-amber-200',
-      hint: 'Боевые ключи не заданы — реальные отправления не создаются.',
+      hintKey: 'cdek.page.mode.mockHint',
     };
   }
   const cfg = getCdekConfig();
   const isTest = cfg.testMode || /\bedu\./.test(cfg.baseUrl);
   if (isTest) {
     return {
-      label: 'Тестовый контур (edu)',
+      labelKey: 'cdek.page.mode.testLabel',
       cls: 'bg-blue-100 text-blue-800 border-blue-200',
-      hint: 'Запросы идут на sandbox СДЭК (api.edu.cdek.ru). Отправления — тестовые.',
+      hintKey: 'cdek.page.mode.testHint',
     };
   }
   return {
-    label: 'Боевой контур',
+    labelKey: 'cdek.page.mode.prodLabel',
     cls: 'bg-green-100 text-green-800 border-green-200',
-    hint: 'Запросы идут на боевой API СДЭК. Создаются реальные отправления.',
+    hintKey: 'cdek.page.mode.prodHint',
   };
 }
 
@@ -108,10 +109,11 @@ export default async function CdekPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations();
   const guard = await guardCdek('cdek.manage');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="доставка СДЭК (модуль выключен)" />;
+      return <Forbidden permission={t('cdek.page.moduleDisabledPermission')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -137,17 +139,17 @@ export default async function CdekPage({
   return (
     <div>
       <PageHeader
-        title="Доставка (СДЭК)"
-        subtitle={`Найдено отправлений: ${total}.`}
-        breadcrumbs={[{ label: 'Доставка' }]}
+        title={t('cdek.page.title')}
+        subtitle={t('cdek.page.subtitle', { total })}
+        breadcrumbs={[{ label: t('nav.cdek') }]}
         action={
           <div className="text-right">
             <span
               className={`inline-block rounded-full border px-3 py-1 text-xs font-medium ${mode.cls}`}
             >
-              {mode.label}
+              {t(mode.labelKey)}
             </span>
-            <p className="mt-1 max-w-xs text-xs text-gray-400">{mode.hint}</p>
+            <p className="mt-1 max-w-xs text-xs text-gray-400">{t(mode.hintKey)}</p>
           </div>
         }
       />
@@ -157,21 +159,21 @@ export default async function CdekPage({
           type="search"
           name="q"
           defaultValue={q ?? ''}
-          placeholder="Поиск: трек-номер или номер заказа"
+          placeholder={t('cdek.page.searchPlaceholder')}
           className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm"
         />
         <button
           type="submit"
           className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
         >
-          Найти
+          {t('cdek.page.searchButton')}
         </button>
         {q ? (
           <Link
             href="/admin/cdek"
             className="rounded-md px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100"
           >
-            Сбросить
+            {t('common.actions.reset')}
           </Link>
         ) : null}
       </form>
@@ -180,22 +182,21 @@ export default async function CdekPage({
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Трек-номер</th>
-              <th scope="col" className="px-4 py-2 font-medium">Заказ</th>
-              <th scope="col" className="px-4 py-2 font-medium">Покупатель</th>
-              <th scope="col" className="px-4 py-2 font-medium">Способ</th>
-              <th scope="col" className="px-4 py-2 font-medium">Назначение</th>
-              <th scope="col" className="px-4 py-2 font-medium">Статус СДЭК</th>
-              <th scope="col" className="px-4 py-2 font-medium">Обновлён</th>
-              <th scope="col" className="px-4 py-2 font-medium">Печать</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.trackNumber')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.order')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.customer')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.method')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.destination')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.cdekStatus')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.updated')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('cdek.page.columns.print')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                  Отправлений нет. Накладные СДЭК создаются из карточки заказа
-                  (блок «Доставка СДЭК») после успешной оплаты.
+                  {t('cdek.page.empty')}
                 </td>
               </tr>
             ) : (
@@ -247,7 +248,7 @@ export default async function CdekPage({
                         // некликабельный бейдж-пояснение (находка #12).
                         <span
                           className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700"
-                          title="MOCK: реальная накладная появится в боевом режиме (с боевыми ключами СДЭК)"
+                          title={t('cdek.page.mockPrintTitle')}
                         >
                           mock
                         </span>
@@ -258,7 +259,7 @@ export default async function CdekPage({
                           rel="noopener noreferrer"
                           className="text-blue-700 hover:underline"
                         >
-                          Накладная
+                          {t('cdek.page.printWaybill')}
                         </a>
                       )
                     ) : (
@@ -273,9 +274,9 @@ export default async function CdekPage({
       </div>
 
       {totalPages > 1 ? (
-        <nav className="mt-4 flex items-center justify-between text-sm" aria-label="Пагинация">
+        <nav className="mt-4 flex items-center justify-between text-sm" aria-label={t('cdek.page.paginationAria')}>
           <span className="text-gray-500">
-            Страница {currentPage} из {totalPages}
+            {t('common.pagination.page', { page: currentPage, total: totalPages })}
           </span>
           <div className="flex gap-2">
             {currentPage > 1 ? (
@@ -283,7 +284,7 @@ export default async function CdekPage({
                 href={pageHref(currentPage - 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Назад
+                {t('common.pagination.prev')}
               </Link>
             ) : null}
             {currentPage < totalPages ? (
@@ -291,7 +292,7 @@ export default async function CdekPage({
                 href={pageHref(currentPage + 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Вперёд
+                {t('common.pagination.next')}
               </Link>
             ) : null}
           </div>

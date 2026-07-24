@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import { changePassword, type ChangePasswordResult } from '@/lib/auth/actions';
@@ -30,6 +31,7 @@ const labelCls = 'block text-sm font-medium text-gray-700';
 const MIN_PASSWORD_LENGTH = 8;
 
 export function ChangePasswordForm() {
+  const t = useTranslations();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -49,7 +51,7 @@ export function ChangePasswordForm() {
 
     // Клиентская проверка совпадения нового пароля и подтверждения.
     if (newPassword !== confirmPassword) {
-      setConfirmError('Пароли не совпадают');
+      setConfirmError(t('account.changePasswordForm.passwordsMismatch'));
       return;
     }
 
@@ -84,16 +86,15 @@ export function ChangePasswordForm() {
         role="status"
         className="rounded border border-green-200 bg-green-50 p-4 text-sm text-green-800"
       >
-        <p className="font-medium">Пароль изменён.</p>
+        <p className="font-medium">{t('account.changePasswordForm.doneTitle')}</p>
         <p className="mt-1">
-          В целях безопасности все ваши сессии завершены. Войдите заново с новым
-          паролем.
+          {t('account.changePasswordForm.doneMessage')}
         </p>
         <a
           href="/admin/login"
           className="mt-3 inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
         >
-          Войти заново
+          {t('account.changePasswordForm.loginAgain')}
         </a>
       </div>
     );
@@ -113,7 +114,7 @@ export function ChangePasswordForm() {
       <div className="space-y-4">
         <div>
           <label htmlFor="cp-old" className={labelCls}>
-            Текущий пароль
+            {t('account.changePasswordForm.currentPasswordLabel')}
           </label>
           <input
             id="cp-old"
@@ -132,7 +133,7 @@ export function ChangePasswordForm() {
 
         <div>
           <label htmlFor="cp-new" className={labelCls}>
-            Новый пароль
+            {t('account.changePasswordForm.newPasswordLabel')}
           </label>
           <input
             id="cp-new"
@@ -141,7 +142,9 @@ export function ChangePasswordForm() {
             autoComplete="new-password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            placeholder={`не короче ${MIN_PASSWORD_LENGTH} символов`}
+            placeholder={t('account.changePasswordForm.newPasswordPlaceholder', {
+              min: MIN_PASSWORD_LENGTH,
+            })}
             className={inputCls}
             minLength={MIN_PASSWORD_LENGTH}
             required
@@ -153,7 +156,7 @@ export function ChangePasswordForm() {
 
         <div>
           <label htmlFor="cp-confirm" className={labelCls}>
-            Подтверждение нового пароля
+            {t('account.changePasswordForm.confirmPasswordLabel')}
           </label>
           <input
             id="cp-confirm"
@@ -179,7 +182,7 @@ export function ChangePasswordForm() {
           disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {pending ? 'Сохранение…' : 'Сменить пароль'}
+          {pending ? t('common.form.saving') : t('account.changePasswordForm.submit')}
         </button>
       </div>
     </form>

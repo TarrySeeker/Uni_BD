@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { Forbidden } from '../../_components/Forbidden';
 import { PageHeader } from '../../_components/PageHeader';
@@ -25,6 +26,8 @@ export default async function CustomerDetailPage({
     return <Forbidden permission={guard.permission} />;
   }
 
+  const t = await getTranslations();
+
   const { id } = await params;
   const customer = await getCustomerById(id);
   if (!customer) {
@@ -37,23 +40,23 @@ export default async function CustomerDetailPage({
     <div className="max-w-4xl">
       <PageHeader
         title={customer.email}
-        subtitle="Аккаунт покупателя — просмотр"
+        subtitle={t('customers.detailPage.subtitle')}
         breadcrumbs={[
-          { label: 'Покупатели', href: '/admin/customers' },
+          { label: t('nav.customers'), href: '/admin/customers' },
           { label: customer.email },
         ]}
       />
 
       <section className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Профиль</h2>
+        <h2 className="mb-3 text-sm font-semibold text-gray-700">{t('customers.detailPage.profileHeading')}</h2>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-          <dt className="text-gray-500">Email</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.email')}</dt>
           <dd>{customer.email}</dd>
-          <dt className="text-gray-500">Имя</dt>
+          <dt className="text-gray-500">{t('fields.name')}</dt>
           <dd>{customer.name || '—'}</dd>
-          <dt className="text-gray-500">Телефон</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.phone')}</dt>
           <dd>{customer.phone || '—'}</dd>
-          <dt className="text-gray-500">Статус</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.status')}</dt>
           <dd>
             <span
               className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${customerStatusBadgeClass(customer.status)}`}
@@ -61,15 +64,15 @@ export default async function CustomerDetailPage({
               {customerStatusLabel(customer.status)}
             </span>
           </dd>
-          <dt className="text-gray-500">Email подтверждён</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.emailVerified')}</dt>
           <dd>{customer.emailVerifiedAt ? formatDateTime(customer.emailVerifiedAt) : '—'}</dd>
-          <dt className="text-gray-500">Язык</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.language')}</dt>
           <dd>{customer.preferredLocale || '—'}</dd>
-          <dt className="text-gray-500">Последний вход</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.lastLogin')}</dt>
           <dd>{customer.lastLoginAt ? formatDateTime(customer.lastLoginAt) : '—'}</dd>
-          <dt className="text-gray-500">Регистрация</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.registered')}</dt>
           <dd>{formatDateTime(customer.createdAt)}</dd>
-          <dt className="text-gray-500">Заказов / сумма</dt>
+          <dt className="text-gray-500">{t('customers.detailPage.ordersAndTotal')}</dt>
           <dd>
             {customer.ordersCount} / {customer.totalSpent}
           </dd>
@@ -77,19 +80,19 @@ export default async function CustomerDetailPage({
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Заказы</h2>
+        <h2 className="mb-3 text-sm font-semibold text-gray-700">{t('nav.orders')}</h2>
         {orders.length === 0 ? (
-          <p className="text-sm text-gray-600">У покупателя пока нет привязанных заказов.</p>
+          <p className="text-sm text-gray-600">{t('customers.detailPage.ordersEmpty')}</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-gray-500">
-                  <th className="px-4 py-2 font-medium">Номер</th>
-                  <th className="px-4 py-2 font-medium">Дата</th>
-                  <th className="px-4 py-2 font-medium">Статус</th>
-                  <th className="px-4 py-2 font-medium">Оплата</th>
-                  <th className="px-4 py-2 font-medium">Сумма</th>
+                  <th className="px-4 py-2 font-medium">{t('customers.detailPage.colNumber')}</th>
+                  <th className="px-4 py-2 font-medium">{t('customers.detailPage.colDate')}</th>
+                  <th className="px-4 py-2 font-medium">{t('customers.detailPage.status')}</th>
+                  <th className="px-4 py-2 font-medium">{t('customers.detailPage.colPayment')}</th>
+                  <th className="px-4 py-2 font-medium">{t('customers.detailPage.colTotal')}</th>
                 </tr>
               </thead>
               <tbody>

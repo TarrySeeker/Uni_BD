@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { GiftCertificate } from '@/lib/gift-certificates';
 import type { ActionResult } from '@/lib/server/action';
@@ -17,12 +18,6 @@ import { issueGiftCertificateAction, updateGiftCertificateAction } from './form-
 import { errorMessage, fieldError } from './action-result';
 
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
-
-/** Переводимые поля сертификата для панели переводов (совпадает с GIFT_TR_FIELDS). */
-const GIFT_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'description', label: 'Описание', kind: 'textarea' },
-  { key: 'terms', label: 'Условия использования', kind: 'textarea' },
-];
 
 const inputCls = 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm';
 
@@ -53,8 +48,15 @@ export function GiftCertificateForm({
   locales: readonly string[];
   defaultLocale: string;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const isEdit = cert !== null;
+
+  /** Переводимые поля сертификата для панели переводов (совпадает с GIFT_TR_FIELDS). */
+  const GIFT_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
+    { key: 'description', label: t('fields.description'), kind: 'textarea' },
+    { key: 'terms', label: t('giftCertificates.giftCertificateForm.termsLabel'), kind: 'textarea' },
+  ];
 
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -124,7 +126,7 @@ export function GiftCertificateForm({
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Изменения сохранены.');
+        setSuccess(t('giftCertificates.giftCertificateForm.savedChanges'));
         router.refresh();
       } else {
         router.push('/admin/gift-certificates');
@@ -152,19 +154,19 @@ export function GiftCertificateForm({
       {isEdit ? (
         <dl className="mb-6 grid grid-cols-2 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm sm:grid-cols-4">
           <div>
-            <dt className="text-gray-500">Номинал</dt>
+            <dt className="text-gray-500">{t('giftCertificates.giftCertificateForm.summary.nominal')}</dt>
             <dd className="font-medium text-gray-900">{cert!.initialAmount} {cert!.currency}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Потрачено</dt>
+            <dt className="text-gray-500">{t('giftCertificates.giftCertificateForm.summary.spent')}</dt>
             <dd className="font-medium text-gray-900">{cert!.spentTotal} {cert!.currency}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Остаток</dt>
+            <dt className="text-gray-500">{t('giftCertificates.giftCertificateForm.summary.remaining')}</dt>
             <dd className="font-medium text-gray-900">{cert!.remaining} {cert!.currency}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Статус</dt>
+            <dt className="text-gray-500">{t('giftCertificates.giftCertificateForm.summary.status')}</dt>
             <dd className="font-medium text-gray-900">{cert!.status}</dd>
           </div>
         </dl>
@@ -183,54 +185,56 @@ export function GiftCertificateForm({
       >
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <label htmlFor="g-code" className="block text-sm font-medium text-gray-700">Код*</label>
+            <label htmlFor="g-code" className="block text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.codeLabel')}</label>
             <input
               id="g-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               disabled={isEdit}
-              placeholder="напр. GIFT2026"
+              placeholder={t('giftCertificates.giftCertificateForm.codePlaceholder')}
               className={`${inputCls} disabled:bg-gray-100`}
               required
             />
-            {isEdit ? <p className="mt-1 text-xs text-gray-500">Код изменить нельзя.</p> : null}
+            {isEdit ? <p className="mt-1 text-xs text-gray-500">{t('giftCertificates.giftCertificateForm.codeLocked')}</p> : null}
             {fe('code') ? <p className="mt-1 text-xs text-red-600">{fe('code')}</p> : null}
           </div>
 
           <div>
-            <label htmlFor="g-name" className="block text-sm font-medium text-gray-700">Наименование</label>
+            <label htmlFor="g-name" className="block text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.nameLabel')}</label>
             <input
               id="g-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="служебная метка (не публикуется)"
+              placeholder={t('giftCertificates.giftCertificateForm.namePlaceholder')}
               className={inputCls}
             />
           </div>
 
           <div>
             <label htmlFor="g-face" className="block text-sm font-medium text-gray-700">
-              {isEdit ? 'Номинал (только пополнение вверх)' : 'Номинал*'}
+              {isEdit
+                ? t('giftCertificates.giftCertificateForm.faceTopUp')
+                : t('giftCertificates.giftCertificateForm.faceRequired')}
             </label>
             <input
               id="g-face"
               value={initialAmount}
               onChange={(e) => setInitialAmount(e.target.value)}
               inputMode="decimal"
-              placeholder="напр. 5000.00"
+              placeholder={t('giftCertificates.giftCertificateForm.facePlaceholder')}
               className={inputCls}
               required={!isEdit}
             />
             {isEdit ? (
               <p className="mt-1 text-xs text-gray-500">
-                Оставьте как есть или увеличьте (не ниже потраченного). Уменьшать нельзя.
+                {t('giftCertificates.giftCertificateForm.faceTopUpHelp')}
               </p>
             ) : null}
             {fe('initialAmount') ? <p className="mt-1 text-xs text-red-600">{fe('initialAmount')}</p> : null}
           </div>
 
           <div>
-            <label htmlFor="g-valid" className="block text-sm font-medium text-gray-700">Действует до</label>
+            <label htmlFor="g-valid" className="block text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.validUntilLabel')}</label>
             <input
               id="g-valid"
               type="datetime-local"
@@ -238,11 +242,11 @@ export function GiftCertificateForm({
               onChange={(e) => setValidUntil(e.target.value)}
               className={inputCls}
             />
-            <p className="mt-1 text-xs text-gray-500">Пусто — бессрочно.</p>
+            <p className="mt-1 text-xs text-gray-500">{t('giftCertificates.giftCertificateForm.validUntilHelp')}</p>
           </div>
 
           <div className="lg:col-span-2">
-            <label htmlFor="g-desc" className="block text-sm font-medium text-gray-700">Описание (публичное)</label>
+            <label htmlFor="g-desc" className="block text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.descriptionLabel')}</label>
             <textarea
               id="g-desc"
               value={description}
@@ -253,7 +257,7 @@ export function GiftCertificateForm({
           </div>
 
           <div className="lg:col-span-2">
-            <label htmlFor="g-terms" className="block text-sm font-medium text-gray-700">Условия использования</label>
+            <label htmlFor="g-terms" className="block text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.termsLabel')}</label>
             <textarea
               id="g-terms"
               value={terms}
@@ -264,48 +268,48 @@ export function GiftCertificateForm({
           </div>
 
           <fieldset className="lg:col-span-2 rounded border border-gray-200 p-4">
-            <legend className="px-1 text-sm font-medium text-gray-700">Кто купил</legend>
+            <legend className="px-1 text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.purchaserLegend')}</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <label htmlFor="g-buyer-name" className="block text-xs text-gray-500">Имя</label>
+                <label htmlFor="g-buyer-name" className="block text-xs text-gray-500">{t('fields.name')}</label>
                 <input id="g-buyer-name" value={purchaserName} onChange={(e) => setPurchaserName(e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label htmlFor="g-buyer-email" className="block text-xs text-gray-500">E-mail</label>
+                <label htmlFor="g-buyer-email" className="block text-xs text-gray-500">{t('giftCertificates.giftCertificateForm.emailLabel')}</label>
                 <input id="g-buyer-email" value={purchaserEmail} onChange={(e) => setPurchaserEmail(e.target.value)} className={inputCls} />
                 {fe('purchaser.email') ? <p className="mt-1 text-xs text-red-600">{fe('purchaser.email')}</p> : null}
               </div>
               <div>
-                <label htmlFor="g-buyer-phone" className="block text-xs text-gray-500">Телефон</label>
+                <label htmlFor="g-buyer-phone" className="block text-xs text-gray-500">{t('giftCertificates.giftCertificateForm.phoneLabel')}</label>
                 <input id="g-buyer-phone" value={purchaserPhone} onChange={(e) => setPurchaserPhone(e.target.value)} className={inputCls} />
               </div>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              Снимок на момент выпуска: правка карточки клиента его не изменит.
+              {t('giftCertificates.giftCertificateForm.purchaserSnapshotHelp')}
             </p>
           </fieldset>
 
           <fieldset className="lg:col-span-2 rounded border border-gray-200 p-4">
-            <legend className="px-1 text-sm font-medium text-gray-700">На чьё имя</legend>
+            <legend className="px-1 text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.recipientLegend')}</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <label htmlFor="g-rcpt-name" className="block text-xs text-gray-500">Имя</label>
+                <label htmlFor="g-rcpt-name" className="block text-xs text-gray-500">{t('fields.name')}</label>
                 <input id="g-rcpt-name" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label htmlFor="g-rcpt-email" className="block text-xs text-gray-500">E-mail</label>
+                <label htmlFor="g-rcpt-email" className="block text-xs text-gray-500">{t('giftCertificates.giftCertificateForm.emailLabel')}</label>
                 <input id="g-rcpt-email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} className={inputCls} />
                 {fe('recipient.email') ? <p className="mt-1 text-xs text-red-600">{fe('recipient.email')}</p> : null}
               </div>
               <div>
-                <label htmlFor="g-rcpt-phone" className="block text-xs text-gray-500">Телефон</label>
+                <label htmlFor="g-rcpt-phone" className="block text-xs text-gray-500">{t('giftCertificates.giftCertificateForm.phoneLabel')}</label>
                 <input id="g-rcpt-phone" value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)} className={inputCls} />
               </div>
             </div>
           </fieldset>
 
           <div className="lg:col-span-2">
-            <label htmlFor="g-comment" className="block text-sm font-medium text-gray-700">Комментарий (внутренний)</label>
+            <label htmlFor="g-comment" className="block text-sm font-medium text-gray-700">{t('giftCertificates.giftCertificateForm.commentLabel')}</label>
             <input id="g-comment" value={comment} onChange={(e) => setComment(e.target.value)} className={inputCls} />
           </div>
         </div>
@@ -317,14 +321,18 @@ export function GiftCertificateForm({
             disabled={pending || !canSubmit}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Выпустить'}
+            {pending
+              ? t('common.form.saving')
+              : isEdit
+                ? t('common.actions.save')
+                : t('giftCertificates.giftCertificateForm.submitIssue')}
           </button>
           <button
             type="button"
             onClick={() => router.push('/admin/gift-certificates')}
             className="text-sm text-gray-600 hover:underline"
           >
-            Отмена
+            {t('common.actions.cancel')}
           </button>
         </div>
       </LocaleTabs>

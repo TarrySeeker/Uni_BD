@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { can } from '@/lib/auth/rbac';
 import { listGiftCertificates, countGiftCertificates } from '@/lib/gift-certificates';
@@ -29,10 +30,11 @@ function partyLabel(party: { name: string | null; email: string | null; phone: s
 }
 
 export default async function GiftCertificatesPage() {
+  const t = await getTranslations();
   const guard = await guardGift('gift.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="orders (модуль выключен)" />;
+      return <Forbidden permission={t('giftCertificates.page.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -44,16 +46,16 @@ export default async function GiftCertificatesPage() {
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title="Подарочные сертификаты"
-        subtitle={`Балансовые сертификаты: номинал списывается частично по нескольким заказам, хранится остаток. Всего: ${total}.`}
-        breadcrumbs={[{ label: 'Сертификаты' }]}
+        title={t('nav.giftCertificates')}
+        subtitle={t('giftCertificates.page.subtitle', { total })}
+        breadcrumbs={[{ label: t('giftCertificates.page.breadcrumb') }]}
         action={
           canWrite ? (
             <Link
               href="/admin/gift-certificates/new"
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
             >
-              Выпустить
+              {t('giftCertificates.page.issue')}
             </Link>
           ) : undefined
         }
@@ -66,22 +68,22 @@ export default async function GiftCertificatesPage() {
       ) : null}
 
       {certs.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-600">Пока нет сертификатов.</p>
+        <p className="mt-6 text-sm text-gray-600">{t('giftCertificates.page.empty')}</p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-gray-500">
-                <th className="px-4 py-2 font-medium">Код</th>
-                <th className="px-4 py-2 font-medium">Наименование</th>
-                <th className="px-4 py-2 font-medium">Кто купил</th>
-                <th className="px-4 py-2 font-medium">На чьё имя</th>
-                <th className="px-4 py-2 font-medium">Номинал</th>
-                <th className="px-4 py-2 font-medium">Потрачено</th>
-                <th className="px-4 py-2 font-medium">Остаток</th>
-                <th className="px-4 py-2 font-medium">Действует до</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
-                <th className="px-4 py-2 font-medium">Действия</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.code')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.name')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.purchaser')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.recipient')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.nominal')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.spent')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.remaining')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.validUntil')}</th>
+                <th className="px-4 py-2 font-medium">{t('giftCertificates.page.cols.status')}</th>
+                <th className="px-4 py-2 font-medium">{t('common.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -96,7 +98,7 @@ export default async function GiftCertificatesPage() {
                   <td className="px-4 py-2 text-gray-700">
                     {partyLabel(c.purchaser)}
                     {c.issuedOrderId ? (
-                      <div className="text-xs text-gray-400">по заказу</div>
+                      <div className="text-xs text-gray-400">{t('giftCertificates.page.byOrder')}</div>
                     ) : null}
                   </td>
                   <td className="px-4 py-2 text-gray-700">{partyLabel(c.recipient)}</td>
@@ -104,7 +106,7 @@ export default async function GiftCertificatesPage() {
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">{c.spentTotal}</td>
                   <td className="whitespace-nowrap px-4 py-2 font-medium text-gray-900">{c.remaining}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">
-                    {c.validUntil ? formatDateTime(c.validUntil) : 'бессрочно'}
+                    {c.validUntil ? formatDateTime(c.validUntil) : t('giftCertificates.page.unlimited')}
                   </td>
                   <td className="px-4 py-2">
                     <GiftStatusBadge status={c.status} />

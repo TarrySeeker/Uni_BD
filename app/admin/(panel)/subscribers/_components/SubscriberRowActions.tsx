@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -24,6 +25,7 @@ export function SubscriberRowActions({
   email: string;
   status: string;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [pending, setPending] = useState(false);
@@ -34,7 +36,7 @@ export function SubscriberRowActions({
   }
 
   async function onUnsubscribe() {
-    if (!window.confirm(`Отписать «${email}» от рассылки?`)) return;
+    if (!window.confirm(t('subscribers.subscriberRowActions.confirmUnsubscribe', { email }))) return;
     setPending(true);
     setError(null);
     const result = await unsubscribeSubscriberAction({ id });
@@ -54,7 +56,7 @@ export function SubscriberRowActions({
         onClick={onUnsubscribe}
         className="rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
       >
-        Отписать
+        {t('subscribers.subscriberRowActions.unsubscribe')}
       </button>
       {error ? (
         <span role="alert" className="text-xs text-red-600">

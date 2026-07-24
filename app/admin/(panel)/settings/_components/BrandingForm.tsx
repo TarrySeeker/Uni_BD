@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
 import type { TranslationsMap } from '@/lib/i18n';
@@ -37,6 +39,7 @@ export function SettingsImageUpload({
   label?: string;
   onUploaded: (value: string) => void;
 }) {
+  const t = useTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -71,10 +74,10 @@ export function SettingsImageUpload({
         disabled={pending}
         className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
-        {pending ? 'Загрузка…' : (label ?? 'Загрузить файл')}
+        {pending ? t('settings.brandingForm.uploading') : (label ?? t('settings.brandingForm.uploadFileDefault'))}
       </button>
       {done ? (
-        <span className="ml-2 text-xs text-green-700">✓ файл загружен, адрес подставлен в поле</span>
+        <span className="ml-2 text-xs text-green-700">{t('settings.brandingForm.uploadDone')}</span>
       ) : null}
       {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
     </div>
@@ -90,6 +93,7 @@ export function BrandingForm({
   i18n: { defaultLocale: string; locales: string[] };
   translations?: TranslationsMap;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -123,7 +127,7 @@ export function BrandingForm({
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Брендинг сохранён.');
+      setSuccess(t('settings.brandingForm.saved'));
       router.refresh();
     } else {
       setError(result);
@@ -154,35 +158,35 @@ export function BrandingForm({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="s-name" className="block text-sm font-medium text-gray-700">Название магазина</label>
+          <label htmlFor="s-name" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.shopName')}</label>
           <input id="s-name" value={shopName} onChange={(e) => setShopName(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('shopName') ? <p className="mt-1 text-xs text-red-600">{fe('shopName')}</p> : null}
         </div>
         <div>
-          <label htmlFor="s-logo" className="block text-sm font-medium text-gray-700">Логотип</label>
+          <label htmlFor="s-logo" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.logo')}</label>
           <input id="s-logo" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://… или загрузите файл" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
-          <SettingsImageUpload kind="logo" label="Загрузить логотип" onUploaded={setLogoUrl} />
+            placeholder={t('settings.brandingForm.urlOrUploadPlaceholder')} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          <SettingsImageUpload kind="logo" label={t('settings.brandingForm.uploadLogo')} onUploaded={setLogoUrl} />
           {fe('logoUrl') ? <p className="mt-1 text-xs text-red-600">{fe('logoUrl')}</p> : null}
         </div>
         <div>
-          <label htmlFor="s-favicon" className="block text-sm font-medium text-gray-700">Favicon</label>
+          <label htmlFor="s-favicon" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.favicon')}</label>
           <input id="s-favicon" value={faviconUrl} onChange={(e) => setFaviconUrl(e.target.value)}
-            placeholder="https://… или загрузите файл" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
-          <SettingsImageUpload kind="favicon" label="Загрузить favicon" onUploaded={setFaviconUrl} />
+            placeholder={t('settings.brandingForm.urlOrUploadPlaceholder')} className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          <SettingsImageUpload kind="favicon" label={t('settings.brandingForm.uploadFavicon')} onUploaded={setFaviconUrl} />
         </div>
         <div>
-          <label htmlFor="s-mode" className="block text-sm font-medium text-gray-700">Тема</label>
+          <label htmlFor="s-mode" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.theme')}</label>
           <select id="s-mode" value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm">
-            <option value="system">Системная</option>
-            <option value="light">Светлая</option>
-            <option value="dark">Тёмная</option>
+            <option value="system">{t('settings.brandingForm.themeSystem')}</option>
+            <option value="light">{t('settings.brandingForm.themeLight')}</option>
+            <option value="dark">{t('settings.brandingForm.themeDark')}</option>
           </select>
         </div>
         <div>
-          <label htmlFor="s-primary" className="block text-sm font-medium text-gray-700">Основной цвет (HEX)</label>
+          <label htmlFor="s-primary" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.primaryColor')}</label>
           <input id="s-primary" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)}
             placeholder="#1a1a1a" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fieldError(error, 'branding.theme') ? (
@@ -190,18 +194,18 @@ export function BrandingForm({
           ) : null}
         </div>
         <div>
-          <label htmlFor="s-accent" className="block text-sm font-medium text-gray-700">Акцентный цвет (HEX)</label>
+          <label htmlFor="s-accent" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.accentColor')}</label>
           <input id="s-accent" value={accentColor} onChange={(e) => setAccentColor(e.target.value)}
             placeholder="#ff0000" className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label htmlFor="s-semail" className="block text-sm font-medium text-gray-700">Email поддержки</label>
+          <label htmlFor="s-semail" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.supportEmail')}</label>
           <input id="s-semail" value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('supportEmail') ? <p className="mt-1 text-xs text-red-600">{fe('supportEmail')}</p> : null}
         </div>
         <div>
-          <label htmlFor="s-sphone" className="block text-sm font-medium text-gray-700">Телефон поддержки</label>
+          <label htmlFor="s-sphone" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.supportPhone')}</label>
           <input id="s-sphone" value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
@@ -210,7 +214,7 @@ export function BrandingForm({
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить брендинг'}
+          {pending ? t('common.form.saving') : t('settings.brandingForm.saveButton')}
         </button>
       </div>
     </div>

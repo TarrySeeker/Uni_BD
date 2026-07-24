@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
@@ -175,6 +176,8 @@ export default async function AuditPage({
     return <Forbidden permission="audit.read" />;
   }
 
+  const t = await getTranslations();
+
   const sp = await searchParams;
   const filter = parseAuditFilters(sp);
 
@@ -184,9 +187,9 @@ export default async function AuditPage({
   return (
     <div>
       <PageHeader
-        title="Журнал аудита"
-        subtitle={`Всего событий: ${total}. Страница ${currentPage} из ${totalPages}.`}
-        breadcrumbs={[{ label: 'Аудит' }]}
+        title={t('audit.page.title')}
+        subtitle={t('audit.page.subtitle', { total, currentPage, totalPages })}
+        breadcrumbs={[{ label: t('nav.audit') }]}
       />
 
       <div className="mt-4">
@@ -197,18 +200,18 @@ export default async function AuditPage({
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Время (МСК)</th>
-              <th scope="col" className="px-4 py-2 font-medium">Инициатор</th>
-              <th scope="col" className="px-4 py-2 font-medium">Действие</th>
-              <th scope="col" className="px-4 py-2 font-medium">Сущность</th>
-              <th scope="col" className="px-4 py-2 font-medium">Изменения</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('audit.page.columns.time')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('audit.page.columns.actor')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('audit.page.columns.action')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('audit.page.columns.entity')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('audit.page.columns.changes')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
-                  Записей пока нет.
+                  {t('audit.page.empty')}
                 </td>
               </tr>
             ) : (
@@ -257,14 +260,14 @@ export default async function AuditPage({
                       {diff.length > 0 ? (
                         <details>
                           <summary className="cursor-pointer text-blue-700 hover:underline">
-                            Подробнее ({diff.length})
+                            {t('audit.page.details', { count: diff.length })}
                           </summary>
                           <table className="mt-2 border-collapse text-xs">
                             <thead className="text-left text-gray-400">
                               <tr>
-                                <th className="pr-3 font-medium">Поле</th>
-                                <th className="pr-3 font-medium">Было</th>
-                                <th className="font-medium">Стало</th>
+                                <th className="pr-3 font-medium">{t('audit.page.diff.field')}</th>
+                                <th className="pr-3 font-medium">{t('audit.page.diff.before')}</th>
+                                <th className="font-medium">{t('audit.page.diff.after')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -293,9 +296,9 @@ export default async function AuditPage({
       </div>
 
       {totalPages > 1 ? (
-        <nav className="mt-4 flex items-center justify-between text-sm" aria-label="Пагинация">
+        <nav className="mt-4 flex items-center justify-between text-sm" aria-label={t('audit.page.paginationAria')}>
           <span className="text-gray-500">
-            Страница {currentPage} из {totalPages}
+            {t('common.pagination.page', { page: currentPage, total: totalPages })}
           </span>
           <div className="flex gap-2">
             {currentPage > 1 ? (
@@ -303,7 +306,7 @@ export default async function AuditPage({
                 href={pageHref(sp, currentPage - 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Назад
+                {t('common.pagination.prev')}
               </Link>
             ) : null}
             {currentPage < totalPages ? (
@@ -311,7 +314,7 @@ export default async function AuditPage({
                 href={pageHref(sp, currentPage + 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Вперёд
+                {t('common.pagination.next')}
               </Link>
             ) : null}
           </div>

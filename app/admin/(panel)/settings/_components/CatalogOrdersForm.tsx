@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -39,6 +40,7 @@ export function CatalogOrdersForm({
   delivery: EffectiveSettings['delivery'];
   orders: EffectiveSettings['orders'];
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -91,7 +93,7 @@ export function CatalogOrdersForm({
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Настройки сохранены.');
+      setSuccess(t('settings.catalogOrdersForm.savedSuccess'));
       router.refresh();
     } else {
       setError(result);
@@ -116,7 +118,7 @@ export function CatalogOrdersForm({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <label htmlFor="co-newdays" className="block text-sm font-medium text-gray-700">
-            «Новизна» товара (дней)
+            {t('settings.catalogOrdersForm.newProductDaysLabel')}
           </label>
           <input id="co-newdays" type="number" min={0} value={newProductDays}
             onChange={(e) => setNewProductDays(e.target.value)}
@@ -127,22 +129,22 @@ export function CatalogOrdersForm({
         </div>
         <div>
           <label htmlFor="co-free" className="block text-sm font-medium text-gray-700">
-            Порог бесплатной доставки (₽)
+            {t('settings.catalogOrdersForm.freeThresholdLabel')}
           </label>
           <input id="co-free" value={freeThresholdRub} onChange={(e) => setFreeThresholdRub(e.target.value)}
-            placeholder="0 = выключено"
+            placeholder={t('settings.catalogOrdersForm.freeThresholdPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('delivery.freeDeliveryThreshold') ? (
             <p className="mt-1 text-xs text-red-600">{fe('delivery.freeDeliveryThreshold')}</p>
           ) : null}
-          <p className="mt-1 text-xs text-gray-500">Сумма заказа, с которой доставка бесплатна. 0 — бесплатной доставки нет.</p>
+          <p className="mt-1 text-xs text-gray-500">{t('settings.catalogOrdersForm.freeThresholdHelp')}</p>
         </div>
         <div>
           <label htmlFor="co-prefix" className="block text-sm font-medium text-gray-700">
-            Префикс номера заказа
+            {t('settings.catalogOrdersForm.orderPrefixLabel')}
           </label>
           <input id="co-prefix" value={orderPrefix} onChange={(e) => setOrderPrefix(e.target.value)}
-            placeholder="например GA"
+            placeholder={t('settings.catalogOrdersForm.orderPrefixPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
       </div>
@@ -151,36 +153,35 @@ export function CatalogOrdersForm({
       <div className="mt-6 border-t border-gray-200 pt-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-gray-900">Зоны доставки</h3>
+            <h3 className="text-sm font-medium text-gray-900">{t('settings.catalogOrdersForm.zonesHeading')}</h3>
             <p className="mt-1 text-xs text-gray-500">
-              Цена доставки для выбранной покупателем зоны. Порог — необязательный: сумма заказа,
-              с которой доставка в эту зону бесплатна.
+              {t('settings.catalogOrdersForm.zonesHelp')}
             </p>
           </div>
           <button type="button" onClick={addZone}
             className="shrink-0 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            + Добавить зону
+            {t('settings.catalogOrdersForm.addZone')}
           </button>
         </div>
 
         {zones.length === 0 ? (
-          <p className="mt-3 text-sm text-gray-500">Зоны не заданы — используется обычный расчёт доставки.</p>
+          <p className="mt-3 text-sm text-gray-500">{t('settings.catalogOrdersForm.zonesEmpty')}</p>
         ) : (
           <div className="mt-3 space-y-2">
             {zones.map((z, i) => (
               <div key={i} className="grid grid-cols-1 gap-2 rounded border border-gray-200 p-3 sm:grid-cols-[1fr,8rem,8rem,auto] sm:items-end">
                 <div>
                   <label htmlFor={`zone-label-${i}`} className="block text-xs font-medium text-gray-600">
-                    Название
+                    {t('fields.name')}
                   </label>
                   <input id={`zone-label-${i}`} value={z.label}
                     onChange={(e) => updateZone(i, { label: e.target.value })}
-                    placeholder="например В пределах МКАД"
+                    placeholder={t('settings.catalogOrdersForm.zoneLabelPlaceholder')}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
                 </div>
                 <div>
                   <label htmlFor={`zone-price-${i}`} className="block text-xs font-medium text-gray-600">
-                    Цена (₽)
+                    {t('settings.catalogOrdersForm.zonePriceLabel')}
                   </label>
                   <input id={`zone-price-${i}`} value={z.priceRub}
                     onChange={(e) => updateZone(i, { priceRub: e.target.value })}
@@ -189,7 +190,7 @@ export function CatalogOrdersForm({
                 </div>
                 <div>
                   <label htmlFor={`zone-free-${i}`} className="block text-xs font-medium text-gray-600">
-                    Порог ₽ (опц.)
+                    {t('settings.catalogOrdersForm.zoneFreeThresholdLabel')}
                   </label>
                   <input id={`zone-free-${i}`} value={z.freeThresholdRub}
                     onChange={(e) => updateZone(i, { freeThresholdRub: e.target.value })}
@@ -198,7 +199,7 @@ export function CatalogOrdersForm({
                 </div>
                 <button type="button" onClick={() => removeZone(i)}
                   className="rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
-                  Удалить
+                  {t('common.actions.delete')}
                 </button>
               </div>
             ))}
@@ -209,7 +210,7 @@ export function CatalogOrdersForm({
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить'}
+          {pending ? t('common.form.saving') : t('common.actions.save')}
         </button>
       </div>
     </div>

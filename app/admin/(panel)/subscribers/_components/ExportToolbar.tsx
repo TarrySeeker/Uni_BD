@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import { subscribersToCsv } from '@/lib/newsletter/csv';
@@ -23,6 +24,7 @@ export interface ExportRow {
 }
 
 export function ExportToolbar({ rows }: { rows: ExportRow[] }) {
+  const t = useTranslations();
   const [copied, setCopied] = useState(false);
 
   const emails = rows.map((r) => r.email);
@@ -34,7 +36,7 @@ export function ExportToolbar({ rows }: { rows: ExportRow[] }) {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Фолбэк для окружений без Clipboard API (старый браузер / http).
-      window.prompt('Скопируйте адреса вручную:', emails.join(', '));
+      window.prompt(t('subscribers.exportToolbar.copyManualPrompt'), emails.join(', '));
     }
   }
 
@@ -68,14 +70,14 @@ export function ExportToolbar({ rows }: { rows: ExportRow[] }) {
         onClick={copyEmails}
         className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
       >
-        {copied ? 'Скопировано' : 'Скопировать адреса'}
+        {copied ? t('subscribers.exportToolbar.copied') : t('subscribers.exportToolbar.copyAddresses')}
       </button>
       <button
         type="button"
         onClick={downloadCsv}
         className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
       >
-        Скачать CSV
+        {t('subscribers.exportToolbar.downloadCsv')}
       </button>
     </div>
   );

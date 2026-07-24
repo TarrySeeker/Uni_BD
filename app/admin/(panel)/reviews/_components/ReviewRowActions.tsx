@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { nextReviewStatuses, reviewStatusLabel } from '@/lib/reviews/status';
 import type { ActionResult } from '@/lib/server/action';
@@ -27,6 +28,7 @@ export function ReviewRowActions({
   id: string;
   status: string;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [pending, setPending] = useState(false);
@@ -65,7 +67,9 @@ export function ReviewRowActions({
                   ? 'bg-green-700 text-white hover:bg-green-600'
                   : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
               }`}
-              title={`Сменить статус на «${reviewStatusLabel(to)}»`}
+              title={t('reviews.reviewRowActions.changeStatusTo', {
+                status: reviewStatusLabel(to),
+              })}
             >
               {reviewStatusLabel(to)}
             </button>
@@ -77,13 +81,13 @@ export function ReviewRowActions({
           onClick={() =>
             run(
               () => deleteReviewAdminAction({ id }),
-              'Удалить отзыв без возможности восстановления?',
+              t('reviews.reviewRowActions.confirmDelete'),
             )
           }
           className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-          title="Удалить отзыв"
+          title={t('reviews.reviewRowActions.deleteTitle')}
         >
-          Удалить
+          {t('common.actions.delete')}
         </button>
       </div>
       {error ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ActionResult } from '@/lib/server/action';
 
@@ -16,12 +17,13 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
  * Виджет НЕ ослабляет серверную валидацию (magic-bytes/webp/право — в Server Action).
  */
 export function NewsImageUploadButton({
-  label = 'Загрузить файл',
+  label,
   onUploaded,
 }: {
   label?: string;
   onUploaded: (key: string) => void;
 }) {
+  const t = useTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,10 +63,10 @@ export function NewsImageUploadButton({
         disabled={pending}
         className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
-        {pending ? 'Загрузка…' : label}
+        {pending ? t('news.newsImageUploadButton.uploading') : (label ?? t('news.newsImageUploadButton.defaultLabel'))}
       </button>
       {done ? (
-        <span className="ml-2 text-xs text-green-700">✓ файл загружен, ключ подставлен</span>
+        <span className="ml-2 text-xs text-green-700">{t('news.newsImageUploadButton.done')}</span>
       ) : null}
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
     </div>

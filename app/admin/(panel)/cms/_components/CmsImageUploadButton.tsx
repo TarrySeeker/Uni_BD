@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRef, useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -22,12 +23,14 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
  * передаём байты файла через FormData.
  */
 export function CmsImageUploadButton({
-  label = 'Загрузить файл',
+  label,
   onUploaded,
 }: {
   label?: string;
   onUploaded: (key: string) => void;
 }) {
+  const t = useTranslations();
+  const resolvedLabel = label ?? t('cms.cmsImageUploadButton.uploadFile');
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,11 +70,11 @@ export function CmsImageUploadButton({
         disabled={pending}
         className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
-        {pending ? 'Загрузка…' : label}
+        {pending ? t('cms.cmsImageUploadButton.uploading') : resolvedLabel}
       </button>
       {done ? (
         <span className="ml-2 text-xs text-green-700">
-          ✓ файл загружен, ключ подставлен в поле
+          {t('cms.cmsImageUploadButton.done')}
         </span>
       ) : null}
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}

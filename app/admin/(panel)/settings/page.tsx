@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getEffectiveSettings } from '@/lib/config/settings';
 import { getSetting } from '@/lib/settings/repository';
 import { getEnabledModules } from '@/lib/config/modules';
@@ -30,6 +32,7 @@ import type { SettingKey } from '@/lib/settings/schemas';
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
+  const t = await getTranslations();
   const guard = await guardSettings('settings.manage');
   if (!guard.ok) {
     return <Forbidden permission={guard.permission} />;
@@ -45,30 +48,30 @@ export default async function SettingsPage() {
   // Разделы настроек. Якоря в боковой колонке → СЕО больше не «спрятан» внизу
   // (Prevki.md): он виден в навигации сразу, наравне с остальными разделами.
   const sections = [
-    { id: 'branding', title: 'Брендинг' },
-    { id: 'home', title: 'Главная страница' },
-    { id: 'currency', title: 'Валюта и единицы измерения' },
-    { id: 'contacts', title: 'Реквизиты и контакты' },
-    { id: 'catalog', title: 'Каталог, доставка, заказы' },
-    { id: 'gift', title: 'Подарочные сертификаты' },
-    { id: 'modules', title: 'Модули' },
-    { id: 'navigation', title: 'Навигация (меню и футер)' },
-    { id: 'access', title: 'Доступ' },
-    { id: 'languages', title: 'Языки' },
-    { id: 'seo', title: 'SEO и поиск' },
+    { id: 'branding', title: t('settings.page.sections.branding') },
+    { id: 'home', title: t('settings.page.sections.home') },
+    { id: 'currency', title: t('settings.page.sections.currency') },
+    { id: 'contacts', title: t('settings.page.sections.contacts') },
+    { id: 'catalog', title: t('settings.page.sections.catalog') },
+    { id: 'gift', title: t('nav.giftCertificates') },
+    { id: 'modules', title: t('settings.page.sections.modules') },
+    { id: 'navigation', title: t('settings.page.sections.navigation') },
+    { id: 'access', title: t('settings.page.sections.access') },
+    { id: 'languages', title: t('nav.languages') },
+    { id: 'seo', title: t('settings.page.sections.seo') },
   ];
 
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title="Настройки магазина"
-        subtitle="Название, валюта, контакты, доставка и другие параметры магазина."
-        breadcrumbs={[{ label: 'Настройки' }]}
+        title={t('settings.page.header.title')}
+        subtitle={t('settings.page.header.subtitle')}
+        breadcrumbs={[{ label: t('nav.settings') }]}
       />
 
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
         {/* Боковая колонка-оглавление (sticky на десктопе). */}
-        <nav aria-label="Разделы настроек" className="lg:sticky lg:top-6 lg:self-start">
+        <nav aria-label={t('settings.page.tocAriaLabel')} className="lg:sticky lg:top-6 lg:self-start">
           <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
             {sections.map((s) => (
               <li key={s.id}>
@@ -85,17 +88,17 @@ export default async function SettingsPage() {
 
         {/* Контент разделов. */}
         <div className="min-w-0">
-          <Section id="branding" title="Брендинг">
+          <Section id="branding" title={t('settings.page.sections.branding')}>
             <BrandingForm branding={eff.branding} i18n={eff.i18n} translations={eff.contentI18n} />
-            <ResetRow keys={[{ key: 'branding', label: 'Сбросить брендинг' }]} />
+            <ResetRow keys={[{ key: 'branding', label: t('settings.page.reset.branding') }]} />
           </Section>
 
-          <Section id="home" title="Главная страница">
+          <Section id="home" title={t('settings.page.sections.home')}>
             <HomeContentForm home={eff.home} i18n={eff.i18n} translations={eff.contentI18n} />
-            <ResetRow keys={[{ key: 'home', label: 'Сбросить контент главной' }]} />
+            <ResetRow keys={[{ key: 'home', label: t('settings.page.reset.homeContent') }]} />
           </Section>
 
-          <Section id="currency" title="Валюта и единицы измерения">
+          <Section id="currency" title={t('settings.page.sections.currency')}>
             <CurrencyUnitsForm
               currency={eff.currency}
               exchange={eff.exchange}
@@ -103,14 +106,14 @@ export default async function SettingsPage() {
             />
             <ResetRow
               keys={[
-                { key: 'currency', label: 'Сбросить валюту' },
-                { key: 'exchange', label: 'Сбросить курсы валют' },
-                { key: 'units', label: 'Сбросить единицы' },
+                { key: 'currency', label: t('settings.page.reset.currency') },
+                { key: 'exchange', label: t('settings.page.reset.exchange') },
+                { key: 'units', label: t('settings.page.reset.units') },
               ]}
             />
           </Section>
 
-          <Section id="contacts" title="Реквизиты и контакты">
+          <Section id="contacts" title={t('settings.page.sections.contacts')}>
             <LegalContactsForm
               legalEntity={eff.legalEntity}
               contacts={eff.contacts}
@@ -119,79 +122,74 @@ export default async function SettingsPage() {
             />
             <ResetRow
               keys={[
-                { key: 'contacts', label: 'Сбросить контакты' },
-                { key: 'legal_entity', label: 'Сбросить реквизиты' },
+                { key: 'contacts', label: t('settings.page.reset.contacts') },
+                { key: 'legal_entity', label: t('settings.page.reset.legalEntity') },
               ]}
             />
           </Section>
 
-          <Section id="catalog" title="Каталог, доставка, заказы">
+          <Section id="catalog" title={t('settings.page.sections.catalog')}>
             <CatalogOrdersForm catalog={eff.catalog} delivery={eff.delivery} orders={eff.orders} />
             <ResetRow
               keys={[
-                { key: 'catalog', label: 'Сбросить каталог' },
-                { key: 'delivery', label: 'Сбросить доставку' },
-                { key: 'orders', label: 'Сбросить заказы' },
+                { key: 'catalog', label: t('settings.page.reset.catalog') },
+                { key: 'delivery', label: t('settings.page.reset.delivery') },
+                { key: 'orders', label: t('settings.page.reset.orders') },
               ]}
             />
           </Section>
 
-          <Section id="gift" title="Подарочные сертификаты">
+          <Section id="gift" title={t('nav.giftCertificates')}>
             <p className="text-sm text-gray-600">
-              Создавать ли код сертификата автоматически при оплате, сколько дней он
-              действует и какие разделы каталога считаются сертификатами — в отдельном
-              разделе.
+              {t('settings.page.gift.description')}
             </p>
             <a
               href="/admin/settings/gift"
               className="mt-3 inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
             >
-              Открыть настройки сертификатов →
+              {t('settings.page.gift.openLink')}
             </a>
-            <ResetRow keys={[{ key: 'gift', label: 'Сбросить настройки сертификатов' }]} />
+            <ResetRow keys={[{ key: 'gift', label: t('settings.page.reset.giftSettings') }]} />
           </Section>
 
-          <Section id="modules" title="Модули">
+          <Section id="modules" title={t('settings.page.sections.modules')}>
             <ModulesForm overrides={overrides} envEnabled={envEnabled} />
-            <ResetRow keys={[{ key: 'module_overrides', label: 'Сбросить модули' }]} />
+            <ResetRow keys={[{ key: 'module_overrides', label: t('settings.page.reset.modules') }]} />
           </Section>
 
-          <Section id="navigation" title="Навигация (меню и футер)">
+          <Section id="navigation" title={t('settings.page.sections.navigation')}>
             <NavigationForm navigation={eff.navigation} i18n={eff.i18n} translations={eff.contentI18n} />
           </Section>
 
-          <Section id="access" title="Доступ">
+          <Section id="access" title={t('settings.page.sections.access')}>
             <AccessForm singleUserMode={eff.access.singleUserMode} />
-            <ResetRow keys={[{ key: 'access', label: 'Сбросить режим доступа' }]} />
+            <ResetRow keys={[{ key: 'access', label: t('settings.page.reset.access') }]} />
           </Section>
 
-          <Section id="languages" title="Языки">
+          <Section id="languages" title={t('nav.languages')}>
             <p className="text-sm text-gray-600">
-              Какие языки доступны в магазине и насколько заполнены переводы —
-              в отдельном разделе. Язык по умолчанию сменить нельзя: на нём
-              хранится весь основной контент.
+              {t('settings.page.languages.description')}
             </p>
             <a
               href="/admin/settings/languages"
               className="mt-3 inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
             >
-              Открыть настройки языков →
+              {t('settings.page.languages.openLink')}
             </a>
-            <ResetRow keys={[{ key: 'i18n', label: 'Сбросить языки' }]} />
+            <ResetRow keys={[{ key: 'i18n', label: t('settings.page.reset.languages') }]} />
           </Section>
 
-          <Section id="seo" title="SEO и поиск">
+          <Section id="seo" title={t('settings.page.sections.seo')}>
             <p className="text-sm text-gray-600">
-              Заголовки страниц, описания для поисковиков, адрес сайта, карта сайта
-              (sitemap) и robots — в отдельном разделе.
+              {t('settings.page.seo.description')}
             </p>
             <a
               href="/admin/settings/seo"
               className="mt-3 inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
             >
-              Открыть SEO-настройки →
+              {t('settings.page.seo.openLink')}
             </a>
-            <ResetRow keys={[{ key: 'seo', label: 'Сбросить SEO' }]} />
+            <ResetRow keys={[{ key: 'seo', label: t('settings.page.reset.seo') }]} />
           </Section>
         </div>
       </div>

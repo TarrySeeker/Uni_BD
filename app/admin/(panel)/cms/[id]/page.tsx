@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { getCmsPageById } from '@/lib/cms/repository';
 import { can } from '@/lib/auth/rbac';
@@ -24,10 +25,11 @@ export default async function CmsPageDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const guard = await guardCms('cms.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="cms (модуль выключен)" />;
+      return <Forbidden permission={t('cms.detailPage.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -46,9 +48,9 @@ export default async function CmsPageDetail({
 
   return (
     <div>
-      <nav className="text-sm text-gray-500" aria-label="Хлебные крошки">
+      <nav className="text-sm text-gray-500" aria-label={t('layout.breadcrumbs.ariaLabel')}>
         <Link href="/admin/cms" className="text-blue-700 hover:underline">
-          Контент
+          {t('nav.cms')}
         </Link>{' '}
         / {page.title}
       </nav>
@@ -57,7 +59,7 @@ export default async function CmsPageDetail({
         <StatusBadge status={page.status} />
       </div>
       <p className="mt-1 text-sm text-gray-600">
-        Slug: <code className="text-xs">{page.slug}</code>
+        {t('cms.detailPage.slugLabel')} <code className="text-xs">{page.slug}</code>
       </p>
 
       <div className="mt-6">

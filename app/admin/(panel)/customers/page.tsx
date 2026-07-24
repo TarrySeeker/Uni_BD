@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
@@ -26,6 +27,8 @@ export default async function CustomersPage({
     return <Forbidden permission={guard.permission} />;
   }
 
+  const t = await getTranslations();
+
   const { q } = await searchParams;
   const query = (q ?? '').trim();
 
@@ -38,9 +41,9 @@ export default async function CustomersPage({
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title="Покупатели"
-        subtitle={`Аккаунты и гостевые контакты витрины. Всего: ${total}.`}
-        breadcrumbs={[{ label: 'Покупатели' }]}
+        title={t('nav.customers')}
+        subtitle={t('customers.page.subtitle', { total })}
+        breadcrumbs={[{ label: t('nav.customers') }]}
       />
 
       <form method="get" className="mt-4 flex gap-2">
@@ -48,14 +51,14 @@ export default async function CustomersPage({
           type="search"
           name="q"
           defaultValue={query}
-          placeholder="Поиск по email, имени, телефону"
+          placeholder={t('customers.page.searchPlaceholder')}
           className="w-72 rounded border border-gray-300 px-3 py-1.5 text-sm"
         />
         <button
           type="submit"
           className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white"
         >
-          Найти
+          {t('customers.page.searchButton')}
         </button>
       </form>
 
@@ -69,19 +72,19 @@ export default async function CustomersPage({
       ) : null}
 
       {customers.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-600">Покупателей не найдено.</p>
+        <p className="mt-6 text-sm text-gray-600">{t('customers.page.emptyState')}</p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-gray-500">
-                <th className="px-4 py-2 font-medium">Email</th>
-                <th className="px-4 py-2 font-medium">Имя</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
-                <th className="px-4 py-2 font-medium">Заказов</th>
-                <th className="px-4 py-2 font-medium">Сумма</th>
-                <th className="px-4 py-2 font-medium">Последний вход</th>
-                <th className="px-4 py-2 font-medium">Регистрация</th>
+                <th className="px-4 py-2 font-medium">{t('customers.page.colEmail')}</th>
+                <th className="px-4 py-2 font-medium">{t('fields.name')}</th>
+                <th className="px-4 py-2 font-medium">{t('customers.page.colStatus')}</th>
+                <th className="px-4 py-2 font-medium">{t('customers.page.colOrders')}</th>
+                <th className="px-4 py-2 font-medium">{t('customers.page.colTotal')}</th>
+                <th className="px-4 py-2 font-medium">{t('customers.page.colLastLogin')}</th>
+                <th className="px-4 py-2 font-medium">{t('customers.page.colRegistered')}</th>
               </tr>
             </thead>
             <tbody>

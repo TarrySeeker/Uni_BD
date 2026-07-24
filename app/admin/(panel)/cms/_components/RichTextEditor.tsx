@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
 
 /**
@@ -27,6 +28,7 @@ const btn =
   'rounded border border-gray-300 px-2 py-0.5 text-xs hover:bg-gray-100 data-[active=true]:bg-gray-900 data-[active=true]:text-white';
 
 export function RichTextEditor({ value, onChange, ariaLabel }: RichTextEditorProps) {
+  const t = useTranslations();
   // Чтобы избежать цикла value→setContent→onUpdate→value: помечаем «своё» обновление.
   const skipNextSync = useRef(false);
 
@@ -75,14 +77,14 @@ export function RichTextEditor({ value, onChange, ariaLabel }: RichTextEditorPro
 
   return (
     <div>
-      <div className="mb-1 flex flex-wrap gap-1" role="toolbar" aria-label="Форматирование">
+      <div className="mb-1 flex flex-wrap gap-1" role="toolbar" aria-label={t('cms.richTextEditor.toolbarAriaLabel')}>
         <button
           type="button"
           className={btn}
           data-active={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()}
         >
-          Ж
+          {t('cms.richTextEditor.bold')}
         </button>
         <button
           type="button"
@@ -90,7 +92,7 @@ export function RichTextEditor({ value, onChange, ariaLabel }: RichTextEditorPro
           data-active={editor.isActive('italic')}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         >
-          К
+          {t('cms.richTextEditor.italic')}
         </button>
         <button
           type="button"
@@ -106,7 +108,7 @@ export function RichTextEditor({ value, onChange, ariaLabel }: RichTextEditorPro
           data-active={editor.isActive('bulletList')}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         >
-          • Список
+          {t('cms.richTextEditor.bulletList')}
         </button>
       </div>
       <EditorContent editor={editor} />

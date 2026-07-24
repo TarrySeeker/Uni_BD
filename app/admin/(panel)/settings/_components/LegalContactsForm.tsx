@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import type { ActionResult } from '@/lib/server/action';
@@ -29,6 +30,7 @@ export function LegalContactsForm({
   i18n: { defaultLocale: string; locales: string[] };
   translations?: TranslationsMap;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export function LegalContactsForm({
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Реквизиты и контакты сохранены.');
+      setSuccess(t('settings.legalContactsForm.savedSuccess'));
       router.refresh();
     } else {
       setError(result);
@@ -113,56 +115,56 @@ export function LegalContactsForm({
         </div>
       ) : null}
 
-      <h3 className="text-sm font-semibold text-gray-800">Реквизиты юрлица</h3>
+      <h3 className="text-sm font-semibold text-gray-800">{t('settings.legalContactsForm.legalEntityHeading')}</h3>
       <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="l-name" className="block text-sm font-medium text-gray-700">Наименование</label>
+          <label htmlFor="l-name" className="block text-sm font-medium text-gray-700">{t('fields.name')}</label>
           <input id="l-name" value={name} onChange={(e) => setName(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label htmlFor="l-inn" className="block text-sm font-medium text-gray-700">ИНН (10 или 12 цифр)</label>
+          <label htmlFor="l-inn" className="block text-sm font-medium text-gray-700">{t('settings.legalContactsForm.innLabel')}</label>
           <input id="l-inn" value={inn} onChange={(e) => setInn(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('legalEntity.inn') ? <p className="mt-1 text-xs text-red-600">{fe('legalEntity.inn')}</p> : null}
         </div>
         <div>
-          <label htmlFor="l-kpp" className="block text-sm font-medium text-gray-700">КПП (9 цифр)</label>
+          <label htmlFor="l-kpp" className="block text-sm font-medium text-gray-700">{t('settings.legalContactsForm.kppLabel')}</label>
           <input id="l-kpp" value={kpp} onChange={(e) => setKpp(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('legalEntity.kpp') ? <p className="mt-1 text-xs text-red-600">{fe('legalEntity.kpp')}</p> : null}
         </div>
         <div>
-          <label htmlFor="l-ogrn" className="block text-sm font-medium text-gray-700">ОГРН (13 или 15 цифр)</label>
+          <label htmlFor="l-ogrn" className="block text-sm font-medium text-gray-700">{t('settings.legalContactsForm.ogrnLabel')}</label>
           <input id="l-ogrn" value={ogrn} onChange={(e) => setOgrn(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('legalEntity.ogrn') ? <p className="mt-1 text-xs text-red-600">{fe('legalEntity.ogrn')}</p> : null}
         </div>
         <div className="lg:col-span-2">
-          <label htmlFor="l-addr" className="block text-sm font-medium text-gray-700">Юридический адрес</label>
+          <label htmlFor="l-addr" className="block text-sm font-medium text-gray-700">{t('settings.legalContactsForm.legalAddressLabel')}</label>
           <input id="l-addr" value={legalAddress} onChange={(e) => setLegalAddress(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div className="lg:col-span-2">
           <label htmlFor="l-bank" className="block text-sm font-medium text-gray-700">
-            Банковские реквизиты <span className="text-gray-400">(приватно, не публикуется)</span>
+            {t('settings.legalContactsForm.bankDetailsLabel')} <span className="text-gray-400">{t('settings.legalContactsForm.bankDetailsPrivate')}</span>
           </label>
           <textarea id="l-bank" value={bankDetails} onChange={(e) => setBankDetails(e.target.value)} rows={2}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div>
           <label htmlFor="l-offer" className="block text-sm font-medium text-gray-700">
-            Файл оферты (ключ в хранилище)
+            {t('settings.legalContactsForm.offerDocKeyLabel')}
           </label>
           <input id="l-offer" value={offerDocKey} onChange={(e) => setOfferDocKey(e.target.value)}
-            placeholder="напр. docs/offer.pdf"
+            placeholder={t('settings.legalContactsForm.offerDocKeyPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('legalEntity.offerDocKey')
             ? <p className="mt-1 text-xs text-red-600">{fe('legalEntity.offerDocKey')}</p> : null}
         </div>
         <div>
           <label htmlFor="l-email-designers" className="block text-sm font-medium text-gray-700">
-            E-mail для заявок дизайнеров
+            {t('settings.legalContactsForm.emailDesignersLabel')}
           </label>
           <input id="l-email-designers" type="email" value={emailDesigners}
             onChange={(e) => setEmailDesigners(e.target.value)}
@@ -173,10 +175,10 @@ export function LegalContactsForm({
         </div>
       </div>
 
-      <h3 className="mt-6 text-sm font-semibold text-gray-800">Публичные контакты</h3>
+      <h3 className="mt-6 text-sm font-semibold text-gray-800">{t('settings.legalContactsForm.publicContactsHeading')}</h3>
       <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="ct-phone" className="block text-sm font-medium text-gray-700">Телефон</label>
+          <label htmlFor="ct-phone" className="block text-sm font-medium text-gray-700">{t('settings.legalContactsForm.phoneLabel')}</label>
           <input id="ct-phone" value={phone} onChange={(e) => setPhone(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
@@ -187,33 +189,33 @@ export function LegalContactsForm({
           {fe('contacts.email') ? <p className="mt-1 text-xs text-red-600">{fe('contacts.email')}</p> : null}
         </div>
         <div>
-          <label htmlFor="ct-addr" className="block text-sm font-medium text-gray-700">Адрес</label>
+          <label htmlFor="ct-addr" className="block text-sm font-medium text-gray-700">{t('settings.legalContactsForm.addressLabel')}</label>
           <input id="ct-addr" value={address} onChange={(e) => setAddress(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label htmlFor="ct-hours" className="block text-sm font-medium text-gray-700">Часы работы</label>
+          <label htmlFor="ct-hours" className="block text-sm font-medium text-gray-700">{t('settings.legalContactsForm.workingHoursLabel')}</label>
           <input id="ct-hours" value={workingHours} onChange={(e) => setWorkingHours(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
       </div>
 
-      <h3 className="mt-6 text-sm font-semibold text-gray-800">Соцсети</h3>
+      <h3 className="mt-6 text-sm font-semibold text-gray-800">{t('settings.legalContactsForm.socialsHeading')}</h3>
       <p className="mt-1 text-xs text-gray-500">
-        Ссылки в футере витрины. Тип — подпись (Instagram, Telegram…), адрес — ссылка.
+        {t('settings.legalContactsForm.socialsHelp')}
       </p>
       <div className="mt-2 space-y-3">
         {socials.map((s, i) => (
           <div key={i} className="flex items-center gap-2">
             <input
-              aria-label={`Соцсеть ${i + 1} — тип`}
+              aria-label={t('settings.legalContactsForm.socialTypeAria', { n: i + 1 })}
               value={s.type}
               onChange={(e) => setSocial(i, 'type', e.target.value)}
               placeholder="Instagram"
               className="w-40 rounded border border-gray-300 px-3 py-2 text-sm"
             />
             <input
-              aria-label={`Соцсеть ${i + 1} — адрес`}
+              aria-label={t('settings.legalContactsForm.socialUrlAria', { n: i + 1 })}
               value={s.url}
               onChange={(e) => setSocial(i, 'url', e.target.value)}
               placeholder="https://instagram.com/shop"
@@ -224,7 +226,7 @@ export function LegalContactsForm({
               onClick={() => removeSocial(i)}
               className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
             >
-              Удалить
+              {t('common.actions.delete')}
             </button>
           </div>
         ))}
@@ -233,7 +235,7 @@ export function LegalContactsForm({
           onClick={addSocial}
           className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
         >
-          + Добавить соцсеть
+          {t('settings.legalContactsForm.addSocial')}
         </button>
         {fe('contacts.socials') ? <p className="text-xs text-red-600">{fe('contacts.socials')}</p> : null}
       </div>
@@ -241,7 +243,7 @@ export function LegalContactsForm({
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить'}
+          {pending ? t('common.form.saving') : t('common.actions.save')}
         </button>
       </div>
     </div>

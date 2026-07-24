@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { getNewsById } from '@/lib/news/repository';
 import { can } from '@/lib/auth/rbac';
@@ -23,10 +24,11 @@ export default async function NewsDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const guard = await guardNews('news.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="news (модуль выключен)" />;
+      return <Forbidden permission={t('news.detailPage.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -41,8 +43,8 @@ export default async function NewsDetail({
 
   return (
     <div>
-      <nav className="text-sm text-gray-500" aria-label="Хлебные крошки">
-        <Link href="/admin/news" className="text-blue-700 hover:underline">Новости</Link>{' '}
+      <nav className="text-sm text-gray-500" aria-label={t('news.detailPage.breadcrumbsAria')}>
+        <Link href="/admin/news" className="text-blue-700 hover:underline">{t('news.detailPage.breadcrumbNews')}</Link>{' '}
         / {article.title}
       </nav>
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -50,7 +52,7 @@ export default async function NewsDetail({
         <NewsStatusBadge status={article.status} />
       </div>
       <p className="mt-1 text-sm text-gray-600">
-        Slug: <code className="text-xs">{article.slug}</code>
+        {t('news.detailPage.slugLabel')} <code className="text-xs">{article.slug}</code>
       </p>
 
       <div className="mt-6">

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { listNews, type NewsListFilter } from '@/lib/news/repository';
 import { NEWS_STATUSES, type NewsStatus } from '@/lib/news/types';
@@ -63,10 +64,11 @@ export default async function NewsListPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations();
   const guard = await guardNews('news.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="news (модуль выключен)" />;
+      return <Forbidden permission={t('news.page.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -81,39 +83,39 @@ export default async function NewsListPage({
   return (
     <div>
       <PageHeader
-        title="Новости"
-        subtitle={`Найдено новостей: ${total}.`}
-        breadcrumbs={[{ label: 'Новости' }]}
+        title={t('news.page.title')}
+        subtitle={t('news.page.subtitle', { total })}
+        breadcrumbs={[{ label: t('news.page.title') }]}
         action={
           <Link href="/admin/news/new"
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">
-            + Создать новость
+            {t('news.page.createButton')}
           </Link>
         }
       />
 
       <form method="get" className="mt-4 flex flex-wrap items-end gap-3">
         <div>
-          <label htmlFor="news-search" className="block text-xs font-medium text-gray-600">Поиск</label>
+          <label htmlFor="news-search" className="block text-xs font-medium text-gray-600">{t('news.page.searchLabel')}</label>
           <input id="news-search" name="search" defaultValue={filter.search ?? ''}
-            placeholder="Заголовок, slug или раздел"
+            placeholder={t('news.page.searchPlaceholder')}
             className="mt-1 w-64 rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label htmlFor="news-status" className="block text-xs font-medium text-gray-600">Статус</label>
+          <label htmlFor="news-status" className="block text-xs font-medium text-gray-600">{t('news.page.statusLabel')}</label>
           <select id="news-status" name="status" defaultValue={filter.status ?? ''}
             className="mt-1 rounded border border-gray-300 px-3 py-2 text-sm">
-            <option value="">Все</option>
-            <option value="draft">Черновик</option>
-            <option value="published">Опубликована</option>
-            <option value="archived">В архиве</option>
+            <option value="">{t('news.page.statusAll')}</option>
+            <option value="draft">{t('news.page.status.draft')}</option>
+            <option value="published">{t('news.page.status.published')}</option>
+            <option value="archived">{t('news.page.status.archived')}</option>
           </select>
         </div>
         <button type="submit" className="rounded border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100">
-          Применить
+          {t('common.actions.apply')}
         </button>
         {(filter.search || filter.status) ? (
-          <Link href="/admin/news" className="px-2 py-2 text-sm text-gray-500 hover:underline">Сбросить</Link>
+          <Link href="/admin/news" className="px-2 py-2 text-sm text-gray-500 hover:underline">{t('common.actions.reset')}</Link>
         ) : null}
       </form>
 
@@ -121,18 +123,18 @@ export default async function NewsListPage({
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Заголовок</th>
-              <th scope="col" className="px-4 py-2 font-medium">Раздел</th>
-              <th scope="col" className="px-4 py-2 font-medium">Статус</th>
-              <th scope="col" className="px-4 py-2 font-medium">Опубликована</th>
-              <th scope="col" className="px-4 py-2 font-medium">Порядок</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('news.page.columns.title')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('news.page.columns.group')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('news.page.columns.status')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('news.page.columns.publishedAt')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('news.page.columns.sortOrder')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
-                  Новости не найдены. Измените фильтры или создайте новость.
+                  {t('news.page.empty')}
                 </td>
               </tr>
             ) : (
@@ -156,16 +158,16 @@ export default async function NewsListPage({
       </div>
 
       {totalPages > 1 ? (
-        <nav className="mt-4 flex items-center justify-between text-sm" aria-label="Пагинация">
-          <span className="text-gray-500">Страница {currentPage} из {totalPages}</span>
+        <nav className="mt-4 flex items-center justify-between text-sm" aria-label={t('news.page.paginationAria')}>
+          <span className="text-gray-500">{t('common.pagination.page', { page: currentPage, total: totalPages })}</span>
           <div className="flex gap-2">
             {currentPage > 1 ? (
               <Link href={pageHref(sp, currentPage - 1)}
-                className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100">Назад</Link>
+                className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100">{t('common.pagination.prev')}</Link>
             ) : null}
             {currentPage < totalPages ? (
               <Link href={pageHref(sp, currentPage + 1)}
-                className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100">Вперёд</Link>
+                className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100">{t('news.page.forward')}</Link>
             ) : null}
           </div>
         </nav>

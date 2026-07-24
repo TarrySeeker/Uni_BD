@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import {
   LocaleTabs,
@@ -14,11 +15,6 @@ import type { ActionResult } from '@/lib/server/action';
 
 import { replyToReviewAction } from './actions';
 import { errorMessage } from './action-result';
-
-/** Поле перевода ответа магазина (whitelist REVIEW_TRANSLATABLE_FIELDS = ['reply']). */
-const REPLY_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'reply', label: 'Ответ магазина', kind: 'textarea' },
-];
 
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
@@ -45,7 +41,18 @@ export function ReviewReplyForm({
   defaultLocale: string;
   canWrite: boolean;
 }) {
+  const t = useTranslations();
   const router = useRouter();
+
+  /** Поле перевода ответа магазина (whitelist REVIEW_TRANSLATABLE_FIELDS = ['reply']). */
+  const REPLY_FIELD_DEFS: readonly TranslatableFieldDef[] = [
+    {
+      key: 'reply',
+      label: t('reviews.reviewReplyForm.replyFieldLabel'),
+      kind: 'textarea',
+    },
+  ];
+
   const [baseReply, setBaseReply] = useState<string>(reply ?? '');
   const [tr, setTr] = useState<TranslationsState>(() =>
     toTranslationsState(translations),
@@ -90,7 +97,9 @@ export function ReviewReplyForm({
             htmlFor="review-reply"
             className="block text-sm font-medium text-gray-700"
           >
-            Ответ магазина ({defaultLocale.toUpperCase()})
+            {t('reviews.reviewReplyForm.baseReplyLabel', {
+              locale: defaultLocale.toUpperCase(),
+            })}
           </label>
           <textarea
             id="review-reply"
@@ -98,7 +107,7 @@ export function ReviewReplyForm({
             rows={4}
             disabled={!canWrite}
             onChange={(e) => setBaseReply(e.target.value)}
-            placeholder="Публичный ответ на отзыв (виден на витрине)"
+            placeholder={t('reviews.reviewReplyForm.replyPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           />
         </div>
@@ -112,11 +121,13 @@ export function ReviewReplyForm({
             disabled={pending}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            {pending ? 'Сохранение…' : 'Сохранить ответ'}
+            {pending
+              ? t('common.form.saving')
+              : t('reviews.reviewReplyForm.saveReply')}
           </button>
           {saved ? (
             <span role="status" className="text-sm text-green-700">
-              Сохранено.
+              {t('common.form.saved')}
             </span>
           ) : null}
         </div>

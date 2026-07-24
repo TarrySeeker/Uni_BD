@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { ActionResult } from '@/lib/server/action';
 
 import { updateAccessAction } from './form-actions';
@@ -20,6 +22,7 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
  * через Server Action под settings.manage (Zod → upsert access → invalidate → audit).
  */
 export function AccessForm({ singleUserMode }: { singleUserMode: boolean }) {
+  const t = useTranslations();
   const router = useRouter();
   const [value, setValue] = useState(singleUserMode);
   const [error, setError] = useState<Fail | null>(null);
@@ -33,7 +36,7 @@ export function AccessForm({ singleUserMode }: { singleUserMode: boolean }) {
     const result = await updateAccessAction({ access: { singleUserMode: value } });
     setPending(false);
     if (result.ok) {
-      setSuccess('Режим доступа сохранён.');
+      setSuccess(t('settings.accessForm.saved'));
       router.refresh();
     } else {
       setError(result);
@@ -61,11 +64,9 @@ export function AccessForm({ singleUserMode }: { singleUserMode: boolean }) {
           className="mt-1 h-4 w-4"
         />
         <span>
-          <span className="block text-sm font-medium text-gray-800">Однопользовательский режим</span>
+          <span className="block text-sm font-medium text-gray-800">{t('settings.accessForm.singleUserModeLabel')}</span>
           <span className="block text-xs text-gray-500">
-            Скрыть и заблокировать разделы «Пользователи» и «Роли». Подходит магазину
-            с единственным администратором: лишние разделы не мешают, а случайное
-            создание второй учётной записи или роли исключено. По умолчанию выключено.
+            {t('settings.accessForm.singleUserModeHelp')}
           </span>
         </span>
       </label>
@@ -77,7 +78,7 @@ export function AccessForm({ singleUserMode }: { singleUserMode: boolean }) {
           disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {pending ? 'Сохранение…' : 'Сохранить режим доступа'}
+          {pending ? t('common.form.saving') : t('settings.accessForm.saveButton')}
         </button>
       </div>
     </div>

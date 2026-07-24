@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ActionResult } from '@/lib/server/action';
 
@@ -64,6 +65,7 @@ export function GiftIssueBlock({
   warnings?: readonly string[];
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
@@ -84,7 +86,12 @@ export function GiftIssueBlock({
     });
     setPendingItemId(null);
     if (result.ok) {
-      setSuccess(`Сертификат ${result.data.code} на ${result.data.initialAmount} выпущен.`);
+      setSuccess(
+        t('orders.detailGiftIssueBlock.issuedSuccess', {
+          code: result.data.code,
+          amount: result.data.initialAmount,
+        }),
+      );
       setOpenItemId(null);
       setRecipientName('');
       setRecipientEmail('');
@@ -97,7 +104,7 @@ export function GiftIssueBlock({
   return (
     <section className="mt-6 rounded-lg border border-gray-200 bg-white">
       <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">
-        Подарочные сертификаты
+        {t('orders.detailGiftIssueBlock.heading')}
       </h2>
 
       <div className="px-4 py-3">
@@ -132,19 +139,19 @@ export function GiftIssueBlock({
                 <Link href={`/admin/gift-certificates/${c.id}`} className="font-mono text-blue-700 hover:underline">
                   {c.code}
                 </Link>{' '}
-                <span className="text-gray-600">на {c.initialAmount}</span>
-                <span className="text-gray-500"> · на чьё имя: {c.recipient}</span>
-                <span className="text-gray-500"> · потрачено: {c.spentLabel}</span>{' '}
+                <span className="text-gray-600">{t('orders.detailGiftIssueBlock.forAmount', { amount: c.initialAmount })}</span>
+                <span className="text-gray-500"> · {t('orders.detailGiftIssueBlock.recipientLine', { recipient: c.recipient })}</span>
+                <span className="text-gray-500"> · {t('orders.detailGiftIssueBlock.spentLine', { spent: c.spentLabel })}</span>{' '}
                 <GiftStatusBadge status={c.status} />
               </li>
             ))}
           </ul>
         ) : (
-          <p className="mb-3 text-sm text-gray-500">По этому заказу сертификаты ещё не выпускались.</p>
+          <p className="mb-3 text-sm text-gray-500">{t('orders.detailGiftIssueBlock.noneIssued')}</p>
         )}
 
         {!canWrite ? (
-          <p className="text-xs text-gray-500">Для выпуска нужно право gift.write.</p>
+          <p className="text-xs text-gray-500">{t('orders.detailGiftIssueBlock.needWritePermission')}</p>
         ) : (
           <ul className="divide-y divide-gray-100 text-sm">
             {items.map((it) => {
@@ -156,20 +163,20 @@ export function GiftIssueBlock({
                       {it.name}
                       {it.hint !== 'none' ? (
                         <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-xs text-violet-700">
-                          похоже на сертификат
+                          {t('orders.detailGiftIssueBlock.looksLikeCertificate')}
                         </span>
                       ) : null}
-                      <span className="ml-2 text-xs text-gray-500">номинал {it.faceValue}</span>
+                      <span className="ml-2 text-xs text-gray-500">{t('orders.detailGiftIssueBlock.faceValue', { value: it.faceValue })}</span>
                     </span>
                     {already ? (
-                      <span className="text-xs text-gray-500">сертификат уже выпущен</span>
+                      <span className="text-xs text-gray-500">{t('orders.detailGiftIssueBlock.alreadyIssued')}</span>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setOpenItemId(openItemId === it.id ? null : it.id)}
                         className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-800 hover:bg-gray-50"
                       >
-                        Выпустить сертификат по заказу
+                        {t('orders.detailGiftIssueBlock.issueButton')}
                       </button>
                     )}
                   </div>
@@ -177,13 +184,12 @@ export function GiftIssueBlock({
                   {openItemId === it.id && !already ? (
                     <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-3">
                       <p className="text-xs text-gray-600">
-                        Номинал будет равен фактически уплаченной сумме позиции ({it.faceValue}).
-                        Покупатель подставится из данных заказа.
+                        {t('orders.detailGiftIssueBlock.faceValueHint', { value: it.faceValue })}
                       </p>
                       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div>
                           <label htmlFor={`rc-name-${it.id}`} className="block text-xs text-gray-500">
-                            На чьё имя
+                            {t('orders.detailGiftIssueBlock.recipientNameLabel')}
                           </label>
                           <input
                             id={`rc-name-${it.id}`}
@@ -194,7 +200,7 @@ export function GiftIssueBlock({
                         </div>
                         <div>
                           <label htmlFor={`rc-mail-${it.id}`} className="block text-xs text-gray-500">
-                            E-mail получателя
+                            {t('orders.detailGiftIssueBlock.recipientEmailLabel')}
                           </label>
                           <input
                             id={`rc-mail-${it.id}`}
@@ -210,7 +216,7 @@ export function GiftIssueBlock({
                         disabled={pendingItemId === it.id}
                         className="mt-3 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
                       >
-                        {pendingItemId === it.id ? 'Выпуск…' : 'Выпустить'}
+                        {pendingItemId === it.id ? t('orders.detailGiftIssueBlock.issuing') : t('orders.detailGiftIssueBlock.issueConfirm')}
                       </button>
                     </div>
                   ) : null}

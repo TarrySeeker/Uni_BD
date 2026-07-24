@@ -25,6 +25,26 @@ const form = readFileSync(resolve(BASE, '_components/LanguagesForm.tsx'), 'utf8'
 const page = readFileSync(resolve(BASE, 'languages/page.tsx'), 'utf8');
 const settingsPage = readFileSync(resolve(BASE, 'page.tsx'), 'utf8');
 
+// После i18n-переноса тексты предупреждений формы живут в messages/ru.json
+// (LanguagesForm рендерит их через t(...)); суть инвариантов от этого не меняется.
+const ru = JSON.parse(readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8')) as Record<string, unknown>;
+function ruVal(dot: string): string {
+  let o: unknown = ru;
+  for (const k of dot.split('.')) o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  return typeof o === 'string' ? o : '';
+}
+function ruUnder(prefix: string): string {
+  let o: unknown = ru;
+  for (const k of prefix.split('.')) o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  const out: string[] = [];
+  const walk = (x: unknown): void => {
+    if (typeof x === 'string') out.push(x);
+    else if (x && typeof x === 'object') Object.values(x as Record<string, unknown>).forEach(walk);
+  };
+  walk(o);
+  return out.join('\n');
+}
+
 describe('LanguagesForm — язык по умолчанию заблокирован', () => {
   it('поле defaultLocale отрисовано как disabled', () => {
     expect(form).toMatch(/defaultLocale/);
@@ -37,8 +57,9 @@ describe('LanguagesForm — язык по умолчанию заблокиро�
   });
 
   it('рядом с полем есть объяснение, почему сменить нельзя', () => {
-    expect(form).toMatch(/язык по умолчанию/i);
-    expect(form).toMatch(/миграц/i);
+    const labels = ruUnder('settings.languagesForm');
+    expect(labels).toMatch(/язык по умолчанию/i);
+    expect(labels).toMatch(/миграц/i);
   });
 
   it('чекбокс языка по умолчанию нельзя снять', () => {
@@ -48,8 +69,9 @@ describe('LanguagesForm — язык по умолчанию заблокиро�
 
 describe('LanguagesForm — честное предупреждение про витрину', () => {
   it('форма прямо говорит, что витрина пока не читает набор языков', () => {
-    expect(form).toMatch(/витрин/i);
-    expect(form).toMatch(/русск|язык по умолчанию/i);
+    const labels = ruUnder('settings.languagesForm');
+    expect(labels).toMatch(/витрин/i);
+    expect(labels).toMatch(/язык по умолчанию/i);
   });
 });
 
@@ -88,7 +110,8 @@ describe('Экран «Языки» — страница', () => {
 
   it('раздел «Языки» доступен со страницы настроек', () => {
     expect(settingsPage).toContain('/admin/settings/languages');
-    expect(settingsPage).toMatch(/Языки/);
+    expect(settingsPage).toContain("t('nav.languages')");
+    expect(ruVal('nav.languages')).toMatch(/Языки/);
   });
 });
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 import { CMS_SECTION_TYPES, type CmsSection, type CmsSectionType } from '@/lib/cms/types';
 import { SECTION_TYPE_LABELS } from '@/lib/cms/section-form';
@@ -44,6 +45,7 @@ export function SectionEditor({
   /** Язык по умолчанию магазина. */
   defaultLocale: string;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const [error, setError] = useState<Fail | null>(null);
   const [pending, setPending] = useState(false);
@@ -140,7 +142,7 @@ export function SectionEditor({
   }
 
   async function removeSection(section: CmsSection) {
-    if (!confirm(`Удалить секцию «${section.sectionKey}»?`)) return;
+    if (!confirm(t('cms.sectionEditor.confirmDelete', { key: section.sectionKey }))) return;
     setPending(true);
     setError(null);
     const result = await deleteCmsSectionAction({ id: section.id });
@@ -179,14 +181,14 @@ export function SectionEditor({
   return (
     <section className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-gray-900">Секции страницы</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{t('cms.sectionEditor.title')}</h2>
         {!adding ? (
           <div className="flex items-center gap-2">
             <select
               value={newType}
               onChange={(e) => setNewType(e.target.value as CmsSectionType)}
               className="rounded border border-gray-300 px-3 py-1.5 text-sm"
-              aria-label="Тип секции"
+              aria-label={t('cms.sectionEditor.typeAriaLabel')}
             >
               {CMS_SECTION_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -199,7 +201,7 @@ export function SectionEditor({
               onClick={() => setAdding(true)}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
             >
-              Добавить секцию
+              {t('cms.sectionEditor.addSection')}
             </button>
           </div>
         ) : null}
@@ -217,7 +219,7 @@ export function SectionEditor({
       {adding ? (
         <div className="mt-4 rounded-lg border border-gray-300 bg-gray-50 p-4">
           <p className="mb-3 text-sm font-medium text-gray-700">
-            Новая секция: {SECTION_TYPE_LABELS[newType]}
+            {t('cms.sectionEditor.newSection', { type: SECTION_TYPE_LABELS[newType] })}
           </p>
           <SectionForm
             type={newType}
@@ -235,7 +237,7 @@ export function SectionEditor({
       <ul className="mt-4 space-y-3">
         {ordered.length === 0 && !adding ? (
           <li className="rounded border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-400">
-            Секций пока нет. Добавьте первую.
+            {t('cms.sectionEditor.empty')}
           </li>
         ) : null}
 
@@ -255,7 +257,7 @@ export function SectionEditor({
                 <span
                   className="cursor-grab text-gray-400"
                   aria-hidden="true"
-                  title="Перетащите для изменения порядка"
+                  title={t('cms.sectionEditor.dragTitle')}
                 >
                   ⠿
                 </span>
@@ -265,7 +267,7 @@ export function SectionEditor({
                 <code className="text-xs text-gray-500">{section.sectionKey}</code>
                 {!section.enabled ? (
                   <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
-                    скрыта
+                    {t('cms.sectionEditor.hiddenBadge')}
                   </span>
                 ) : null}
               </div>
@@ -277,14 +279,14 @@ export function SectionEditor({
                     onChange={() => toggleEnabled(section)}
                     disabled={pending}
                   />
-                  Видима
+                  {t('cms.sectionEditor.visibleLabel')}
                 </label>
                 <button
                   type="button"
                   onClick={() => setEditingId(editingId === section.id ? null : section.id)}
                   className="text-blue-700 hover:underline"
                 >
-                  {editingId === section.id ? 'Свернуть' : 'Редактировать'}
+                  {editingId === section.id ? t('cms.sectionEditor.collapse') : t('common.actions.edit')}
                 </button>
                 <button
                   type="button"
@@ -292,7 +294,7 @@ export function SectionEditor({
                   disabled={pending}
                   className="text-red-600 hover:underline"
                 >
-                  Удалить
+                  {t('common.actions.delete')}
                 </button>
               </div>
             </div>

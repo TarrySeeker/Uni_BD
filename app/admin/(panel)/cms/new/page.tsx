@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { getLocaleConfig } from '@/lib/i18n';
 
@@ -15,10 +16,11 @@ import { PageForm } from '../_components/PageForm';
 export const dynamic = 'force-dynamic';
 
 export default async function NewCmsPage() {
+  const t = await getTranslations();
   const guard = await guardCms('cms.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="cms (модуль выключен)" />;
+      return <Forbidden permission={t('cms.newPage.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -27,16 +29,15 @@ export default async function NewCmsPage() {
 
   return (
     <div>
-      <nav className="text-sm text-gray-500" aria-label="Хлебные крошки">
+      <nav className="text-sm text-gray-500" aria-label={t('layout.breadcrumbs.ariaLabel')}>
         <Link href="/admin/cms" className="text-blue-700 hover:underline">
-          Контент
+          {t('nav.cms')}
         </Link>{' '}
-        / Новая страница
+        / {t('cms.newPage.breadcrumbCurrent')}
       </nav>
-      <h1 className="mt-2 text-2xl font-semibold text-gray-900">Новая страница</h1>
+      <h1 className="mt-2 text-2xl font-semibold text-gray-900">{t('cms.newPage.title')}</h1>
       <p className="mt-1 text-sm text-gray-600">
-        Заполните заголовок и SEO, затем создайте страницу. Секции (hero, текст,
-        баннеры, сетка товаров и др.) станут доступны после создания.
+        {t('cms.newPage.subtitle')}
       </p>
 
       <div className="mt-6">

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { nextLeadStatuses, leadStatusLabel } from '@/lib/leads/status';
 import type { ActionResult } from '@/lib/server/action';
@@ -22,6 +23,7 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
  */
 export function LeadRowActions({ id, status }: { id: string; status: string }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -59,7 +61,7 @@ export function LeadRowActions({ id, status }: { id: string; status: string }) {
                   ? 'border border-gray-300 text-gray-600 hover:bg-gray-100'
                   : 'bg-gray-900 text-white hover:bg-gray-700'
               }`}
-              title={`Сменить статус на «${leadStatusLabel(to)}»`}
+              title={t('leads.leadRowActions.changeStatusTo', { status: leadStatusLabel(to) })}
             >
               {leadStatusLabel(to)}
             </button>
@@ -71,13 +73,13 @@ export function LeadRowActions({ id, status }: { id: string; status: string }) {
           onClick={() =>
             run(
               () => deleteLeadAction({ id }),
-              'Удалить заявку без возможности восстановления?',
+              t('leads.leadRowActions.confirmDelete'),
             )
           }
           className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-          title="Удалить заявку"
+          title={t('leads.leadRowActions.deleteTitle')}
         >
-          Удалить
+          {t('common.actions.delete')}
         </button>
       </div>
       {error ? (

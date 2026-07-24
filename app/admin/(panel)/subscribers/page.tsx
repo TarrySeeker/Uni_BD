@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 
@@ -20,6 +22,7 @@ export const dynamic = 'force-dynamic';
 const LIST_LIMIT = 500;
 
 export default async function SubscribersPage() {
+  const t = await getTranslations();
   const user = await requireUser();
   if (!can(user, 'orders.read')) {
     return <Forbidden permission="orders.read" />;
@@ -47,9 +50,9 @@ export default async function SubscribersPage() {
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title="Подписчики"
-        subtitle={`Email-подписчики рассылки (форма в футере витрины). Всего: ${total}.`}
-        breadcrumbs={[{ label: 'Подписчики' }]}
+        title={t('nav.subscribers')}
+        subtitle={t('subscribers.page.subtitle', { total })}
+        breadcrumbs={[{ label: t('nav.subscribers') }]}
         action={<ExportToolbar rows={exportRows} />}
       />
 
@@ -58,21 +61,21 @@ export default async function SubscribersPage() {
           role="status"
           className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
         >
-          {truncation}. Используйте экспорт, чтобы получить полный список.
+          {truncation}. {t('subscribers.page.truncationHint')}
         </p>
       ) : null}
 
       {subscribers.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-600">Пока нет подписчиков.</p>
+        <p className="mt-6 text-sm text-gray-600">{t('subscribers.page.empty')}</p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-gray-500">
-                <th className="px-4 py-2 font-medium">Дата</th>
-                <th className="px-4 py-2 font-medium">Email</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
-                {canWrite ? <th className="px-4 py-2 text-right font-medium">Действия</th> : null}
+                <th className="px-4 py-2 font-medium">{t('subscribers.page.columns.date')}</th>
+                <th className="px-4 py-2 font-medium">{t('subscribers.page.columns.email')}</th>
+                <th className="px-4 py-2 font-medium">{t('subscribers.page.columns.status')}</th>
+                {canWrite ? <th className="px-4 py-2 text-right font-medium">{t('common.table.actions')}</th> : null}
               </tr>
             </thead>
             <tbody>

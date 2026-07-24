@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ActionResult } from '@/lib/server/action';
 import { ALL_PERMISSIONS, type PermissionDef } from '@/lib/auth/permissions';
@@ -21,21 +22,16 @@ import { errorMessage, fieldError } from './action-result';
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
-/** Человекочитаемое название модуля для группировки прав. */
-const MODULE_LABELS: Record<string, string> = {
-  core: 'Основное',
-  catalog: 'Каталог',
-  orders: 'Заказы',
-  cdek: 'Доставка СДЭК',
-  cms: 'Контент',
-};
-
-function moduleLabel(module: string): string {
-  return MODULE_LABELS[module] ?? module;
-}
+/** Модули с человекочитаемыми подписями (см. roles.roleForm.modules.*). */
+const KNOWN_MODULES = ['core', 'catalog', 'orders', 'cdek', 'cms'];
 
 export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
+  const t = useTranslations();
   const router = useRouter();
+
+  function moduleLabel(module: string): string {
+    return KNOWN_MODULES.includes(module) ? t(`roles.roleForm.modules.${module}`) : module;
+  }
   const isEdit = role !== null;
 
   const [error, setError] = useState<Fail | null>(null);
@@ -83,7 +79,7 @@ export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Сохранено.');
+        setSuccess(t('common.form.saved'));
         router.refresh();
       } else {
         router.push('/admin/roles');
@@ -112,35 +108,35 @@ export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="r-code" className="block text-sm font-medium text-gray-700">Код*</label>
+          <label htmlFor="r-code" className="block text-sm font-medium text-gray-700">{t('roles.roleForm.codeLabel')}</label>
           <input
             id="r-code"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             readOnly={isEdit}
-            placeholder="например: support"
+            placeholder={t('roles.roleForm.codePlaceholder')}
             className={`mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm ${isEdit ? 'bg-gray-100 text-gray-500' : ''}`}
             required={!isEdit}
           />
           {isEdit ? (
             <p className="mt-1 text-xs text-gray-400">
-              Код роли изменить нельзя.{role!.isSystem ? ' Это системная роль.' : ''}
+              {t('roles.roleForm.codeReadonlyHint')}{role!.isSystem ? ` ${t('roles.roleForm.systemRoleNote')}` : ''}
             </p>
           ) : (
             <p className="mt-1 text-xs text-gray-400">
-              Латиница в нижнем регистре, без пробелов (например: support, content).
+              {t('roles.roleForm.codeHint')}
             </p>
           )}
           {fe('code') ? <p className="mt-1 text-xs text-red-600">{fe('code')}</p> : null}
         </div>
 
         <div>
-          <label htmlFor="r-title" className="block text-sm font-medium text-gray-700">Название*</label>
+          <label htmlFor="r-title" className="block text-sm font-medium text-gray-700">{t('roles.roleForm.titleLabel')}</label>
           <input
             id="r-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="например: Поддержка"
+            placeholder={t('roles.roleForm.titlePlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
             required
           />
@@ -149,9 +145,9 @@ export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
       </div>
 
       <div className="mt-6">
-        <span className="block text-sm font-medium text-gray-700">Права</span>
+        <span className="block text-sm font-medium text-gray-700">{t('roles.roleForm.permissionsLegend')}</span>
         <p className="mt-1 text-xs text-gray-400">
-          Отметьте, что разрешено сотрудникам с этой ролью.
+          {t('roles.roleForm.permissionsHint')}
         </p>
         <div className="mt-3 space-y-4">
           {groups.map(([module, perms]) => (
@@ -179,11 +175,11 @@ export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать роль'}
+          {pending ? t('common.form.saving') : isEdit ? t('common.actions.save') : t('roles.roleForm.createButton')}
         </button>
         <button type="button" onClick={() => router.push('/admin/roles')}
           className="text-sm text-gray-600 hover:underline">
-          Отмена
+          {t('common.actions.cancel')}
         </button>
       </div>
     </div>

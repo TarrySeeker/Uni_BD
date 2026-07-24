@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { NewsArticle } from '@/lib/news/types';
 import { slugify } from '@/lib/news/slug';
@@ -40,18 +41,6 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 const inputCls = 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm';
 const labelCls = 'block text-sm font-medium text-gray-700';
 
-/** Переводимые поля новости для LocaleTabs (совпадает с NEWS_TRANSLATABLE_FIELDS). */
-const NEWS_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'title', label: 'Заголовок', kind: 'text' },
-  { key: 'groupLabel', label: 'Раздел', kind: 'text' },
-  { key: 'excerpt', label: 'Анонс', kind: 'textarea' },
-  { key: 'body', label: 'Текст', kind: 'textarea' },
-  { key: 'seoTitle', label: 'SEO Title', kind: 'text' },
-  { key: 'seoDescription', label: 'SEO Description', kind: 'textarea' },
-  { key: 'ogTitle', label: 'OG Title', kind: 'text' },
-  { key: 'ogDescription', label: 'OG Description', kind: 'textarea' },
-];
-
 /** datetime-local строка (YYYY-MM-DDTHH:mm) из Date (локальное время). */
 function toDatetimeLocal(d: Date | null): string {
   if (!d) return '';
@@ -70,8 +59,21 @@ export function NewsForm({
   locales: readonly string[];
   defaultLocale: string;
 }) {
+  const t = useTranslations();
   const router = useRouter();
   const isEdit = article !== null;
+
+  /** Переводимые поля новости для LocaleTabs (совпадает с NEWS_TRANSLATABLE_FIELDS). */
+  const NEWS_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
+    { key: 'title', label: t('news.newsForm.fields.title'), kind: 'text' },
+    { key: 'groupLabel', label: t('news.newsForm.fields.group'), kind: 'text' },
+    { key: 'excerpt', label: t('news.newsForm.fields.excerpt'), kind: 'textarea' },
+    { key: 'body', label: t('news.newsForm.fields.body'), kind: 'textarea' },
+    { key: 'seoTitle', label: t('fields.seoTitle'), kind: 'text' },
+    { key: 'seoDescription', label: t('fields.seoDescription'), kind: 'textarea' },
+    { key: 'ogTitle', label: t('fields.ogTitle'), kind: 'text' },
+    { key: 'ogDescription', label: t('fields.ogDescription'), kind: 'textarea' },
+  ];
 
   const [translations, setTranslations] = useState<TranslationsState>(
     toTranslationsState(article?.translations),
@@ -148,7 +150,7 @@ export function NewsForm({
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Изменения сохранены.');
+        setSuccess(t('news.newsForm.toast.saved'));
         router.refresh();
       } else {
         router.push(`/admin/news/${(result.data as { id: string }).id}`);
@@ -187,7 +189,7 @@ export function NewsForm({
 
   async function remove() {
     if (!isEdit) return;
-    if (!confirm('Удалить новость? Действие необратимо.')) return;
+    if (!confirm(t('news.newsForm.confirmDelete'))) return;
     setPending(true);
     setError(null);
     const result = await deleteNewsAction({ id: article!.id });
@@ -216,8 +218,7 @@ export function NewsForm({
 
       {!canWrite ? (
         <div role="status" className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          У вас нет права на редактирование новостей (нужно «news.write»). Поля доступны
-          только для просмотра.
+          {t('news.newsForm.noWriteWarning')}
         </div>
       ) : null}
 
@@ -234,67 +235,67 @@ export function NewsForm({
       >
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <label htmlFor="n-title" className={labelCls}>Заголовок*</label>
+            <label htmlFor="n-title" className={labelCls}>{t('news.newsForm.fields.titleRequired')}</label>
             <input id="n-title" value={title} onChange={(e) => onTitleChange(e.target.value)}
               className={inputCls} required disabled={!canWrite} />
             {fe('title') ? <p className="mt-1 text-xs text-red-600">{fe('title')}</p> : null}
           </div>
           <div>
-            <label htmlFor="n-slug" className={labelCls}>ЧПУ (slug)</label>
-            <input id="n-slug" value={slug} placeholder="авто из заголовка"
+            <label htmlFor="n-slug" className={labelCls}>{t('news.newsForm.fields.slug')}</label>
+            <input id="n-slug" value={slug} placeholder={t('news.newsForm.slugPlaceholder')}
               onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }}
               className={inputCls} disabled={!canWrite} />
             {fe('slug') ? <p className="mt-1 text-xs text-red-600">{fe('slug')}</p> : null}
           </div>
 
           <div>
-            <label htmlFor="n-group" className={labelCls}>Раздел</label>
+            <label htmlFor="n-group" className={labelCls}>{t('news.newsForm.fields.group')}</label>
             <input id="n-group" value={groupLabel} onChange={(e) => setGroupLabel(e.target.value)}
               className={inputCls} disabled={!canWrite} />
           </div>
           <div>
-            <label htmlFor="n-status" className={labelCls}>Статус</label>
+            <label htmlFor="n-status" className={labelCls}>{t('news.newsForm.fields.status')}</label>
             <select id="n-status" value={status}
               onChange={(e) => setStatus(e.target.value as typeof status)}
               className={inputCls} disabled={!canWrite}>
-              <option value="draft">Черновик</option>
-              {status === 'published' ? <option value="published" disabled>Опубликована</option> : null}
-              <option value="archived">В архиве</option>
+              <option value="draft">{t('news.newsForm.status.draft')}</option>
+              {status === 'published' ? <option value="published" disabled>{t('news.newsForm.status.published')}</option> : null}
+              <option value="archived">{t('news.newsForm.status.archived')}</option>
             </select>
           </div>
 
           <div className="lg:col-span-2">
-            <label htmlFor="n-excerpt" className={labelCls}>Анонс</label>
+            <label htmlFor="n-excerpt" className={labelCls}>{t('news.newsForm.fields.excerpt')}</label>
             <textarea id="n-excerpt" value={excerpt} rows={2}
               onChange={(e) => setExcerpt(e.target.value)} className={inputCls} disabled={!canWrite} />
             {fe('excerpt') ? <p className="mt-1 text-xs text-red-600">{fe('excerpt')}</p> : null}
           </div>
 
           <div className="lg:col-span-2">
-            <label htmlFor="n-body" className={labelCls}>Текст (HTML)</label>
+            <label htmlFor="n-body" className={labelCls}>{t('news.newsForm.fields.bodyHtml')}</label>
             <textarea id="n-body" value={body} rows={10}
               onChange={(e) => setBody(e.target.value)} className={`${inputCls} font-mono`} disabled={!canWrite} />
             <p className="mt-1 text-xs text-gray-400">
-              HTML-разметка санитайзится на сервере (разрешены p/strong/em/a/списки/заголовки).
+              {t('news.newsForm.bodyHelp')}
             </p>
           </div>
 
           <div>
-            <label htmlFor="n-cover" className={labelCls}>Обложка (адрес файла)</label>
+            <label htmlFor="n-cover" className={labelCls}>{t('news.newsForm.fields.cover')}</label>
             <input id="n-cover" value={coverImageKey} onChange={(e) => setCoverImageKey(e.target.value)}
               placeholder="news/<id>.webp" className={inputCls} disabled={!canWrite} />
             {canWrite ? (
-              <NewsImageUploadButton label="Загрузить обложку" onUploaded={setCoverImageKey} />
+              <NewsImageUploadButton label={t('news.newsForm.uploadCover')} onUploaded={setCoverImageKey} />
             ) : null}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="n-pub" className={labelCls}>Дата публикации</label>
+              <label htmlFor="n-pub" className={labelCls}>{t('news.newsForm.fields.publishedAt')}</label>
               <input id="n-pub" type="datetime-local" value={publishedAt}
                 onChange={(e) => setPublishedAt(e.target.value)} className={inputCls} disabled={!canWrite} />
             </div>
             <div>
-              <label htmlFor="n-sort" className={labelCls}>Порядок</label>
+              <label htmlFor="n-sort" className={labelCls}>{t('news.newsForm.fields.sortOrder')}</label>
               <input id="n-sort" type="number" min="0" value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)} className={inputCls} disabled={!canWrite} />
             </div>
@@ -302,7 +303,7 @@ export function NewsForm({
 
           <div className="lg:col-span-2">
             <SeoFieldset value={seo} onChange={setSeo} idPrefix="n-seo"
-              canonicalPlaceholder={`Авто: /news/${slug || 'slug-новости'}`}
+              canonicalPlaceholder={t('news.newsForm.seo.canonicalPlaceholder', { slug: slug || t('news.newsForm.seo.slugFallback') })}
               disabled={!canWrite}
               fieldErrors={{
                 seoTitle: fe('seoTitle'),
@@ -313,7 +314,7 @@ export function NewsForm({
                 canonicalUrl: fe('canonicalUrl'),
               }}
               ogImageSlot={
-                <NewsImageUploadButton label="Загрузить картинку"
+                <NewsImageUploadButton label={t('news.newsForm.uploadImage')}
                   onUploaded={(key) => setSeo((prev) => ({ ...prev, ogImageKey: key }))} />
               }
             />
@@ -325,28 +326,28 @@ export function NewsForm({
             <>
               <button type="button" onClick={save} disabled={pending}
                 className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-                {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать новость'}
+                {pending ? t('common.form.saving') : isEdit ? t('common.actions.save') : t('news.newsForm.createButton')}
               </button>
 
               {isEdit && status !== 'published' ? (
-                <button type="button" onClick={() => changeStatus('published', 'Новость опубликована.')}
+                <button type="button" onClick={() => changeStatus('published', t('news.newsForm.toast.published'))}
                   disabled={pending}
                   className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50">
-                  Сохранить и опубликовать
+                  {t('news.newsForm.saveAndPublish')}
                 </button>
               ) : null}
               {isEdit && status === 'published' ? (
-                <button type="button" onClick={() => changeStatus('draft', 'Снято с публикации.')}
+                <button type="button" onClick={() => changeStatus('draft', t('news.newsForm.toast.unpublished'))}
                   disabled={pending}
                   className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50">
-                  Снять с публикации
+                  {t('news.newsForm.unpublish')}
                 </button>
               ) : null}
               {isEdit && status !== 'archived' ? (
-                <button type="button" onClick={() => changeStatus('archived', 'Новость в архиве.')}
+                <button type="button" onClick={() => changeStatus('archived', t('news.newsForm.toast.archived'))}
                   disabled={pending}
                   className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50">
-                  В архив
+                  {t('news.newsForm.archive')}
                 </button>
               ) : null}
             </>
@@ -354,13 +355,13 @@ export function NewsForm({
 
           <button type="button" onClick={() => router.push('/admin/news')}
             className="text-sm text-gray-600 hover:underline">
-            {canWrite ? 'Отмена' : 'Назад к списку'}
+            {canWrite ? t('common.actions.cancel') : t('news.newsForm.backToList')}
           </button>
 
           {isEdit && canWrite ? (
             <button type="button" onClick={remove} disabled={pending}
               className="ml-auto text-sm text-red-600 hover:underline disabled:opacity-50">
-              Удалить новость
+              {t('news.newsForm.deleteButton')}
             </button>
           ) : null}
         </div>

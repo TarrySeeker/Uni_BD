@@ -19,6 +19,15 @@ const ORDER_PAGE = src('app/admin/(panel)/orders/[id]/page.tsx');
 const GIFT_BLOCK = src('app/admin/(panel)/orders/[id]/_components/GiftIssueBlock.tsx');
 const ACTIONS = src('app/admin/(panel)/orders/_components/OrderActionsPanel.tsx');
 
+// После i18n-переноса подпись «потрачено» живёт в messages/ru.json (блок рендерит t(...)).
+// GUARD сторожит суть: исходник ссылается на ключ И ru-значение несёт текст.
+const ru = JSON.parse(src('messages/ru.json')) as Record<string, unknown>;
+function ruVal(dot: string): string {
+  let o: unknown = ru;
+  for (const k of dot.split('.')) o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  return typeof o === 'string' ? o : '';
+}
+
 describe('ядро предупреждений — чистое и не течёт в клиентский бандл', () => {
   it('warnings.ts не тянет БД/Next-серверные модули', () => {
     expect(WARNINGS).not.toMatch(/from\s+'@\/lib\/db/);
@@ -88,6 +97,7 @@ describe('слот 2 — блок сертификата, role="alert"', () => {
   it('в списке выпущенных видно потраченное и статус кода', () => {
     expect(GIFT_BLOCK).toContain('c.spentLabel');
     expect(GIFT_BLOCK).toContain('status={c.status}');
-    expect(GIFT_BLOCK).toContain('потрачено');
+    expect(GIFT_BLOCK).toContain('orders.detailGiftIssueBlock.spentLine');
+    expect(ruVal('orders.detailGiftIssueBlock.spentLine')).toContain('потрачено');
   });
 });
