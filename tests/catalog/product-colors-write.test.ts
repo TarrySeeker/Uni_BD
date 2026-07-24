@@ -266,8 +266,13 @@ describe('guard — блок «Цвета» в ProductForm.tsx', () => {
   const src = read('app/admin/(panel)/catalog/_components/ProductForm.tsx');
 
   it('есть вкладка/секция цветов с легаси-заголовками', () => {
-    expect(src).toContain('Основной цвет');
-    expect(src).toContain('Дополнительный цвет');
+    // Заголовки слотов переведены на next-intl: компонент подставляет их по
+    // ключам, а сами легаси-подписи живут в messages/ru.json (дефолтный язык).
+    expect(src).toMatch(/catalog\.product\.colors\.slotPrimary/);
+    expect(src).toMatch(/catalog\.product\.colors\.slotSecondary/);
+    const ru = read('messages/ru.json');
+    expect(ru).toContain('Основной цвет');
+    expect(ru).toContain('Дополнительный цвет');
   });
 
   it('есть колорпикер input type="color" И ручной ввод кода цвета', () => {

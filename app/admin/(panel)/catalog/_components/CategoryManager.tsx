@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import {
   childCount,
   expandAll,
@@ -104,6 +106,7 @@ function writeExpandedSnapshot(ids: ReadonlySet<string>): void {
 
 export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -182,7 +185,7 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
           slug: newSlug.trim() || undefined,
           parentId,
         }),
-      'Категория создана.',
+      t('catalog.category.toast.created'),
     );
     if (ok) {
       reveal(parentId);
@@ -201,7 +204,7 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
 
   async function saveRename(node: CategoryTreeNode) {
     if (!renameValue.trim()) return;
-    await run(() => updateCategoryAction({ id: node.id, name: renameValue.trim() }), 'Переименовано.');
+    await run(() => updateCategoryAction({ id: node.id, name: renameValue.trim() }), t('catalog.category.toast.renamed'));
     setRenameId(null);
   }
 
@@ -216,7 +219,7 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
     const parentId = moveParent || null;
     const ok = await run(
       () => moveCategoryAction({ id: node.id, parentId }),
-      'Категория перемещена.',
+      t('catalog.category.toast.moved'),
     );
     if (ok) {
       reveal(parentId);
@@ -246,10 +249,10 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
               aria-controls={isExpanded ? childrenId : undefined}
               aria-label={
                 isExpanded
-                  ? `Свернуть подкатегории «${node.name}»`
-                  : `Показать подкатегории «${node.name}»`
+                  ? t('catalog.category.collapseAria', { name: node.name })
+                  : t('catalog.category.expandAria', { name: node.name })
               }
-              title={isExpanded ? 'Свернуть подкатегории' : 'Показать подкатегории'}
+              title={isExpanded ? t('catalog.category.collapseTitle') : t('catalog.category.expandTitle')}
               className="h-6 w-6 shrink-0 rounded border border-gray-300 text-sm font-bold leading-none text-gray-700 hover:bg-gray-100"
             >
               {isExpanded ? '−' : '+'}
@@ -268,10 +271,10 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
                 className="rounded border border-gray-300 px-2 py-1 text-sm"
               />
               <button type="button" onClick={() => void saveRename(node)} className={`${btn} text-blue-700`}>
-                Сохранить
+                {t('common.actions.save')}
               </button>
               <button type="button" onClick={() => setRenameId(null)} className={`${btn} text-gray-500`}>
-                Отмена
+                {t('common.actions.cancel')}
               </button>
             </>
           ) : moveId === node.id ? (
@@ -282,7 +285,7 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
                 onChange={(e) => setMoveParent(e.target.value)}
                 className="rounded border border-gray-300 px-2 py-1 text-sm"
               >
-                <option value="">— верхний уровень —</option>
+                <option value="">{t('catalog.category.topLevel')}</option>
                 {parentOptions.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}
@@ -290,24 +293,24 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
                 ))}
               </select>
               <button type="button" onClick={() => void saveMove(node)} className={`${btn} text-blue-700`}>
-                Переместить
+                {t('catalog.category.move')}
               </button>
               <button type="button" onClick={() => setMoveId(null)} className={`${btn} text-gray-500`}>
-                Отмена
+                {t('common.actions.cancel')}
               </button>
             </>
           ) : (
             <>
               <span className="text-sm text-gray-800">{node.name}</span>
               {kids > 0 ? (
-                <span className="text-xs text-gray-500" title="Подкатегорий внутри">
+                <span className="text-xs text-gray-500" title={t('catalog.category.childCountTitle')}>
                   ({kids})
                 </span>
               ) : null}
-              {!node.isActive ? <span className="text-xs text-amber-700">(скрыта)</span> : null}
+              {!node.isActive ? <span className="text-xs text-amber-700">{t('catalog.category.hiddenBadge')}</span> : null}
               {/* C13: переход к полной форме категории (описание + SEO/OG). */}
               <Link href={`/admin/catalog/categories/${node.id}`} className={`${btn} text-gray-700`}>
-                Изменить
+                {t('catalog.category.edit')}
               </Link>
               {/* Редкие действия убраны под «Ещё» — иначе строка длиннее имени категории. */}
               <button
@@ -320,15 +323,15 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
                 aria-expanded={menuId === node.id}
                 className={`${btn} text-gray-600`}
               >
-                Ещё {menuId === node.id ? '▴' : '▾'}
+                {t('catalog.category.more')} {menuId === node.id ? '▴' : '▾'}
               </button>
               {menuId === node.id ? (
                 <>
                   <button type="button" onClick={() => startRename(node)} className={`${btn} text-gray-700`}>
-                    Переименовать
+                    {t('catalog.category.rename')}
                   </button>
                   <button type="button" onClick={() => startMove(node)} className={`${btn} text-gray-700`}>
-                    Переместить
+                    {t('catalog.category.move')}
                   </button>
                   {/* C4: скрыть/показать категорию (is_active) — синхронизирует видимость
                       на витрине через updateCategory (COALESCE is_active). */}
@@ -337,23 +340,23 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
                     onClick={() =>
                       void run(
                         () => updateCategoryAction({ id: node.id, isActive: !node.isActive }),
-                        node.isActive ? 'Категория скрыта на сайте.' : 'Категория показана на сайте.',
+                        node.isActive ? t('catalog.category.toast.hidden') : t('catalog.category.toast.shown'),
                       )
                     }
                     className={`${btn} ${node.isActive ? 'text-amber-700' : 'text-green-700'}`}
                   >
-                    {node.isActive ? 'Скрыть' : 'Показать'}
+                    {node.isActive ? t('catalog.category.hide') : t('catalog.category.show')}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(`Удалить категорию «${node.name}»?`)) {
-                        void run(() => deleteCategoryAction({ id: node.id }), 'Категория удалена.');
+                      if (window.confirm(t('catalog.category.confirmDelete', { name: node.name }))) {
+                        void run(() => deleteCategoryAction({ id: node.id }), t('catalog.category.toast.deleted'));
                       }
                     }}
                     className={`${btn} text-red-600`}
                   >
-                    Удалить
+                    {t('common.actions.delete')}
                   </button>
                 </>
               ) : null}
@@ -383,20 +386,19 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
       <div className="rounded-lg border border-gray-200 p-4">
         {tree.length === 0 ? (
           <p className="text-sm text-gray-500">
-            Категорий пока нет. Создайте первую в форме ниже — по категориям товары
-            раскладываются в каталоге на сайте.
+            {t('catalog.category.emptyHint')}
           </p>
         ) : (
           <>
             <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
               <button type="button" onClick={() => applyExpanded(expandAll(tree))} className={`${btn} text-gray-700`}>
-                Развернуть всё
+                {t('catalog.category.expandAll')}
               </button>
               <button type="button" onClick={() => applyExpanded(new Set())} className={`${btn} text-gray-700`}>
-                Свернуть всё
+                {t('catalog.category.collapseAll')}
               </button>
               <span className="text-xs text-gray-500">
-                Показано {rows.length} из {options.length}
+                {t('catalog.category.shownCount', { shown: String(rows.length), total: String(options.length) })}
               </span>
             </div>
             <ul>{tree.map((n) => renderNode(n, 0))}</ul>
@@ -405,24 +407,24 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
       </div>
 
       <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <h2 className="text-sm font-semibold text-gray-800">Новая категория</h2>
+        <h2 className="text-sm font-semibold text-gray-800">{t('catalog.category.newHeading')}</h2>
         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <label htmlFor="c-name" className="block text-xs font-medium text-gray-600">Название*</label>
+            <label htmlFor="c-name" className="block text-xs font-medium text-gray-600">{t('fields.name')}*</label>
             <input id="c-name" value={newName} onChange={(e) => setNewName(e.target.value)}
               className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" />
           </div>
           <div>
-            <label htmlFor="c-slug" className="block text-xs font-medium text-gray-600">Адрес на сайте</label>
+            <label htmlFor="c-slug" className="block text-xs font-medium text-gray-600">{t('catalog.category.slugLabel')}</label>
             <input id="c-slug" value={newSlug} onChange={(e) => setNewSlug(e.target.value)}
-              placeholder="можно не заполнять — создастся автоматически"
+              placeholder={t('catalog.category.slugPlaceholder')}
               className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm" />
           </div>
           <div>
-            <label htmlFor="c-parent" className="block text-xs font-medium text-gray-600">Внутри категории</label>
+            <label htmlFor="c-parent" className="block text-xs font-medium text-gray-600">{t('catalog.category.parentLabel')}</label>
             <select id="c-parent" value={newParent} onChange={(e) => setNewParent(e.target.value)}
               className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm">
-              <option value="">— верхний уровень —</option>
+              <option value="">{t('catalog.category.topLevel')}</option>
               {options.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
@@ -431,11 +433,12 @@ export function CategoryManager({ tree }: { tree: CategoryTreeNode[] }) {
         </div>
         <button
           type="button"
+          data-testid="category-add"
           onClick={create}
           disabled={!newName.trim()}
           className="mt-3 rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          Создать категорию
+          {t('catalog.category.createButton')}
         </button>
       </div>
     </div>

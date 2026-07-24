@@ -260,6 +260,11 @@ const managerSource = () =>
     'utf8',
   );
 
+// Подписи UI переведены на next-intl: дефолтный язык (ru) — источник правды
+// текста, компонент ссылается на ключи каталога.
+const ruMessages = () =>
+  readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8');
+
 describe('CategoryManager (вёрстка)', () => {
   it('держит состояние раскрытия и берёт логику из lib/catalog/tree', () => {
     const src = managerSource();
@@ -307,15 +312,21 @@ describe('CategoryManager (вёрстка)', () => {
 
   it('есть тулбар «Развернуть всё / Свернуть всё»', () => {
     const src = managerSource();
-    expect(src).toContain('Развернуть всё');
-    expect(src).toContain('Свернуть всё');
+    expect(src).toMatch(/catalog\.category\.expandAll/);
+    expect(src).toMatch(/catalog\.category\.collapseAll/);
+    const ru = ruMessages();
+    expect(ru).toContain('Развернуть всё');
+    expect(ru).toContain('Свернуть всё');
   });
 
   it('редкие действия свёрнуты под «Ещё», в строке остаётся «Изменить»', () => {
     const src = managerSource();
-    expect(src).toContain('Ещё');
+    expect(src).toMatch(/catalog\.category\.more/);
     expect(src).toMatch(/menuId === node\.id/);
-    expect(src).toContain('Изменить');
+    expect(src).toMatch(/catalog\.category\.edit/);
+    const ru = ruMessages();
+    expect(ru).toContain('Ещё');
+    expect(ru).toContain('Изменить');
   });
 
   it('персист раскрытия читается через useSyncExternalStore, а не setState в эффекте', () => {

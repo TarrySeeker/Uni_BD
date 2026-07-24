@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type {
   Brand,
   CategoryTreeNode,
@@ -61,17 +63,8 @@ type Section = 'main' | 'colors' | 'variants' | 'attributes' | 'media' | 'seo';
  */
 type ColorSlot = { masterId: string; name: string; hex: string };
 
-/** Подписи слотов — как в старой админке. */
-const COLOR_SLOT_LABELS = ['Основной цвет', 'Дополнительный цвет'];
-
 /** Пустой слот. */
 const EMPTY_COLOR_SLOT: ColorSlot = { masterId: '', name: '', hex: '' };
-
-const STATUS_LABEL: Record<ProductStatus, string> = {
-  draft: 'Черновик — скрыт с сайта',
-  active: 'Активен — виден на сайте',
-  archived: 'В архиве — скрыт с сайта',
-};
 
 function flattenCategories(
   nodes: CategoryTreeNode[],
@@ -117,7 +110,18 @@ export function ProductForm({
   defaultLocale: string;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const isEdit = product !== null;
+
+  const colorSlotLabels = [
+    t('catalog.product.colors.slotPrimary'),
+    t('catalog.product.colors.slotSecondary'),
+  ];
+  const statusLabel: Record<ProductStatus, string> = {
+    draft: t('catalog.product.status.draft'),
+    active: t('catalog.product.status.active'),
+    archived: t('catalog.product.status.archived'),
+  };
 
   const [section, setSection] = useState<Section>('main');
   const [translations, setTranslations] = useState<TranslationsState>(
@@ -272,7 +276,7 @@ export function ProductForm({
 
       if (result.ok) {
         if (isEdit) {
-          setSuccess('Изменения сохранены.');
+          setSuccess(t('catalog.common.savedChanges'));
           router.refresh();
         } else {
           router.push(`/admin/catalog/products/${result.data.id}`);
@@ -292,9 +296,7 @@ export function ProductForm({
   // archiveProduct (status='archived'); не удаляет данные/историю заказов.
   async function onArchive() {
     if (!isEdit) return;
-    const ok = window.confirm(
-      'Снять товар с продажи? Он исчезнет с сайта, но останется в каталоге — позже можно вернуть, выбрав статус «Активен».',
-    );
+    const ok = window.confirm(t('catalog.product.confirmArchive'));
     if (!ok) return;
     setPending(true);
     setError(null);
@@ -303,7 +305,7 @@ export function ProductForm({
       const result = await archiveProductAction({ id: product!.id });
       if (result.ok) {
         setStatus('archived');
-        setSuccess('Товар снят с продажи (в архиве) — на сайте больше не показывается.');
+        setSuccess(t('catalog.product.toast.archived'));
         router.refresh();
       } else {
         setError(result);
@@ -319,10 +321,7 @@ export function ProductForm({
   // уходят каскадом; история заказов сохраняется (снимок позиции, ADR-010).
   async function onDelete() {
     if (!isEdit) return;
-    const ok = window.confirm(
-      'Удалить товар НАВСЕГДА? Это действие нельзя отменить: товар и его варианты/фото/остатки будут удалены. ' +
-        'История заказов с этим товаром сохранится. Если нужно просто убрать с сайта — используйте «Снять с продажи».',
-    );
+    const ok = window.confirm(t('catalog.product.confirmDelete'));
     if (!ok) return;
     setPending(true);
     setError(null);
@@ -356,17 +355,17 @@ export function ProductForm({
   const isLiveOnSite = isPubliclyVisible(status);
   // НЕ-блокирующие заметки: товар виден, но есть на что обратить внимание.
   const storefrontNotes: string[] = [];
-  if (!hasPrice) storefrontNotes.push('Цена не задана — на витрине покажется как 0. Укажите цену.');
+  if (!hasPrice) storefrontNotes.push(t('catalog.product.notes.noPrice'));
   if (isEdit && totalAvailable <= 0)
-    storefrontNotes.push('На складе 0 — на витрине показывается «Нет в наличии» (кнопка покупки недоступна). Задайте остаток на вкладке «Варианты».');
+    storefrontNotes.push(t('catalog.product.notes.noStock'));
 
   const tabs: Array<{ key: Section; label: string; editOnly?: boolean }> = [
-    { key: 'main', label: 'Основное' },
-    { key: 'colors', label: 'Цвета' },
-    { key: 'variants', label: 'Варианты', editOnly: true },
-    { key: 'attributes', label: 'Характеристики', editOnly: true },
-    { key: 'media', label: 'Медиа', editOnly: true },
-    { key: 'seo', label: 'SEO' },
+    { key: 'main', label: t('catalog.product.tabs.main') },
+    { key: 'colors', label: t('catalog.product.tabs.colors') },
+    { key: 'variants', label: t('catalog.product.tabs.variants'), editOnly: true },
+    { key: 'attributes', label: t('catalog.product.tabs.attributes'), editOnly: true },
+    { key: 'media', label: t('catalog.product.tabs.media'), editOnly: true },
+    { key: 'seo', label: t('seo.legend') },
   ];
 
   function fieldErr(f: string) {
@@ -390,7 +389,9 @@ export function ProductForm({
         isLiveOnSite ? (
           <div className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
             <p>
-              ✓ Товар <strong>виден покупателям</strong> на сайте в каталоге.
+              {t.rich('catalog.product.visibility.visible', {
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </p>
             {storefrontNotes.length > 0 ? (
               <ul className="mt-1 list-disc pl-5 text-amber-800">
@@ -403,8 +404,9 @@ export function ProductForm({
         ) : (
           <div className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <p>
-              ⚠ Товар <strong>скрыт с сайта</strong>. Чтобы он появился в каталоге на витрине,
-              выберите статус «Активен — виден на сайте».
+              {t.rich('catalog.product.visibility.hidden', {
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </p>
           </div>
         )
@@ -420,7 +422,7 @@ export function ProductForm({
         pending={pending}
         onSave={onSubmit}
       >
-      <div role="tablist" aria-label="Секции товара" className="flex flex-wrap gap-1 border-b border-gray-200">
+      <div role="tablist" aria-label={t('catalog.product.tabsAriaLabel')} className="flex flex-wrap gap-1 border-b border-gray-200">
         {tabs
           .filter((t) => isEdit || !t.editOnly)
           // «Характеристики» (доп. атрибуты) прячем, пока их нет в справочнике —
@@ -449,7 +451,7 @@ export function ProductForm({
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div>
               <label htmlFor="p-name" className="block text-sm font-medium text-gray-700">
-                Название*
+                {t('fields.name')}*
               </label>
               <input
                 id="p-name"
@@ -463,7 +465,7 @@ export function ProductForm({
 
             <div>
               <label htmlFor="p-price" className="block text-sm font-medium text-gray-700">
-                Цена*
+                {t('catalog.product.fields.price')}*
               </label>
               <input
                 id="p-price"
@@ -477,7 +479,7 @@ export function ProductForm({
 
             <div>
               <label htmlFor="p-status" className="block text-sm font-medium text-gray-700">
-                Статус
+                {t('catalog.product.fields.status')}
               </label>
               <select
                 id="p-status"
@@ -487,18 +489,18 @@ export function ProductForm({
               >
                 {PRODUCT_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {STATUS_LABEL[s]}
+                    {statusLabel[s]}
                   </option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                «Активен» — товар виден на сайте. «Черновик» и «В архиве» — скрыт.
+                {t('catalog.product.statusHelp')}
               </p>
             </div>
 
             <div className="lg:col-span-2">
               <label htmlFor="p-desc" className="block text-sm font-medium text-gray-700">
-                Описание
+                {t('fields.description')}
               </label>
               <textarea
                 id="p-desc"
@@ -510,10 +512,10 @@ export function ProductForm({
             </div>
 
             <fieldset className="lg:col-span-2">
-              <legend className="text-sm font-medium text-gray-700">Категории</legend>
+              <legend className="text-sm font-medium text-gray-700">{t('catalog.product.categoriesLegend')}</legend>
               {categories.length === 0 ? (
                 <p className="mt-1 text-sm text-gray-500">
-                  Категорий пока нет. Создайте их в разделе «Категории».
+                  {t('catalog.product.noCategoriesHint')}
                 </p>
               ) : (
                 <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
@@ -533,7 +535,7 @@ export function ProductForm({
                             checked={primaryCategoryId === c.id}
                             onChange={() => setPrimaryCategoryId(c.id)}
                           />
-                          основная
+                          {t('catalog.product.primaryCategoryRadio')}
                         </label>
                       ) : null}
                     </label>
@@ -547,54 +549,54 @@ export function ProductForm({
 
             <details className="lg:col-span-2 rounded border border-gray-200 p-3">
               <summary className="cursor-pointer text-sm font-medium text-gray-700">
-                Дополнительные настройки — необязательно
+                {t('catalog.product.advancedSummary')}
               </summary>
 
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="p-sku" className="block text-sm font-medium text-gray-700">
-                    Артикул
+                    {t('catalog.product.fields.sku')}
                   </label>
                   <input
                     id="p-sku"
                     value={sku}
                     onChange={(e) => setSku(e.target.value)}
-                    placeholder="оставьте пустым — создастся автоматически"
+                    placeholder={t('catalog.product.placeholders.skuAuto')}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Код товара для учёта. Можно не заполнять.
+                    {t('catalog.product.help.sku')}
                   </p>
                   {fieldErr('sku') ? <p className="mt-1 text-xs text-red-600">{fieldErr('sku')}</p> : null}
                 </div>
 
                 <div>
                   <label htmlFor="p-slug" className="block text-sm font-medium text-gray-700">
-                    Адрес страницы на сайте
+                    {t('catalog.product.fields.slug')}
                   </label>
                   <input
                     id="p-slug"
                     value={slug}
                     onChange={(e) => setSlug(e.target.value)}
-                    placeholder="оставьте пустым — создастся автоматически из названия"
+                    placeholder={t('catalog.product.placeholders.slugAuto')}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Часть ссылки товара на витрине. Можно не заполнять.
+                    {t('catalog.product.help.slug')}
                   </p>
                   {fieldErr('slug') ? <p className="mt-1 text-xs text-red-600">{fieldErr('slug')}</p> : null}
                 </div>
 
                 <div>
                   <label htmlFor="p-compare" className="block text-sm font-medium text-gray-700">
-                    Цена до скидки («было»)
+                    {t('catalog.product.fields.compareAtPrice')}
                   </label>
                   <input
                     id="p-compare"
                     inputMode="decimal"
                     value={compareAtPrice}
                     onChange={(e) => setCompareAtPrice(e.target.value)}
-                    placeholder="оставьте пустым — без скидки"
+                    placeholder={t('catalog.product.placeholders.compareAtPrice')}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   />
                   {fieldErr('compareAtPrice') ? (
@@ -604,7 +606,7 @@ export function ProductForm({
 
                 <div>
                   <label htmlFor="p-brand" className="block text-sm font-medium text-gray-700">
-                    Бренд
+                    {t('catalog.product.fields.brand')}
                   </label>
                   <select
                     id="p-brand"
@@ -612,7 +614,7 @@ export function ProductForm({
                     onChange={(e) => setBrandId(e.target.value)}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   >
-                    <option value="">— без бренда —</option>
+                    <option value="">{t('catalog.product.brandNone')}</option>
                     {brands.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.name}
@@ -623,7 +625,7 @@ export function ProductForm({
 
                 <div>
                   <label htmlFor="p-designer" className="block text-sm font-medium text-gray-700">
-                    Дизайнер
+                    {t('catalog.product.fields.designer')}
                   </label>
                   <select
                     id="p-designer"
@@ -631,7 +633,7 @@ export function ProductForm({
                     onChange={(e) => setDesignerId(e.target.value)}
                     className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   >
-                    <option value="">— без дизайнера —</option>
+                    <option value="">{t('catalog.product.designerNone')}</option>
                     {designers.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.name}
@@ -642,42 +644,41 @@ export function ProductForm({
               </div>
 
               <fieldset className="mt-4 flex flex-col gap-2">
-                <legend className="text-sm font-medium text-gray-700">Бейджи на витрине</legend>
+                <legend className="text-sm font-medium text-gray-700">{t('catalog.product.badgesLegend')}</legend>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
                     checked={isFeatured}
                     onChange={(e) => setIsFeatured(e.target.checked)}
                   />
-                  Показать на главной (бейдж «хит продаж» + блок «Коллекция»)
+                  {t('catalog.product.featuredLabel')}
                 </label>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <label htmlFor="p-isnew">Бейдж «Новинка»:</label>
+                  <label htmlFor="p-isnew">{t('catalog.product.isNewLabel')}</label>
                   <select
                     id="p-isnew"
                     value={isNewMode}
                     onChange={(e) => setIsNewMode(e.target.value as 'auto' | 'yes' | 'no')}
                     className="rounded border border-gray-300 px-2 py-1 text-sm"
                   >
-                    <option value="auto">Авто (по дате)</option>
-                    <option value="yes">Да</option>
-                    <option value="no">Нет</option>
+                    <option value="auto">{t('catalog.product.isNew.auto')}</option>
+                    <option value="yes">{t('common.confirm.yes')}</option>
+                    <option value="no">{t('common.confirm.no')}</option>
                   </select>
                 </div>
               </fieldset>
 
               <div className="mt-4">
                 <p className="text-sm font-medium text-gray-700">
-                  Вес и габариты (для расчёта доставки)
+                  {t('catalog.product.dimensionsTitle')}
                 </p>
                 <p className="mt-1 text-xs text-gray-500">
-                  Пусто — берётся значение по умолчанию из настроек магазина. У каждого
-                  варианта можно задать свои.
+                  {t('catalog.product.dimensionsHelp')}
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div>
                     <label htmlFor="p-weight" className="block text-xs font-medium text-gray-600">
-                      Вес (г)
+                      {t('catalog.product.fields.weight')}
                     </label>
                     <input
                       id="p-weight"
@@ -690,7 +691,7 @@ export function ProductForm({
                   </div>
                   <div>
                     <label htmlFor="p-length" className="block text-xs font-medium text-gray-600">
-                      Длина (см)
+                      {t('catalog.product.fields.length')}
                     </label>
                     <input
                       id="p-length"
@@ -703,7 +704,7 @@ export function ProductForm({
                   </div>
                   <div>
                     <label htmlFor="p-width" className="block text-xs font-medium text-gray-600">
-                      Ширина (см)
+                      {t('catalog.product.fields.width')}
                     </label>
                     <input
                       id="p-width"
@@ -716,7 +717,7 @@ export function ProductForm({
                   </div>
                   <div>
                     <label htmlFor="p-height" className="block text-xs font-medium text-gray-600">
-                      Высота (см)
+                      {t('catalog.product.fields.height')}
                     </label>
                     <input
                       id="p-height"
@@ -736,9 +737,7 @@ export function ProductForm({
         {section === 'colors' ? (
           <div className="grid grid-cols-1 gap-4">
             <p className="text-sm text-gray-500">
-              Кружки цвета на карточке товара. Можно оставить пустыми — тогда блок
-              цветов на сайте не показывается. Выберите цвет из списка (имя и оттенок
-              подставятся) либо задайте свой оттенок.
+              {t('catalog.product.colors.intro')}
             </p>
             {colorSlots.map((slot, i) => (
               <fieldset
@@ -746,7 +745,7 @@ export function ProductForm({
                 className="rounded border border-gray-200 p-3"
               >
                 <legend className="px-1 text-sm font-medium text-gray-700">
-                  {COLOR_SLOT_LABELS[i]}
+                  {colorSlotLabels[i]}
                 </legend>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div>
@@ -754,7 +753,7 @@ export function ProductForm({
                       htmlFor={`p-color-master-${i}`}
                       className="block text-xs font-medium text-gray-600"
                     >
-                      Цвет из списка
+                      {t('catalog.product.colors.fromList')}
                     </label>
                     <select
                       id={`p-color-master-${i}`}
@@ -762,7 +761,7 @@ export function ProductForm({
                       onChange={(e) => pickMasterColor(i, e.target.value)}
                       className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                     >
-                      <option value="">— не выбран —</option>
+                      <option value="">{t('catalog.product.colors.notSelected')}</option>
                       {masterColors.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
@@ -776,13 +775,13 @@ export function ProductForm({
                       htmlFor={`p-color-name-${i}`}
                       className="block text-xs font-medium text-gray-600"
                     >
-                      Название цвета
+                      {t('catalog.product.colors.name')}
                     </label>
                     <input
                       id={`p-color-name-${i}`}
                       value={slot.name}
                       onChange={(e) => patchColorSlot(i, { name: e.target.value })}
-                      placeholder="необязательно"
+                      placeholder={t('catalog.product.colors.namePlaceholder')}
                       className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
                     />
                   </div>
@@ -792,7 +791,7 @@ export function ProductForm({
                       htmlFor={`p-color-hex-${i}`}
                       className="block text-xs font-medium text-gray-600"
                     >
-                      Оттенок
+                      {t('catalog.product.colors.shade')}
                     </label>
                     <div className="mt-1 flex items-center gap-2">
                       <input
@@ -801,21 +800,21 @@ export function ProductForm({
                         value={/^#[0-9a-fA-F]{6}$/.test(slot.hex) ? slot.hex : '#ffffff'}
                         onChange={(e) => patchColorSlot(i, { hex: e.target.value })}
                         className="h-9 w-12 rounded border border-gray-300"
-                        aria-label={`${COLOR_SLOT_LABELS[i]}: выбрать оттенок`}
+                        aria-label={t('catalog.product.colors.pickShadeAria', { slot: colorSlotLabels[i] })}
                       />
                       <input
                         value={slot.hex}
                         onChange={(e) => patchColorSlot(i, { hex: e.target.value })}
                         placeholder="#rrggbb"
                         className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                        aria-label={`${COLOR_SLOT_LABELS[i]}: код цвета`}
+                        aria-label={t('catalog.product.colors.hexAria', { slot: colorSlotLabels[i] })}
                       />
                       <button
                         type="button"
                         onClick={() => patchColorSlot(i, { ...EMPTY_COLOR_SLOT })}
                         className="whitespace-nowrap text-xs text-gray-500 hover:underline"
                       >
-                        Очистить
+                        {t('catalog.product.colors.clear')}
                       </button>
                     </div>
                   </div>
@@ -834,7 +833,9 @@ export function ProductForm({
               value={seo}
               onChange={setSeo}
               idPrefix="p-seo"
-              canonicalPlaceholder={`Авто: /product/${slug || 'slug-товара'}`}
+              canonicalPlaceholder={t('catalog.product.seo.canonicalPlaceholder', {
+                slug: slug || t('catalog.product.seo.slugFallback'),
+              })}
               fieldErrors={{
                 seoTitle: fieldError(error, 'seoTitle'),
                 seoDescription: fieldError(error, 'seoDescription'),
@@ -846,7 +847,7 @@ export function ProductForm({
             />
             {!isEdit ? (
               <p className="text-sm text-gray-500">
-                OG/canonical/noindex станут доступны после сохранения товара.
+                {t('catalog.product.seo.afterSaveHint')}
               </p>
             ) : null}
           </div>
@@ -869,18 +870,19 @@ export function ProductForm({
         <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
           <button
             type="button"
+            data-testid="product-submit"
             onClick={onSubmit}
             disabled={pending}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать товар'}
+            {pending ? t('common.form.saving') : isEdit ? t('common.actions.save') : t('catalog.product.createButton')}
           </button>
           <button
             type="button"
             onClick={() => router.push('/admin/catalog')}
             className="text-sm text-gray-600 hover:underline"
           >
-            Отмена
+            {t('common.actions.cancel')}
           </button>
           {isEdit ? (
             <div className="ml-auto flex items-center gap-2">
@@ -891,7 +893,7 @@ export function ProductForm({
                   disabled={pending}
                   className="rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
                 >
-                  Снять с продажи
+                  {t('catalog.product.archiveButton')}
                 </button>
               ) : null}
               <button
@@ -900,7 +902,7 @@ export function ProductForm({
                 disabled={pending}
                 className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
               >
-                Удалить навсегда
+                {t('catalog.product.deleteButton')}
               </button>
             </div>
           ) : null}

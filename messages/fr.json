@@ -185,5 +185,161 @@
     "designerName": "Nom",
     "country": "Pays",
     "title": "Titre"
+  },
+  "catalog": {
+    "common": {
+      "savedChanges": "Modifications enregistrées."
+    },
+    "product": {
+      "tabs": {
+        "main": "Général",
+        "colors": "Couleurs",
+        "variants": "Variantes",
+        "attributes": "Caractéristiques",
+        "media": "Médias"
+      },
+      "tabsAriaLabel": "Sections du produit",
+      "status": {
+        "draft": "Brouillon — masqué du site",
+        "active": "Actif — visible sur le site",
+        "archived": "Archivé — masqué du site"
+      },
+      "statusHelp": "« Actif » — le produit est visible sur le site. « Brouillon » et « Archivé » — masqué.",
+      "fields": {
+        "price": "Prix",
+        "status": "Statut",
+        "sku": "Référence",
+        "slug": "Adresse de la page sur le site",
+        "compareAtPrice": "Prix avant remise (« avant »)",
+        "brand": "Marque",
+        "designer": "Designer",
+        "weight": "Poids (g)",
+        "length": "Longueur (cm)",
+        "width": "Largeur (cm)",
+        "height": "Hauteur (cm)"
+      },
+      "placeholders": {
+        "skuAuto": "laisser vide — généré automatiquement",
+        "slugAuto": "laisser vide — généré automatiquement à partir du nom",
+        "compareAtPrice": "laisser vide — sans remise"
+      },
+      "help": {
+        "sku": "Code produit pour la comptabilité. Facultatif.",
+        "slug": "Partie du lien du produit sur la vitrine. Facultatif."
+      },
+      "categoriesLegend": "Catégories",
+      "noCategoriesHint": "Aucune catégorie pour le moment. Créez-les dans la section « Catégories ».",
+      "primaryCategoryRadio": "principale",
+      "advancedSummary": "Paramètres supplémentaires — facultatif",
+      "brandNone": "— sans marque —",
+      "designerNone": "— sans designer —",
+      "badgesLegend": "Badges de la vitrine",
+      "featuredLabel": "Afficher sur la page d’accueil (badge « meilleure vente » + bloc « Collection »)",
+      "isNewLabel": "Badge « Nouveauté » :",
+      "isNew": {
+        "auto": "Auto (par date)"
+      },
+      "dimensionsTitle": "Poids et dimensions (pour le calcul de la livraison)",
+      "dimensionsHelp": "Vide — la valeur par défaut des paramètres de la boutique est utilisée. Chaque variante peut avoir les siennes.",
+      "createButton": "Créer le produit",
+      "archiveButton": "Retirer de la vente",
+      "deleteButton": "Supprimer définitivement",
+      "confirmArchive": "Retirer le produit de la vente ? Il disparaîtra du site mais restera dans le catalogue — vous pourrez le rétablir plus tard en choisissant le statut « Actif ».",
+      "confirmDelete": "Supprimer le produit DÉFINITIVEMENT ? Cette action est irréversible : le produit et ses variantes/photos/stocks seront supprimés. L’historique des commandes de ce produit sera conservé. Si vous voulez simplement le retirer du site — utilisez « Retirer de la vente ».",
+      "toast": {
+        "archived": "Le produit a été retiré de la vente (archivé) — il n’est plus affiché sur le site."
+      },
+      "notes": {
+        "noPrice": "Aucun prix défini — il s’affichera comme 0 sur la vitrine. Indiquez un prix.",
+        "noStock": "0 en stock — la vitrine affiche « Rupture de stock » (le bouton d’achat est désactivé). Définissez le stock dans l’onglet « Variantes »."
+      },
+      "visibility": {
+        "visible": "✓ Le produit est <strong>visible par les clients</strong> dans le catalogue sur le site.",
+        "hidden": "⚠ Le produit est <strong>masqué du site</strong>. Pour qu’il apparaisse dans le catalogue sur la vitrine, choisissez le statut « Actif — visible sur le site »."
+      },
+      "colors": {
+        "intro": "Pastilles de couleur sur la fiche produit. Vous pouvez les laisser vides — le bloc des couleurs ne s’affiche alors pas sur le site. Choisissez une couleur dans la liste (le nom et la teinte seront remplis) ou définissez votre propre teinte.",
+        "slotPrimary": "Couleur principale",
+        "slotSecondary": "Couleur secondaire",
+        "fromList": "Couleur de la liste",
+        "notSelected": "— non sélectionnée —",
+        "name": "Nom de la couleur",
+        "namePlaceholder": "facultatif",
+        "shade": "Teinte",
+        "clear": "Effacer",
+        "pickShadeAria": "{slot} : choisir une teinte",
+        "hexAria": "{slot} : code couleur"
+      },
+      "seo": {
+        "afterSaveHint": "OG/canonical/noindex deviennent disponibles après l’enregistrement du produit.",
+        "canonicalPlaceholder": "Auto : /product/{slug}",
+        "slugFallback": "slug-produit"
+      }
+    },
+    "category": {
+      "edit": "Modifier",
+      "move": "Déplacer",
+      "rename": "Renommer",
+      "more": "Plus",
+      "hide": "Masquer",
+      "show": "Afficher",
+      "topLevel": "— niveau supérieur —",
+      "hiddenBadge": "(masquée)",
+      "childCountTitle": "Sous-catégories à l’intérieur",
+      "collapseTitle": "Réduire les sous-catégories",
+      "expandTitle": "Afficher les sous-catégories",
+      "collapseAria": "Réduire les sous-catégories de « {name} »",
+      "expandAria": "Afficher les sous-catégories de « {name} »",
+      "expandAll": "Tout développer",
+      "collapseAll": "Tout réduire",
+      "shownCount": "Affichés {shown} sur {total}",
+      "emptyHint": "Aucune catégorie pour le moment. Créez la première dans le formulaire ci-dessous — les produits sont classés par catégorie dans le catalogue du site.",
+      "newHeading": "Nouvelle catégorie",
+      "slugLabel": "Adresse sur le site",
+      "slugPlaceholder": "facultatif — généré automatiquement",
+      "parentLabel": "Dans la catégorie",
+      "createButton": "Créer la catégorie",
+      "confirmDelete": "Supprimer la catégorie « {name} » ?",
+      "toast": {
+        "created": "Catégorie créée.",
+        "renamed": "Renommée.",
+        "moved": "Catégorie déplacée.",
+        "hidden": "Catégorie masquée sur le site.",
+        "shown": "Catégorie affichée sur le site.",
+        "deleted": "Catégorie supprimée."
+      }
+    },
+    "attribute": {
+      "types": {
+        "select": "Liste de valeurs (select)",
+        "text": "Texte",
+        "number": "Nombre",
+        "boolean": "Oui / non"
+      },
+      "fields": {
+        "code": "Code",
+        "type": "Type de valeur",
+        "unit": "Unité de mesure",
+        "sort": "Ordre (sort)"
+      },
+      "placeholders": {
+        "code": "ex. : color, size",
+        "name": "ex. : Couleur, Taille",
+        "unit": "ex. : cm, kg (facultatif)"
+      },
+      "help": {
+        "code": "Lettres latines minuscules, chiffres et tiret bas.",
+        "codeLocked": "Non modifiable.",
+        "codeOnce": "Défini une seule fois.",
+        "type": "Pour « Liste de valeurs », le dictionnaire des valeurs est ci-dessous ; pour les autres, la valeur est saisie sur le produit."
+      },
+      "flagsLegend": "Indicateurs de la caractéristique",
+      "flags": {
+        "variant": "Attribut de variante",
+        "filterable": "Dans les filtres de la vitrine",
+        "required": "Obligatoire"
+      },
+      "createButton": "Créer la caractéristique"
+    }
   }
 }

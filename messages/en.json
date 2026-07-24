@@ -185,5 +185,161 @@
     "designerName": "Name",
     "country": "Country",
     "title": "Title"
+  },
+  "catalog": {
+    "common": {
+      "savedChanges": "Changes saved."
+    },
+    "product": {
+      "tabs": {
+        "main": "General",
+        "colors": "Colors",
+        "variants": "Variants",
+        "attributes": "Attributes",
+        "media": "Media"
+      },
+      "tabsAriaLabel": "Product sections",
+      "status": {
+        "draft": "Draft — hidden from the site",
+        "active": "Active — visible on the site",
+        "archived": "Archived — hidden from the site"
+      },
+      "statusHelp": "«Active» — the product is visible on the site. «Draft» and «Archived» — hidden.",
+      "fields": {
+        "price": "Price",
+        "status": "Status",
+        "sku": "SKU",
+        "slug": "Page URL on the site",
+        "compareAtPrice": "Price before discount («was»)",
+        "brand": "Brand",
+        "designer": "Designer",
+        "weight": "Weight (g)",
+        "length": "Length (cm)",
+        "width": "Width (cm)",
+        "height": "Height (cm)"
+      },
+      "placeholders": {
+        "skuAuto": "leave empty — generated automatically",
+        "slugAuto": "leave empty — generated automatically from the name",
+        "compareAtPrice": "leave empty — no discount"
+      },
+      "help": {
+        "sku": "Product code for accounting. Optional.",
+        "slug": "Part of the product link on the storefront. Optional."
+      },
+      "categoriesLegend": "Categories",
+      "noCategoriesHint": "No categories yet. Create them in the «Categories» section.",
+      "primaryCategoryRadio": "primary",
+      "advancedSummary": "Additional settings — optional",
+      "brandNone": "— no brand —",
+      "designerNone": "— no designer —",
+      "badgesLegend": "Storefront badges",
+      "featuredLabel": "Show on the homepage (badge «bestseller» + «Collection» block)",
+      "isNewLabel": "«New» badge:",
+      "isNew": {
+        "auto": "Auto (by date)"
+      },
+      "dimensionsTitle": "Weight and dimensions (for delivery calculation)",
+      "dimensionsHelp": "Empty — the default value from the store settings is used. Each variant can have its own.",
+      "createButton": "Create product",
+      "archiveButton": "Remove from sale",
+      "deleteButton": "Delete permanently",
+      "confirmArchive": "Remove the product from sale? It will disappear from the site but stay in the catalog — you can bring it back later by choosing the «Active» status.",
+      "confirmDelete": "Delete the product PERMANENTLY? This action cannot be undone: the product and its variants/photos/stock will be deleted. The order history for this product will be kept. If you just need to remove it from the site — use «Remove from sale».",
+      "toast": {
+        "archived": "The product has been removed from sale (archived) — it is no longer shown on the site."
+      },
+      "notes": {
+        "noPrice": "No price set — it will show as 0 on the storefront. Set a price.",
+        "noStock": "0 in stock — the storefront shows «Out of stock» (the buy button is disabled). Set the stock on the «Variants» tab."
+      },
+      "visibility": {
+        "visible": "✓ The product is <strong>visible to customers</strong> in the catalog on the site.",
+        "hidden": "⚠ The product is <strong>hidden from the site</strong>. To make it appear in the catalog on the storefront, choose the «Active — visible on the site» status."
+      },
+      "colors": {
+        "intro": "Color swatches on the product card. You can leave them empty — then the colors block is not shown on the site. Pick a color from the list (the name and shade will be filled in) or set your own shade.",
+        "slotPrimary": "Primary color",
+        "slotSecondary": "Secondary color",
+        "fromList": "Color from the list",
+        "notSelected": "— not selected —",
+        "name": "Color name",
+        "namePlaceholder": "optional",
+        "shade": "Shade",
+        "clear": "Clear",
+        "pickShadeAria": "{slot}: pick a shade",
+        "hexAria": "{slot}: color code"
+      },
+      "seo": {
+        "afterSaveHint": "OG/canonical/noindex become available after the product is saved.",
+        "canonicalPlaceholder": "Auto: /product/{slug}",
+        "slugFallback": "product-slug"
+      }
+    },
+    "category": {
+      "edit": "Edit",
+      "move": "Move",
+      "rename": "Rename",
+      "more": "More",
+      "hide": "Hide",
+      "show": "Show",
+      "topLevel": "— top level —",
+      "hiddenBadge": "(hidden)",
+      "childCountTitle": "Subcategories inside",
+      "collapseTitle": "Collapse subcategories",
+      "expandTitle": "Show subcategories",
+      "collapseAria": "Collapse subcategories of «{name}»",
+      "expandAria": "Show subcategories of «{name}»",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "shownCount": "Showing {shown} of {total}",
+      "emptyHint": "No categories yet. Create the first one in the form below — products are organized in the site catalog by category.",
+      "newHeading": "New category",
+      "slugLabel": "URL on the site",
+      "slugPlaceholder": "optional — generated automatically",
+      "parentLabel": "Inside category",
+      "createButton": "Create category",
+      "confirmDelete": "Delete category «{name}»?",
+      "toast": {
+        "created": "Category created.",
+        "renamed": "Renamed.",
+        "moved": "Category moved.",
+        "hidden": "Category hidden on the site.",
+        "shown": "Category shown on the site.",
+        "deleted": "Category deleted."
+      }
+    },
+    "attribute": {
+      "types": {
+        "select": "Value list (select)",
+        "text": "Text",
+        "number": "Number",
+        "boolean": "Yes / no"
+      },
+      "fields": {
+        "code": "Code",
+        "type": "Value type",
+        "unit": "Unit of measurement",
+        "sort": "Order (sort)"
+      },
+      "placeholders": {
+        "code": "e.g.: color, size",
+        "name": "e.g.: Color, Size",
+        "unit": "e.g.: cm, kg (optional)"
+      },
+      "help": {
+        "code": "Lowercase Latin letters, digits and underscore.",
+        "codeLocked": "Cannot be changed.",
+        "codeOnce": "Set once.",
+        "type": "For «Value list» the dictionary of values is below; for the rest the value is entered on the product."
+      },
+      "flagsLegend": "Attribute flags",
+      "flags": {
+        "variant": "Variant attribute",
+        "filterable": "In storefront filters",
+        "required": "Required"
+      },
+      "createButton": "Create attribute"
+    }
   }
 }
