@@ -1,0 +1,181 @@
+{
+  "common": {
+    "actions": {
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "delete": "Supprimer",
+      "add": "Ajouter",
+      "apply": "Appliquer",
+      "create": "Créer",
+      "edit": "Modifier",
+      "back": "Retour",
+      "close": "Fermer",
+      "reset": "Réinitialiser",
+      "logout": "Se déconnecter"
+    },
+    "states": {
+      "active": "Actif",
+      "disabled": "Désactivé",
+      "draft": "Brouillon",
+      "published": "Publié",
+      "hidden": "Masqué",
+      "loading": "Chargement…"
+    },
+    "table": {
+      "empty": "Aucune donnée",
+      "actions": "Actions",
+      "loading": "Chargement…"
+    },
+    "pagination": {
+      "prev": "Précédent",
+      "next": "Suivant",
+      "page": "Page {page} sur {total}"
+    },
+    "confirm": {
+      "title": "Confirmer l’action",
+      "message": "Êtes-vous sûr ?",
+      "yes": "Oui",
+      "no": "Non"
+    },
+    "form": {
+      "required": "Champ obligatoire",
+      "optional": "Facultatif",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré"
+    }
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "catalog": "Catalogue",
+    "orders": "Commandes",
+    "promo": "Codes promo",
+    "giftCertificates": "Cartes cadeaux",
+    "leads": "Demandes",
+    "subscribers": "Abonnés",
+    "cdek": "Livraison",
+    "cms": "Contenu",
+    "news": "Actualités",
+    "reviews": "Avis",
+    "customers": "Clients",
+    "users": "Utilisateurs",
+    "roles": "Rôles",
+    "audit": "Audit",
+    "settings": "Paramètres",
+    "languages": "Langues"
+  },
+  "layout": {
+    "topbar": {
+      "profileTitle": "Profil et changement de mot de passe",
+      "logout": "Se déconnecter",
+      "logoAlt": "Logo : {shopName}"
+    },
+    "sidebar": {
+      "mainNav": "Navigation principale",
+      "openMenu": "Ouvrir le menu",
+      "closeMenu": "Fermer le menu",
+      "menu": "Menu"
+    },
+    "breadcrumbs": {
+      "root": "Administration",
+      "ariaLabel": "Fil d’Ariane",
+      "back": "Retour"
+    }
+  },
+  "login": {
+    "subtitle": "Connexion au panneau d’administration",
+    "logoAlt": "Logo : {shopName}",
+    "emailLabel": "Identifiant ou e-mail",
+    "emailPlaceholder": "Identifiant ou e-mail",
+    "passwordLabel": "Mot de passe",
+    "submit": "Se connecter",
+    "submitting": "Connexion…"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "greeting": "Bonjour, {name}.",
+    "metrics": {
+      "products": "Produits au catalogue",
+      "categories": "Catégories",
+      "ordersToday": "Commandes aujourd’hui",
+      "ordersTotal": "Commandes au total",
+      "newLeads": "Nouvelles demandes"
+    },
+    "quickActions": {
+      "title": "Actions rapides",
+      "createProduct": "+ Créer un produit",
+      "catalog": "Catalogue de produits",
+      "categories": "Catégories",
+      "orders": "Commandes",
+      "delivery": "Livraison",
+      "settings": "Paramètres"
+    },
+    "charts": {
+      "orders": {
+        "title": "Commandes sur 14 jours",
+        "unit": "commandes"
+      },
+      "visits": {
+        "title": "Visites du site sur 14 jours",
+        "unit": "vues"
+      },
+      "total": "total {total} {unit}",
+      "empty": "Aucune donnée pour cette période.",
+      "ariaLabel": "{title} : total {total} {unit} sur {count} jours"
+    },
+    "aria": {
+      "metrics": "Indicateurs",
+      "charts": "Graphiques sur 14 jours",
+      "quickActions": "Actions rapides",
+      "leads": "Nouvelles demandes : {count}. Aller aux demandes"
+    }
+  },
+  "errors": {
+    "forbidden": {
+      "title": "Accès à la section refusé",
+      "message": "Cette section nécessite l’autorisation « {permission} ». Contactez l’administrateur de la boutique pour l’obtenir."
+    },
+    "singleUser": {
+      "title": "Mode utilisateur unique",
+      "manageUsers": "des utilisateurs",
+      "manageRoles": "des rôles",
+      "message": "La gestion {what} est désactivée : la boutique fonctionne en mode utilisateur unique. Vous pouvez réactiver la section dans « Paramètres → Accès »."
+    }
+  },
+  "seo": {
+    "legend": "SEO",
+    "titleLabel": "Titre pour les moteurs de recherche",
+    "titlePlaceholder": "Par défaut — le nom de l’élément",
+    "descLabel": "Description pour les moteurs de recherche",
+    "previewTitle": "Titre",
+    "previewDesc": "La description apparaîtra ici…",
+    "ogTitleLabel": "Titre OG",
+    "ogImageLabel": "Image pour les réseaux sociaux (chemin du fichier)",
+    "ogDescLabel": "Description OG",
+    "canonicalLabel": "Adresse principale de la page",
+    "canonicalPlaceholder": "Générée depuis le slug et le domaine",
+    "canonicalHelp": "URL https absolue ou chemin commençant par « / ». Vide — auto depuis le slug.",
+    "noindexLabel": "Masquer la page des moteurs de recherche"
+  },
+  "localeTabs": {
+    "ariaLabel": "Langue du contenu",
+    "baseTab": "{locale} · principal",
+    "translationHint": "Traduction pour {locale}. Un champ vide affiche le texte principal ({defaultLocale}) sur la vitrine. Les valeurs principales se modifient dans l’onglet « {defaultLocale} · principal ».",
+    "translationHintCreate": "La traduction sera enregistrée avec la création de l’enregistrement.",
+    "saveCreate": "Créer et enregistrer la traduction",
+    "saveEdit": "Enregistrer la traduction",
+    "saving": "Enregistrement…",
+    "noticeSingleLocale": "La boutique n’a qu’une seule langue — {base}. Rien à traduire : les langues supplémentaires s’activent dans les paramètres de la boutique.",
+    "noticeCreateFirst": "Les traductions ({others}) se remplissent après la création : enregistrez la fiche dans la langue principale ({base}) — et les onglets de langue apparaîtront sur sa fiche."
+  },
+  "fields": {
+    "name": "Nom",
+    "description": "Description",
+    "seoTitle": "Titre SEO",
+    "seoDescription": "Description SEO",
+    "ogTitle": "Titre OG",
+    "ogDescription": "Description OG",
+    "designerName": "Nom",
+    "country": "Pays",
+    "title": "Titre"
+  }
+}

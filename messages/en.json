@@ -1,0 +1,181 @@
+{
+  "common": {
+    "actions": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "add": "Add",
+      "apply": "Apply",
+      "create": "Create",
+      "edit": "Edit",
+      "back": "Back",
+      "close": "Close",
+      "reset": "Reset",
+      "logout": "Log out"
+    },
+    "states": {
+      "active": "Active",
+      "disabled": "Disabled",
+      "draft": "Draft",
+      "published": "Published",
+      "hidden": "Hidden",
+      "loading": "Loading…"
+    },
+    "table": {
+      "empty": "No data",
+      "actions": "Actions",
+      "loading": "Loading…"
+    },
+    "pagination": {
+      "prev": "Previous",
+      "next": "Next",
+      "page": "Page {page} of {total}"
+    },
+    "confirm": {
+      "title": "Confirm action",
+      "message": "Are you sure?",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "form": {
+      "required": "Required field",
+      "optional": "Optional",
+      "saving": "Saving…",
+      "saved": "Saved"
+    }
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "catalog": "Catalog",
+    "orders": "Orders",
+    "promo": "Promo codes",
+    "giftCertificates": "Gift certificates",
+    "leads": "Leads",
+    "subscribers": "Subscribers",
+    "cdek": "Delivery",
+    "cms": "Content",
+    "news": "News",
+    "reviews": "Reviews",
+    "customers": "Customers",
+    "users": "Users",
+    "roles": "Roles",
+    "audit": "Audit",
+    "settings": "Settings",
+    "languages": "Languages"
+  },
+  "layout": {
+    "topbar": {
+      "profileTitle": "Profile and password change",
+      "logout": "Log out",
+      "logoAlt": "Logo: {shopName}"
+    },
+    "sidebar": {
+      "mainNav": "Main navigation",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "menu": "Menu"
+    },
+    "breadcrumbs": {
+      "root": "Admin",
+      "ariaLabel": "Breadcrumbs",
+      "back": "Back"
+    }
+  },
+  "login": {
+    "subtitle": "Sign in to the admin panel",
+    "logoAlt": "Logo: {shopName}",
+    "emailLabel": "Login or email",
+    "emailPlaceholder": "Login or email",
+    "passwordLabel": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Hello, {name}.",
+    "metrics": {
+      "products": "Products in catalog",
+      "categories": "Categories",
+      "ordersToday": "Orders today",
+      "ordersTotal": "Total orders",
+      "newLeads": "New leads"
+    },
+    "quickActions": {
+      "title": "Quick actions",
+      "createProduct": "+ Create product",
+      "catalog": "Product catalog",
+      "categories": "Categories",
+      "orders": "Orders",
+      "delivery": "Delivery",
+      "settings": "Settings"
+    },
+    "charts": {
+      "orders": {
+        "title": "Orders over 14 days",
+        "unit": "orders"
+      },
+      "visits": {
+        "title": "Site visits over 14 days",
+        "unit": "views"
+      },
+      "total": "total {total} {unit}",
+      "empty": "No data for this period yet.",
+      "ariaLabel": "{title}: total {total} {unit} over {count} days"
+    },
+    "aria": {
+      "metrics": "Metrics",
+      "charts": "Charts over 14 days",
+      "quickActions": "Quick actions",
+      "leads": "New leads: {count}. Go to leads"
+    }
+  },
+  "errors": {
+    "forbidden": {
+      "title": "Section access denied",
+      "message": "This section requires the «{permission}» permission. Contact the store administrator to have it granted."
+    },
+    "singleUser": {
+      "title": "Single-user mode",
+      "manageUsers": "users",
+      "manageRoles": "roles",
+      "message": "Managing {what} is disabled: the store runs in single-user mode. You can re-enable the section under «Settings → Access»."
+    }
+  },
+  "seo": {
+    "legend": "SEO",
+    "titleLabel": "Search engine title",
+    "titlePlaceholder": "Defaults to the entity name",
+    "descLabel": "Search engine description",
+    "previewTitle": "Title",
+    "previewDesc": "Description will appear here…",
+    "ogTitleLabel": "OG title",
+    "ogImageLabel": "Social image (file path)",
+    "ogDescLabel": "OG description",
+    "canonicalLabel": "Canonical page URL",
+    "canonicalPlaceholder": "Auto-generated from slug and domain",
+    "canonicalHelp": "Absolute https URL or a path starting with «/». Empty — auto from slug.",
+    "noindexLabel": "Hide the page from search engines"
+  },
+  "localeTabs": {
+    "ariaLabel": "Content language",
+    "baseTab": "{locale} · primary",
+    "translationHint": "Translation for {locale}. An empty field shows the primary ({defaultLocale}) text on the storefront. Primary values are edited on the «{defaultLocale} · primary» tab.",
+    "translationHintCreate": "The translation will be saved together with the record.",
+    "saveCreate": "Create and save translation",
+    "saveEdit": "Save translation",
+    "saving": "Saving…",
+    "noticeSingleLocale": "The store has a single language — {base}. Nothing to translate: additional languages are enabled in the store settings.",
+    "noticeCreateFirst": "Translations ({others}) are filled in after creation: save the record in the primary language ({base}) — and language tabs will appear on its card."
+  },
+  "fields": {
+    "name": "Name",
+    "description": "Description",
+    "seoTitle": "SEO Title",
+    "seoDescription": "SEO Description",
+    "ogTitle": "OG Title",
+    "ogDescription": "OG Description",
+    "designerName": "Name",
+    "country": "Country",
+    "title": "Title"
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "common": {
+    "actions": {
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "delete": "Удалить",
+      "add": "Добавить",
+      "apply": "Применить",
+      "create": "Создать",
+      "edit": "Редактировать",
+      "back": "Назад",
+      "close": "Закрыть",
+      "reset": "Сбросить",
+      "logout": "Выйти"
+    },
+    "states": {
+      "active": "Активен",
+      "disabled": "Отключён",
+      "draft": "Черновик",
+      "published": "Опубликован",
+      "hidden": "Скрыт",
+      "loading": "Загрузка…"
+    },
+    "table": {
+      "empty": "Нет данных",
+      "actions": "Действия",
+      "loading": "Загрузка…"
+    },
+    "pagination": {
+      "prev": "Предыдущая",
+      "next": "Следующая",
+      "page": "Страница {page} из {total}"
+    },
+    "confirm": {
+      "title": "Подтвердите действие",
+      "message": "Вы уверены?",
+      "yes": "Да",
+      "no": "Нет"
+    },
+    "form": {
+      "required": "Обязательное поле",
+      "optional": "Необязательно",
+      "saving": "Сохранение…",
+      "saved": "Сохранено"
+    }
+  },
+  "nav": {
+    "dashboard": "Дашборд",
+    "catalog": "Каталог",
+    "orders": "Заказы",
+    "promo": "Промокоды",
+    "giftCertificates": "Сертификаты",
+    "leads": "Заявки",
+    "subscribers": "Подписчики",
+    "cdek": "Доставка",
+    "cms": "Контент",
+    "news": "Новости",
+    "reviews": "Отзывы",
+    "customers": "Покупатели",
+    "users": "Пользователи",
+    "roles": "Роли",
+    "audit": "Аудит",
+    "settings": "Настройки",
+    "languages": "Языки"
+  },
+  "layout": {
+    "topbar": {
+      "profileTitle": "Профиль и смена пароля",
+      "logout": "Выйти",
+      "logoAlt": "Логотип: {shopName}"
+    },
+    "sidebar": {
+      "mainNav": "Основная навигация",
+      "openMenu": "Открыть меню",
+      "closeMenu": "Закрыть меню",
+      "menu": "Меню"
+    },
+    "breadcrumbs": {
+      "root": "Админка",
+      "ariaLabel": "Хлебные крошки",
+      "back": "Назад"
+    }
+  },
+  "login": {
+    "subtitle": "Вход в панель управления",
+    "logoAlt": "Логотип: {shopName}",
+    "emailLabel": "Логин или email",
+    "emailPlaceholder": "Логин или email",
+    "passwordLabel": "Пароль",
+    "submit": "Войти",
+    "submitting": "Вход…"
+  },
+  "dashboard": {
+    "title": "Дашборд",
+    "greeting": "Здравствуйте, {name}.",
+    "metrics": {
+      "products": "Товаров в каталоге",
+      "categories": "Категорий",
+      "ordersToday": "Заказов сегодня",
+      "ordersTotal": "Заказов всего",
+      "newLeads": "Новые заявки"
+    },
+    "quickActions": {
+      "title": "Быстрые действия",
+      "createProduct": "+ Создать товар",
+      "catalog": "Каталог товаров",
+      "categories": "Категории",
+      "orders": "Заказы",
+      "delivery": "Доставка",
+      "settings": "Настройки"
+    },
+    "charts": {
+      "orders": {
+        "title": "Заказы за 14 дней",
+        "unit": "заказов"
+      },
+      "visits": {
+        "title": "Посещения сайта за 14 дней",
+        "unit": "просмотров"
+      },
+      "total": "всего {total} {unit}",
+      "empty": "Пока нет данных за период.",
+      "ariaLabel": "{title}: всего {total} {unit} за {count} дней"
+    },
+    "aria": {
+      "metrics": "Показатели",
+      "charts": "Графики за 14 дней",
+      "quickActions": "Быстрые действия",
+      "leads": "Новые заявки: {count}. Перейти к заявкам"
+    }
+  },
+  "errors": {
+    "forbidden": {
+      "title": "Доступ к разделу закрыт",
+      "message": "Для этого раздела нужно право «{permission}». Обратитесь к администратору магазина, чтобы его выдали."
+    },
+    "singleUser": {
+      "title": "Однопользовательский режим",
+      "manageUsers": "пользователями",
+      "manageRoles": "ролями",
+      "message": "Управление {what} отключено: магазин работает в однопользовательском режиме. Включить раздел снова можно в разделе «Настройки → Доступ»."
+    }
+  },
+  "seo": {
+    "legend": "SEO",
+    "titleLabel": "Заголовок для поисковиков",
+    "titlePlaceholder": "По умолчанию — название сущности",
+    "descLabel": "Описание для поисковиков",
+    "previewTitle": "Заголовок",
+    "previewDesc": "Описание появится здесь…",
+    "ogTitleLabel": "OG-заголовок",
+    "ogImageLabel": "Картинка для соцсетей (адрес файла)",
+    "ogDescLabel": "OG-описание",
+    "canonicalLabel": "Основной адрес страницы",
+    "canonicalPlaceholder": "Автоген из slug и домена",
+    "canonicalHelp": "Абсолютный https-URL или путь с ведущим «/». Пусто — авто из slug.",
+    "noindexLabel": "Скрыть страницу от поисковиков"
+  },
+  "localeTabs": {
+    "ariaLabel": "Язык контента",
+    "baseTab": "{locale} · основной",
+    "translationHint": "Перевод для языка {locale}. Пустое поле — на витрине показывается основной ({defaultLocale}) текст. Основные значения редактируются на вкладке «{defaultLocale} · основной».",
+    "translationHintCreate": "Перевод сохранится вместе с созданием записи.",
+    "saveCreate": "Создать и сохранить перевод",
+    "saveEdit": "Сохранить перевод",
+    "saving": "Сохранение…",
+    "noticeSingleLocale": "В магазине включён один язык — {base}. Переводить нечего: дополнительные языки подключаются в настройках магазина.",
+    "noticeCreateFirst": "Переводы ({others}) заполняются после создания: сохраните запись на основном языке ({base}) — и на её карточке появятся вкладки языков."
+  },
+  "fields": {
+    "name": "Название",
+    "description": "Описание",
+    "seoTitle": "SEO Title",
+    "seoDescription": "SEO Description",
+    "ogTitle": "OG Title",
+    "ogDescription": "OG Description",
+    "designerName": "Имя",
+    "country": "Страна",
+    "title": "Заголовок"
+  }
+}

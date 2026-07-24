@@ -1,3 +1,10 @@
+import createNextIntlPlugin from 'next-intl/plugin';
+
+// Плагин next-intl подключает request-конфиг ./i18n/request.ts (путь по умолчанию)
+// — источник locale/messages для интерфейса админки. Роутинга по языку нет: язык
+// берётся из cookie NEXT_LOCALE (см. i18n/request.ts).
+const withNextIntl = createNextIntlPlugin();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -18,4 +25,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);
