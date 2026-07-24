@@ -46,7 +46,7 @@ export function ImageUploadButton({
       onUploaded(res.data.key);
       setDone(true);
     } else {
-      setError(errorMessage(res as Fail));
+      setError(errorMessage(res as Fail, t));
     }
   }
 

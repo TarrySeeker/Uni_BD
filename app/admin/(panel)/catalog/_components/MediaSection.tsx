@@ -77,7 +77,7 @@ export function MediaSection({ product }: { product: ProductDetail }) {
     <div>
       {error ? (
         <div role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
           {error.fieldErrors?.file ? ` ${error.fieldErrors.file[0]}` : ''}
         </div>
       ) : null}

@@ -74,7 +74,7 @@ export function SettingsTranslationTabs({
     for (const save of buildContentI18nSaves(section, trState)) {
       const res = (await updateContentI18n(save)) as ActionResult<unknown>;
       if (!res.ok) {
-        setError(errorMessage(res as Fail));
+        setError(errorMessage(res as Fail, t));
         setPending(false);
         return;
       }

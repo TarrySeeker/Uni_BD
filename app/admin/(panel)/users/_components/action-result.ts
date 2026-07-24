@@ -6,20 +6,23 @@ import type { ActionResult } from '@/lib/server/action';
  * — показываем его как есть; иначе — обобщённый текст по коду ошибки.
  * fieldErrors показываются у полей, общая ошибка — этим сообщением.
  */
-export function errorMessage(result: Extract<ActionResult<unknown>, { ok: false }>): string {
+export function errorMessage(
+  result: Extract<ActionResult<unknown>, { ok: false }>,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
   if (result.message) {
     return result.message;
   }
   switch (result.error) {
     case 'unauthorized':
-      return 'Требуется вход в систему.';
+      return t('errors.action.unauthorized');
     case 'forbidden':
-      return 'Недостаточно прав для этого действия.';
+      return t('errors.action.forbiddenGeneric');
     case 'validation':
-      return 'Проверьте корректность полей формы.';
+      return t('errors.action.validation');
     case 'internal':
     default:
-      return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
+      return t('errors.action.internal');
   }
 }
 

@@ -84,7 +84,7 @@ export function LeadRowActions({ id, status }: { id: string; status: string }) {
       </div>
       {error ? (
         <div role="alert" className="text-xs text-red-700">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </div>
       ) : null}
     </div>

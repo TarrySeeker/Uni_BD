@@ -212,7 +212,7 @@ export function SectionEditor({
           role="alert"
           className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
         >
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </div>
       ) : null}
 

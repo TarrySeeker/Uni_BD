@@ -91,7 +91,7 @@ export function PromoRowActions({
       </div>
       {error ? (
         <span role="alert" className="text-xs text-red-600">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </span>
       ) : null}
     </div>

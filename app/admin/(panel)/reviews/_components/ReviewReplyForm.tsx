@@ -135,7 +135,7 @@ export function ReviewReplyForm({
 
       {error ? (
         <div role="alert" className="mt-3 text-sm text-red-700">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </div>
       ) : null}
     </div>

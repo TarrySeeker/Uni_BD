@@ -195,7 +195,8 @@
       "invalidFile": "Fichier non valide.",
       "storageSaveFailed": "Échec de l’enregistrement du fichier dans le stockage.",
       "exchangeFetchFailed": "Impossible de récupérer les taux auprès de la Banque centrale de Russie. Les taux précédents ont été conservés, réessayez plus tard.",
-      "defaultLocaleImmutable": "La langue par défaut (« {locale} ») ne peut pas être modifiée : elle est stockée dans les champs de base du catalogue et du contenu. La modifier nécessite une migration des données."
+      "defaultLocaleImmutable": "La langue par défaut (« {locale} ») ne peut pas être modifiée : elle est stockée dans les champs de base du catalogue et du contenu. La modifier nécessite une migration des données.",
+      "saveFailed": "Échec de l'enregistrement des paramètres. Veuillez réessayer."
     },
     "newsAction": {
       "slugExists": "Un article d'actualité avec cette adresse (slug) existe déjà."
@@ -264,6 +265,13 @@
     },
     "newsletter": {
       "subscriberNotFoundOrUnsubscribed": "Abonné introuvable ou déjà désabonné."
+    },
+    "action": {
+      "unauthorized": "Connexion requise.",
+      "forbidden": "Autorisations insuffisantes (nécessite {permission}).",
+      "forbiddenGeneric": "Vous n'avez pas l'autorisation pour cette action.",
+      "validation": "Veuillez vérifier les champs du formulaire.",
+      "internal": "L'opération a échoué. Veuillez réessayer."
     }
   },
   "seo": {

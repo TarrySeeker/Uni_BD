@@ -27,7 +27,7 @@ export function RoleDeleteButton({ id, title }: { id: string; title: string }) {
     if (result.ok) {
       router.refresh();
     } else {
-      window.alert(errorMessage(result));
+      window.alert(errorMessage(result, t));
     }
   }
 

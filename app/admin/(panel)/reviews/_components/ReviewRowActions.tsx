@@ -92,7 +92,7 @@ export function ReviewRowActions({
       </div>
       {error ? (
         <div role="alert" className="text-xs text-red-700">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </div>
       ) : null}
     </div>

@@ -31,7 +31,7 @@ export function LeadAnswerForm({ id, answer }: { id: string; answer: string | nu
       setSaved(true);
       router.refresh();
     } else {
-      setError(errorMessage(result));
+      setError(errorMessage(result, t));
     }
   }
 

@@ -5,18 +5,21 @@ import type { ActionResult } from '@/lib/server/action';
  * Доменное сообщение (PublicActionError: дубликат кода / номинал только вверх /
  * не найден) приходит в result.message — оно приоритетно.
  */
-export function errorMessage(result: Extract<ActionResult<unknown>, { ok: false }>): string {
+export function errorMessage(
+  result: Extract<ActionResult<unknown>, { ok: false }>,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
   if (result.message) return result.message;
   switch (result.error) {
     case 'unauthorized':
-      return 'Требуется вход в систему.';
+      return t('errors.action.unauthorized');
     case 'forbidden':
-      return 'Недостаточно прав (требуется gift.write).';
+      return t('errors.action.forbidden', { permission: 'gift.write' });
     case 'validation':
-      return 'Проверьте корректность данных.';
+      return t('errors.action.validation');
     case 'internal':
     default:
-      return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
+      return t('errors.action.internal');
   }
 }
 

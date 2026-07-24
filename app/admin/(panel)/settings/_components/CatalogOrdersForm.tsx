@@ -106,7 +106,7 @@ export function CatalogOrdersForm({
     <div>
       {error ? (
         <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </div>
       ) : null}
       {success ? (

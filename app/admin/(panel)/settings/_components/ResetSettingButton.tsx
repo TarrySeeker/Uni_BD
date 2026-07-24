@@ -67,7 +67,7 @@ export function ResetSettingButton({
       </button>
       {error ? (
         <span role="alert" className="text-sm text-red-700">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </span>
       ) : null}
       {success ? (

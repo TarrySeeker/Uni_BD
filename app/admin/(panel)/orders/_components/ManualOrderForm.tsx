@@ -222,7 +222,7 @@ export function ManualOrderForm({
     <div className="space-y-8">
       {error ? (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {errorMessage(error)}
+          {errorMessage(error, t)}
         </div>
       ) : null}
 

@@ -3,20 +3,21 @@ import type { ActionResult } from '@/lib/server/action';
 /** Человекочитаемое сообщение по коду отказа ActionResult (для форм новостей). */
 export function errorMessage(
   result: Extract<ActionResult<unknown>, { ok: false }>,
+  t: (key: string, values?: Record<string, string | number>) => string,
 ): string {
   if (result.message) {
     return result.message;
   }
   switch (result.error) {
     case 'unauthorized':
-      return 'Требуется вход в систему.';
+      return t('errors.action.unauthorized');
     case 'forbidden':
-      return 'Недостаточно прав (требуется news.write).';
+      return t('errors.action.forbidden', { permission: 'news.write' });
     case 'validation':
-      return 'Проверьте корректность полей формы.';
+      return t('errors.action.validation');
     case 'internal':
     default:
-      return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
+      return t('errors.action.internal');
   }
 }
 

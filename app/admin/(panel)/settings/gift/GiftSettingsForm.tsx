@@ -64,7 +64,7 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
           role="alert"
           className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
         >
-          {localError ?? errorMessage(error!)}
+          {localError ?? errorMessage(error!, t)}
         </div>
       ) : null}
       {success ? (

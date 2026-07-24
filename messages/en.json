@@ -195,7 +195,8 @@
       "invalidFile": "Invalid file.",
       "storageSaveFailed": "Failed to save the file to storage.",
       "exchangeFetchFailed": "Failed to fetch rates from the Central Bank of Russia. The previous rates were kept, please try again later.",
-      "defaultLocaleImmutable": "The default language («{locale}») cannot be changed: it is stored in the base fields of the catalog and content. Changing it requires a data migration."
+      "defaultLocaleImmutable": "The default language («{locale}») cannot be changed: it is stored in the base fields of the catalog and content. Changing it requires a data migration.",
+      "saveFailed": "Failed to save the settings. Please try again."
     },
     "newsAction": {
       "slugExists": "A news article with this address (slug) already exists."
@@ -264,6 +265,13 @@
     },
     "newsletter": {
       "subscriberNotFoundOrUnsubscribed": "Subscriber not found or already unsubscribed."
+    },
+    "action": {
+      "unauthorized": "Sign-in required.",
+      "forbidden": "Insufficient permissions (requires {permission}).",
+      "forbiddenGeneric": "You do not have permission for this action.",
+      "validation": "Please check the form fields.",
+      "internal": "The operation failed. Please try again."
     }
   },
   "seo": {
