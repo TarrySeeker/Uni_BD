@@ -213,7 +213,12 @@
       "emailInvalid": "Enter a valid email address",
       "passwordMinLength": "Password must be at least 8 characters long",
       "roleCodeFormat": "Role code: lowercase Latin letters, starting with a letter (2–31 characters)",
-      "roleTitleRequired": "Enter a title"
+      "roleTitleRequired": "Enter a title",
+      "changePassword": {
+        "newPasswordMin": "Password must be at least 8 characters long",
+        "invalidInput": "Please check the entered data",
+        "wrongCurrent": "The current password is incorrect"
+      }
     },
     "cms": {
       "productsGridSlugsRequired": "mode='slugs' requires a non-empty list of slugs",
@@ -229,6 +234,36 @@
     },
     "seo": {
       "canonicalInvalid": "canonical_url: expected an absolute https URL or a relative path starting with «/»"
+    },
+    "authAdmin": {
+      "rolesAssignForbidden": "You do not have permission to assign roles.",
+      "ownerImmutable": "The store owner cannot be modified or disabled.",
+      "userEmailExists": "A user with this email already exists.",
+      "cannotChangeOwnRoles": "You cannot change your own roles — ask another administrator.",
+      "userNotFound": "User not found.",
+      "cannotDisableSelf": "You cannot disable your own account.",
+      "roleCodeExists": "A role with this code already exists.",
+      "roleNotFound": "Role not found.",
+      "systemRoleCannotDelete": "A system role cannot be deleted.",
+      "singleUserModeCreateUser": "Single-user mode: creating users is disabled.",
+      "singleUserModeManageUsers": "Single-user mode: user management is disabled.",
+      "singleUserModeManageRoles": "Single-user mode: role management is disabled."
+    },
+    "leadsActions": {
+      "leadNotFound": "Lead not found.",
+      "invalidTransition": "Invalid lead status transition: «{from}» → «{to}»."
+    },
+    "cmsActions": {
+      "slugAlreadyExists": "A page with this address (slug) already exists.",
+      "invalidFile": "Invalid file.",
+      "storagePutFailed": "Failed to save the file to storage."
+    },
+    "newsActions": {
+      "invalidFile": "Invalid file.",
+      "storageSaveFailed": "Failed to save the file to storage."
+    },
+    "newsletter": {
+      "subscriberNotFoundOrUnsubscribed": "Subscriber not found or already unsubscribed."
     }
   },
   "seo": {

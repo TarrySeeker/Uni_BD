@@ -212,9 +212,7 @@ export const updateCmsPage = defineAction({
       `;
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new PublicActionError(
-          'Страница с таким адресом (slug) уже существует.',
-        );
+        throw new PublicActionError('errors.cmsActions.slugAlreadyExists');
       }
       throw err;
     }
@@ -531,7 +529,7 @@ const _uploadCmsImage = defineAction({
 
     const validation = await validateUpload(data.bytes, data.filename);
     if (!validation.ok || !validation.mime) {
-      throw new PublicActionError(validation.error ?? 'Недопустимый файл.');
+      throw new PublicActionError(validation.error ?? 'errors.cmsActions.invalidFile');
     }
 
     const previews = await generatePreviews(data.bytes);
@@ -543,7 +541,7 @@ const _uploadCmsImage = defineAction({
     try {
       put = await storage.put(key, main.buffer, 'image/webp');
     } catch {
-      throw new PublicActionError('Не удалось сохранить файл в хранилище.');
+      throw new PublicActionError('errors.cmsActions.storagePutFailed');
     }
 
     return {

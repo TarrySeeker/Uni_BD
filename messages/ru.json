@@ -213,7 +213,12 @@
       "emailInvalid": "Укажите корректный email",
       "passwordMinLength": "Пароль не короче 8 символов",
       "roleCodeFormat": "Код роли: латиница в нижнем регистре, начинается с буквы (2–31 символ)",
-      "roleTitleRequired": "Укажите название"
+      "roleTitleRequired": "Укажите название",
+      "changePassword": {
+        "newPasswordMin": "Минимальная длина пароля — 8 символов",
+        "invalidInput": "Проверьте корректность введённых данных",
+        "wrongCurrent": "Текущий пароль неверен"
+      }
     },
     "cms": {
       "productsGridSlugsRequired": "mode='slugs' требует непустой список slugs",
@@ -229,6 +234,36 @@
     },
     "seo": {
       "canonicalInvalid": "canonical_url: ожидается абсолютный https-URL или относительный путь с ведущим «/»"
+    },
+    "authAdmin": {
+      "rolesAssignForbidden": "Недостаточно прав для назначения ролей.",
+      "ownerImmutable": "Владельца магазина нельзя изменять или отключать.",
+      "userEmailExists": "Пользователь с таким email уже существует.",
+      "cannotChangeOwnRoles": "Нельзя менять собственные роли — попросите другого администратора.",
+      "userNotFound": "Пользователь не найден.",
+      "cannotDisableSelf": "Нельзя отключить собственную учётную запись.",
+      "roleCodeExists": "Роль с таким кодом уже существует.",
+      "roleNotFound": "Роль не найдена.",
+      "systemRoleCannotDelete": "Системную роль удалить нельзя.",
+      "singleUserModeCreateUser": "Однопользовательский режим: создание пользователей отключено.",
+      "singleUserModeManageUsers": "Однопользовательский режим: управление пользователями отключено.",
+      "singleUserModeManageRoles": "Однопользовательский режим: управление ролями отключено."
+    },
+    "leadsActions": {
+      "leadNotFound": "Заявка не найдена.",
+      "invalidTransition": "Недопустимый переход статуса заявки: «{from}» → «{to}»."
+    },
+    "cmsActions": {
+      "slugAlreadyExists": "Страница с таким адресом (slug) уже существует.",
+      "invalidFile": "Недопустимый файл.",
+      "storagePutFailed": "Не удалось сохранить файл в хранилище."
+    },
+    "newsActions": {
+      "invalidFile": "Недопустимый файл.",
+      "storageSaveFailed": "Не удалось сохранить файл в хранилище."
+    },
+    "newsletter": {
+      "subscriberNotFoundOrUnsubscribed": "Подписчик не найден или уже отписан."
     }
   },
   "seo": {

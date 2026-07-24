@@ -75,7 +75,7 @@ function filterKnownPermissions(codes: string[]): string[] {
  */
 function assertCanAssignRoles(ctx: ActionCtx): void {
   if (!can(ctx.user, 'roles.manage')) {
-    throw new PublicActionError('Недостаточно прав для назначения ролей.');
+    throw new PublicActionError('errors.authAdmin.rolesAssignForbidden');
   }
 }
 
@@ -94,7 +94,7 @@ async function assertNotOwner(id: string): Promise<{ id: string; is_owner: boole
   `;
   const row = rows[0];
   if (row?.is_owner) {
-    throw new PublicActionError('Владельца магазина нельзя изменять или отключать.');
+    throw new PublicActionError('errors.authAdmin.ownerImmutable');
   }
   return row ?? null;
 }
@@ -127,9 +127,7 @@ export const createUser = defineAction({
   input: UserCreateSchema,
   handler: async (data, ctx: ActionCtx) => {
     // Однопользовательский режим (B9): отказ ДО хеша пароля и любой записи.
-    await assertSingleUserModeAllows(
-      'Однопользовательский режим: создание пользователей отключено.',
-    );
+    await assertSingleUserModeAllows('errors.authAdmin.singleUserModeCreateUser');
 
     // Anti-escalation: назначение ролей требует roles.manage (до любой записи).
     // Создание без ролей доступно носителю одного users.manage.
@@ -153,7 +151,7 @@ export const createUser = defineAction({
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new PublicActionError('Пользователь с таким email уже существует.');
+        throw new PublicActionError('errors.authAdmin.userEmailExists');
       }
       throw err;
     }
@@ -182,9 +180,7 @@ export const updateUser = defineAction({
   input: UserUpdateSchema,
   handler: async (data, ctx: ActionCtx) => {
     // Однопользовательский режим (B9): управление пользователями заблокировано.
-    await assertSingleUserModeAllows(
-      'Однопользовательский режим: управление пользователями отключено.',
-    );
+    await assertSingleUserModeAllows('errors.authAdmin.singleUserModeManageUsers');
 
     // Защита владельца — единый хелпер (бросает PublicActionError, если is_owner).
     await assertNotOwner(data.id);
@@ -202,9 +198,7 @@ export const updateUser = defineAction({
     // Владелец сюда не дойдёт — его раньше отсекает assertNotOwner.
     const changingOwnRoles = data.roleIds !== undefined && data.id === ctx.user.id;
     if (changingOwnRoles) {
-      throw new PublicActionError(
-        'Нельзя менять собственные роли — попросите другого администратора.',
-      );
+      throw new PublicActionError('errors.authAdmin.cannotChangeOwnRoles');
     }
 
     const before = await sql<
@@ -214,14 +208,14 @@ export const updateUser = defineAction({
       FROM users WHERE id = ${data.id} LIMIT 1
     `;
     if (!before[0]) {
-      throw new PublicActionError('Пользователь не найден.');
+      throw new PublicActionError('errors.authAdmin.userNotFound');
     }
 
     // Нельзя отключить самого себя — иначе можно потерять доступ к админке.
     const disablingSelf =
       data.id === ctx.user.id && data.status !== undefined && data.status !== 'active';
     if (disablingSelf) {
-      throw new PublicActionError('Нельзя отключить собственную учётную запись.');
+      throw new PublicActionError('errors.authAdmin.cannotDisableSelf');
     }
 
     await sql.begin(async (tx: TransactionSql) => {
@@ -270,9 +264,7 @@ export const resetUserPassword = defineAction({
   input: UserPasswordResetSchema,
   handler: async (data, _ctx: ActionCtx) => {
     // Однопользовательский режим (B9): управление пользователями заблокировано.
-    await assertSingleUserModeAllows(
-      'Однопользовательский режим: управление пользователями отключено.',
-    );
+    await assertSingleUserModeAllows('errors.authAdmin.singleUserModeManageUsers');
 
     // Защита владельца (RBAC §5.4): нельзя сбросить пароль владельцу — иначе
     // носитель users.manage перехватил бы его учётку (privilege escalation).
@@ -286,7 +278,7 @@ export const resetUserPassword = defineAction({
       RETURNING id
     `;
     if (!rows[0]) {
-      throw new PublicActionError('Пользователь не найден.');
+      throw new PublicActionError('errors.authAdmin.userNotFound');
     }
 
     // Ротация сессий цели: после сброса пароля старые сессии должны умереть
@@ -315,7 +307,7 @@ export const createRole = defineAction({
   input: RoleCreateSchema,
   handler: async (data, _ctx: ActionCtx) => {
     // Однопользовательский режим (B9): управление ролями заблокировано (до записи).
-    await assertSingleUserModeAllows('Однопользовательский режим: управление ролями отключено.');
+    await assertSingleUserModeAllows('errors.authAdmin.singleUserModeManageRoles');
 
     const codes = filterKnownPermissions(data.permissionCodes);
 
@@ -333,7 +325,7 @@ export const createRole = defineAction({
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new PublicActionError('Роль с таким кодом уже существует.');
+        throw new PublicActionError('errors.authAdmin.roleCodeExists');
       }
       throw err;
     }
@@ -356,13 +348,13 @@ export const updateRole = defineAction({
   input: RoleUpdateSchema,
   handler: async (data, _ctx: ActionCtx) => {
     // Однопользовательский режим (B9): управление ролями заблокировано (до записи).
-    await assertSingleUserModeAllows('Однопользовательский режим: управление ролями отключено.');
+    await assertSingleUserModeAllows('errors.authAdmin.singleUserModeManageRoles');
 
     const before = await sql<{ id: string; code: string; title: string; is_system: boolean }[]>`
       SELECT id, code, title, is_system FROM roles WHERE id = ${data.id} LIMIT 1
     `;
     if (!before[0]) {
-      throw new PublicActionError('Роль не найдена.');
+      throw new PublicActionError('errors.authAdmin.roleNotFound');
     }
     // Системную роль править можно (название/права), но НЕ её код — он неизменяем
     // в принципе (схема UpdateSchema его не принимает).
@@ -405,16 +397,16 @@ export const deleteRole = defineAction({
   input: RoleIdSchema,
   handler: async (data, _ctx: ActionCtx) => {
     // Однопользовательский режим (B9): управление ролями заблокировано (до записи).
-    await assertSingleUserModeAllows('Однопользовательский режим: управление ролями отключено.');
+    await assertSingleUserModeAllows('errors.authAdmin.singleUserModeManageRoles');
 
     const before = await sql<{ id: string; code: string; is_system: boolean }[]>`
       SELECT id, code, is_system FROM roles WHERE id = ${data.id} LIMIT 1
     `;
     if (!before[0]) {
-      throw new PublicActionError('Роль не найдена.');
+      throw new PublicActionError('errors.authAdmin.roleNotFound');
     }
     if (before[0].is_system) {
-      throw new PublicActionError('Системную роль удалить нельзя.');
+      throw new PublicActionError('errors.authAdmin.systemRoleCannotDelete');
     }
     // ON DELETE CASCADE снимет привязки role_permissions и user_roles.
     await sql`DELETE FROM roles WHERE id = ${data.id}`;

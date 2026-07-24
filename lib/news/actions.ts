@@ -47,7 +47,7 @@ const _uploadNewsImage = defineAction({
 
     const validation = await validateUpload(data.bytes, data.filename);
     if (!validation.ok || !validation.mime) {
-      throw new PublicActionError(validation.error ?? 'Недопустимый файл.');
+      throw new PublicActionError(validation.error ?? 'errors.newsActions.invalidFile');
     }
 
     const previews = await generatePreviews(data.bytes);
@@ -57,7 +57,7 @@ const _uploadNewsImage = defineAction({
     try {
       put = await storage.put(key, previews.main.buffer, 'image/webp');
     } catch {
-      throw new PublicActionError('Не удалось сохранить файл в хранилище.');
+      throw new PublicActionError('errors.newsActions.storageSaveFailed');
     }
 
     return {

@@ -213,7 +213,12 @@
       "emailInvalid": "Saisissez une adresse e-mail valide",
       "passwordMinLength": "Le mot de passe doit comporter au moins 8 caractères",
       "roleCodeFormat": "Code de rôle : lettres latines minuscules, commençant par une lettre (2 à 31 caractères)",
-      "roleTitleRequired": "Saisissez un intitulé"
+      "roleTitleRequired": "Saisissez un intitulé",
+      "changePassword": {
+        "newPasswordMin": "Le mot de passe doit comporter au moins 8 caractères",
+        "invalidInput": "Veuillez vérifier les données saisies",
+        "wrongCurrent": "Le mot de passe actuel est incorrect"
+      }
     },
     "cms": {
       "productsGridSlugsRequired": "mode='slugs' nécessite une liste de slugs non vide",
@@ -229,6 +234,36 @@
     },
     "seo": {
       "canonicalInvalid": "canonical_url : une URL https absolue ou un chemin relatif commençant par «/» est attendu"
+    },
+    "authAdmin": {
+      "rolesAssignForbidden": "Vous n'avez pas l'autorisation d'attribuer des rôles.",
+      "ownerImmutable": "Le propriétaire de la boutique ne peut pas être modifié ni désactivé.",
+      "userEmailExists": "Un utilisateur avec cette adresse e-mail existe déjà.",
+      "cannotChangeOwnRoles": "Vous ne pouvez pas modifier vos propres rôles — demandez à un autre administrateur.",
+      "userNotFound": "Utilisateur introuvable.",
+      "cannotDisableSelf": "Vous ne pouvez pas désactiver votre propre compte.",
+      "roleCodeExists": "Un rôle avec ce code existe déjà.",
+      "roleNotFound": "Rôle introuvable.",
+      "systemRoleCannotDelete": "Un rôle système ne peut pas être supprimé.",
+      "singleUserModeCreateUser": "Mode mono-utilisateur : la création d'utilisateurs est désactivée.",
+      "singleUserModeManageUsers": "Mode mono-utilisateur : la gestion des utilisateurs est désactivée.",
+      "singleUserModeManageRoles": "Mode mono-utilisateur : la gestion des rôles est désactivée."
+    },
+    "leadsActions": {
+      "leadNotFound": "Demande introuvable.",
+      "invalidTransition": "Transition de statut de demande invalide : «{from}» → «{to}»."
+    },
+    "cmsActions": {
+      "slugAlreadyExists": "Une page avec cette adresse (slug) existe déjà.",
+      "invalidFile": "Fichier non valide.",
+      "storagePutFailed": "Échec de l'enregistrement du fichier dans le stockage."
+    },
+    "newsActions": {
+      "invalidFile": "Fichier non valide.",
+      "storageSaveFailed": "Échec de l'enregistrement du fichier dans le stockage."
+    },
+    "newsletter": {
+      "subscriberNotFoundOrUnsubscribed": "Abonné introuvable ou déjà désabonné."
     }
   },
   "seo": {

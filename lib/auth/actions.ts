@@ -1,5 +1,6 @@
 'use server';
 
+import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 
 import { sql } from '@/lib/db/client';
@@ -78,7 +79,7 @@ const changePasswordSchema = z.object({
   oldPassword: z.string().min(1),
   newPassword: z
     .string()
-    .min(MIN_PASSWORD_LENGTH, `Минимальная длина пароля — ${MIN_PASSWORD_LENGTH} символов`),
+    .min(MIN_PASSWORD_LENGTH, 'errors.auth.changePassword.newPasswordMin'),
 });
 
 // -----------------------------------------------------------------------------
@@ -310,16 +311,26 @@ export async function changePassword(
   raw: FormData | { oldPassword: string; newPassword: string },
 ): Promise<ChangePasswordResult> {
   const user = await requireUser();
+  // Это действие НЕ идёт через defineAction, поэтому локализуем сообщения здесь
+  // (в языке оператора: cookie NEXT_LOCALE → users.ui_locale). Ключи-сообщения
+  // резолвятся, обычные строки проходят как есть.
+  const t = await getTranslations();
 
   const parsed = changePasswordSchema.safeParse(
     readFields(raw, ['oldPassword', 'newPassword']),
   );
   if (!parsed.success) {
     const { fieldErrors } = parsed.error.flatten();
+    const localized: Record<string, string[]> = {};
+    for (const [field, msgs] of Object.entries(
+      fieldErrors as Record<string, string[]>,
+    )) {
+      localized[field] = (msgs ?? []).map((m) => (t.has(m) ? t(m) : m));
+    }
     return {
       ok: false,
-      message: 'Проверьте корректность введённых данных',
-      fieldErrors: fieldErrors as Record<string, string[]>,
+      message: t('errors.auth.changePassword.invalidInput'),
+      fieldErrors: localized,
     };
   }
   const { oldPassword, newPassword } = parsed.data;
@@ -331,7 +342,7 @@ export async function changePassword(
   `;
   const current = rows[0];
   if (!current || !(await verifyPassword(current.password_hash, oldPassword))) {
-    return { ok: false, message: 'Текущий пароль неверен' };
+    return { ok: false, message: t('errors.auth.changePassword.wrongCurrent') };
   }
 
   // (4) Хешируем и сохраняем новый пароль.

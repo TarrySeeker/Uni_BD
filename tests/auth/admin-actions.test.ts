@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -139,7 +141,7 @@ describe('resetUserPassword — защита владельца (privilege escal
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
-    expect(res.message).toBe('Владельца магазина нельзя изменять или отключать.');
+    expect(res.message).toBe('errors.authAdmin.ownerImmutable');
 
     // UPDATE password_hash НЕ должен был выполниться.
     const ranUpdate = h.state.sqlCalls.some((c) =>
@@ -176,7 +178,7 @@ describe('resetUserPassword — ротация сессий цели', () => {
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toBe('Пользователь не найден.');
+    expect(res.message).toBe('errors.authAdmin.userNotFound');
     expect(h.invalidateUserSessions).not.toHaveBeenCalled();
   });
 });
@@ -194,7 +196,7 @@ describe('updateUser — защита владельца и ротация пр�
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toBe('Владельца магазина нельзя изменять или отключать.');
+    expect(res.message).toBe('errors.authAdmin.ownerImmutable');
     expect(h.invalidateUserSessions).not.toHaveBeenCalled();
   });
 
@@ -250,7 +252,7 @@ describe('createUser — назначение ролей требует roles.ma
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
-    expect(res.message).toBe('Недостаточно прав для назначения ролей.');
+    expect(res.message).toBe('errors.authAdmin.rolesAssignForbidden');
 
     // Привязка ролей НЕ должна была произойти.
     expect(h.assignUserRoles).not.toHaveBeenCalled();
@@ -326,7 +328,7 @@ describe('updateUser — изменение ролей требует roles.mana
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
-    expect(res.message).toBe('Недостаточно прав для назначения ролей.');
+    expect(res.message).toBe('errors.authAdmin.rolesAssignForbidden');
 
     expect(h.assignUserRoles).not.toHaveBeenCalled();
     // UPDATE users SET ... также не должен выполниться.
@@ -389,7 +391,7 @@ describe('updateUser — запрет смены собственных роле
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
-    expect(res.message).toBe('Нельзя менять собственные роли — попросите другого администратора.');
+    expect(res.message).toBe('errors.authAdmin.cannotChangeOwnRoles');
 
     // Привязка ролей НЕ должна была произойти.
     expect(h.assignUserRoles).not.toHaveBeenCalled();
@@ -456,7 +458,7 @@ describe('createUser — однопользовательский режим', (
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
-    expect(res.message).toBe('Однопользовательский режим: создание пользователей отключено.');
+    expect(res.message).toBe('errors.authAdmin.singleUserModeCreateUser');
 
     const ranInsert = h.state.sqlCalls.some((c) => /INSERT\s+INTO\s+users/i.test(c.text));
     expect(ranInsert).toBe(false);
@@ -487,7 +489,7 @@ describe('createRole — однопользовательский режим', (
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toBe('Однопользовательский режим: управление ролями отключено.');
+    expect(res.message).toBe('errors.authAdmin.singleUserModeManageRoles');
     const ranInsert = h.state.sqlCalls.some((c) => /INSERT\s+INTO\s+roles/i.test(c.text));
     expect(ranInsert).toBe(false);
     expect(h.setRolePermissions).not.toHaveBeenCalled();
@@ -512,7 +514,7 @@ describe('updateRole / deleteRole — однопользовательский �
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toBe('Однопользовательский режим: управление ролями отключено.');
+    expect(res.message).toBe('errors.authAdmin.singleUserModeManageRoles');
     const ranUpdate = h.state.sqlCalls.some((c) => /UPDATE\s+roles\s+SET/i.test(c.text));
     expect(ranUpdate).toBe(false);
   });
@@ -525,7 +527,7 @@ describe('updateRole / deleteRole — однопользовательский �
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toBe('Однопользовательский режим: управление ролями отключено.');
+    expect(res.message).toBe('errors.authAdmin.singleUserModeManageRoles');
     const ranDelete = h.state.sqlCalls.some((c) => /DELETE\s+FROM\s+roles/i.test(c.text));
     expect(ranDelete).toBe(false);
   });
@@ -543,7 +545,7 @@ describe('updateUser / resetUserPassword — однопользовательс�
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toBe('Однопользовательский режим: управление пользователями отключено.');
+    expect(res.message).toBe('errors.authAdmin.singleUserModeManageUsers');
     const ranUpdate = h.state.sqlCalls.some((c) => /UPDATE\s+users\s+SET/i.test(c.text));
     expect(ranUpdate).toBe(false);
   });
@@ -556,9 +558,36 @@ describe('updateUser / resetUserPassword — однопользовательс�
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toBe('Однопользовательский режим: управление пользователями отключено.');
+    expect(res.message).toBe('errors.authAdmin.singleUserModeManageUsers');
     expect(h.hashPassword).not.toHaveBeenCalled();
     const ranUpdate = h.state.sqlCalls.some((c) => /UPDATE\s+users\s+SET/i.test(c.text));
     expect(ranUpdate).toBe(false);
   });
+});
+
+
+// i18n-инвариант (волна 6-Б): PublicActionError-сообщения стали ключами; здесь
+// сторожим, что каждый ключ резолвится в ТОЧНЫЙ русский оригинал (смысл сохранён).
+describe('admin-actions — сообщения существуют в русском каталоге', () => {
+  const ru = JSON.parse(
+    readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8'),
+  ) as { errors: { authAdmin: Record<string, string> } };
+  const cases: Record<string, string> = {
+    ownerImmutable: 'Владельца магазина нельзя изменять или отключать.',
+    userNotFound: 'Пользователь не найден.',
+    rolesAssignForbidden: 'Недостаточно прав для назначения ролей.',
+    cannotChangeOwnRoles:
+      'Нельзя менять собственные роли — попросите другого администратора.',
+    singleUserModeCreateUser:
+      'Однопользовательский режим: создание пользователей отключено.',
+    singleUserModeManageRoles:
+      'Однопользовательский режим: управление ролями отключено.',
+    singleUserModeManageUsers:
+      'Однопользовательский режим: управление пользователями отключено.',
+  };
+  for (const [k, ruText] of Object.entries(cases)) {
+    it(`errors.authAdmin.${k} = русский оригинал`, () => {
+      expect(ru.errors.authAdmin[k]).toBe(ruText);
+    });
+  }
 });

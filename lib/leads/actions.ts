@@ -82,18 +82,19 @@ export function createLeadActions(deps: LeadActionDeps) {
     handler: async (data, _ctx: ActionCtx) => {
       const current = await deps.getLeadStatus(data.id);
       if (current === null) {
-        throw new PublicActionError('Заявка не найдена.');
+        throw new PublicActionError('errors.leadsActions.leadNotFound');
       }
       if (!canLeadTransition(current, data.status)) {
-        throw new PublicActionError(
-          `Недопустимый переход статуса заявки: «${leadStatusLabel(current)}» → «${leadStatusLabel(data.status)}».`,
-        );
+        throw new PublicActionError('errors.leadsActions.invalidTransition', {
+          from: leadStatusLabel(current),
+          to: leadStatusLabel(data.status),
+        });
       }
 
       const updated = await deps.updateLeadStatus(data.id, data.status);
       if (!updated) {
         // Гонка: заявку удалили между чтением и записью.
-        throw new PublicActionError('Заявка не найдена.');
+        throw new PublicActionError('errors.leadsActions.leadNotFound');
       }
 
       return {
@@ -122,11 +123,11 @@ export function createLeadActions(deps: LeadActionDeps) {
     handler: async (data, _ctx: ActionCtx) => {
       const current = await deps.getLeadStatus(data.id);
       if (current === null) {
-        throw new PublicActionError('Заявка не найдена.');
+        throw new PublicActionError('errors.leadsActions.leadNotFound');
       }
       const updated = await deps.updateLeadAnswer(data.id, data.answer);
       if (!updated) {
-        throw new PublicActionError('Заявка не найдена.');
+        throw new PublicActionError('errors.leadsActions.leadNotFound');
       }
       return {
         result: { id: data.id },
@@ -150,7 +151,7 @@ export function createLeadActions(deps: LeadActionDeps) {
       const before = await deps.getLeadStatus(data.id);
       const deleted = await deps.deleteLead(data.id);
       if (!deleted) {
-        throw new PublicActionError('Заявка не найдена.');
+        throw new PublicActionError('errors.leadsActions.leadNotFound');
       }
       return {
         result: { id: data.id },

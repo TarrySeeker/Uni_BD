@@ -31,7 +31,7 @@ export const unsubscribeSubscriber = defineAction({
   handler: async (data, _ctx) => {
     const row = await unsubscribe(data.id);
     if (!row) {
-      throw new PublicActionError('Подписчик не найден или уже отписан.');
+      throw new PublicActionError('errors.newsletter.subscriberNotFoundOrUnsubscribed');
     }
     return {
       result: { id: row.id },
