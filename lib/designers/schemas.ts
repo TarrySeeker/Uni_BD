@@ -26,7 +26,7 @@ export const slugSchema = z
   .max(200)
   .regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    'slug: только латиница в нижнем регистре, цифры и дефисы (без двойных/краевых дефисов)',
+    'errors.designers.slugFormat',
   );
 
 const seoTitle = z.string().max(255).optional();

@@ -81,7 +81,7 @@ const moneyRubles = z
     } catch {
       return false;
     }
-  }, 'Ожидается неотрицательная сумма в рублях (до 2 знаков после точки)');
+  }, 'errors.settingsAction.moneyRubles');
 
 /**
  * Зона доставки на ВХОДЕ (ТЗ_1): цены в РУБЛЯХ (конвертируются в копейки в
@@ -91,7 +91,7 @@ const moneyRubles = z
 const deliveryZoneInputSchema = z
   .object({
     id: z.string().trim().optional(),
-    label: z.string().trim().min(1, 'Укажите название зоны'),
+    label: z.string().trim().min(1, 'errors.settingsAction.zoneLabelRequired'),
     price: moneyRubles,
     freeThreshold: moneyRubles.optional(),
   })
@@ -212,7 +212,7 @@ export const ContentI18nInputSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .regex(/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/, 'Код языка вида «ru», «en», «pt-br»'),
+    .regex(/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/, 'errors.settingsAction.localeCodeFormat'),
   section: z.enum(CONTENT_I18N_SECTIONS),
   patch: z.record(z.string(), z.unknown()),
 });
@@ -235,7 +235,7 @@ export const SeoSettingsInputSchema = z.object({
     if (value.title_template !== undefined && !value.title_template.includes('%s')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "title_template должен содержать плейсхолдер «%s»",
+        message: 'errors.settingsAction.titleTemplatePlaceholder',
         path: ['title_template'],
       });
     }
@@ -626,7 +626,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     handler: async (data, ctx: ActionCtx) => {
       const validation = await deps.validateUpload(data.bytes, data.filename);
       if (!validation.ok || !validation.mime) {
-        throw new PublicActionError(validation.error ?? 'Недопустимый файл.');
+        throw new PublicActionError(validation.error ?? 'errors.settingsAction.invalidFile');
       }
 
       const previews = await deps.generatePreviews(data.bytes);
@@ -638,7 +638,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
       try {
         put = await storage.put(key, main.buffer, 'image/webp');
       } catch {
-        throw new PublicActionError('Не удалось сохранить файл в хранилище.');
+        throw new PublicActionError('errors.settingsAction.storageSaveFailed');
       }
 
       // Запись значения в соответствующий ключ настроек (мердж в существующий блок).
@@ -715,7 +715,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     handler: async (data, _ctx: ActionCtx) => {
       const validation = await deps.validateUpload(data.bytes, data.filename);
       if (!validation.ok || !validation.mime) {
-        throw new PublicActionError(validation.error ?? 'Недопустимый файл.');
+        throw new PublicActionError(validation.error ?? 'errors.settingsAction.invalidFile');
       }
       const previews = await deps.generatePreviews(data.bytes);
       const storage = deps.getStorage();
@@ -724,7 +724,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
       try {
         put = await storage.put(key, previews.main.buffer, 'image/webp');
       } catch {
-        throw new PublicActionError('Не удалось сохранить файл в хранилище.');
+        throw new PublicActionError('errors.settingsAction.storageSaveFailed');
       }
       return {
         // ВОЗВРАЩАЕМ ключ (для home.*) + url (для превью в форме). Запись значения
@@ -769,7 +769,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
       if (!stats.ok) {
         // Внешний источник не ответил — прежние курсы целы, сообщаем владельцу.
         throw new PublicActionError(
-          'Не удалось получить курсы с ЦБ РФ. Прежние курсы сохранены, попробуйте позже.',
+          'errors.settingsAction.exchangeFetchFailed',
         );
       }
       // Воркер уже инвалидировал кеш настроек, но действие обязано отдать
@@ -813,7 +813,8 @@ export function createSettingsActions(deps: SettingsActionDeps) {
 
       if (data.i18n.defaultLocale !== current.defaultLocale) {
         throw new PublicActionError(
-          `Язык по умолчанию («${current.defaultLocale}») сменить нельзя: он хранится в базовых полях каталога и контента. Смена требует миграции данных.`,
+          'errors.settingsAction.defaultLocaleImmutable',
+          { locale: current.defaultLocale },
         );
       }
 

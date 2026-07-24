@@ -264,14 +264,14 @@ export const promoTargetSchema = z
           ctx.addIssue({
             code: 'custom',
             path: [field],
-            message: `Для target_type='${val.targetType}' требуется ${field}.`,
+            message: 'errors.orders.targetFieldRequired',
           });
         }
       } else if (val[field]) {
         ctx.addIssue({
           code: 'custom',
           path: [field],
-          message: `Для target_type='${val.targetType}' поле ${field} должно быть пустым.`,
+          message: 'errors.orders.targetFieldMustBeEmpty',
         });
       }
     }
@@ -412,7 +412,7 @@ function refinePromo(
       ctx.addIssue({
         code: 'custom',
         path: ['value'],
-        message: 'Для percent value должно быть в диапазоне 0..100.',
+        message: 'errors.orders.percentRange',
       });
     }
   }
@@ -420,7 +420,7 @@ function refinePromo(
     ctx.addIssue({
       code: 'custom',
       path: ['endsAt'],
-      message: 'Дата окончания не может быть раньше даты начала.',
+      message: 'errors.orders.endBeforeStart',
     });
   }
   if (
@@ -431,7 +431,7 @@ function refinePromo(
     ctx.addIssue({
       code: 'custom',
       path: ['bogoPayQty'],
-      message: 'Для bogo «плати за M» должно быть меньше «купи N».',
+      message: 'errors.orders.bogoPayLessBuy',
     });
   }
   // kind='bogo' ⇒ пара bogoBuyQty/bogoPayQty обязательна (§5.2.3).
@@ -440,14 +440,14 @@ function refinePromo(
       ctx.addIssue({
         code: 'custom',
         path: ['bogoBuyQty'],
-        message: 'Для kind=bogo требуется «купи N» (bogoBuyQty).',
+        message: 'errors.orders.bogoBuyRequired',
       });
     }
     if (typeof val.bogoPayQty !== 'number') {
       ctx.addIssue({
         code: 'custom',
         path: ['bogoPayQty'],
-        message: 'Для kind=bogo требуется «плати за M» (bogoPayQty).',
+        message: 'errors.orders.bogoPayRequired',
       });
     }
   }
@@ -461,7 +461,7 @@ function refinePromo(
       ctx.addIssue({
         code: 'custom',
         path: ['targets'],
-        message: `Для apply_scope='${val.applyScope}' требуется хотя бы один таргет.`,
+        message: 'errors.orders.scopeTargetsRequired',
       });
     } else {
       // Баг #5: тип таргета ДОЛЖЕН соответствовать области применения (иначе
@@ -473,9 +473,7 @@ function refinePromo(
           ctx.addIssue({
             code: 'custom',
             path: ['targets', i, 'targetType'],
-            message:
-              `Для apply_scope='${val.applyScope}' тип таргета должен быть одним из: ` +
-              `${allowed.join(', ')}.`,
+            message: 'errors.orders.scopeTargetTypeMismatch',
           });
         }
       });
@@ -494,8 +492,7 @@ function refinePromo(
     ctx.addIssue({
       code: 'custom',
       path: ['applyScope'],
-      message:
-        "Бесплатная доставка (kind='free_delivery') возможна только для apply_scope='cart'.",
+      message: 'errors.orders.freeDeliveryCartOnly',
     });
   }
 }

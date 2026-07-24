@@ -135,9 +135,10 @@ export function createReviewActions(deps: ReviewActionDeps) {
       // X→X запрещён (нулевой переход) — модерация в тот же статус бессмысленна
       // (машина статусов, docs/24 §4; образец leads canLeadTransition).
       if (!canReviewTransition(before.status, target)) {
-        throw new PublicActionError(
-          `Недопустимый переход статуса: «${reviewStatusLabel(before.status)}» → «${reviewStatusLabel(target)}».`,
-        );
+        throw new PublicActionError('errors.reviewsAction.invalidTransition', {
+          from: reviewStatusLabel(before.status),
+          to: reviewStatusLabel(target),
+        });
       }
 
       const after = await deps.updateReviewStatus(data.id, target, ctx.user.id);

@@ -31,7 +31,7 @@ export const giftFaceValueSchema = moneySchema.refine(
       return false;
     }
   },
-  { message: 'Номинал сертификата должен быть больше нуля.' },
+  { message: 'errors.giftCert.faceValuePositive' },
 );
 
 /** Срок действия: ISO-строка → Date, либо null (бессрочно), либо отсутствует. */
@@ -51,7 +51,7 @@ const partyEmailSchema = z
   .trim()
   .max(320)
   .refine((v) => v === '' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), {
-    message: 'Некорректный email.',
+    message: 'errors.giftCert.invalidEmail',
   });
 
 export const giftPartySchema = z.object({

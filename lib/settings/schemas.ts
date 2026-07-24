@@ -43,7 +43,7 @@ const imageRefSchema = z
   .min(1)
   .refine(
     (v) => v.startsWith('/') || /^https?:\/\/\S+$/i.test(v),
-    'Укажите URL картинки (https://…) или путь от «/» (например /media/…)',
+    'errors.settings.imageRefInvalid',
   );
 
 /**
@@ -63,7 +63,7 @@ const hrefSchema = z
       v.startsWith('/') ||
       /^https?:\/\/\S+$/i.test(v) ||
       /^(?:mailto:|tel:)\S+$/i.test(v),
-    'Укажите путь от «/» (например /catalog или /#delivery) либо полный URL https://…',
+    'errors.settings.hrefInvalid',
   );
 
 /**
@@ -83,26 +83,26 @@ const internalHrefSchema = z
     // `/path` (но НЕ `//host` — protocol-relative = скрытый open-redirect на чужой
     // хост) ИЛИ полный https://-URL.
     (v) => (v.startsWith('/') && !v.startsWith('//')) || /^https:\/\/\S+$/i.test(v),
-    'Укажите путь от «/» (например /search?q=…) либо полный URL https://…',
+    'errors.settings.internalHrefInvalid',
   );
 
 /** HEX-цвет вида #rgb / #rrggbb (для темы брендинга). */
 const hexColor = z
   .string()
   .trim()
-  .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Ожидается HEX-цвет (#rgb или #rrggbb)');
+  .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'errors.settings.hexColorInvalid');
 
 /** ISO 4217 — буквенный код валюты (3 заглавные латинские). */
 const currencyCode = z
   .string()
   .trim()
-  .regex(/^[A-Z]{3}$/, 'Код валюты — 3 заглавные латинские буквы (ISO 4217)');
+  .regex(/^[A-Z]{3}$/, 'errors.settings.currencyCodeInvalid');
 
 /** ИНН: ровно 10 (юрлицо) или 12 (ИП/физлицо) цифр. */
 const innField = z
   .string()
   .trim()
-  .regex(/^(?:\d{10}|\d{12})$/, 'ИНН — 10 или 12 цифр');
+  .regex(/^(?:\d{10}|\d{12})$/, 'errors.settings.innInvalid');
 
 /** Денежная величина в копейках (целое, ≥ 0). */
 const minorMoney = z.number().int().min(0);
@@ -170,7 +170,7 @@ export const displayCurrencySchema = z
     symbol: z.string().trim().min(1),
     // rate > 0: цена_отображаемой = цена_базовой / rate — деление на 0/отрицательный
     // курс недопустимо. positive() отсекает 0 и отрицательные.
-    rate: z.number().positive('Курс должен быть больше нуля'),
+    rate: z.number().positive('errors.settings.rateMustBePositive'),
     fractionDigits: z.number().int().min(0).max(4).optional(),
     // ПЕР-ВАЛЮТНЫЙ ручной курс: true → ночной крон ЦБ эту валюту не трогает.
     // ОБЯЗАТЕЛЬНО опционально: на живых стендах лежат значения без этого поля,
@@ -226,12 +226,12 @@ export const legalEntitySchema = z
     kpp: z
       .string()
       .trim()
-      .regex(/^\d{9}$/, 'КПП — 9 цифр')
+      .regex(/^\d{9}$/, 'errors.settings.kppInvalid')
       .optional(),
     ogrn: z
       .string()
       .trim()
-      .regex(/^(?:\d{13}|\d{15})$/, 'ОГРН — 13 или 15 цифр')
+      .regex(/^(?:\d{13}|\d{15})$/, 'errors.settings.ogrnInvalid')
       .optional(),
     legalAddress: z.string().trim().min(1).optional(),
     bankDetails: z.string().trim().min(1).optional(),
@@ -240,7 +240,7 @@ export const legalEntitySchema = z
     /** Ключ S3-файла оферты (offer_doc). Как og_image_key — КЛЮЧ, URL собирает storage. */
     offerDocKey: z.string().trim().max(512).optional(),
     /** Почта для заявок дизайнеров (email_designers). */
-    emailDesigners: z.string().trim().email('Некорректный e-mail').optional(),
+    emailDesigners: z.string().trim().email('errors.settings.emailInvalid').optional(),
   })
   .strip();
 
@@ -585,7 +585,7 @@ const localeTagField = z
   .toLowerCase()
   .regex(
     /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/,
-    'Код языка вида «ru», «en», «pt-br» (латиница, части через дефис)',
+    'errors.settings.localeTagInvalid',
   );
 
 /**
@@ -604,7 +604,7 @@ const localeTagField = z
 export const i18nSchema = z
   .object({
     defaultLocale: localeTagField,
-    locales: z.array(localeTagField).min(1, 'Нужен хотя бы один язык'),
+    locales: z.array(localeTagField).min(1, 'errors.settings.localesRequired'),
   })
   .strip()
   .superRefine((value, ctx) => {
@@ -613,7 +613,7 @@ export const i18nSchema = z
       if (seen.has(locale)) {
         ctx.addIssue({
           code: 'custom',
-          message: `Язык «${locale}» указан дважды`,
+          message: 'errors.settings.localeDuplicate',
           path: ['locales', index],
         });
       }
@@ -623,7 +623,7 @@ export const i18nSchema = z
     if (!seen.has(value.defaultLocale)) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Язык по умолчанию должен входить в список включённых языков',
+        message: 'errors.settings.defaultLocaleNotInList',
         path: ['defaultLocale'],
       });
     }

@@ -17,13 +17,13 @@ import { z } from 'zod';
 const uuid = z.string().uuid();
 
 /** Email: обрезаем пробелы, валидируем формат (в БД — citext UNIQUE). */
-const emailSchema = z.string().trim().email('Укажите корректный email');
+const emailSchema = z.string().trim().email('errors.auth.emailInvalid');
 
 /** Отображаемое имя: до 200 символов, по умолчанию пусто (NOT NULL DEFAULT ''). */
 const displayNameSchema = z.string().trim().max(200).optional().default('');
 
 /** Пароль: минимум 8 символов (хешируется argon2id перед записью). */
-const passwordSchema = z.string().min(8, 'Пароль не короче 8 символов');
+const passwordSchema = z.string().min(8, 'errors.auth.passwordMinLength');
 
 /** Массив id ролей (привязка user_roles). */
 const roleIdsSchema = z.array(uuid).optional().default([]);
@@ -37,11 +37,11 @@ const roleCodeSchema = z
   .trim()
   .regex(
     /^[a-z][a-z0-9_-]{1,30}$/,
-    'Код роли: латиница в нижнем регистре, начинается с буквы (2–31 символ)',
+    'errors.auth.roleCodeFormat',
   );
 
 /** Название роли (человекочитаемое): 1..100 символов. */
-const roleTitleSchema = z.string().trim().min(1, 'Укажите название').max(100);
+const roleTitleSchema = z.string().trim().min(1, 'errors.auth.roleTitleRequired').max(100);
 
 /** Коды прав, привязываемых к роли (role_permissions.permission_code). */
 const permissionCodesSchema = z.array(z.string()).optional().default([]);

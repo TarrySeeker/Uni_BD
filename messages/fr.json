@@ -147,6 +147,88 @@
       "manageUsers": "des utilisateurs",
       "manageRoles": "des rôles",
       "message": "La gestion {what} est désactivée : la boutique fonctionne en mode mono-utilisateur. Vous pouvez réactiver cette section dans <link>Paramètres → Accès</link>."
+    },
+    "orders": {
+      "targetFieldRequired": "Ce champ est requis pour le type de cible sélectionné.",
+      "targetFieldMustBeEmpty": "Ce champ doit être vide pour le type de cible sélectionné.",
+      "percentRange": "Pour un pourcentage, la valeur doit être comprise entre 0 et 100.",
+      "endBeforeStart": "La date de fin ne peut pas être antérieure à la date de début.",
+      "bogoPayLessBuy": "Pour le BOGO, « payez pour M » doit être inférieur à « achetez N ».",
+      "bogoBuyRequired": "Pour kind=bogo, « achetez N » (bogoBuyQty) est requis.",
+      "bogoPayRequired": "Pour kind=bogo, « payez pour M » (bogoPayQty) est requis.",
+      "scopeTargetsRequired": "La portée d'application sélectionnée requiert au moins une cible.",
+      "scopeTargetTypeMismatch": "Le type de cible ne correspond pas à la portée d'application sélectionnée.",
+      "freeDeliveryCartOnly": "La livraison gratuite (kind='free_delivery') n'est possible que pour apply_scope='cart'."
+    },
+    "settings": {
+      "imageRefInvalid": "Indiquez l’URL de l’image (https://…) ou un chemin commençant par «/» (par exemple /media/…)",
+      "hrefInvalid": "Indiquez un chemin commençant par «/» (par exemple /catalog ou /#delivery) ou une URL complète https://…",
+      "internalHrefInvalid": "Indiquez un chemin commençant par «/» (par exemple /search?q=…) ou une URL complète https://…",
+      "hexColorInvalid": "Une couleur HEX est attendue (#rgb ou #rrggbb)",
+      "currencyCodeInvalid": "Code de devise — 3 lettres latines majuscules (ISO 4217)",
+      "innInvalid": "NIF — 10 ou 12 chiffres",
+      "rateMustBePositive": "Le taux de change doit être supérieur à zéro",
+      "kppInvalid": "Code du motif d’enregistrement fiscal — 9 chiffres",
+      "ogrnInvalid": "Numéro d’enregistrement d’État — 13 ou 15 chiffres",
+      "emailInvalid": "E-mail invalide",
+      "localeTagInvalid": "Un code de langue comme «ru», «en», «pt-br» (lettres latines, parties séparées par un tiret)",
+      "localesRequired": "Au moins une langue est requise",
+      "localeDuplicate": "La langue «{locale}» est indiquée deux fois",
+      "defaultLocaleNotInList": "La langue par défaut doit faire partie des langues activées"
+    },
+    "catalog": {
+      "slugInvalid": "Slug : uniquement des lettres latines minuscules, des chiffres et des tirets (sans tirets doubles ni en début/fin).",
+      "priceInvalid": "Prix : nombre positif ou nul avec au maximum 2 décimales.",
+      "attributeCodeInvalid": "Code d'attribut : lettres latines minuscules, chiffres et tiret bas.",
+      "colorHexInvalid": "Couleur : un code au format #rrggbb (par exemple #1e88e5).",
+      "tooManyColors": "Couleurs : pas plus de 2 (principale et secondaire).",
+      "brandExternalUrlInvalid": "Site externe de la marque — une URL absolue (https://...).",
+      "primaryCategoryNotInList": "La catégorie principale doit figurer parmi les catégories sélectionnées.",
+      "attributeValueRequired": "Vous devez indiquer une valeur du dictionnaire (liste) ou une valeur en ligne (texte/nombre/booléen).",
+      "stockDeltaZero": "L'ajustement ne peut pas être égal à 0."
+    },
+    "settingsAction": {
+      "moneyRubles": "Un montant positif ou nul en roubles est attendu (jusqu’à 2 décimales).",
+      "zoneLabelRequired": "Indiquez le nom de la zone.",
+      "localeCodeFormat": "Un code de langue du type « ru », « en », « pt-br ».",
+      "titleTemplatePlaceholder": "title_template doit contenir l’espace réservé « %s ».",
+      "invalidFile": "Fichier non valide.",
+      "storageSaveFailed": "Échec de l’enregistrement du fichier dans le stockage.",
+      "exchangeFetchFailed": "Impossible de récupérer les taux auprès de la Banque centrale de Russie. Les taux précédents ont été conservés, réessayez plus tard.",
+      "defaultLocaleImmutable": "La langue par défaut (« {locale} ») ne peut pas être modifiée : elle est stockée dans les champs de base du catalogue et du contenu. La modifier nécessite une migration des données."
+    },
+    "newsAction": {
+      "slugExists": "Un article d'actualité avec cette adresse (slug) existe déjà."
+    },
+    "reviewsAction": {
+      "invalidTransition": "Transition de statut invalide : «{from}» → «{to}»."
+    },
+    "customerAuth": {
+      "passwordTooShort": "Le mot de passe doit comporter au moins 8 caractères.",
+      "passwordTooLong": "Le mot de passe ne doit pas dépasser 128 caractères.",
+      "invalidEmail": "Adresse e-mail invalide.",
+      "nothingToUpdate": "Rien à mettre à jour."
+    },
+    "auth": {
+      "emailInvalid": "Saisissez une adresse e-mail valide",
+      "passwordMinLength": "Le mot de passe doit comporter au moins 8 caractères",
+      "roleCodeFormat": "Code de rôle : lettres latines minuscules, commençant par une lettre (2 à 31 caractères)",
+      "roleTitleRequired": "Saisissez un intitulé"
+    },
+    "cms": {
+      "productsGridSlugsRequired": "mode='slugs' nécessite une liste de slugs non vide",
+      "productsGridCategoryRequired": "mode='category' nécessite categorySlug",
+      "productsGridBrandRequired": "mode='brand' nécessite brandSlug"
+    },
+    "giftCert": {
+      "faceValuePositive": "La valeur nominale du certificat doit être supérieure à zéro.",
+      "invalidEmail": "Adresse e-mail invalide."
+    },
+    "designers": {
+      "slugFormat": "Slug : uniquement des lettres latines minuscules, des chiffres et des traits d'union (sans traits d'union doubles ni en début/fin)."
+    },
+    "seo": {
+      "canonicalInvalid": "canonical_url : une URL https absolue ou un chemin relatif commençant par «/» est attendu"
     }
   },
   "seo": {

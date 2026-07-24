@@ -147,6 +147,88 @@
       "manageUsers": "пользователями",
       "manageRoles": "ролями",
       "message": "Управление {what} отключено: магазин работает в однопользовательском режиме. Включить раздел снова можно в <link>Настройки → Доступ</link>."
+    },
+    "orders": {
+      "targetFieldRequired": "Обязательное поле для выбранного типа таргета.",
+      "targetFieldMustBeEmpty": "Это поле должно быть пустым для выбранного типа таргета.",
+      "percentRange": "Для percent value должно быть в диапазоне 0..100.",
+      "endBeforeStart": "Дата окончания не может быть раньше даты начала.",
+      "bogoPayLessBuy": "Для bogo «плати за M» должно быть меньше «купи N».",
+      "bogoBuyRequired": "Для kind=bogo требуется «купи N» (bogoBuyQty).",
+      "bogoPayRequired": "Для kind=bogo требуется «плати за M» (bogoPayQty).",
+      "scopeTargetsRequired": "Для выбранной области применения требуется хотя бы один таргет.",
+      "scopeTargetTypeMismatch": "Тип таргета не соответствует выбранной области применения.",
+      "freeDeliveryCartOnly": "Бесплатная доставка (kind='free_delivery') возможна только для apply_scope='cart'."
+    },
+    "settings": {
+      "imageRefInvalid": "Укажите URL картинки (https://…) или путь от «/» (например /media/…)",
+      "hrefInvalid": "Укажите путь от «/» (например /catalog или /#delivery) либо полный URL https://…",
+      "internalHrefInvalid": "Укажите путь от «/» (например /search?q=…) либо полный URL https://…",
+      "hexColorInvalid": "Ожидается HEX-цвет (#rgb или #rrggbb)",
+      "currencyCodeInvalid": "Код валюты — 3 заглавные латинские буквы (ISO 4217)",
+      "innInvalid": "ИНН — 10 или 12 цифр",
+      "rateMustBePositive": "Курс должен быть больше нуля",
+      "kppInvalid": "КПП — 9 цифр",
+      "ogrnInvalid": "ОГРН — 13 или 15 цифр",
+      "emailInvalid": "Некорректный e-mail",
+      "localeTagInvalid": "Код языка вида «ru», «en», «pt-br» (латиница, части через дефис)",
+      "localesRequired": "Нужен хотя бы один язык",
+      "localeDuplicate": "Язык «{locale}» указан дважды",
+      "defaultLocaleNotInList": "Язык по умолчанию должен входить в список включённых языков"
+    },
+    "catalog": {
+      "slugInvalid": "slug: только латиница в нижнем регистре, цифры и дефисы (без двойных/краевых дефисов)",
+      "priceInvalid": "цена: неотрицательное число с не более чем 2 знаками после точки",
+      "attributeCodeInvalid": "код атрибута: латиница в нижнем регистре, цифры и подчёркивание",
+      "colorHexInvalid": "цвет: код вида #rrggbb (например #1e88e5)",
+      "tooManyColors": "цвета: не больше 2 (основной и дополнительный)",
+      "brandExternalUrlInvalid": "Внешний сайт бренда — абсолютный URL (https://...)",
+      "primaryCategoryNotInList": "primaryCategoryId должна входить в categoryIds",
+      "attributeValueRequired": "нужно указать valueId (select) или valueText (text/number/boolean)",
+      "stockDeltaZero": "delta не может быть 0"
+    },
+    "settingsAction": {
+      "moneyRubles": "Ожидается неотрицательная сумма в рублях (до 2 знаков после точки)",
+      "zoneLabelRequired": "Укажите название зоны",
+      "localeCodeFormat": "Код языка вида «ru», «en», «pt-br»",
+      "titleTemplatePlaceholder": "title_template должен содержать плейсхолдер «%s»",
+      "invalidFile": "Недопустимый файл.",
+      "storageSaveFailed": "Не удалось сохранить файл в хранилище.",
+      "exchangeFetchFailed": "Не удалось получить курсы с ЦБ РФ. Прежние курсы сохранены, попробуйте позже.",
+      "defaultLocaleImmutable": "Язык по умолчанию («{locale}») сменить нельзя: он хранится в базовых полях каталога и контента. Смена требует миграции данных."
+    },
+    "newsAction": {
+      "slugExists": "Новость с таким адресом (slug) уже существует."
+    },
+    "reviewsAction": {
+      "invalidTransition": "Недопустимый переход статуса: «{from}» → «{to}»."
+    },
+    "customerAuth": {
+      "passwordTooShort": "Пароль не короче 8 символов.",
+      "passwordTooLong": "Пароль не длиннее 128 символов.",
+      "invalidEmail": "Некорректный email.",
+      "nothingToUpdate": "Нечего обновлять."
+    },
+    "auth": {
+      "emailInvalid": "Укажите корректный email",
+      "passwordMinLength": "Пароль не короче 8 символов",
+      "roleCodeFormat": "Код роли: латиница в нижнем регистре, начинается с буквы (2–31 символ)",
+      "roleTitleRequired": "Укажите название"
+    },
+    "cms": {
+      "productsGridSlugsRequired": "mode='slugs' требует непустой список slugs",
+      "productsGridCategoryRequired": "mode='category' требует categorySlug",
+      "productsGridBrandRequired": "mode='brand' требует brandSlug"
+    },
+    "giftCert": {
+      "faceValuePositive": "Номинал сертификата должен быть больше нуля.",
+      "invalidEmail": "Некорректный email."
+    },
+    "designers": {
+      "slugFormat": "slug: только латиница в нижнем регистре, цифры и дефисы (без двойных/краевых дефисов)"
+    },
+    "seo": {
+      "canonicalInvalid": "canonical_url: ожидается абсолютный https-URL или относительный путь с ведущим «/»"
     }
   },
   "seo": {

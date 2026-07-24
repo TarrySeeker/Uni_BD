@@ -264,7 +264,7 @@ export function createNewsActions(deps: NewsActionDeps) {
         });
       } catch (err) {
         if (isUniqueViolation(err)) {
-          throw new PublicActionError('Новость с таким адресом (slug) уже существует.');
+          throw new PublicActionError('errors.newsAction.slugExists');
         }
         throw err;
       }

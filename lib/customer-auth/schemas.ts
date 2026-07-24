@@ -12,15 +12,15 @@ import { z } from 'zod';
 /** Пароль покупателя: 8..128 символов. */
 const passwordSchema = z
   .string()
-  .min(8, 'Пароль не короче 8 символов.')
-  .max(128, 'Пароль не длиннее 128 символов.');
+  .min(8, 'errors.customerAuth.passwordTooShort')
+  .max(128, 'errors.customerAuth.passwordTooLong');
 
 /** Email: нормализуем к нижнему регистру и обрезаем пробелы (citext-совместимо). */
 const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .email('Некорректный email.')
+  .email('errors.customerAuth.invalidEmail')
   .max(254);
 
 /** Необязательная предпочитаемая локаль (членство в наборе — проверяет сервис). */
@@ -68,6 +68,6 @@ export const ProfileUpdateSchema = z
     preferredLocale: preferredLocaleSchema,
   })
   .refine((v) => v.name !== undefined || v.phone !== undefined || v.preferredLocale !== undefined, {
-    message: 'Нечего обновлять.',
+    message: 'errors.customerAuth.nothingToUpdate',
   });
 export type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;

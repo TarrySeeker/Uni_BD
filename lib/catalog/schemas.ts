@@ -45,7 +45,7 @@ export const slugSchema = z
   .max(200)
   .regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    'slug: только латиница в нижнем регистре, цифры и дефисы (без двойных/краевых дефисов)',
+    'errors.catalog.slugInvalid',
   );
 
 /** Артикул (sku): непустой, регистронезависим в БД (citext); до 100 символов. */
@@ -73,7 +73,7 @@ export const moneySchema = z.preprocess(
   (v) => (typeof v === 'string' ? normalizeMoney(v) : v),
   z.string().regex(
     /^\d{1,12}(?:\.\d{1,2})?$/,
-    'цена: неотрицательное число с не более чем 2 знаками после точки',
+    'errors.catalog.priceInvalid',
   ),
 );
 
@@ -85,7 +85,7 @@ export const attributeCodeSchema = z
   .max(64)
   .regex(
     /^[a-z0-9_]+$/,
-    'код атрибута: латиница в нижнем регистре, цифры и подчёркивание',
+    'errors.catalog.attributeCodeInvalid',
   );
 
 /**
@@ -100,7 +100,7 @@ export const productColorSchema = z.object({
     (v) => (typeof v === 'string' ? (normalizeHex(v) ?? v) : v),
     z
       .string()
-      .regex(/^#[0-9a-f]{6}$/, 'цвет: код вида #rrggbb (например #1e88e5)'),
+      .regex(/^#[0-9a-f]{6}$/, 'errors.catalog.colorHexInvalid'),
   ),
   name: z.string().trim().max(64).optional().default(''),
 });
@@ -111,10 +111,7 @@ export const productColorSchema = z.object({
  */
 export const productColorsSchema = z
   .array(productColorSchema)
-  .max(
-    MAX_PRODUCT_COLORS,
-    `цвета: не больше ${MAX_PRODUCT_COLORS} (основной и дополнительный)`,
-  );
+  .max(MAX_PRODUCT_COLORS, 'errors.catalog.tooManyColors');
 
 const seoTitle = z.string().max(255).optional();
 const seoDescription = z.string().max(1000).optional();
@@ -136,7 +133,7 @@ const externalUrlSchema = z
   .string()
   .trim()
   .max(2048)
-  .url('Внешний сайт бренда — абсолютный URL (https://...)')
+  .url('errors.catalog.brandExternalUrlInvalid')
   .nullish();
 
 /**
@@ -245,7 +242,7 @@ export const ProductCreateSchema = z
       !v.primaryCategoryId ||
       (v.categoryIds?.includes(v.primaryCategoryId) ?? false),
     {
-      message: 'primaryCategoryId должна входить в categoryIds',
+      message: 'errors.catalog.primaryCategoryNotInList',
       path: ['primaryCategoryId'],
     },
   );
@@ -293,7 +290,7 @@ export const ProductUpdateSchema = z.object({
       ctx.addIssue({
         code: 'custom',
         path: ['primaryCategoryId'],
-        message: 'primaryCategoryId должна входить в categoryIds',
+        message: 'errors.catalog.primaryCategoryNotInList',
       });
     }
   });
@@ -459,7 +456,7 @@ export const ProductAttributeItemSchema = z
     valueText: z.string().max(1000).nullish(),
   })
   .refine((v) => Boolean(v.valueId) || Boolean(v.valueText), {
-    message: 'нужно указать valueId (select) или valueText (text/number/boolean)',
+    message: 'errors.catalog.attributeValueRequired',
     path: ['valueId'],
   });
 
@@ -530,7 +527,7 @@ export const StockAdjustSchema = z
     delta: z.number().int(),
   })
   .refine((v) => v.delta !== 0, {
-    message: 'delta не может быть 0',
+    message: 'errors.catalog.stockDeltaZero',
     path: ['delta'],
   });
 export type StockAdjustInput = z.infer<typeof StockAdjustSchema>;

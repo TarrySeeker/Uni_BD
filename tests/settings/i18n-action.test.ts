@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, it, expect, vi } from 'vitest';
 
 import type { ActionDeps } from '@/lib/server/action';
@@ -146,7 +149,16 @@ describe('settings/actions — updateI18nSettings: язык по умолчан�
 
     expect(res.ok).toBe(false);
     expect(res.ok === false && res.error).toBe('validation');
-    expect(res.ok === false && res.message).toMatch(/по умолчанию/i);
+    // После i18n-переноса (волна 6-Б) message — i18n-КЛЮЧ; defineAction локализует
+    // его в язык оператора через getTranslations. В юните translate — no-op (нет
+    // реквест-контекста), поэтому проверяем КЛЮЧ + русский текст из каталога.
+    expect(res.ok === false && res.message).toBe(
+      'errors.settingsAction.defaultLocaleImmutable',
+    );
+    const ru = JSON.parse(
+      readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8'),
+    ) as { errors: { settingsAction: { defaultLocaleImmutable: string } } };
+    expect(ru.errors.settingsAction.defaultLocaleImmutable).toMatch(/по умолчанию/i);
     expect(deps.upsertSetting).not.toHaveBeenCalled();
   });
 

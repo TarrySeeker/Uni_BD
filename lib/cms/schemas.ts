@@ -153,7 +153,7 @@ export const CmsSectionContentSchema = cmsSectionContentBaseSchema.superRefine(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['slugs'],
-          message: "mode='slugs' требует непустой список slugs",
+          message: 'errors.cms.productsGridSlugsRequired',
         });
       }
     } else if (val.mode === 'category') {
@@ -161,7 +161,7 @@ export const CmsSectionContentSchema = cmsSectionContentBaseSchema.superRefine(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['categorySlug'],
-          message: "mode='category' требует categorySlug",
+          message: 'errors.cms.productsGridCategoryRequired',
         });
       }
     } else if (val.mode === 'brand') {
@@ -169,7 +169,7 @@ export const CmsSectionContentSchema = cmsSectionContentBaseSchema.superRefine(
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['brandSlug'],
-          message: "mode='brand' требует brandSlug",
+          message: 'errors.cms.productsGridBrandRequired',
         });
       }
     }

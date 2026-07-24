@@ -61,7 +61,6 @@ export const canonicalUrlSchema = z
   .string()
   .trim()
   .refine((v) => v === '' || isSafeCanonical(v), {
-    message:
-      'canonical_url: ожидается абсолютный https-URL или относительный путь с ведущим «/»',
+    message: 'errors.seo.canonicalInvalid',
   })
   .optional();

@@ -147,6 +147,88 @@
       "manageUsers": "users",
       "manageRoles": "roles",
       "message": "Managing {what} is disabled: the store runs in single-user mode. You can re-enable this section in <link>Settings → Access</link>."
+    },
+    "orders": {
+      "targetFieldRequired": "This field is required for the selected target type.",
+      "targetFieldMustBeEmpty": "This field must be empty for the selected target type.",
+      "percentRange": "For percent, value must be in the range 0..100.",
+      "endBeforeStart": "The end date cannot be earlier than the start date.",
+      "bogoPayLessBuy": "For BOGO, «pay for M» must be less than «buy N».",
+      "bogoBuyRequired": "For kind=bogo, «buy N» (bogoBuyQty) is required.",
+      "bogoPayRequired": "For kind=bogo, «pay for M» (bogoPayQty) is required.",
+      "scopeTargetsRequired": "The selected apply scope requires at least one target.",
+      "scopeTargetTypeMismatch": "The target type does not match the selected apply scope.",
+      "freeDeliveryCartOnly": "Free delivery (kind='free_delivery') is only available for apply_scope='cart'."
+    },
+    "settings": {
+      "imageRefInvalid": "Enter an image URL (https://…) or a path starting with «/» (e.g. /media/…)",
+      "hrefInvalid": "Enter a path starting with «/» (e.g. /catalog or /#delivery) or a full https:// URL",
+      "internalHrefInvalid": "Enter a path starting with «/» (e.g. /search?q=…) or a full https:// URL",
+      "hexColorInvalid": "A HEX color is expected (#rgb or #rrggbb)",
+      "currencyCodeInvalid": "Currency code — 3 uppercase Latin letters (ISO 4217)",
+      "innInvalid": "TIN — 10 or 12 digits",
+      "rateMustBePositive": "The exchange rate must be greater than zero",
+      "kppInvalid": "Tax registration reason code — 9 digits",
+      "ogrnInvalid": "State registration number — 13 or 15 digits",
+      "emailInvalid": "Invalid e-mail",
+      "localeTagInvalid": "A language code like «ru», «en», «pt-br» (Latin letters, parts separated by a hyphen)",
+      "localesRequired": "At least one language is required",
+      "localeDuplicate": "The language «{locale}» is listed twice",
+      "defaultLocaleNotInList": "The default language must be one of the enabled languages"
+    },
+    "catalog": {
+      "slugInvalid": "Slug: lowercase Latin letters, digits and hyphens only (no double or leading/trailing hyphens).",
+      "priceInvalid": "Price: a non-negative number with at most 2 decimal places.",
+      "attributeCodeInvalid": "Attribute code: lowercase Latin letters, digits and underscore.",
+      "colorHexInvalid": "Color: a code in the #rrggbb format (e.g. #1e88e5).",
+      "tooManyColors": "Colors: no more than 2 (primary and secondary).",
+      "brandExternalUrlInvalid": "Brand external website — an absolute URL (https://...).",
+      "primaryCategoryNotInList": "The primary category must be among the selected categories.",
+      "attributeValueRequired": "You must provide a dictionary value (select) or an inline value (text/number/boolean).",
+      "stockDeltaZero": "The adjustment cannot be 0."
+    },
+    "settingsAction": {
+      "moneyRubles": "Expected a non-negative amount in rubles (up to 2 decimal places).",
+      "zoneLabelRequired": "Enter the zone name.",
+      "localeCodeFormat": "A language code like «ru», «en», «pt-br».",
+      "titleTemplatePlaceholder": "title_template must contain the «%s» placeholder.",
+      "invalidFile": "Invalid file.",
+      "storageSaveFailed": "Failed to save the file to storage.",
+      "exchangeFetchFailed": "Failed to fetch rates from the Central Bank of Russia. The previous rates were kept, please try again later.",
+      "defaultLocaleImmutable": "The default language («{locale}») cannot be changed: it is stored in the base fields of the catalog and content. Changing it requires a data migration."
+    },
+    "newsAction": {
+      "slugExists": "A news article with this address (slug) already exists."
+    },
+    "reviewsAction": {
+      "invalidTransition": "Invalid status transition: «{from}» → «{to}»."
+    },
+    "customerAuth": {
+      "passwordTooShort": "Password must be at least 8 characters.",
+      "passwordTooLong": "Password must be no longer than 128 characters.",
+      "invalidEmail": "Invalid email.",
+      "nothingToUpdate": "Nothing to update."
+    },
+    "auth": {
+      "emailInvalid": "Enter a valid email address",
+      "passwordMinLength": "Password must be at least 8 characters long",
+      "roleCodeFormat": "Role code: lowercase Latin letters, starting with a letter (2–31 characters)",
+      "roleTitleRequired": "Enter a title"
+    },
+    "cms": {
+      "productsGridSlugsRequired": "mode='slugs' requires a non-empty list of slugs",
+      "productsGridCategoryRequired": "mode='category' requires categorySlug",
+      "productsGridBrandRequired": "mode='brand' requires brandSlug"
+    },
+    "giftCert": {
+      "faceValuePositive": "The certificate face value must be greater than zero.",
+      "invalidEmail": "Invalid email."
+    },
+    "designers": {
+      "slugFormat": "Slug: lowercase Latin letters, digits and hyphens only (no double or leading/trailing hyphens)."
+    },
+    "seo": {
+      "canonicalInvalid": "canonical_url: expected an absolute https URL or a relative path starting with «/»"
     }
   },
   "seo": {
