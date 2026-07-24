@@ -188,7 +188,13 @@
   },
   "catalog": {
     "common": {
-      "savedChanges": "Changes saved."
+      "savedChanges": "Changes saved.",
+      "chooseFile": "Choose a file.",
+      "slugLabel": "URL slug",
+      "slugAutoFromName": "auto from name",
+      "fileLabel": "File",
+      "colAddress": "Address",
+      "backToCatalog": "Back to catalog"
     },
     "product": {
       "tabs": {
@@ -307,7 +313,70 @@
         "hidden": "Category hidden on the site.",
         "shown": "Category shown on the site.",
         "deleted": "Category deleted."
-      }
+      },
+      "listSubtitle": "Groups by which products are arranged in the catalog on the site. Click «+» to the left of a name to expand subcategories; the number in brackets is how many are inside. A category with subcategories cannot be deleted — first move or delete the nested ones.",
+      "imageKeyLabel": "Category image (storage key)",
+      "imageKeyPlaceholder": "e.g. categories/scarves.webp",
+      "imageKeyHelp": "S3 key, like the OG image; the storefront URL is built by the storage.",
+      "showOnSiteLabel": "Show on the site",
+      "seoCanonicalPlaceholder": "Auto: /catalog/{slug}",
+      "slugFallback": "category-slug"
+    },
+    "designer": {
+      "listSubtitle": "People/authors for designer pages and product links. Can be left empty. Found: {count}.",
+      "createLink": "+ Add designer",
+      "createButton": "Create designer",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Name, country or address",
+      "sortLabel": "Sorting",
+      "sort": {
+        "nameAsc": "Alphabetical: A → Z",
+        "nameDesc": "Alphabetical: Z → A",
+        "manual": "Manual order"
+      },
+      "searchEmpty": "No designers found. Change the query or reset the search.",
+      "listEmpty": "No designers yet.",
+      "newTitle": "New designer",
+      "newSubtitle": "After creation, avatar upload and OG/translations become available.",
+      "backToList": "Back to designers",
+      "workCountLabel": "Number of works",
+      "videoLabel": "Video (Vimeo/YouTube)",
+      "socialsLegend": "Social networks",
+      "socials": {
+        "website": "Website"
+      },
+      "slugPlaceholder": "auto from name",
+      "seoAfterCreateHint": "OG/canonical/noindex and the avatar become available after the designer is created.",
+      "seoCanonicalPlaceholder": "Auto: /designers/{slug}",
+      "slugFallback": "designer-slug",
+      "avatarTitle": "Avatar",
+      "avatarAlt": "Avatar of {name}",
+      "noPhoto": "no photo",
+      "toast": {
+        "imageUploaded": "Avatar uploaded."
+      },
+      "confirmDelete": "Delete designer «{name}»? Products will not be deleted; the designer will be unlinked from them."
+    },
+    "brand": {
+      "listSubtitle": "Manufacturers for the filter and brand pages. Can be left empty.",
+      "createLink": "+ Add brand",
+      "createButton": "Create brand",
+      "externalUrlLabel": "Brand's external website",
+      "seoAfterCreateHint": "OG/canonical/noindex become available after the brand is created.",
+      "seoCanonicalPlaceholder": "Auto: /brand/{slug}",
+      "slugFallback": "brand-slug",
+      "logoTitle": "Logo",
+      "logoAlt": "{name} logo",
+      "noLogo": "no logo",
+      "toast": {
+        "logoUploaded": "Logo uploaded."
+      },
+      "newTitle": "New brand",
+      "newSubtitle": "After creation, logo upload becomes available.",
+      "backToList": "Back to brands",
+      "listEmpty": "No brands yet.",
+      "confirmDelete": "Delete brand «{name}»? Products will not be deleted; the brand will be unlinked from them.",
+      "colLogo": "Logo"
     },
     "attribute": {
       "types": {

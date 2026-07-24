@@ -17,20 +17,32 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
 const pageSrc = () => read('app/admin/(panel)/catalog/designers/page.tsx');
 const formSrc = () => read('app/admin/(panel)/catalog/_components/DesignerForm.tsx');
 
-/** Значение пропа `subtitle` у <PageHeader> (шаблонная строка или литерал). */
-function subtitle(src: string): string {
-  const m = src.match(/subtitle=\{?[`"]([^`"]*)[`"]\}?/);
-  expect(m, 'в page.tsx не найден subtitle у PageHeader').not.toBeNull();
-  return m![1];
+/**
+ * ru-значение ключа подзаголовка из каталога сообщений. После i18n-переноса текст
+ * подзаголовка живёт в messages/ru.json (page.tsx рендерит его через t(...)), но
+ * инвариант C1 неизменен: подсказка о необязательности + живой счётчик найденного.
+ */
+function ruSubtitle(): string {
+  const ru = JSON.parse(read('messages/ru.json')) as {
+    catalog: { designer: { listSubtitle: string } };
+  };
+  return ru.catalog.designer.listSubtitle;
 }
 
 describe('C1: подзаголовок раздела «Дизайнеры»', () => {
-  it('содержит И подсказку о необязательности раздела, И счётчик найденного', () => {
-    const s = subtitle(pageSrc());
+  it('ru-текст подзаголовка содержит И подсказку о необязательности, И счётчик найденного', () => {
+    const s = ruSubtitle();
     expect(s).toContain('Можно оставить пустым');
     expect(s).toContain('Найдено:');
+    // Счётчик — ICU-плейсхолдер {count}, а не забитое число.
+    expect(s).toMatch(/Найдено:\s*\{count\}/);
+  });
+
+  it('page.tsx рендерит подзаголовок через ключ перевода с ЖИВЫМ счётчиком', () => {
+    const src = pageSrc();
+    expect(src).toContain("'catalog.designer.listSubtitle'");
     // Счётчик обязан быть живым (из данных), а не забитым числом.
-    expect(s).toMatch(/Найдено:\s*\$\{items\.length\}/);
+    expect(src).toMatch(/count:\s*items\.length/);
   });
 });
 

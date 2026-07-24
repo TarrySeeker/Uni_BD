@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { listBrands } from '@/lib/catalog/repository';
 import { getStorage } from '@/lib/storage';
@@ -17,10 +18,11 @@ import { BrandList } from '../_components/BrandList';
 export const dynamic = 'force-dynamic';
 
 export default async function BrandsPage() {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -37,17 +39,20 @@ export default async function BrandsPage() {
   return (
     <div>
       <PageHeader
-        title="Бренды"
-        subtitle="Производители для фильтра и страниц бренда. Можно оставить пустым."
-        breadcrumbs={[{ label: 'Каталог', href: '/admin/catalog' }, { label: 'Бренды' }]}
+        title={t('catalog.list.nav.brands')}
+        subtitle={t('catalog.brand.listSubtitle')}
+        breadcrumbs={[
+          { label: t('nav.catalog'), href: '/admin/catalog' },
+          { label: t('catalog.list.nav.brands') },
+        ]}
         backHref="/admin/catalog"
-        backLabel="К каталогу"
+        backLabel={t('catalog.common.backToCatalog')}
         action={
           <Link
             href="/admin/catalog/brands/new"
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
-            + Создать бренд
+            {t('catalog.brand.createLink')}
           </Link>
         }
       />

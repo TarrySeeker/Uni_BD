@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getLocaleConfig } from '@/lib/i18n';
 
 import { Forbidden } from '../../../_components/Forbidden';
@@ -14,10 +16,11 @@ import { DesignerForm } from '../../_components/DesignerForm';
 export const dynamic = 'force-dynamic';
 
 export default async function NewDesignerPage() {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -27,15 +30,15 @@ export default async function NewDesignerPage() {
   return (
     <div>
       <PageHeader
-        title="Новый дизайнер"
-        subtitle="После создания станут доступны загрузка аватара и OG/переводы."
+        title={t('catalog.designer.newTitle')}
+        subtitle={t('catalog.designer.newSubtitle')}
         breadcrumbs={[
-          { label: 'Каталог', href: '/admin/catalog' },
-          { label: 'Дизайнеры', href: '/admin/catalog/designers' },
-          { label: 'Новый дизайнер' },
+          { label: t('nav.catalog'), href: '/admin/catalog' },
+          { label: t('catalog.list.nav.designers'), href: '/admin/catalog/designers' },
+          { label: t('catalog.designer.newTitle') },
         ]}
         backHref="/admin/catalog/designers"
-        backLabel="К списку дизайнеров"
+        backLabel={t('catalog.designer.backToList')}
       />
 
       <div className="mt-6">

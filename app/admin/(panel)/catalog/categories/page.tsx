@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getCategoryTree } from '@/lib/catalog/repository';
 
 import { Forbidden } from '../../_components/Forbidden';
@@ -15,10 +17,11 @@ import { CategoryManager } from '../_components/CategoryManager';
 export const dynamic = 'force-dynamic';
 
 export default async function CategoriesPage() {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -28,11 +31,14 @@ export default async function CategoriesPage() {
   return (
     <div>
       <PageHeader
-        title="Категории"
-        subtitle="Группы, по которым товары раскладываются в каталоге на сайте. Нажмите «+» слева от названия, чтобы раскрыть подкатегории; в скобках — сколько их внутри. Категорию с подкатегориями удалить нельзя — сначала перенесите или удалите вложенные."
-        breadcrumbs={[{ label: 'Каталог', href: '/admin/catalog' }, { label: 'Категории' }]}
+        title={t('catalog.list.nav.categories')}
+        subtitle={t('catalog.category.listSubtitle')}
+        breadcrumbs={[
+          { label: t('nav.catalog'), href: '/admin/catalog' },
+          { label: t('catalog.list.nav.categories') },
+        ]}
         backHref="/admin/catalog"
-        backLabel="К каталогу"
+        backLabel={t('catalog.common.backToCatalog')}
       />
 
       <div className="mt-6">

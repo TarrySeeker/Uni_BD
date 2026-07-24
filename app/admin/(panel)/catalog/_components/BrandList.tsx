@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { Brand } from '@/lib/catalog/types';
 
 import { deleteBrandAction } from './form-actions';
@@ -24,10 +26,11 @@ export type BrandListItem = Brand & { logoUrl: string | null };
 
 export function BrandList({ brands }: { brands: BrandListItem[] }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
 
   async function remove(brand: Brand) {
-    if (!window.confirm(`Удалить бренд «${brand.name}»? Товары не удалятся, у них снимется бренд.`)) {
+    if (!window.confirm(t('catalog.brand.confirmDelete', { name: brand.name }))) {
       return;
     }
     setError(null);
@@ -48,18 +51,18 @@ export function BrandList({ brands }: { brands: BrandListItem[] }) {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-gray-500">
             <tr>
-              <th scope="col" className="px-4 py-2 font-medium">Лого</th>
-              <th scope="col" className="px-4 py-2 font-medium">Название</th>
-              <th scope="col" className="px-4 py-2 font-medium">Адрес</th>
-              <th scope="col" className="px-4 py-2 font-medium">Активен</th>
-              <th scope="col" className="px-4 py-2 font-medium text-right">Действия</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('catalog.brand.colLogo')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('fields.name')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('catalog.common.colAddress')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('common.states.active')}</th>
+              <th scope="col" className="px-4 py-2 font-medium text-right">{t('common.table.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {brands.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
-                  Брендов пока нет.
+                  {t('catalog.brand.listEmpty')}
                 </td>
               </tr>
             ) : (
@@ -79,21 +82,21 @@ export function BrandList({ brands }: { brands: BrandListItem[] }) {
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-gray-600"><code className="text-xs">{b.slug}</code></td>
-                  <td className="px-4 py-2 text-gray-600">{b.isActive ? 'да' : 'нет'}</td>
+                  <td className="px-4 py-2 text-gray-600">{b.isActive ? t('catalog.variants.yes') : t('catalog.variants.no')}</td>
                   <td className="px-4 py-2">
                     <div className="flex justify-end gap-2">
                       <Link
                         href={`/admin/catalog/brands/${b.id}`}
                         className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
                       >
-                        Редактировать
+                        {t('common.actions.edit')}
                       </Link>
                       <button
                         type="button"
                         onClick={() => remove(b)}
                         className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
                       >
-                        Удалить
+                        {t('common.actions.delete')}
                       </button>
                     </div>
                   </td>

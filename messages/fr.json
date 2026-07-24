@@ -188,7 +188,13 @@
   },
   "catalog": {
     "common": {
-      "savedChanges": "Modifications enregistrées."
+      "savedChanges": "Modifications enregistrées.",
+      "chooseFile": "Choisissez un fichier.",
+      "slugLabel": "Slug (URL)",
+      "slugAutoFromName": "auto d'après le nom",
+      "fileLabel": "Fichier",
+      "colAddress": "Adresse",
+      "backToCatalog": "Retour au catalogue"
     },
     "product": {
       "tabs": {
@@ -307,7 +313,70 @@
         "hidden": "Catégorie masquée sur le site.",
         "shown": "Catégorie affichée sur le site.",
         "deleted": "Catégorie supprimée."
-      }
+      },
+      "listSubtitle": "Groupes selon lesquels les produits sont classés dans le catalogue du site. Cliquez sur «+» à gauche du nom pour développer les sous-catégories ; le nombre entre parenthèses indique combien il y en a. Une catégorie avec des sous-catégories ne peut pas être supprimée — déplacez ou supprimez d'abord les éléments imbriqués.",
+      "imageKeyLabel": "Image de la catégorie (clé de stockage)",
+      "imageKeyPlaceholder": "p. ex. categories/scarves.webp",
+      "imageKeyHelp": "Clé S3, comme l'image OG ; l'URL pour la vitrine est construite par le stockage.",
+      "showOnSiteLabel": "Afficher sur le site",
+      "seoCanonicalPlaceholder": "Auto : /catalog/{slug}",
+      "slugFallback": "slug-categorie"
+    },
+    "designer": {
+      "listSubtitle": "Personnes/auteurs pour les pages designers et l'association aux produits. Peut rester vide. Trouvés : {count}.",
+      "createLink": "+ Ajouter un designer",
+      "createButton": "Créer le designer",
+      "searchLabel": "Recherche",
+      "searchPlaceholder": "Nom, pays ou adresse",
+      "sortLabel": "Tri",
+      "sort": {
+        "nameAsc": "Alphabétique : A → Z",
+        "nameDesc": "Alphabétique : Z → A",
+        "manual": "Ordre manuel"
+      },
+      "searchEmpty": "Aucun designer trouvé. Modifiez la requête ou réinitialisez la recherche.",
+      "listEmpty": "Aucun designer pour le moment.",
+      "newTitle": "Nouveau designer",
+      "newSubtitle": "Après la création, le téléversement de l'avatar et les OG/traductions deviennent disponibles.",
+      "backToList": "Retour à la liste des designers",
+      "workCountLabel": "Nombre d'œuvres",
+      "videoLabel": "Vidéo (Vimeo/YouTube)",
+      "socialsLegend": "Réseaux sociaux",
+      "socials": {
+        "website": "Site web"
+      },
+      "slugPlaceholder": "auto d'après le nom",
+      "seoAfterCreateHint": "Les OG/canonical/noindex et l'avatar deviennent disponibles après la création du designer.",
+      "seoCanonicalPlaceholder": "Auto : /designers/{slug}",
+      "slugFallback": "slug-designer",
+      "avatarTitle": "Avatar",
+      "avatarAlt": "Avatar de {name}",
+      "noPhoto": "pas de photo",
+      "toast": {
+        "imageUploaded": "Avatar téléversé."
+      },
+      "confirmDelete": "Supprimer le designer «{name}» ? Les produits ne seront pas supprimés ; le designer en sera dissocié."
+    },
+    "brand": {
+      "listSubtitle": "Fabricants pour le filtre et les pages de marque. Peut rester vide.",
+      "createLink": "+ Ajouter une marque",
+      "createButton": "Créer la marque",
+      "externalUrlLabel": "Site web externe de la marque",
+      "seoAfterCreateHint": "Les OG/canonical/noindex deviennent disponibles après la création de la marque.",
+      "seoCanonicalPlaceholder": "Auto : /brand/{slug}",
+      "slugFallback": "slug-marque",
+      "logoTitle": "Logo",
+      "logoAlt": "Logo {name}",
+      "noLogo": "pas de logo",
+      "toast": {
+        "logoUploaded": "Logo téléversé."
+      },
+      "newTitle": "Nouvelle marque",
+      "newSubtitle": "Après la création, le téléversement du logo devient disponible.",
+      "backToList": "Retour à la liste des marques",
+      "listEmpty": "Aucune marque pour le moment.",
+      "confirmDelete": "Supprimer la marque «{name}» ? Les produits ne seront pas supprimés ; la marque en sera dissociée.",
+      "colLogo": "Logo"
     },
     "attribute": {
       "types": {

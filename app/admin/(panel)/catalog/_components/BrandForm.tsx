@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { Brand } from '@/lib/catalog/types';
 
 import {
@@ -46,6 +48,7 @@ export function BrandForm({
   defaultLocale: string;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const isEdit = brand !== null;
   const fileRef = useRef<HTMLInputElement>(null);
   const [translations, setTranslations] = useState<TranslationsState>(
@@ -104,7 +107,7 @@ export function BrandForm({
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Изменения сохранены.');
+        setSuccess(t('catalog.common.savedChanges'));
         router.refresh();
       } else {
         router.push(`/admin/catalog/brands/${result.data.id}`);
@@ -118,7 +121,7 @@ export function BrandForm({
     if (!isEdit) return;
     const file = fileRef.current?.files?.[0];
     if (!file) {
-      setError({ ok: false, error: 'validation', fieldErrors: { file: ['Выберите файл.'] } });
+      setError({ ok: false, error: 'validation', fieldErrors: { file: [t('catalog.common.chooseFile')] } });
       return;
     }
     setPending(true);
@@ -128,7 +131,7 @@ export function BrandForm({
     const result = await uploadBrandLogoAction(brand!.id, fd);
     setPending(false);
     if (result.ok) {
-      setSuccess('Логотип загружен.');
+      setSuccess(t('catalog.brand.toast.logoUploaded'));
       if (fileRef.current) fileRef.current.value = '';
       router.refresh();
     } else {
@@ -165,25 +168,25 @@ export function BrandForm({
       >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="b-name" className="block text-sm font-medium text-gray-700">Название*</label>
+          <label htmlFor="b-name" className="block text-sm font-medium text-gray-700">{t('fields.name')}*</label>
           <input id="b-name" value={name} onChange={(e) => setName(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" required />
           {fe('name') ? <p className="mt-1 text-xs text-red-600">{fe('name')}</p> : null}
         </div>
         <div>
-          <label htmlFor="b-slug" className="block text-sm font-medium text-gray-700">ЧПУ (slug)</label>
+          <label htmlFor="b-slug" className="block text-sm font-medium text-gray-700">{t('catalog.common.slugLabel')}</label>
           <input id="b-slug" value={slug} onChange={(e) => setSlug(e.target.value)}
-            placeholder="авто из названия"
+            placeholder={t('catalog.common.slugAutoFromName')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('slug') ? <p className="mt-1 text-xs text-red-600">{fe('slug')}</p> : null}
         </div>
         <div className="lg:col-span-2">
-          <label htmlFor="b-desc" className="block text-sm font-medium text-gray-700">Описание</label>
+          <label htmlFor="b-desc" className="block text-sm font-medium text-gray-700">{t('fields.description')}</label>
           <textarea id="b-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div className="lg:col-span-2">
-          <label htmlFor="b-ext-url" className="block text-sm font-medium text-gray-700">Внешний сайт бренда</label>
+          <label htmlFor="b-ext-url" className="block text-sm font-medium text-gray-700">{t('catalog.brand.externalUrlLabel')}</label>
           <input id="b-ext-url" type="url" value={externalUrl} onChange={(e) => setExternalUrl(e.target.value)}
             placeholder="https://brand.example.com"
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
@@ -191,14 +194,16 @@ export function BrandForm({
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          Активен
+          {t('common.states.active')}
         </label>
         <div className="lg:col-span-2">
           <SeoFieldset
             value={seo}
             onChange={setSeo}
             idPrefix="b-seo"
-            canonicalPlaceholder={`Авто: /brand/${slug || 'slug-бренда'}`}
+            canonicalPlaceholder={t('catalog.brand.seoCanonicalPlaceholder', {
+              slug: slug || t('catalog.brand.slugFallback'),
+            })}
             fieldErrors={{
               seoTitle: fieldError(error, 'seoTitle'),
               seoDescription: fieldError(error, 'seoDescription'),
@@ -210,7 +215,7 @@ export function BrandForm({
           />
           {!isEdit ? (
             <p className="mt-2 text-sm text-gray-500">
-              OG/canonical/noindex станут доступны после создания бренда.
+              {t('catalog.brand.seoAfterCreateHint')}
             </p>
           ) : null}
         </div>
@@ -219,33 +224,33 @@ export function BrandForm({
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать бренд'}
+          {pending ? t('common.form.saving') : isEdit ? t('common.actions.save') : t('catalog.brand.createButton')}
         </button>
         <button type="button" onClick={() => router.push('/admin/catalog/brands')}
           className="text-sm text-gray-600 hover:underline">
-          Отмена
+          {t('common.actions.cancel')}
         </button>
       </div>
 
       {isEdit ? (
         <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <h2 className="text-sm font-semibold text-gray-800">Логотип</h2>
+          <h2 className="text-sm font-semibold text-gray-800">{t('catalog.brand.logoTitle')}</h2>
           <div className="mt-2 flex items-center gap-4">
             {brand!.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand!.logoUrl} alt={`Логотип ${brand!.name}`} className="h-16 w-16 rounded object-contain" />
+              <img src={brand!.logoUrl} alt={t('catalog.brand.logoAlt', { name: brand!.name })} className="h-16 w-16 rounded object-contain" />
             ) : (
               <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-200 text-xs text-gray-500">
-                нет лого
+                {t('catalog.brand.noLogo')}
               </div>
             )}
             <div>
-              <label htmlFor="b-logo" className="block text-xs font-medium text-gray-600">Файл</label>
+              <label htmlFor="b-logo" className="block text-xs font-medium text-gray-600">{t('catalog.common.fileLabel')}</label>
               <input id="b-logo" ref={fileRef} type="file" accept="image/*" className="mt-1 text-sm" />
             </div>
             <button type="button" onClick={uploadLogo} disabled={pending}
               className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-              Загрузить
+              {t('catalog.blocks.buttons.upload')}
             </button>
           </div>
         </div>

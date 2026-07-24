@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { getLocaleConfig } from '@/lib/i18n';
 
 import { Forbidden } from '../../../_components/Forbidden';
@@ -14,10 +16,11 @@ import { BrandForm } from '../../_components/BrandForm';
 export const dynamic = 'force-dynamic';
 
 export default async function NewBrandPage() {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -27,15 +30,15 @@ export default async function NewBrandPage() {
   return (
     <div>
       <PageHeader
-        title="Новый бренд"
-        subtitle="После создания станет доступна загрузка логотипа."
+        title={t('catalog.brand.newTitle')}
+        subtitle={t('catalog.brand.newSubtitle')}
         breadcrumbs={[
-          { label: 'Каталог', href: '/admin/catalog' },
-          { label: 'Бренды', href: '/admin/catalog/brands' },
-          { label: 'Новый бренд' },
+          { label: t('nav.catalog'), href: '/admin/catalog' },
+          { label: t('catalog.list.nav.brands'), href: '/admin/catalog/brands' },
+          { label: t('catalog.brand.newTitle') },
         ]}
         backHref="/admin/catalog/brands"
-        backLabel="К списку брендов"
+        backLabel={t('catalog.brand.backToList')}
       />
 
       <div className="mt-6">

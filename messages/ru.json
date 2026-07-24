@@ -188,7 +188,13 @@
   },
   "catalog": {
     "common": {
-      "savedChanges": "Изменения сохранены."
+      "savedChanges": "Изменения сохранены.",
+      "chooseFile": "Выберите файл.",
+      "slugLabel": "ЧПУ (slug)",
+      "slugAutoFromName": "авто из названия",
+      "fileLabel": "Файл",
+      "colAddress": "Адрес",
+      "backToCatalog": "К каталогу"
     },
     "product": {
       "tabs": {
@@ -307,7 +313,70 @@
         "hidden": "Категория скрыта на сайте.",
         "shown": "Категория показана на сайте.",
         "deleted": "Категория удалена."
-      }
+      },
+      "listSubtitle": "Группы, по которым товары раскладываются в каталоге на сайте. Нажмите «+» слева от названия, чтобы раскрыть подкатегории; в скобках — сколько их внутри. Категорию с подкатегориями удалить нельзя — сначала перенесите или удалите вложенные.",
+      "imageKeyLabel": "Картинка категории (ключ в хранилище)",
+      "imageKeyPlaceholder": "напр. categories/scarves.webp",
+      "imageKeyHelp": "S3-ключ, как og-изображение; URL для витрины собирает хранилище.",
+      "showOnSiteLabel": "Показывать на сайте",
+      "seoCanonicalPlaceholder": "Авто: /catalog/{slug}",
+      "slugFallback": "slug-категории"
+    },
+    "designer": {
+      "listSubtitle": "Персоны/авторы для страниц дизайнеров и привязки товаров. Можно оставить пустым. Найдено: {count}.",
+      "createLink": "+ Создать дизайнера",
+      "createButton": "Создать дизайнера",
+      "searchLabel": "Поиск",
+      "searchPlaceholder": "Имя, страна или адрес",
+      "sortLabel": "Сортировка",
+      "sort": {
+        "nameAsc": "По алфавиту: А → Я",
+        "nameDesc": "По алфавиту: Я → А",
+        "manual": "Ручной порядок"
+      },
+      "searchEmpty": "Дизайнеры не найдены. Измените запрос или сбросьте поиск.",
+      "listEmpty": "Дизайнеров пока нет.",
+      "newTitle": "Новый дизайнер",
+      "newSubtitle": "После создания станут доступны загрузка аватара и OG/переводы.",
+      "backToList": "К списку дизайнеров",
+      "workCountLabel": "Число работ",
+      "videoLabel": "Видео (Vimeo/YouTube)",
+      "socialsLegend": "Соцсети",
+      "socials": {
+        "website": "Сайт"
+      },
+      "slugPlaceholder": "авто из имени",
+      "seoAfterCreateHint": "OG/canonical/noindex и аватар станут доступны после создания дизайнера.",
+      "seoCanonicalPlaceholder": "Авто: /designers/{slug}",
+      "slugFallback": "slug-дизайнера",
+      "avatarTitle": "Аватар",
+      "avatarAlt": "Аватар {name}",
+      "noPhoto": "нет фото",
+      "toast": {
+        "imageUploaded": "Аватар загружен."
+      },
+      "confirmDelete": "Удалить дизайнера «{name}»? Товары не удалятся, у них снимется дизайнер."
+    },
+    "brand": {
+      "listSubtitle": "Производители для фильтра и страниц бренда. Можно оставить пустым.",
+      "createLink": "+ Создать бренд",
+      "createButton": "Создать бренд",
+      "externalUrlLabel": "Внешний сайт бренда",
+      "seoAfterCreateHint": "OG/canonical/noindex станут доступны после создания бренда.",
+      "seoCanonicalPlaceholder": "Авто: /brand/{slug}",
+      "slugFallback": "slug-бренда",
+      "logoTitle": "Логотип",
+      "logoAlt": "Логотип {name}",
+      "noLogo": "нет лого",
+      "toast": {
+        "logoUploaded": "Логотип загружен."
+      },
+      "newTitle": "Новый бренд",
+      "newSubtitle": "После создания станет доступна загрузка логотипа.",
+      "backToList": "К списку брендов",
+      "listEmpty": "Брендов пока нет.",
+      "confirmDelete": "Удалить бренд «{name}»? Товары не удалятся, у них снимется бренд.",
+      "colLogo": "Лого"
     },
     "attribute": {
       "types": {

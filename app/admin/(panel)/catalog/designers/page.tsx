@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { listDesigners } from '@/lib/designers/repository';
 import {
@@ -31,10 +32,11 @@ export default async function DesignersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -64,17 +66,20 @@ export default async function DesignersPage({
   return (
     <div>
       <PageHeader
-        title="Дизайнеры"
-        subtitle={`Персоны/авторы для страниц дизайнеров и привязки товаров. Можно оставить пустым. Найдено: ${items.length}.`}
-        breadcrumbs={[{ label: 'Каталог', href: '/admin/catalog' }, { label: 'Дизайнеры' }]}
+        title={t('catalog.list.nav.designers')}
+        subtitle={t('catalog.designer.listSubtitle', { count: items.length })}
+        breadcrumbs={[
+          { label: t('nav.catalog'), href: '/admin/catalog' },
+          { label: t('catalog.list.nav.designers') },
+        ]}
         backHref="/admin/catalog"
-        backLabel="К каталогу"
+        backLabel={t('catalog.common.backToCatalog')}
         action={
           <Link
             href={buildDesignerHref(`${DESIGNER_LIST_PATH}/new`, listQuery)}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
-            + Создать дизайнера
+            {t('catalog.designer.createLink')}
           </Link>
         }
       />
@@ -82,19 +87,19 @@ export default async function DesignersPage({
       <form method="get" className="mt-4 flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="designer-search" className="block text-xs font-medium text-gray-600">
-            Поиск
+            {t('catalog.designer.searchLabel')}
           </label>
           <input
             id="designer-search"
             name="search"
             defaultValue={params.search ?? ''}
-            placeholder="Имя, страна или адрес"
+            placeholder={t('catalog.designer.searchPlaceholder')}
             className="mt-1 w-64 rounded border border-gray-300 px-3 py-2 text-sm"
           />
         </div>
         <div>
           <label htmlFor="designer-sort" className="block text-xs font-medium text-gray-600">
-            Сортировка
+            {t('catalog.designer.sortLabel')}
           </label>
           <select
             id="designer-sort"
@@ -102,23 +107,23 @@ export default async function DesignersPage({
             defaultValue={params.sort}
             className="mt-1 rounded border border-gray-300 px-3 py-2 text-sm"
           >
-            <option value="name_asc">По алфавиту: А → Я</option>
-            <option value="name_desc">По алфавиту: Я → А</option>
-            <option value="manual">Ручной порядок</option>
+            <option value="name_asc">{t('catalog.designer.sort.nameAsc')}</option>
+            <option value="name_desc">{t('catalog.designer.sort.nameDesc')}</option>
+            <option value="manual">{t('catalog.designer.sort.manual')}</option>
           </select>
         </div>
         <button
           type="submit"
           className="rounded border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100"
         >
-          Применить
+          {t('common.actions.apply')}
         </button>
         {isFiltered ? (
           <Link
             href="/admin/catalog/designers"
             className="px-2 py-2 text-sm text-gray-500 hover:underline"
           >
-            Сбросить
+            {t('common.actions.reset')}
           </Link>
         ) : null}
       </form>
@@ -126,7 +131,7 @@ export default async function DesignersPage({
       <div className="mt-6">
         {items.length === 0 && params.search ? (
           <p className="rounded-lg border border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
-            Дизайнеры не найдены. Измените запрос или сбросьте поиск.
+            {t('catalog.designer.searchEmpty')}
           </p>
         ) : (
           <DesignerList designers={items} />

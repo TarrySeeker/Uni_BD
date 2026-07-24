@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { Category } from '@/lib/catalog/types';
 
 import { updateCategoryAction } from './form-actions';
@@ -39,6 +41,7 @@ export function CategoryForm({
   defaultLocale: string;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -71,7 +74,7 @@ export function CategoryForm({
     });
     setPending(false);
     if (result.ok) {
-      setSuccess('Изменения сохранены.');
+      setSuccess(t('catalog.common.savedChanges'));
       router.refresh();
     } else {
       setError(result);
@@ -107,45 +110,47 @@ export function CategoryForm({
       >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <label htmlFor="c-name" className="block text-sm font-medium text-gray-700">Название*</label>
+          <label htmlFor="c-name" className="block text-sm font-medium text-gray-700">{t('fields.name')}*</label>
           <input id="c-name" value={name} onChange={(e) => setName(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" required />
           {fe('name') ? <p className="mt-1 text-xs text-red-600">{fe('name')}</p> : null}
         </div>
         <div>
-          <label htmlFor="c-slug" className="block text-sm font-medium text-gray-700">ЧПУ (slug)</label>
+          <label htmlFor="c-slug" className="block text-sm font-medium text-gray-700">{t('catalog.common.slugLabel')}</label>
           <input id="c-slug" value={slug} onChange={(e) => setSlug(e.target.value)}
-            placeholder="авто из названия"
+            placeholder={t('catalog.common.slugAutoFromName')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           {fe('slug') ? <p className="mt-1 text-xs text-red-600">{fe('slug')}</p> : null}
         </div>
         <div className="lg:col-span-2">
-          <label htmlFor="c-desc" className="block text-sm font-medium text-gray-700">Описание</label>
+          <label htmlFor="c-desc" className="block text-sm font-medium text-gray-700">{t('fields.description')}</label>
           <textarea id="c-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div className="lg:col-span-2">
           <label htmlFor="c-image" className="block text-sm font-medium text-gray-700">
-            Картинка категории (ключ в хранилище)
+            {t('catalog.category.imageKeyLabel')}
           </label>
           <input id="c-image" value={imageKey} onChange={(e) => setImageKey(e.target.value)}
-            placeholder="напр. categories/scarves.webp"
+            placeholder={t('catalog.category.imageKeyPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           <p className="mt-1 text-xs text-gray-500">
-            S3-ключ, как og-изображение; URL для витрины собирает хранилище.
+            {t('catalog.category.imageKeyHelp')}
           </p>
           {fe('imageKey') ? <p className="mt-1 text-xs text-red-600">{fe('imageKey')}</p> : null}
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          Показывать на сайте
+          {t('catalog.category.showOnSiteLabel')}
         </label>
         <div className="lg:col-span-2">
           <SeoFieldset
             value={seo}
             onChange={setSeo}
             idPrefix="c-seo"
-            canonicalPlaceholder={`Авто: /catalog/${slug || 'slug-категории'}`}
+            canonicalPlaceholder={t('catalog.category.seoCanonicalPlaceholder', {
+              slug: slug || t('catalog.category.slugFallback'),
+            })}
             fieldErrors={{
               seoTitle: fieldError(error, 'seoTitle'),
               seoDescription: fieldError(error, 'seoDescription'),
@@ -161,11 +166,11 @@ export function CategoryForm({
       <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
         <button type="button" onClick={save} disabled={pending || !name.trim()}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить'}
+          {pending ? t('common.form.saving') : t('common.actions.save')}
         </button>
         <button type="button" onClick={() => router.push('/admin/catalog/categories')}
           className="text-sm text-gray-600 hover:underline">
-          Отмена
+          {t('common.actions.cancel')}
         </button>
       </div>
       </LocaleTabs>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 
 import { getBrandById } from '@/lib/catalog/repository';
 import { getStorage } from '@/lib/storage';
@@ -22,10 +23,11 @@ export default async function BrandDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -44,9 +46,9 @@ export default async function BrandDetailPage({
 
   return (
     <div>
-      <nav className="text-sm text-gray-500" aria-label="Хлебные крошки">
+      <nav className="text-sm text-gray-500" aria-label={t('layout.breadcrumbs.ariaLabel')}>
         <Link href="/admin/catalog/brands" className="text-blue-700 hover:underline">
-          Бренды
+          {t('catalog.list.nav.brands')}
         </Link>{' '}
         / {brand.name}
       </nav>

@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import type { Designer } from '@/lib/designers/types';
 
 import {
@@ -32,13 +34,6 @@ type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 /** Дизайнер для формы: доменный Designer + готовый imageUrl (резолвен на сервере). */
 export type DesignerFormDesigner = Designer & { imageUrl?: string | null };
 
-const SOCIAL_KEYS: Array<{ key: string; label: string }> = [
-  { key: 'instagram', label: 'Instagram' },
-  { key: 'facebook', label: 'Facebook' },
-  { key: 'vk', label: 'VK' },
-  { key: 'website', label: 'Сайт' },
-];
-
 export function DesignerForm({
   designer,
   locales,
@@ -49,6 +44,13 @@ export function DesignerForm({
   defaultLocale: string;
 }) {
   const router = useRouter();
+  const t = useTranslations();
+  const socialFields: Array<{ key: string; label: string }> = [
+    { key: 'instagram', label: 'Instagram' },
+    { key: 'facebook', label: 'Facebook' },
+    { key: 'vk', label: 'VK' },
+    { key: 'website', label: t('catalog.designer.socials.website') },
+  ];
   // Поиск/порядок списка пришли сюда в query — возврат обязан их вернуть.
   const listQuery = useSearchParams().toString();
   const isEdit = designer !== null;
@@ -122,7 +124,7 @@ export function DesignerForm({
     setPending(false);
     if (result.ok) {
       if (isEdit) {
-        setSuccess('Изменения сохранены.');
+        setSuccess(t('catalog.common.savedChanges'));
         router.refresh();
       } else {
         router.push(buildDesignerHref(`${DESIGNER_LIST_PATH}/${result.data.id}`, listQuery));
@@ -136,7 +138,7 @@ export function DesignerForm({
     if (!isEdit) return;
     const file = fileRef.current?.files?.[0];
     if (!file) {
-      setError({ ok: false, error: 'validation', fieldErrors: { file: ['Выберите файл.'] } });
+      setError({ ok: false, error: 'validation', fieldErrors: { file: [t('catalog.common.chooseFile')] } });
       return;
     }
     setPending(true);
@@ -146,7 +148,7 @@ export function DesignerForm({
     const result = await uploadDesignerImageAction(designer!.id, fd);
     setPending(false);
     if (result.ok) {
-      setSuccess('Аватар загружен.');
+      setSuccess(t('catalog.designer.toast.imageUploaded'));
       if (fileRef.current) fileRef.current.value = '';
       router.refresh();
     } else {
@@ -183,42 +185,42 @@ export function DesignerForm({
       >
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <label htmlFor="d-name" className="block text-sm font-medium text-gray-700">Имя*</label>
+            <label htmlFor="d-name" className="block text-sm font-medium text-gray-700">{t('fields.designerName')}*</label>
             <input id="d-name" value={name} onChange={(e) => setName(e.target.value)}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" required />
             {fe('name') ? <p className="mt-1 text-xs text-red-600">{fe('name')}</p> : null}
           </div>
           <div>
-            <label htmlFor="d-slug" className="block text-sm font-medium text-gray-700">ЧПУ (slug)</label>
+            <label htmlFor="d-slug" className="block text-sm font-medium text-gray-700">{t('catalog.common.slugLabel')}</label>
             <input id="d-slug" value={slug} onChange={(e) => setSlug(e.target.value)}
-              placeholder="авто из имени"
+              placeholder={t('catalog.designer.slugPlaceholder')}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
             {fe('slug') ? <p className="mt-1 text-xs text-red-600">{fe('slug')}</p> : null}
           </div>
           <div>
-            <label htmlFor="d-country" className="block text-sm font-medium text-gray-700">Страна</label>
+            <label htmlFor="d-country" className="block text-sm font-medium text-gray-700">{t('fields.country')}</label>
             <input id="d-country" value={country} onChange={(e) => setCountry(e.target.value)}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label htmlFor="d-work" className="block text-sm font-medium text-gray-700">Число работ</label>
+            <label htmlFor="d-work" className="block text-sm font-medium text-gray-700">{t('catalog.designer.workCountLabel')}</label>
             <input id="d-work" type="number" min={0} value={workCount} onChange={(e) => setWorkCount(e.target.value)}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <div className="lg:col-span-2">
-            <label htmlFor="d-desc" className="block text-sm font-medium text-gray-700">Описание</label>
+            <label htmlFor="d-desc" className="block text-sm font-medium text-gray-700">{t('fields.description')}</label>
             <textarea id="d-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={4}
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <div className="lg:col-span-2">
-            <label htmlFor="d-video" className="block text-sm font-medium text-gray-700">Видео (Vimeo/YouTube)</label>
+            <label htmlFor="d-video" className="block text-sm font-medium text-gray-700">{t('catalog.designer.videoLabel')}</label>
             <input id="d-video" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
               placeholder="https://..."
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <fieldset className="lg:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <legend className="text-sm font-medium text-gray-700">Соцсети</legend>
-            {SOCIAL_KEYS.map((s) => (
+            <legend className="text-sm font-medium text-gray-700">{t('catalog.designer.socialsLegend')}</legend>
+            {socialFields.map((s) => (
               <div key={s.key}>
                 <label htmlFor={`d-soc-${s.key}`} className="block text-xs font-medium text-gray-600">{s.label}</label>
                 <input id={`d-soc-${s.key}`} value={socials[s.key] ?? ''} onChange={(e) => setSocial(s.key, e.target.value)}
@@ -228,14 +230,16 @@ export function DesignerForm({
           </fieldset>
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            Активен
+            {t('common.states.active')}
           </label>
           <div className="lg:col-span-2">
             <SeoFieldset
               value={seo}
               onChange={setSeo}
               idPrefix="d-seo"
-              canonicalPlaceholder={`Авто: /designers/${slug || 'slug-дизайнера'}`}
+              canonicalPlaceholder={t('catalog.designer.seoCanonicalPlaceholder', {
+                slug: slug || t('catalog.designer.slugFallback'),
+              })}
               fieldErrors={{
                 seoTitle: fieldError(error, 'seoTitle'),
                 seoDescription: fieldError(error, 'seoDescription'),
@@ -247,7 +251,7 @@ export function DesignerForm({
             />
             {!isEdit ? (
               <p className="mt-2 text-sm text-gray-500">
-                OG/canonical/noindex и аватар станут доступны после создания дизайнера.
+                {t('catalog.designer.seoAfterCreateHint')}
               </p>
             ) : null}
           </div>
@@ -256,33 +260,33 @@ export function DesignerForm({
         <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
           <button type="button" onClick={save} disabled={pending}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-            {pending ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать дизайнера'}
+            {pending ? t('common.form.saving') : isEdit ? t('common.actions.save') : t('catalog.designer.createButton')}
           </button>
           <button type="button" onClick={() => router.push(buildDesignerHref(DESIGNER_LIST_PATH, listQuery))}
             className="text-sm text-gray-600 hover:underline">
-            Отмена
+            {t('common.actions.cancel')}
           </button>
         </div>
 
         {isEdit ? (
           <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <h2 className="text-sm font-semibold text-gray-800">Аватар</h2>
+            <h2 className="text-sm font-semibold text-gray-800">{t('catalog.designer.avatarTitle')}</h2>
             <div className="mt-2 flex items-center gap-4">
               {designer!.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={designer!.imageUrl} alt={`Аватар ${designer!.name}`} className="h-16 w-16 rounded-full object-cover" />
+                <img src={designer!.imageUrl} alt={t('catalog.designer.avatarAlt', { name: designer!.name })} className="h-16 w-16 rounded-full object-cover" />
               ) : (
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-500">
-                  нет фото
+                  {t('catalog.designer.noPhoto')}
                 </div>
               )}
               <div>
-                <label htmlFor="d-image" className="block text-xs font-medium text-gray-600">Файл</label>
+                <label htmlFor="d-image" className="block text-xs font-medium text-gray-600">{t('catalog.common.fileLabel')}</label>
                 <input id="d-image" ref={fileRef} type="file" accept="image/*" className="mt-1 text-sm" />
               </div>
               <button type="button" onClick={uploadImage} disabled={pending}
                 className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-                Загрузить
+                {t('catalog.blocks.buttons.upload')}
               </button>
             </div>
           </div>
