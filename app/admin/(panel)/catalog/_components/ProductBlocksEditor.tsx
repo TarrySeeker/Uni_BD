@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ProductBlock, ProductBlockType, ProductBlockTab } from '@/lib/product-blocks/types';
 import { PRODUCT_BLOCK_TYPES } from '@/lib/product-blocks/types';
@@ -30,13 +31,6 @@ export interface AuthorOption {
 
 /** Секция + резолвенный на сервере URL картинки (для превью). */
 export type EditorBlock = ProductBlock & { imageUrl?: string | null };
-
-const TYPE_LABELS: Record<ProductBlockType, string> = {
-  text: 'Текст',
-  quote: 'Цитата',
-  tabs: 'Табы',
-  image: 'Картинка',
-};
 
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
@@ -85,8 +79,16 @@ function BlockCard({
   total: number;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const fileRef = useRef<HTMLInputElement>(null);
   const isNew = !block.id;
+
+  const typeLabels: Record<ProductBlockType, string> = {
+    text: t('catalog.blocks.types.text'),
+    quote: t('catalog.blocks.types.quote'),
+    tabs: t('catalog.blocks.types.tabs'),
+    image: t('catalog.blocks.types.image'),
+  };
 
   const [type, setType] = useState<ProductBlockType>(block.type);
   const [title, setTitle] = useState(block.title ?? '');
@@ -166,7 +168,7 @@ function BlockCard({
     });
     setPending(false);
     if (res.ok) {
-      setOk('Секция сохранена.');
+      setOk(t('catalog.blocks.toast.saved'));
       onChanged();
       router.refresh();
     } else {
@@ -179,7 +181,7 @@ function BlockCard({
       onChanged();
       return;
     }
-    if (!confirm('Удалить секцию?')) return;
+    if (!confirm(t('catalog.blocks.confirms.delete'))) return;
     setPending(true);
     const res = await deleteProductBlockAction({ id: block.id });
     setPending(false);
@@ -193,7 +195,7 @@ function BlockCard({
 
   async function uploadImage() {
     if (!block.id) {
-      setError({ ok: false, error: 'validation', fieldErrors: { file: ['Сначала сохраните секцию.'] } });
+      setError({ ok: false, error: 'validation', fieldErrors: { file: [t('catalog.blocks.errors.saveFirst')] } });
       return;
     }
     const file = fileRef.current?.files?.[0];
@@ -204,7 +206,7 @@ function BlockCard({
     const res = await uploadProductBlockImageAction(block.id, fd);
     setPending(false);
     if (res.ok) {
-      setOk('Картинка загружена.');
+      setOk(t('catalog.blocks.toast.imageUploaded'));
       if (fileRef.current) fileRef.current.value = '';
       router.refresh();
     } else {
@@ -222,26 +224,26 @@ function BlockCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <select
-            aria-label="Тип секции"
+            aria-label={t('catalog.blocks.labels.type')}
             value={type}
             onChange={(e) => setType(e.target.value as ProductBlockType)}
             className="rounded border border-gray-300 px-2 py-1 text-sm"
           >
-            {PRODUCT_BLOCK_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {TYPE_LABELS[t]}
+            {PRODUCT_BLOCK_TYPES.map((bt) => (
+              <option key={bt} value={bt}>
+                {typeLabels[bt]}
               </option>
             ))}
           </select>
-          {isNew ? <span className="text-xs text-amber-600">не сохранено</span> : null}
+          {isNew ? <span className="text-xs text-amber-600">{t('catalog.blocks.unsaved')}</span> : null}
         </div>
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => onReorder(-1)} disabled={index === 0 || pending}
-            className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40" aria-label="Вверх">↑</button>
+            className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40" aria-label={t('catalog.blocks.aria.up')}>↑</button>
           <button type="button" onClick={() => onReorder(1)} disabled={index === total - 1 || pending}
-            className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40" aria-label="Вниз">↓</button>
+            className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40" aria-label={t('catalog.blocks.aria.down')}>↓</button>
           <button type="button" onClick={remove} disabled={pending}
-            className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 disabled:opacity-40">Удалить</button>
+            className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 disabled:opacity-40">{t('common.actions.delete')}</button>
         </div>
       </div>
 
@@ -255,12 +257,12 @@ function BlockCard({
       ) : null}
 
       {overlayLocales.length > 0 ? (
-        <div role="tablist" aria-label="Язык секции" className="mt-3 flex flex-wrap gap-1 border-b border-gray-200">
+        <div role="tablist" aria-label={t('catalog.blocks.aria.localeTabs')} className="mt-3 flex flex-wrap gap-1 border-b border-gray-200">
           {[defaultLocale, ...overlayLocales].map((loc) => (
             <button key={loc} role="tab" type="button" aria-selected={active === loc}
               onClick={() => setActive(loc)}
               className={`px-3 py-1.5 text-xs font-medium ${active === loc ? 'border-b-2 border-gray-900 text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              {loc === defaultLocale ? `${loc.toUpperCase()} · основной` : loc.toUpperCase()}
+              {loc === defaultLocale ? t('localeTabs.baseTab', { locale: loc.toUpperCase() }) : loc.toUpperCase()}
             </button>
           ))}
         </div>
@@ -269,22 +271,22 @@ function BlockCard({
       <div className="mt-4 grid grid-cols-1 gap-4">
         {/* Заголовок — переводимое поле, всегда доступно. */}
         <div>
-          <label className={labelCls}>Заголовок</label>
+          <label className={labelCls}>{t('fields.title')}</label>
           {isBase ? (
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
           ) : (
-            <input value={tr[active]?.title ?? ''} placeholder="основной текст, если пусто"
+            <input value={tr[active]?.title ?? ''} placeholder={t('catalog.blocks.placeholders.fallbackToBase')}
               onChange={(e) => setOverlay(active, { title: e.target.value })} className={inputCls} />
           )}
         </div>
 
         {showText ? (
           <div>
-            <label className={labelCls}>Текст (HTML)</label>
+            <label className={labelCls}>{t('catalog.blocks.labels.bodyHtml')}</label>
             {isBase ? (
               <textarea value={body} rows={5} onChange={(e) => setBody(e.target.value)} className={inputCls} />
             ) : (
-              <textarea value={tr[active]?.body ?? ''} rows={5} placeholder="основной текст, если пусто"
+              <textarea value={tr[active]?.body ?? ''} rows={5} placeholder={t('catalog.blocks.placeholders.fallbackToBase')}
                 onChange={(e) => setOverlay(active, { body: e.target.value })} className={inputCls} />
             )}
           </div>
@@ -293,19 +295,19 @@ function BlockCard({
         {showQuote ? (
           <>
             <div>
-              <label className={labelCls}>Цитата</label>
+              <label className={labelCls}>{t('catalog.blocks.types.quote')}</label>
               {isBase ? (
                 <textarea value={blockquot} rows={3} onChange={(e) => setBlockquot(e.target.value)} className={inputCls} />
               ) : (
-                <textarea value={tr[active]?.blockquot ?? ''} rows={3} placeholder="основной текст, если пусто"
+                <textarea value={tr[active]?.blockquot ?? ''} rows={3} placeholder={t('catalog.blocks.placeholders.fallbackToBase')}
                   onChange={(e) => setOverlay(active, { blockquot: e.target.value })} className={inputCls} />
               )}
             </div>
             {isBase ? (
               <div>
-                <label className={labelCls}>Автор (дизайнер)</label>
+                <label className={labelCls}>{t('catalog.blocks.labels.author')}</label>
                 <select value={authorId} onChange={(e) => setAuthorId(e.target.value)} className={inputCls}>
-                  <option value="">— без автора —</option>
+                  <option value="">{t('catalog.blocks.authorNone')}</option>
                   {authors.map((a) => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
@@ -317,14 +319,14 @@ function BlockCard({
 
         {showTabs ? (
           <fieldset className="rounded border border-gray-200 p-3">
-            <legend className="text-sm font-medium text-gray-700">Табы</legend>
+            <legend className="text-sm font-medium text-gray-700">{t('catalog.blocks.types.tabs')}</legend>
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="mt-2 grid grid-cols-1 gap-2 border-t border-gray-100 pt-2 first:border-0">
-                <input placeholder={`Таб #${i + 1} — название`}
+                <input placeholder={t('catalog.blocks.placeholders.tabName', { n: i + 1 })}
                   value={isBase ? (tabs[i]?.name ?? '') : (coerceTabs(tr[active]?.tabs)[i]?.name ?? '')}
                   onChange={(e) => (isBase ? setTab(i, { name: e.target.value }) : overlayTab(active, i, { name: e.target.value }))}
                   className={inputCls} />
-                <textarea placeholder={`Таб #${i + 1} — текст`} rows={2}
+                <textarea placeholder={t('catalog.blocks.placeholders.tabText', { n: i + 1 })} rows={2}
                   value={isBase ? (tabs[i]?.text ?? '') : (coerceTabs(tr[active]?.tabs)[i]?.text ?? '')}
                   onChange={(e) => (isBase ? setTab(i, { text: e.target.value }) : overlayTab(active, i, { text: e.target.value }))}
                   className={inputCls} />
@@ -335,21 +337,21 @@ function BlockCard({
 
         {showImage && isBase ? (
           <div className="rounded border border-gray-200 bg-gray-50 p-3">
-            <label className={labelCls}>Картинка секции</label>
+            <label className={labelCls}>{t('catalog.blocks.labels.image')}</label>
             {block.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={block.imageUrl} alt="" className="mt-2 h-24 w-auto rounded object-cover" />
             ) : (
-              <p className="mt-1 text-xs text-gray-500">Нет картинки.</p>
+              <p className="mt-1 text-xs text-gray-500">{t('catalog.blocks.noImage')}</p>
             )}
             <div className="mt-2 flex items-center gap-2">
               <input ref={fileRef} type="file" accept="image/*" className="text-sm" />
               <button type="button" onClick={uploadImage} disabled={pending || isNew}
                 className="rounded bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-                Загрузить
+                {t('catalog.blocks.buttons.upload')}
               </button>
             </div>
-            {isNew ? <p className="mt-1 text-xs text-gray-500">Сохраните секцию, чтобы загрузить картинку.</p> : null}
+            {isNew ? <p className="mt-1 text-xs text-gray-500">{t('catalog.blocks.saveToUpload')}</p> : null}
           </div>
         ) : null}
 
@@ -359,7 +361,7 @@ function BlockCard({
       <div className="mt-4 flex items-center gap-3 border-t border-gray-200 pt-3">
         <button type="button" onClick={save} disabled={pending}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
-          {pending ? 'Сохранение…' : 'Сохранить секцию'}
+          {pending ? t('common.form.saving') : t('catalog.blocks.buttons.save')}
         </button>
       </div>
     </div>
@@ -380,6 +382,7 @@ export function ProductBlocksEditor({
   defaultLocale?: string;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   // Локальный список: серверные секции + черновики (без id) до первого сохранения.
   const [drafts, setDrafts] = useState<EditorBlock[]>([]);
   const [reorderError, setReorderError] = useState<string | null>(null);
@@ -423,21 +426,21 @@ export function ProductBlocksEditor({
     if (res.ok) {
       router.refresh();
     } else {
-      setReorderError('Не удалось изменить порядок.');
+      setReorderError(t('catalog.blocks.errors.reorderFailed'));
     }
   }
 
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Структурные секции карточки</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{t('catalog.blocks.title')}</h2>
         <button type="button" onClick={addBlock}
           className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-          + Добавить секцию
+          {t('catalog.blocks.addButton')}
         </button>
       </div>
       <p className="mt-1 text-sm text-gray-500">
-        Цитата с автором, табы, текст, картинка (порт b_work_block). Порядок — стрелками.
+        {t('catalog.blocks.intro')}
       </p>
       {reorderError ? (
         <div role="alert" className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{reorderError}</div>
@@ -445,7 +448,7 @@ export function ProductBlocksEditor({
 
       {all.length === 0 ? (
         <p className="mt-4 rounded border border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
-          Секций нет. Нажмите «Добавить секцию».
+          {t('catalog.blocks.empty')}
         </p>
       ) : (
         <div className="mt-4 space-y-4">

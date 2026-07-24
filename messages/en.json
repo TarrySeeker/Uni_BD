@@ -340,6 +340,139 @@
         "required": "Required"
       },
       "createButton": "Create attribute"
+    },
+    "variants": {
+      "labels": {
+        "nameCol": "Size / name",
+        "priceOverride": "Custom price",
+        "compareAtPrice": "«Was» price",
+        "priceDelta": "Surcharge",
+        "priceDeltaForm": "Price surcharge",
+        "dimensionsCol": "Weight/dimensions"
+      },
+      "placeholders": {
+        "weightShort": "wt",
+        "lengthShort": "len",
+        "widthShort": "w",
+        "heightShort": "h",
+        "name": "e.g. 48, M, Red",
+        "inheritProduct": "empty — same as product",
+        "skuOptional": "can be left empty"
+      },
+      "buttons": {
+        "saveInline": "save",
+        "cancelInline": "cancel",
+        "editInline": "edit",
+        "enable": "enable",
+        "disable": "disable",
+        "deleteInline": "delete",
+        "moveUpTitle": "Up",
+        "moveDownTitle": "Down"
+      },
+      "aria": {
+        "moveUp": "Move variant up",
+        "moveDown": "Move variant down"
+      },
+      "yes": "yes",
+      "no": "no",
+      "empty": "No variants yet.",
+      "dimensionsValue": "{weight} g / {length}×{width}×{height} cm",
+      "addTitle": "Add variant",
+      "adding": "Adding…",
+      "help": {
+        "intro": "A variant is a size/color of the product (e.g. «48» or «M»). Enter a name and, if needed, a custom price. The variant's stock is set in the table below.",
+        "dimensions": "Variant weight/dimensions (empty — taken from the product → store default):"
+      },
+      "confirms": {
+        "delete": "Delete variant? This action is irreversible, the variant's stock will be lost."
+      }
+    },
+    "blocks": {
+      "types": {
+        "text": "Text",
+        "quote": "Quote",
+        "tabs": "Tabs",
+        "image": "Image"
+      },
+      "labels": {
+        "type": "Section type",
+        "bodyHtml": "Text (HTML)",
+        "author": "Author (designer)",
+        "image": "Section image"
+      },
+      "placeholders": {
+        "fallbackToBase": "base text if empty",
+        "tabName": "Tab #{n} — name",
+        "tabText": "Tab #{n} — text"
+      },
+      "authorNone": "— no author —",
+      "noImage": "No image.",
+      "saveToUpload": "Save the section to upload an image.",
+      "unsaved": "not saved",
+      "aria": {
+        "up": "Up",
+        "down": "Down",
+        "localeTabs": "Section language"
+      },
+      "buttons": {
+        "upload": "Upload",
+        "save": "Save section"
+      },
+      "toast": {
+        "saved": "Section saved.",
+        "imageUploaded": "Image uploaded."
+      },
+      "confirms": {
+        "delete": "Delete section?"
+      },
+      "errors": {
+        "saveFirst": "Save the section first.",
+        "reorderFailed": "Failed to change the order."
+      },
+      "title": "Structural card sections",
+      "addButton": "+ Add section",
+      "intro": "Quote with author, tabs, text, image (port of b_work_block). Order — with arrows.",
+      "empty": "No sections. Click «Add section»."
+    },
+    "list": {
+      "moduleDisabled": "catalog (module disabled)",
+      "title": "Catalog — products",
+      "subtitle": "Products found: {total}. Prices in {currency}.",
+      "createProduct": "+ Create product",
+      "sectionsAria": "Catalog sections",
+      "nav": {
+        "categories": "Categories",
+        "brands": "Brands",
+        "designers": "Designers",
+        "attributes": "Attributes"
+      },
+      "paginationAria": "Pagination",
+      "forward": "Forward",
+      "confirmArchiveBulk": "Archive the selected products ({count})?",
+      "selectedCount": "Selected: {count}",
+      "publish": "Publish",
+      "toArchive": "Archive",
+      "clearSelection": "Clear selection",
+      "selectAll": "Select all products",
+      "colPhoto": "Photo",
+      "colFlags": "Flags",
+      "colStock": "Stock",
+      "colStockTitle": "Available to order / total in stock",
+      "emptyProducts": "No products found. Change the filters or create a product.",
+      "selectOne": "Select product {name}",
+      "stockDetail": "Available to order: {available}; total in stock: {total} (some reserved for orders)",
+      "duplicate": "Duplicate",
+      "statusArchived": "Archived",
+      "filtersAria": "Product filters",
+      "searchLabel": "Search (name / SKU)",
+      "searchPlaceholder": "e.g. robe or SKU-123",
+      "anyMasculine": "Any",
+      "anyFeminine": "Any",
+      "categoryLabel": "Category",
+      "collectionsLegend": "Collections",
+      "featuredFilter": "Bestsellers",
+      "newFilter": "New",
+      "onSaleFilter": "On sale"
     }
   }
 }

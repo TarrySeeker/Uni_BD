@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import type { ProductListRow } from '@/lib/catalog/types';
 
@@ -35,6 +36,7 @@ export function ProductBulkTable({
   currency: string;
 }) {
   const router = useRouter();
+  const t = useTranslations();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Fail | null>(null);
@@ -61,7 +63,7 @@ export function ProductBulkTable({
     if (list.length === 0) return;
     if (
       status === 'archived' &&
-      !window.confirm(`Отправить в архив выбранные товары (${list.length})?`)
+      !window.confirm(t('catalog.list.confirmArchiveBulk', { count: list.length }))
     ) {
       return;
     }
@@ -103,7 +105,7 @@ export function ProductBulkTable({
       {selectedCount > 0 ? (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm">
           <span className="font-medium text-gray-700">
-            Выбрано: {selectedCount}
+            {t('catalog.list.selectedCount', { count: selectedCount })}
           </span>
           <button
             type="button"
@@ -111,7 +113,7 @@ export function ProductBulkTable({
             onClick={() => applyStatus('active')}
             className="rounded-md border border-green-300 px-3 py-1.5 font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
           >
-            Опубликовать
+            {t('catalog.list.publish')}
           </button>
           <button
             type="button"
@@ -119,7 +121,7 @@ export function ProductBulkTable({
             onClick={() => applyStatus('archived')}
             className="rounded-md border border-amber-300 px-3 py-1.5 font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
           >
-            В архив
+            {t('catalog.list.toArchive')}
           </button>
           <button
             type="button"
@@ -127,7 +129,7 @@ export function ProductBulkTable({
             onClick={() => setSelected(new Set())}
             className="text-gray-500 hover:underline disabled:opacity-50"
           >
-            Снять выделение
+            {t('catalog.list.clearSelection')}
           </button>
         </div>
       ) : null}
@@ -139,28 +141,28 @@ export function ProductBulkTable({
               <th scope="col" className="px-4 py-2 font-medium">
                 <input
                   type="checkbox"
-                  aria-label="Выбрать все товары"
+                  aria-label={t('catalog.list.selectAll')}
                   checked={allSelected}
                   disabled={ids.length === 0}
                   onChange={(e) => toggleAll(e.target.checked)}
                 />
               </th>
-              <th scope="col" className="px-4 py-2 font-medium">Фото</th>
-              <th scope="col" className="px-4 py-2 font-medium">Название</th>
-              <th scope="col" className="px-4 py-2 font-medium">Артикул</th>
-              <th scope="col" className="px-4 py-2 font-medium">Бренд</th>
-              <th scope="col" className="px-4 py-2 font-medium">Цена</th>
-              <th scope="col" className="px-4 py-2 font-medium">Статус</th>
-              <th scope="col" className="px-4 py-2 font-medium">Флаги</th>
-              <th scope="col" className="px-4 py-2 font-medium" title="Доступно к заказу / всего на складе">Остаток</th>
-              <th scope="col" className="px-4 py-2 font-medium text-right">Действия</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('catalog.list.colPhoto')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('fields.name')}</th>
+              <th scope="col" data-testid="col-sku" className="px-4 py-2 font-medium">{t('catalog.product.fields.sku')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('catalog.product.fields.brand')}</th>
+              <th scope="col" data-testid="col-price" className="px-4 py-2 font-medium">{t('catalog.product.fields.price')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('catalog.product.fields.status')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('catalog.list.colFlags')}</th>
+              <th scope="col" data-testid="col-stock" className="px-4 py-2 font-medium" title={t('catalog.list.colStockTitle')}>{t('catalog.list.colStock')}</th>
+              <th scope="col" className="px-4 py-2 font-medium text-right">{t('common.table.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-6 text-center text-gray-400">
-                  Товары не найдены. Измените фильтры или создайте товар.
+                  {t('catalog.list.emptyProducts')}
                 </td>
               </tr>
             ) : (
@@ -172,7 +174,7 @@ export function ProductBulkTable({
                   <td className="px-4 py-2">
                     <input
                       type="checkbox"
-                      aria-label={`Выбрать товар ${row.name}`}
+                      aria-label={t('catalog.list.selectOne', { name: row.name })}
                       checked={selected.has(row.id)}
                       onChange={(e) => toggleOne(row.id, e.target.checked)}
                     />
@@ -231,7 +233,7 @@ export function ProductBulkTable({
                   <td className="px-4 py-2 text-gray-700">
                     {row.availableStock !== row.totalStock ? (
                       <span
-                        title={`Доступно к заказу: ${row.availableStock}; всего на складе: ${row.totalStock} (часть зарезервирована под заказы)`}
+                        title={t('catalog.list.stockDetail', { available: row.availableStock, total: row.totalStock })}
                       >
                         {row.availableStock} / {row.totalStock}
                       </span>
@@ -245,7 +247,7 @@ export function ProductBulkTable({
                         href={`/admin/catalog/products/${row.id}`}
                         className="inline-block rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
                       >
-                        Редактировать
+                        {t('common.actions.edit')}
                       </Link>
                       <button
                         type="button"
@@ -253,7 +255,7 @@ export function ProductBulkTable({
                         onClick={() => duplicate(row.id)}
                         className="inline-block rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                       >
-                        Дублировать
+                        {t('catalog.list.duplicate')}
                       </button>
                     </div>
                   </td>

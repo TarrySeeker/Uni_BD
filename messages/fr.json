@@ -340,6 +340,139 @@
         "required": "Obligatoire"
       },
       "createButton": "Créer la caractéristique"
+    },
+    "variants": {
+      "labels": {
+        "nameCol": "Taille / nom",
+        "priceOverride": "Prix personnalisé",
+        "compareAtPrice": "Prix « avant »",
+        "priceDelta": "Supplément",
+        "priceDeltaForm": "Supplément au prix",
+        "dimensionsCol": "Poids/dimensions"
+      },
+      "placeholders": {
+        "weightShort": "poids",
+        "lengthShort": "long",
+        "widthShort": "larg",
+        "heightShort": "haut",
+        "name": "p. ex. 48, M, Rouge",
+        "inheritProduct": "vide — comme le produit",
+        "skuOptional": "peut rester vide"
+      },
+      "buttons": {
+        "saveInline": "enregistrer",
+        "cancelInline": "annuler",
+        "editInline": "modifier",
+        "enable": "activer",
+        "disable": "désactiver",
+        "deleteInline": "supprimer",
+        "moveUpTitle": "Monter",
+        "moveDownTitle": "Descendre"
+      },
+      "aria": {
+        "moveUp": "Monter la variante",
+        "moveDown": "Descendre la variante"
+      },
+      "yes": "oui",
+      "no": "non",
+      "empty": "Aucune variante pour l'instant.",
+      "dimensionsValue": "{weight} g / {length}×{width}×{height} cm",
+      "addTitle": "Ajouter une variante",
+      "adding": "Ajout…",
+      "help": {
+        "intro": "Une variante est une taille/couleur du produit (p. ex. « 48 » ou « M »). Indiquez un nom et, si besoin, un prix personnalisé. Le stock de la variante se définit dans le tableau ci-dessous.",
+        "dimensions": "Poids/dimensions de la variante (vide — repris du produit → valeur par défaut du magasin) :"
+      },
+      "confirms": {
+        "delete": "Supprimer la variante ? Action irréversible, le stock de la variante sera perdu."
+      }
+    },
+    "blocks": {
+      "types": {
+        "text": "Texte",
+        "quote": "Citation",
+        "tabs": "Onglets",
+        "image": "Image"
+      },
+      "labels": {
+        "type": "Type de section",
+        "bodyHtml": "Texte (HTML)",
+        "author": "Auteur (designer)",
+        "image": "Image de la section"
+      },
+      "placeholders": {
+        "fallbackToBase": "texte principal si vide",
+        "tabName": "Onglet #{n} — nom",
+        "tabText": "Onglet #{n} — texte"
+      },
+      "authorNone": "— sans auteur —",
+      "noImage": "Aucune image.",
+      "saveToUpload": "Enregistrez la section pour téléverser une image.",
+      "unsaved": "non enregistré",
+      "aria": {
+        "up": "Monter",
+        "down": "Descendre",
+        "localeTabs": "Langue de la section"
+      },
+      "buttons": {
+        "upload": "Téléverser",
+        "save": "Enregistrer la section"
+      },
+      "toast": {
+        "saved": "Section enregistrée.",
+        "imageUploaded": "Image téléversée."
+      },
+      "confirms": {
+        "delete": "Supprimer la section ?"
+      },
+      "errors": {
+        "saveFirst": "Enregistrez d'abord la section.",
+        "reorderFailed": "Impossible de modifier l'ordre."
+      },
+      "title": "Sections structurées de la fiche",
+      "addButton": "+ Ajouter une section",
+      "intro": "Citation avec auteur, onglets, texte, image (portage de b_work_block). Ordre — avec les flèches.",
+      "empty": "Aucune section. Cliquez sur « Ajouter une section »."
+    },
+    "list": {
+      "moduleDisabled": "catalog (module désactivé)",
+      "title": "Catalogue — produits",
+      "subtitle": "Produits trouvés : {total}. Prix en {currency}.",
+      "createProduct": "+ Créer un produit",
+      "sectionsAria": "Sections du catalogue",
+      "nav": {
+        "categories": "Catégories",
+        "brands": "Marques",
+        "designers": "Designers",
+        "attributes": "Caractéristiques"
+      },
+      "paginationAria": "Pagination",
+      "forward": "Suivant",
+      "confirmArchiveBulk": "Archiver les produits sélectionnés ({count}) ?",
+      "selectedCount": "Sélectionnés : {count}",
+      "publish": "Publier",
+      "toArchive": "Archiver",
+      "clearSelection": "Effacer la sélection",
+      "selectAll": "Sélectionner tous les produits",
+      "colPhoto": "Photo",
+      "colFlags": "Indicateurs",
+      "colStock": "Stock",
+      "colStockTitle": "Disponible à la commande / total en stock",
+      "emptyProducts": "Aucun produit trouvé. Modifiez les filtres ou créez un produit.",
+      "selectOne": "Sélectionner le produit {name}",
+      "stockDetail": "Disponible à la commande : {available} ; total en stock : {total} (une partie réservée aux commandes)",
+      "duplicate": "Dupliquer",
+      "statusArchived": "Archivé",
+      "filtersAria": "Filtres des produits",
+      "searchLabel": "Recherche (nom / référence)",
+      "searchPlaceholder": "p. ex. peignoir ou SKU-123",
+      "anyMasculine": "Tous",
+      "anyFeminine": "Toutes",
+      "categoryLabel": "Catégorie",
+      "collectionsLegend": "Sélections",
+      "featuredFilter": "Meilleures ventes",
+      "newFilter": "Nouveautés",
+      "onSaleFilter": "En promo"
     }
   }
 }

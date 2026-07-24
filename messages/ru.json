@@ -340,6 +340,139 @@
         "required": "Обязательная"
       },
       "createButton": "Создать характеристику"
+    },
+    "variants": {
+      "labels": {
+        "nameCol": "Размер / название",
+        "priceOverride": "Своя цена",
+        "compareAtPrice": "Цена «было»",
+        "priceDelta": "Доплата",
+        "priceDeltaForm": "Доплата к цене",
+        "dimensionsCol": "Вес/габариты"
+      },
+      "placeholders": {
+        "weightShort": "вес",
+        "lengthShort": "дл",
+        "widthShort": "ш",
+        "heightShort": "в",
+        "name": "напр. 48, M, Красный",
+        "inheritProduct": "пусто — как у товара",
+        "skuOptional": "можно не заполнять"
+      },
+      "buttons": {
+        "saveInline": "сохранить",
+        "cancelInline": "отмена",
+        "editInline": "редактировать",
+        "enable": "включить",
+        "disable": "отключить",
+        "deleteInline": "удалить",
+        "moveUpTitle": "Выше",
+        "moveDownTitle": "Ниже"
+      },
+      "aria": {
+        "moveUp": "Поднять вариант выше",
+        "moveDown": "Опустить вариант ниже"
+      },
+      "yes": "да",
+      "no": "нет",
+      "empty": "Вариантов пока нет.",
+      "dimensionsValue": "{weight} г / {length}×{width}×{height} см",
+      "addTitle": "Добавить вариант",
+      "adding": "Добавление…",
+      "help": {
+        "intro": "Вариант — это размер/цвет товара (напр. «48» или «M»). Укажите название и, при необходимости, свою цену. Остаток варианта задаётся в таблице ниже.",
+        "dimensions": "Вес/габариты варианта (пусто — берётся от товара → дефолт магазина):"
+      },
+      "confirms": {
+        "delete": "Удалить вариант? Действие необратимо, остатки варианта будут потеряны."
+      }
+    },
+    "blocks": {
+      "types": {
+        "text": "Текст",
+        "quote": "Цитата",
+        "tabs": "Табы",
+        "image": "Картинка"
+      },
+      "labels": {
+        "type": "Тип секции",
+        "bodyHtml": "Текст (HTML)",
+        "author": "Автор (дизайнер)",
+        "image": "Картинка секции"
+      },
+      "placeholders": {
+        "fallbackToBase": "основной текст, если пусто",
+        "tabName": "Таб #{n} — название",
+        "tabText": "Таб #{n} — текст"
+      },
+      "authorNone": "— без автора —",
+      "noImage": "Нет картинки.",
+      "saveToUpload": "Сохраните секцию, чтобы загрузить картинку.",
+      "unsaved": "не сохранено",
+      "aria": {
+        "up": "Вверх",
+        "down": "Вниз",
+        "localeTabs": "Язык секции"
+      },
+      "buttons": {
+        "upload": "Загрузить",
+        "save": "Сохранить секцию"
+      },
+      "toast": {
+        "saved": "Секция сохранена.",
+        "imageUploaded": "Картинка загружена."
+      },
+      "confirms": {
+        "delete": "Удалить секцию?"
+      },
+      "errors": {
+        "saveFirst": "Сначала сохраните секцию.",
+        "reorderFailed": "Не удалось изменить порядок."
+      },
+      "title": "Структурные секции карточки",
+      "addButton": "+ Добавить секцию",
+      "intro": "Цитата с автором, табы, текст, картинка (порт b_work_block). Порядок — стрелками.",
+      "empty": "Секций нет. Нажмите «Добавить секцию»."
+    },
+    "list": {
+      "moduleDisabled": "catalog (модуль выключен)",
+      "title": "Каталог — товары",
+      "subtitle": "Найдено товаров: {total}. Цены в {currency}.",
+      "createProduct": "+ Создать товар",
+      "sectionsAria": "Разделы каталога",
+      "nav": {
+        "categories": "Категории",
+        "brands": "Бренды",
+        "designers": "Дизайнеры",
+        "attributes": "Характеристики"
+      },
+      "paginationAria": "Пагинация",
+      "forward": "Вперёд",
+      "confirmArchiveBulk": "Отправить в архив выбранные товары ({count})?",
+      "selectedCount": "Выбрано: {count}",
+      "publish": "Опубликовать",
+      "toArchive": "В архив",
+      "clearSelection": "Снять выделение",
+      "selectAll": "Выбрать все товары",
+      "colPhoto": "Фото",
+      "colFlags": "Флаги",
+      "colStock": "Остаток",
+      "colStockTitle": "Доступно к заказу / всего на складе",
+      "emptyProducts": "Товары не найдены. Измените фильтры или создайте товар.",
+      "selectOne": "Выбрать товар {name}",
+      "stockDetail": "Доступно к заказу: {available}; всего на складе: {total} (часть зарезервирована под заказы)",
+      "duplicate": "Дублировать",
+      "statusArchived": "В архиве",
+      "filtersAria": "Фильтры товаров",
+      "searchLabel": "Поиск (название / артикул)",
+      "searchPlaceholder": "Например: халат или SKU-123",
+      "anyMasculine": "Любой",
+      "anyFeminine": "Любая",
+      "categoryLabel": "Категория",
+      "collectionsLegend": "Подборки",
+      "featuredFilter": "Хиты",
+      "newFilter": "Новинки",
+      "onSaleFilter": "Со скидкой"
     }
   }
 }

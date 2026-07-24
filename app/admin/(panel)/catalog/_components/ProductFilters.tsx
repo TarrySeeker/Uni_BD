@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { useTranslations } from 'next-intl';
 
 import {
   buildProductListQuery,
@@ -21,12 +22,6 @@ import type { Designer } from '@/lib/designers/types';
  * Поэтому querystring собирает buildProductListQuery: параметры без контрола
  * (brandId, sort) переносятся из текущего URL, иначе «Применить» стёр бы их.
  */
-
-const STATUS_LABEL: Record<ProductStatus, string> = {
-  draft: 'Черновик',
-  active: 'Активен',
-  archived: 'В архиве',
-};
 
 /** Плоский список «отступ + имя» для <select> категорий из дерева. */
 function flattenCategories(
@@ -50,6 +45,13 @@ export function ProductFilters({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const t = useTranslations();
+
+  const statusLabel: Record<ProductStatus, string> = {
+    draft: t('common.states.draft'),
+    active: t('common.states.active'),
+    archived: t('catalog.list.statusArchived'),
+  };
 
   const [search, setSearch] = useState(params.get('search') ?? '');
   const [status, setStatus] = useState(params.get('status') ?? '');
@@ -95,26 +97,27 @@ export function ProductFilters({
     <form
       onSubmit={submit}
       className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-      aria-label="Фильтры товаров"
+      aria-label={t('catalog.list.filtersAria')}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label htmlFor="f-search" className="block text-xs font-medium text-gray-600">
-            Поиск (название / артикул)
+            {t('catalog.list.searchLabel')}
           </label>
           <input
             id="f-search"
             type="search"
+            data-testid="product-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Например: халат или SKU-123"
+            placeholder={t('catalog.list.searchPlaceholder')}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           />
         </div>
 
         <div>
           <label htmlFor="f-status" className="block text-xs font-medium text-gray-600">
-            Статус
+            {t('catalog.product.fields.status')}
           </label>
           <select
             id="f-status"
@@ -122,10 +125,10 @@ export function ProductFilters({
             onChange={(e) => setStatus(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любой</option>
+            <option value="">{t('catalog.list.anyMasculine')}</option>
             {PRODUCT_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABEL[s]}
+                {statusLabel[s]}
               </option>
             ))}
           </select>
@@ -133,7 +136,7 @@ export function ProductFilters({
 
         <div>
           <label htmlFor="f-designer" className="block text-xs font-medium text-gray-600">
-            Дизайнер
+            {t('catalog.product.fields.designer')}
           </label>
           <select
             id="f-designer"
@@ -141,7 +144,7 @@ export function ProductFilters({
             onChange={(e) => setDesignerId(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любой</option>
+            <option value="">{t('catalog.list.anyMasculine')}</option>
             {designers.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
@@ -152,7 +155,7 @@ export function ProductFilters({
 
         <div>
           <label htmlFor="f-category" className="block text-xs font-medium text-gray-600">
-            Категория
+            {t('catalog.list.categoryLabel')}
           </label>
           <select
             id="f-category"
@@ -160,7 +163,7 @@ export function ProductFilters({
             onChange={(e) => setCategoryId(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Любая</option>
+            <option value="">{t('catalog.list.anyFeminine')}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.label}
@@ -171,14 +174,14 @@ export function ProductFilters({
       </div>
 
       <fieldset className="mt-3 flex flex-wrap items-center gap-4">
-        <legend className="sr-only">Подборки</legend>
+        <legend className="sr-only">{t('catalog.list.collectionsLegend')}</legend>
         <label className="flex items-center gap-1.5 text-sm text-gray-700">
           <input
             type="checkbox"
             checked={isFeatured}
             onChange={(e) => setIsFeatured(e.target.checked)}
           />
-          Хиты
+          {t('catalog.list.featuredFilter')}
         </label>
         <label className="flex items-center gap-1.5 text-sm text-gray-700">
           <input
@@ -186,7 +189,7 @@ export function ProductFilters({
             checked={isNew}
             onChange={(e) => setIsNew(e.target.checked)}
           />
-          Новинки
+          {t('catalog.list.newFilter')}
         </label>
         <label className="flex items-center gap-1.5 text-sm text-gray-700">
           <input
@@ -194,7 +197,7 @@ export function ProductFilters({
             checked={onSale}
             onChange={(e) => setOnSale(e.target.checked)}
           />
-          Со скидкой
+          {t('catalog.list.onSaleFilter')}
         </label>
 
         <div className="ml-auto flex gap-2">
@@ -203,13 +206,13 @@ export function ProductFilters({
             onClick={reset}
             className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
           >
-            Сбросить
+            {t('common.actions.reset')}
           </button>
           <button
             type="submit"
             className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
           >
-            Применить
+            {t('common.actions.apply')}
           </button>
         </div>
       </fieldset>

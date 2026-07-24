@@ -121,7 +121,13 @@ describe('ProductFilters — контрол «Бренд» заменён на �
   it('есть селект дизайнера с меткой «Дизайнер» и пустым «Любой»', () => {
     const src = read(FILTERS_TSX);
     expect(src).toContain('f-designer');
-    expect(src).toContain('Дизайнер');
+    // Метка «Дизайнер» переехала в i18n-каталог: компонент ссылается на ключ,
+    // а русский текст живёт в messages/ru.json (инвариант сохранён, не ослаблен).
+    expect(src).toContain('catalog.product.fields.designer');
+    const ru = JSON.parse(read('messages/ru.json')) as {
+      catalog: { product: { fields: { designer: string } } };
+    };
+    expect(ru.catalog.product.fields.designer).toBe('Дизайнер');
     expect(src).toMatch(/designers\.map/);
     expect(src).toMatch(/designerId/);
   });

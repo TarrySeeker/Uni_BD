@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { getEnv } from '@/lib/config/env';
 import { listProducts, getCategoryTree } from '@/lib/catalog/repository';
@@ -48,10 +49,11 @@ export default async function CatalogPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await getTranslations();
   const guard = await guardCatalog('catalog.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
-      return <Forbidden permission="catalog (модуль выключен)" />;
+      return <Forbidden permission={t('catalog.list.moduleDisabled')} />;
     }
     return <Forbidden permission={guard.permission} />;
   }
@@ -72,34 +74,35 @@ export default async function CatalogPage({
   return (
     <div>
       <PageHeader
-        title="Каталог — товары"
-        subtitle={`Найдено товаров: ${total}. Цены в ${currency}.`}
-        breadcrumbs={[{ label: 'Каталог' }]}
+        title={t('catalog.list.title')}
+        subtitle={t('catalog.list.subtitle', { total, currency })}
+        breadcrumbs={[{ label: t('nav.catalog') }]}
         action={
           <Link
             href="/admin/catalog/products/new"
+            data-testid="product-create"
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
-            + Создать товар
+            {t('catalog.list.createProduct')}
           </Link>
         }
       />
 
-      <nav className="flex flex-wrap gap-2 text-sm" aria-label="Разделы каталога">
+      <nav className="flex flex-wrap gap-2 text-sm" aria-label={t('catalog.list.sectionsAria')}>
         <Link href="/admin/catalog/categories" className="text-blue-700 hover:underline">
-          Категории
+          {t('catalog.list.nav.categories')}
         </Link>
         <span className="text-gray-300">·</span>
         <Link href="/admin/catalog/brands" className="text-blue-700 hover:underline">
-          Бренды
+          {t('catalog.list.nav.brands')}
         </Link>
         <span className="text-gray-300">·</span>
         <Link href="/admin/catalog/designers" className="text-blue-700 hover:underline">
-          Дизайнеры
+          {t('catalog.list.nav.designers')}
         </Link>
         <span className="text-gray-300">·</span>
         <Link href="/admin/catalog/attributes" className="text-blue-700 hover:underline">
-          Характеристики
+          {t('catalog.list.nav.attributes')}
         </Link>
       </nav>
 
@@ -114,10 +117,10 @@ export default async function CatalogPage({
       {totalPages > 1 ? (
         <nav
           className="mt-4 flex items-center justify-between text-sm"
-          aria-label="Пагинация"
+          aria-label={t('catalog.list.paginationAria')}
         >
           <span className="text-gray-500">
-            Страница {currentPage} из {totalPages}
+            {t('common.pagination.page', { page: currentPage, total: totalPages })}
           </span>
           <div className="flex gap-2">
             {currentPage > 1 ? (
@@ -125,7 +128,7 @@ export default async function CatalogPage({
                 href={pageHref(sp, currentPage - 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Назад
+                {t('common.actions.back')}
               </Link>
             ) : null}
             {currentPage < totalPages ? (
@@ -133,7 +136,7 @@ export default async function CatalogPage({
                 href={pageHref(sp, currentPage + 1)}
                 className="rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-100"
               >
-                Вперёд
+                {t('catalog.list.forward')}
               </Link>
             ) : null}
           </div>
