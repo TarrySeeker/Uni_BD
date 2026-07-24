@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -6,6 +9,21 @@ import {
   auditActionLabel,
   auditEntityTypeLabel,
 } from '@/lib/admin/audit-labels';
+
+// После i18n-переноса (волна 6-Б) значения мап — i18n-КЛЮЧИ; сами русские подписи
+// живут в messages/ru.json. label-функции принимают переводчик `t`. Здесь строим
+// `t` из ru.json — так инвариант (у каждого кода есть читаемая русская подпись)
+// сохранён, просто текст «переехал» в каталог.
+const ru = JSON.parse(
+  readFileSync(resolve(__dirname, '../../messages/ru.json'), 'utf8'),
+) as Record<string, unknown>;
+function ruGet(key: string): string | undefined {
+  let o: unknown = ru;
+  for (const k of key.split('.'))
+    o = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
+  return typeof o === 'string' ? o : undefined;
+}
+const t = (key: string): string => ruGet(key) ?? key;
 
 /**
  * Находка #17: журнал аудита показывал сырые коды действий и типы сущностей.
@@ -117,29 +135,33 @@ const KNOWN_ENTITY_TYPES = [
 describe('подписи журнала аудита', () => {
   it('у каждого реального кода действия есть русская подпись (не равная коду)', () => {
     for (const code of KNOWN_ACTIONS) {
-      expect(AUDIT_ACTION_LABELS[code], `нет подписи для ${code}`).toBeTruthy();
-      expect(auditActionLabel(code)).not.toBe(code);
+      const key = AUDIT_ACTION_LABELS[code];
+      expect(key, `нет ключа подписи для ${code}`).toBeTruthy();
+      expect(ruGet(key!), `ключ ${key} отсутствует в ru.json`).toBeTruthy();
+      expect(auditActionLabel(code, t)).not.toBe(code);
     }
   });
 
   it('у каждого реального типа сущности есть русская подпись', () => {
     for (const type of KNOWN_ENTITY_TYPES) {
-      expect(AUDIT_ENTITY_TYPE_LABELS[type], `нет подписи для ${type}`).toBeTruthy();
-      expect(auditEntityTypeLabel(type)).not.toBe(type);
+      const key = AUDIT_ENTITY_TYPE_LABELS[type];
+      expect(key, `нет ключа подписи для ${type}`).toBeTruthy();
+      expect(ruGet(key!), `ключ ${key} отсутствует в ru.json`).toBeTruthy();
+      expect(auditEntityTypeLabel(type, t)).not.toBe(type);
     }
   });
 
   it('конкретные подписи читаемы (примеры из находки)', () => {
-    expect(auditActionLabel('user.password.reset')).toBe('Сброс пароля пользователя');
-    expect(auditActionLabel('role.delete')).toBe('Удаление роли');
-    expect(auditActionLabel('auth.login_failed')).toBe('Неудачная попытка входа');
-    expect(auditEntityTypeLabel('user')).toBe('Пользователь');
-    expect(auditEntityTypeLabel('role')).toBe('Роль');
+    expect(auditActionLabel('user.password.reset', t)).toBe('Сброс пароля пользователя');
+    expect(auditActionLabel('role.delete', t)).toBe('Удаление роли');
+    expect(auditActionLabel('auth.login_failed', t)).toBe('Неудачная попытка входа');
+    expect(auditEntityTypeLabel('user', t)).toBe('Пользователь');
+    expect(auditEntityTypeLabel('role', t)).toBe('Роль');
   });
 
   it('неизвестный код/тип мягко возвращается как есть (фолбэк, без падения)', () => {
-    expect(auditActionLabel('some.future.action')).toBe('some.future.action');
-    expect(auditEntityTypeLabel('future_entity')).toBe('future_entity');
-    expect(auditActionLabel('')).toBe('');
+    expect(auditActionLabel('some.future.action', t)).toBe('some.future.action');
+    expect(auditEntityTypeLabel('future_entity', t)).toBe('future_entity');
+    expect(auditActionLabel('', t)).toBe('');
   });
 });

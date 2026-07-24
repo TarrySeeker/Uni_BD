@@ -233,13 +233,13 @@ export default async function AuditPage({
                       ) : null}
                     </td>
                     <td className="px-4 py-2 text-gray-800" title={row.action}>
-                      {auditActionLabel(row.action)}
+                      {auditActionLabel(row.action, t)}
                     </td>
                     <td className="px-4 py-2 text-gray-600">
                       {row.entity_type ? (
                         <span>
                           <span className="text-gray-500">
-                            {auditEntityTypeLabel(row.entity_type)}
+                            {auditEntityTypeLabel(row.entity_type, t)}
                           </span>
                           {name ? (
                             <span className="ml-1 text-gray-900">{name}</span>

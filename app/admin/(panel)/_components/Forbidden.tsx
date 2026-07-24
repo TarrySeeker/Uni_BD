@@ -17,7 +17,7 @@ export async function Forbidden({ permission }: { permission: string }) {
         {t('errors.forbidden.title')}
       </h1>
       <p className="mt-2 text-sm text-red-700">
-        {t('errors.forbidden.message', { permission: permissionTitle(permission) })}
+        {t('errors.forbidden.message', { permission: permissionTitle(permission, t) })}
       </p>
     </div>
   );

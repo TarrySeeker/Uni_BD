@@ -108,7 +108,7 @@ export function AuditFilters() {
             <option value="">{t('audit.auditFilters.anyAction')}</option>
             {Object.entries(AUDIT_ACTION_LABELS).map(([code, label]) => (
               <option key={code} value={code}>
-                {label}
+                {t(label)}
               </option>
             ))}
           </select>
@@ -127,7 +127,7 @@ export function AuditFilters() {
             <option value="">{t('audit.auditFilters.anyEntity')}</option>
             {Object.entries(AUDIT_ENTITY_TYPE_LABELS).map(([code, label]) => (
               <option key={code} value={code}>
-                {label}
+                {t(label)}
               </option>
             ))}
           </select>

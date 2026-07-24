@@ -163,7 +163,7 @@ export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
                       checked={permissionCodes.includes(perm.code)}
                       onChange={() => togglePermission(perm.code)}
                     />
-                    {perm.title}
+                    {t(perm.title)}
                   </label>
                 ))}
               </div>

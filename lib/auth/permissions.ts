@@ -54,31 +54,31 @@ export interface PermissionDef {
  * но в меню/UI отражаются только при включённом модуле (`isModuleEnabled`).
  */
 export const ALL_PERMISSIONS: readonly PermissionDef[] = [
-  { code: 'users.read', title: 'Просмотр пользователей', module: 'core' },
-  { code: 'users.manage', title: 'Управление пользователями', module: 'core' },
-  { code: 'roles.manage', title: 'Управление ролями и привязкой прав', module: 'core' },
-  { code: 'audit.read', title: 'Просмотр журнала аудита', module: 'core' },
-  { code: 'settings.manage', title: 'Управление настройками магазина', module: 'core' },
-  { code: 'catalog.read', title: 'Просмотр каталога', module: 'catalog' },
-  { code: 'catalog.write', title: 'Изменение каталога', module: 'catalog' },
-  { code: 'orders.read', title: 'Просмотр заказов', module: 'orders' },
-  { code: 'orders.write', title: 'Изменение заказов', module: 'orders' },
-  { code: 'cdek.manage', title: 'Управление доставкой СДЭК', module: 'cdek' },
-  { code: 'cms.read', title: 'Просмотр контента', module: 'cms' },
-  { code: 'cms.write', title: 'Изменение контента', module: 'cms' },
-  { code: 'news.read', title: 'Просмотр новостей', module: 'news' },
-  { code: 'news.write', title: 'Изменение новостей', module: 'news' },
-  { code: 'reviews.read', title: 'Просмотр отзывов', module: 'reviews' },
-  { code: 'reviews.write', title: 'Модерация отзывов', module: 'reviews' },
+  { code: 'users.read', title: 'permissions.titles.usersRead', module: 'core' },
+  { code: 'users.manage', title: 'permissions.titles.usersManage', module: 'core' },
+  { code: 'roles.manage', title: 'permissions.titles.rolesManage', module: 'core' },
+  { code: 'audit.read', title: 'permissions.titles.auditRead', module: 'core' },
+  { code: 'settings.manage', title: 'permissions.titles.settingsManage', module: 'core' },
+  { code: 'catalog.read', title: 'permissions.titles.catalogRead', module: 'catalog' },
+  { code: 'catalog.write', title: 'permissions.titles.catalogWrite', module: 'catalog' },
+  { code: 'orders.read', title: 'permissions.titles.ordersRead', module: 'orders' },
+  { code: 'orders.write', title: 'permissions.titles.ordersWrite', module: 'orders' },
+  { code: 'cdek.manage', title: 'permissions.titles.cdekManage', module: 'cdek' },
+  { code: 'cms.read', title: 'permissions.titles.cmsRead', module: 'cms' },
+  { code: 'cms.write', title: 'permissions.titles.cmsWrite', module: 'cms' },
+  { code: 'news.read', title: 'permissions.titles.newsRead', module: 'news' },
+  { code: 'news.write', title: 'permissions.titles.newsWrite', module: 'news' },
+  { code: 'reviews.read', title: 'permissions.titles.reviewsRead', module: 'reviews' },
+  { code: 'reviews.write', title: 'permissions.titles.reviewsWrite', module: 'reviews' },
   // Подарочные сертификаты — часть операционного модуля orders (отдельного
   // модуля gift на платформе нет; данные живут в orders/gift-миграциях).
-  { code: 'gift.read', title: 'Просмотр подарочных сертификатов', module: 'orders' },
-  { code: 'gift.write', title: 'Управление подарочными сертификатами', module: 'orders' },
-  { code: 'customers.read', title: 'Просмотр покупателей', module: 'account' },
-  { code: 'customers.write', title: 'Изменение покупателей', module: 'account' },
+  { code: 'gift.read', title: 'permissions.titles.giftRead', module: 'orders' },
+  { code: 'gift.write', title: 'permissions.titles.giftWrite', module: 'orders' },
+  { code: 'customers.read', title: 'permissions.titles.customersRead', module: 'account' },
+  { code: 'customers.write', title: 'permissions.titles.customersWrite', module: 'account' },
   // i18n — сквозной core-слой (всегда включён), не отдельный переключаемый модуль.
-  { code: 'i18n.read', title: 'Просмотр переводов', module: 'core' },
-  { code: 'i18n.manage', title: 'Управление переводами и языками', module: 'core' },
+  { code: 'i18n.read', title: 'permissions.titles.i18nRead', module: 'core' },
+  { code: 'i18n.manage', title: 'permissions.titles.i18nManage', module: 'core' },
 ] as const;
 
 /** Код системной роли (docs/04 §5.2). Системные роли неудаляемы (is_system). */
@@ -162,6 +162,10 @@ export const SYSTEM_ROLES: readonly SystemRoleDef[] = [
 const PERMISSION_TITLE_BY_CODE = new Map<string, string>(
   ALL_PERMISSIONS.map((p) => [p.code, p.title]),
 );
-export function permissionTitle(code: string): string {
-  return PERMISSION_TITLE_BY_CODE.get(code) ?? code;
+export function permissionTitle(
+  code: string,
+  t: (key: string) => string,
+): string {
+  const key = PERMISSION_TITLE_BY_CODE.get(code);
+  return key ? t(key) : code;
 }
