@@ -5,7 +5,8 @@
  */
 
 import type { Metadata } from 'next';
-import { toLocale, alternatesFor } from '@/lib/i18n';
+import { getSettings } from '@/lib/api';
+import { toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import CatalogView from './CatalogView';
 
@@ -18,9 +19,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const locale = toLocale((await params).lang);
   const dict = getDictionary(locale);
+  const settings = await getSettings(locale);
+  const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
   return {
     title: dict.catalog.title,
-    alternates: alternatesFor('/catalog', locale),
+    alternates: alternatesFor('/catalog', locale, enabledLocales),
   };
 }
 

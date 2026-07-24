@@ -16,7 +16,7 @@ import {
   findCategory,
   categoryHref,
 } from '@/lib/tree';
-import { localizedHref, toLocale, alternatesFor } from '@/lib/i18n';
+import { localizedHref, toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
 import { metaTitle } from '@/lib/seo';
 import { getDictionary } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../../components/Breadcrumbs';
@@ -34,14 +34,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { lang, slug } = await params;
   const locale = toLocale(lang);
-  const product = await getProduct(slug, locale);
+  const [product, settings] = await Promise.all([
+    getProduct(slug, locale),
+    getSettings(locale),
+  ]);
   if (!product) return { title: getDictionary(locale).notFound.productMetaTitle };
+  const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
   return {
     // meta.title от Storefront API — уже с применённым titleTemplate (buildSeoMeta),
     // поэтому absolute: иначе шаблон layout наложится вторым слоем.
     title: metaTitle(product.meta.title, product.name),
     description: product.meta.description ?? undefined,
-    alternates: alternatesFor(`/product/${slug}`, locale),
+    alternates: alternatesFor(`/product/${slug}`, locale, enabledLocales),
     robots: product.meta.noindex ? { index: false, follow: false } : undefined,
   };
 }

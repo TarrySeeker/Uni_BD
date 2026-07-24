@@ -12,14 +12,14 @@
 
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { getCategories } from '@/lib/api';
+import { getCategories, getSettings } from '@/lib/api';
 import {
   rootCategories,
   findCategory,
   resolveCategoryRoute,
   categoryRouteLocation,
 } from '@/lib/tree';
-import { toLocale, alternatesFor } from '@/lib/i18n';
+import { toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import CatalogView from '../CatalogView';
 
@@ -47,15 +47,19 @@ export async function generateMetadata({
   const { lang, slug } = await params;
   const locale = toLocale(lang);
   const dict = getDictionary(locale);
-  const categories = await getCategories(locale);
+  const [categories, settings] = await Promise.all([
+    getCategories(locale),
+    getSettings(locale),
+  ]);
   const roots = rootCategories(categories);
   const route = resolveCategoryRoute(roots, slug);
   if (route.status === 'not-found') return { title: dict.catalog.title };
   const cat = findCategory(roots, route.slug);
+  const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
   // canonical — ВСЕГДА канонический путь категории, а не сырой путь запроса.
   return {
     title: cat ? cat.name : dict.catalog.title,
-    alternates: alternatesFor(route.canonicalPath, locale),
+    alternates: alternatesFor(route.canonicalPath, locale, enabledLocales),
   };
 }
 

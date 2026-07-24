@@ -7,8 +7,8 @@
  */
 
 import type { Metadata } from 'next';
-import { getProducts } from '@/lib/api';
-import { localizedHref, toLocale, alternatesFor } from '@/lib/i18n';
+import { getProducts, getSettings } from '@/lib/api';
+import { localizedHref, toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
 import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 import ProductCard from '../components/ProductCard';
 import CatalogBodyClass from './CatalogBodyClass';
@@ -34,9 +34,11 @@ export async function generateMetadata({
   const locale = toLocale(lang);
   const dict = getDictionary(locale);
   const q = searchQuery(sp.q);
+  const settings = await getSettings(locale);
+  const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
   return {
     title: q ? fillTemplate(dict.search.resultsFor, { q }) : dict.search.title,
-    alternates: alternatesFor('/search', locale),
+    alternates: alternatesFor('/search', locale, enabledLocales),
   };
 }
 

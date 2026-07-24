@@ -13,7 +13,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPage, getSettings } from '@/lib/api';
-import { toLocale, alternatesFor } from '@/lib/i18n';
+import { toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
 import { metaTitle } from '@/lib/seo';
 import { getDictionary } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../components/Breadcrumbs';
@@ -28,10 +28,14 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { lang, slug } = await params;
   const locale = toLocale(lang);
-  const page = await getPage(slug, locale);
+  const [page, settings] = await Promise.all([
+    getPage(slug, locale),
+    getSettings(locale),
+  ]);
   if (!page) return { title: getDictionary(locale).notFound.pageMetaTitle };
 
   const { meta } = page;
+  const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
   return {
     // meta.title/meta.ogTitle от Storefront API — уже с применённым titleTemplate
     // (buildSeoMeta), поэтому absolute: иначе шаблон layout наложится вторым слоем.
@@ -40,7 +44,7 @@ export async function generateMetadata({
     description: meta.description ?? undefined,
     alternates: meta.canonical
       ? { canonical: meta.canonical }
-      : alternatesFor(`/${slug}`, locale),
+      : alternatesFor(`/${slug}`, locale, enabledLocales),
     robots: meta.noindex ? { index: false, follow: false } : undefined,
     openGraph: {
       title: metaTitle(meta.ogTitle ?? meta.title, page.title),

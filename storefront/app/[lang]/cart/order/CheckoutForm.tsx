@@ -452,7 +452,11 @@ export default function CheckoutForm({
                     checked={deliveryChoice === 'zone'}
                     onChange={() => setDeliveryChoice('zone')}
                   />
-                  <span>{t.deliveryCourierMoscow}</span>
+                  {/* i18n-оговорка: z.label — админ-данные (одно поле label:string,
+                      без пер-локальных вариантов), потому на en/fr магазине конкретное
+                      имя зоны может показаться по-русски. Пер-локальные лейблы зон —
+                      изменение схемы/админки, вне рамок этой правки. */}
+                  <span>{zones.length === 1 ? zones[0].label : t.deliveryCourierZonal}</span>
                 </label>
               )}
               <label className="sf-radio">
@@ -475,8 +479,10 @@ export default function CheckoutForm({
               </label>
             </div>
 
-            {/* Зоны Москвы */}
-            {deliveryChoice === 'zone' && (
+            {/* Выбор зоны доставки. При единственной зоне select избыточен —
+                зона уже выбрана по умолчанию (zoneId = zones[0].id), её имя
+                показано в лейбле радио выше. */}
+            {deliveryChoice === 'zone' && zones.length > 1 && (
               <label className="sf-field">
                 <span className="sf-field__label">{t.zoneLabel}</span>
                 <select

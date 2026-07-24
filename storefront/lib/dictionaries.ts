@@ -112,7 +112,7 @@ export interface Dictionary {
     phonePlaceholder: string; // «+7 900 000-00-00»
     // --- Доставка ---
     delivery: string; // «Доставка»
-    deliveryCourierMoscow: string; // «Курьер по Москве»
+    deliveryCourierZonal: string; // «Курьер по региону» (нейтральный лейбл зональной доставки)
     deliveryCourierCdek: string; // «Курьер СДЭК»
     deliveryPvz: string; // «Пункт выдачи СДЭК»
     zoneLabel: string; // «Зона доставки»
@@ -301,7 +301,7 @@ const ru: Dictionary = {
     emailInvalid: 'Введите корректный e-mail.',
     phonePlaceholder: '+7 900 000-00-00',
     delivery: 'Доставка',
-    deliveryCourierMoscow: 'Курьер по Москве',
+    deliveryCourierZonal: 'Курьер по региону',
     deliveryCourierCdek: 'Курьер СДЭК',
     deliveryPvz: 'Пункт выдачи СДЭК',
     zoneLabel: 'Зона доставки',
@@ -485,7 +485,7 @@ const en: Dictionary = {
     emailInvalid: 'Please enter a valid e-mail.',
     phonePlaceholder: '+7 900 000-00-00',
     delivery: 'Delivery',
-    deliveryCourierMoscow: 'Courier within Moscow',
+    deliveryCourierZonal: 'Zonal courier',
     deliveryCourierCdek: 'CDEK courier',
     deliveryPvz: 'CDEK pickup point',
     zoneLabel: 'Delivery zone',
@@ -669,7 +669,7 @@ const fr: Dictionary = {
     emailInvalid: 'Veuillez saisir un e-mail valide.',
     phonePlaceholder: '+7 900 000-00-00',
     delivery: 'Livraison',
-    deliveryCourierMoscow: 'Coursier à Moscou',
+    deliveryCourierZonal: 'Coursier par zone',
     deliveryCourierCdek: 'Coursier CDEK',
     deliveryPvz: 'Point de retrait CDEK',
     zoneLabel: 'Zone de livraison',
