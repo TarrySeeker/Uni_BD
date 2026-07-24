@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 /**
@@ -14,13 +15,14 @@ import { useState } from 'react';
  * название магазина из Topbar. Переиспользуемо для любого арендатора.
  */
 export function ShopLogo({ src, shopName }: { src: string; shopName: string }) {
+  const t = useTranslations();
   const [failed, setFailed] = useState(false);
   if (failed) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- произвольный внешний URL логотипа (.env), не через next/image
     <img
       src={src}
-      alt={`Логотип: ${shopName}`}
+      alt={t('layout.topbar.logoAlt', { shopName })}
       className="h-8 w-auto"
       onError={() => setFailed(true)}
     />

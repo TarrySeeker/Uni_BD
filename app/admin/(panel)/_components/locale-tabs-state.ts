@@ -21,10 +21,28 @@ export type LocaleTabsMode = 'create' | 'edit';
 /** Почему вкладок нет (для видимого пояснения пользователю). */
 export type LocaleTabsNoticeReason = 'single-locale' | 'create-first';
 
+/** i18n-ключ сообщения-объяснения (резолвится в LocaleTabs через t()). */
+export type LocaleTabsNoticeMessageKey =
+  | 'localeTabs.noticeSingleLocale'
+  | 'localeTabs.noticeCreateFirst';
+
 /** Что рисовать вместо/вместе с базовой формой. */
 export type LocaleTabsState =
   | { kind: 'tabs'; tabs: string[] }
-  | { kind: 'notice'; reason: LocaleTabsNoticeReason; text: string };
+  | {
+      kind: 'notice';
+      reason: LocaleTabsNoticeReason;
+      /**
+       * Готовый текст объяснения (config-derived, дефолтный язык). Остаётся как
+       * фолбэк и для чистых юнит-тестов; LocaleTabs предпочитает локализованный
+       * messageKey, откатываясь на text, если ключа нет.
+       */
+      text: string;
+      /** i18n-ключ того же объяснения (LocaleTabs рендерит t(messageKey, values)). */
+      messageKey: LocaleTabsNoticeMessageKey;
+      /** ICU-значения для messageKey. */
+      values: Record<string, string>;
+    };
 
 export interface LocaleTabsStateInput {
   /** Включённые языки магазина (shop_settings.i18n.locales). */
@@ -61,6 +79,8 @@ export function resolveLocaleTabsState(input: LocaleTabsStateInput): LocaleTabsS
       text:
         `В магазине включён один язык — ${base}. Переводить нечего: ` +
         'дополнительные языки подключаются в настройках магазина.',
+      messageKey: 'localeTabs.noticeSingleLocale',
+      values: { base },
     };
   }
 
@@ -71,6 +91,8 @@ export function resolveLocaleTabsState(input: LocaleTabsStateInput): LocaleTabsS
       text:
         `Переводы (${upper(others)}) заполняются после создания: сохраните запись ` +
         `на основном языке (${base}) — и на её карточке появятся вкладки языков.`,
+      messageKey: 'localeTabs.noticeCreateFirst',
+      values: { others: upper(others), base },
     };
   }
 

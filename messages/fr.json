@@ -42,6 +42,11 @@
       "optional": "Facultatif",
       "saving": "Enregistrement…",
       "saved": "Enregistré"
+    },
+    "languages": {
+      "ru": "Русский",
+      "en": "English",
+      "fr": "Français"
     }
   },
   "nav": {
@@ -79,6 +84,9 @@
       "root": "Administration",
       "ariaLabel": "Fil d’Ariane",
       "back": "Retour"
+    },
+    "localeSwitcher": {
+      "label": "Langue de l’interface"
     }
   },
   "login": {
@@ -92,7 +100,7 @@
   },
   "dashboard": {
     "title": "Tableau de bord",
-    "greeting": "Bonjour, {name}.",
+    "greeting": "Bonjour, <b>{name}</b>.",
     "metrics": {
       "products": "Produits au catalogue",
       "categories": "Catégories",
@@ -138,7 +146,7 @@
       "title": "Mode utilisateur unique",
       "manageUsers": "des utilisateurs",
       "manageRoles": "des rôles",
-      "message": "La gestion {what} est désactivée : la boutique fonctionne en mode utilisateur unique. Vous pouvez réactiver la section dans « Paramètres → Accès »."
+      "message": "La gestion {what} est désactivée : la boutique fonctionne en mode mono-utilisateur. Vous pouvez réactiver cette section dans <link>Paramètres → Accès</link>."
     }
   },
   "seo": {
@@ -159,7 +167,7 @@
   "localeTabs": {
     "ariaLabel": "Langue du contenu",
     "baseTab": "{locale} · principal",
-    "translationHint": "Traduction pour {locale}. Un champ vide affiche le texte principal ({defaultLocale}) sur la vitrine. Les valeurs principales se modifient dans l’onglet « {defaultLocale} · principal ».",
+    "translationHint": "Traduction pour <b>{locale}</b>. Un champ vide affiche le texte principal ({defaultLocale}) sur la vitrine. Les valeurs principales se modifient dans l’onglet « {defaultLocale} · principal ».",
     "translationHintCreate": "La traduction sera enregistrée avec la création de l’enregistrement.",
     "saveCreate": "Créer et enregistrer la traduction",
     "saveEdit": "Enregistrer la traduction",

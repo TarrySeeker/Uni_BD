@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
 import { login, type LoginResult } from '@/lib/auth/actions';
@@ -21,6 +22,7 @@ async function loginAction(
 }
 
 export function LoginForm() {
+  const t = useTranslations();
   const [state, formAction, pending] = useActionState<
     LoginResult | null,
     FormData
@@ -33,6 +35,7 @@ export function LoginForm() {
       {errorMessage ? (
         <p
           role="alert"
+          data-reason="bad-credentials"
           className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
         >
           {errorMessage}
@@ -41,22 +44,23 @@ export function LoginForm() {
 
       <div className="flex flex-col gap-1">
         <label htmlFor="email" className="text-sm font-medium text-gray-700">
-          Логин или email
+          {t('login.emailLabel')}
         </label>
         <input
           id="email"
           name="email"
           type="text"
           autoComplete="username"
-          placeholder="Логин или email"
+          placeholder={t('login.emailPlaceholder')}
           required
+          data-testid="login-email"
           className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         />
       </div>
 
       <div className="flex flex-col gap-1">
         <label htmlFor="password" className="text-sm font-medium text-gray-700">
-          Пароль
+          {t('login.passwordLabel')}
         </label>
         <input
           id="password"
@@ -64,6 +68,7 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
+          data-testid="login-password"
           className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         />
       </div>
@@ -71,9 +76,10 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
+        data-testid="login-submit"
         className="mt-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
       >
-        {pending ? 'Вход…' : 'Войти'}
+        {pending ? t('login.submitting') : t('login.submit')}
       </button>
     </form>
   );

@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import type { DailyPoint } from '@/lib/analytics/repository';
 
 /**
@@ -9,7 +11,7 @@ import type { DailyPoint } from '@/lib/analytics/repository';
  * Доступность: role="img" + aria-label с суммой; у каждого столбца <title>
  * (день: значение) для нативного тултипа.
  */
-export function MiniBarChart({
+export async function MiniBarChart({
   title,
   points,
   unit,
@@ -22,6 +24,7 @@ export function MiniBarChart({
   /** Tailwind-класс заливки столбца. */
   barClassName?: string;
 }) {
+  const t = await getTranslations();
   const total = points.reduce((s, p) => s + p.count, 0);
   const max = points.reduce((m, p) => Math.max(m, p.count), 0);
 
@@ -43,20 +46,20 @@ export function MiniBarChart({
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-medium text-gray-500">{title}</h2>
         <span className="text-sm text-gray-400">
-          всего {total} {unit}
+          {t('dashboard.charts.total', { total, unit })}
         </span>
       </div>
 
       {total === 0 ? (
         <p className="mt-6 mb-4 text-sm text-gray-400">
-          Пока нет данных за период.
+          {t('dashboard.charts.empty')}
         </p>
       ) : (
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="mt-3 h-32 w-full"
           role="img"
-          aria-label={`${title}: всего ${total} ${unit} за ${n} дней`}
+          aria-label={t('dashboard.charts.ariaLabel', { title, total, unit, count: n })}
           preserveAspectRatio="none"
         >
           {points.map((p, i) => {

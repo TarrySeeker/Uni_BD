@@ -42,6 +42,11 @@
       "optional": "Optional",
       "saving": "Saving…",
       "saved": "Saved"
+    },
+    "languages": {
+      "ru": "Русский",
+      "en": "English",
+      "fr": "Français"
     }
   },
   "nav": {
@@ -79,6 +84,9 @@
       "root": "Admin",
       "ariaLabel": "Breadcrumbs",
       "back": "Back"
+    },
+    "localeSwitcher": {
+      "label": "Interface language"
     }
   },
   "login": {
@@ -92,7 +100,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "greeting": "Hello, {name}.",
+    "greeting": "Hello, <b>{name}</b>.",
     "metrics": {
       "products": "Products in catalog",
       "categories": "Categories",
@@ -138,7 +146,7 @@
       "title": "Single-user mode",
       "manageUsers": "users",
       "manageRoles": "roles",
-      "message": "Managing {what} is disabled: the store runs in single-user mode. You can re-enable the section under «Settings → Access»."
+      "message": "Managing {what} is disabled: the store runs in single-user mode. You can re-enable this section in <link>Settings → Access</link>."
     }
   },
   "seo": {
@@ -159,7 +167,7 @@
   "localeTabs": {
     "ariaLabel": "Content language",
     "baseTab": "{locale} · primary",
-    "translationHint": "Translation for {locale}. An empty field shows the primary ({defaultLocale}) text on the storefront. Primary values are edited on the «{defaultLocale} · primary» tab.",
+    "translationHint": "Translation for <b>{locale}</b>. An empty field shows the primary ({defaultLocale}) text on the storefront. Primary values are edited on the «{defaultLocale} · primary» tab.",
     "translationHintCreate": "The translation will be saved together with the record.",
     "saveCreate": "Create and save translation",
     "saveEdit": "Save translation",

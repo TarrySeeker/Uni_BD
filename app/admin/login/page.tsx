@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
 import { getCurrentUser } from '@/lib/auth/session';
@@ -26,6 +27,8 @@ export default async function LoginPage() {
   const { branding } = await getEffectiveSettings();
   const shopName = branding.shopName;
 
+  const t = await getTranslations();
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
@@ -34,12 +37,12 @@ export default async function LoginPage() {
             // eslint-disable-next-line @next/next/no-img-element -- логотип из произвольного внешнего URL (настройки)
             <img
               src={branding.logoUrl}
-              alt={`Логотип: ${shopName}`}
+              alt={t('login.logoAlt', { shopName })}
               className="h-10 w-auto"
             />
           ) : null}
           <h1 className="text-xl font-semibold text-gray-900">{shopName}</h1>
-          <p className="text-sm text-gray-500">Вход в панель управления</p>
+          <p className="text-sm text-gray-500">{t('login.subtitle')}</p>
         </div>
 
         <LoginForm />

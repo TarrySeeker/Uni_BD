@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 
 /**
@@ -20,12 +21,12 @@ export interface Crumb {
   href?: string;
 }
 
-export function PageHeader({
+export async function PageHeader({
   title,
   subtitle,
   breadcrumbs = [],
   backHref,
-  backLabel = 'Назад',
+  backLabel,
   action,
 }: {
   title: string;
@@ -35,13 +36,20 @@ export function PageHeader({
   backLabel?: string;
   action?: ReactNode;
 }) {
+  const t = await getTranslations();
+
   // «Админка» (дашборд) — всегда первой крошкой, чтобы с любой страницы был путь
   // на верхний уровень одним кликом.
-  const crumbs: Crumb[] = [{ label: 'Админка', href: '/admin' }, ...breadcrumbs];
+  const crumbs: Crumb[] = [
+    { label: t('layout.breadcrumbs.root'), href: '/admin' },
+    ...breadcrumbs,
+  ];
+  // Подпись кнопки «Назад»: явный проп имеет приоритет, иначе — локализованный дефолт.
+  const backText = backLabel ?? t('layout.breadcrumbs.back');
 
   return (
     <div className="mb-6">
-      <nav aria-label="Хлебные крошки" className="text-sm text-gray-500">
+      <nav aria-label={t('layout.breadcrumbs.ariaLabel')} className="text-sm text-gray-500">
         <ol className="flex flex-wrap items-center gap-1">
           {crumbs.map((c, i) => {
             const last = i === crumbs.length - 1;
@@ -68,11 +76,11 @@ export function PageHeader({
               href={backHref}
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
-              <span aria-hidden="true">←</span> {backLabel}
+              <span aria-hidden="true">←</span> {backText}
             </Link>
           ) : null}
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
+            <h1 data-testid="page-title" className="text-2xl font-semibold text-gray-900">{title}</h1>
             {subtitle ? <p className="mt-1 text-sm text-gray-600">{subtitle}</p> : null}
           </div>
         </div>

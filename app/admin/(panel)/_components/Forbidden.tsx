@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server';
+
 import { permissionTitle } from '@/lib/auth/permissions';
 
 /**
@@ -7,15 +9,15 @@ import { permissionTitle } from '@/lib/auth/permissions';
  * в человеко-понятное название (permissionTitle); нестандартные строки
  * (напр. «catalog (модуль выключен)») показываются как есть.
  */
-export function Forbidden({ permission }: { permission: string }) {
+export async function Forbidden({ permission }: { permission: string }) {
+  const t = await getTranslations();
   return (
     <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-6">
       <h1 className="text-xl font-semibold text-red-800">
-        Доступ к разделу закрыт
+        {t('errors.forbidden.title')}
       </h1>
       <p className="mt-2 text-sm text-red-700">
-        Для этого раздела нужно право «{permissionTitle(permission)}».
-        Обратитесь к администратору магазина, чтобы его выдали.
+        {t('errors.forbidden.message', { permission: permissionTitle(permission) })}
       </p>
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState, type ReactNode } from 'react';
 
 import {
@@ -34,8 +35,10 @@ export {
 export interface TranslatableFieldDef {
   /** Ключ поля (совпадает с whitelist и ключом оверлея, camelCase). */
   key: string;
-  /** Человекочитаемая подпись. */
+  /** Человекочитаемая подпись (фолбэк, если нет labelKey). */
   label: string;
+  /** i18n-ключ подписи (fields.*); LocaleTabs рендерит t(labelKey). */
+  labelKey?: string;
   /** Вид ввода: однострочный (по умолчанию) или многострочный. */
   kind?: 'text' | 'textarea';
 }
@@ -83,6 +86,7 @@ export function LocaleTabs({
   /** Базовая форма (редактирование ru-колонок). */
   children: ReactNode;
 }) {
+  const t = useTranslations();
   const [active, setActive] = useState<string>(defaultLocale);
   const state = resolveLocaleTabsState({
     locales,
@@ -100,7 +104,9 @@ export function LocaleTabs({
           role="note"
           className="mb-4 rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"
         >
-          {state.text}
+          {t.has(state.messageKey)
+            ? t(state.messageKey, state.values)
+            : state.text}
         </p>
         {children}
       </div>
@@ -120,7 +126,7 @@ export function LocaleTabs({
     <div>
       <div
         role="tablist"
-        aria-label="Язык контента"
+        aria-label={t('localeTabs.ariaLabel')}
         className="mb-4 flex flex-wrap gap-1 border-b border-gray-200"
       >
         {tabs.map((loc) => (
@@ -136,7 +142,9 @@ export function LocaleTabs({
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {loc === defaultLocale ? `${loc.toUpperCase()} · основной` : loc.toUpperCase()}
+            {loc === defaultLocale
+              ? t('localeTabs.baseTab', { locale: loc.toUpperCase() })
+              : loc.toUpperCase()}
           </button>
         ))}
       </div>
@@ -146,11 +154,13 @@ export function LocaleTabs({
       ) : (
         <div>
           <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-            Перевод для языка <strong>{active.toUpperCase()}</strong>. Пустое поле —
-            на витрине показывается основной ({defaultLocale.toUpperCase()}) текст.
-            Основные значения редактируются на вкладке «{defaultLocale.toUpperCase()} · основной».
+            {t.rich('localeTabs.translationHint', {
+              locale: active.toUpperCase(),
+              defaultLocale: defaultLocale.toUpperCase(),
+              b: (chunks) => <strong>{chunks}</strong>,
+            })}
             {mode === 'create'
-              ? ' Перевод сохранится вместе с созданием записи.'
+              ? ` ${t('localeTabs.translationHintCreate')}`
               : null}
           </p>
 
@@ -161,7 +171,7 @@ export function LocaleTabs({
               return (
                 <div key={f.key}>
                   <label htmlFor={id} className={labelCls}>
-                    {f.label}
+                    {f.labelKey ? t(f.labelKey) : f.label}
                   </label>
                   {f.kind === 'textarea' ? (
                     <textarea
@@ -195,10 +205,10 @@ export function LocaleTabs({
                 className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
               >
                 {pending
-                  ? 'Сохранение…'
+                  ? t('localeTabs.saving')
                   : mode === 'create'
-                    ? 'Создать и сохранить перевод'
-                    : 'Сохранить перевод'}
+                    ? t('localeTabs.saveCreate')
+                    : t('localeTabs.saveEdit')}
               </button>
             </div>
           ) : null}
@@ -249,26 +259,26 @@ export function translationsPayload(
 
 /** Whitelist-поля товара/бренда/категории для панели переводов (совпадает с *_TR_FIELDS). */
 export const CATALOG_ENTITY_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'name', label: 'Название', kind: 'text' },
-  { key: 'description', label: 'Описание', kind: 'textarea' },
-  { key: 'seoTitle', label: 'SEO Title', kind: 'text' },
-  { key: 'seoDescription', label: 'SEO Description', kind: 'textarea' },
-  { key: 'ogTitle', label: 'OG Title', kind: 'text' },
-  { key: 'ogDescription', label: 'OG Description', kind: 'textarea' },
+  { key: 'name', label: 'Название', labelKey: 'fields.name', kind: 'text' },
+  { key: 'description', label: 'Описание', labelKey: 'fields.description', kind: 'textarea' },
+  { key: 'seoTitle', label: 'SEO Title', labelKey: 'fields.seoTitle', kind: 'text' },
+  { key: 'seoDescription', label: 'SEO Description', labelKey: 'fields.seoDescription', kind: 'textarea' },
+  { key: 'ogTitle', label: 'OG Title', labelKey: 'fields.ogTitle', kind: 'text' },
+  { key: 'ogDescription', label: 'OG Description', labelKey: 'fields.ogDescription', kind: 'textarea' },
 ];
 
 /** Whitelist-поля дизайнера для панели переводов (совпадает с DESIGNER_TR_FIELDS). */
 export const DESIGNER_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'name', label: 'Имя', kind: 'text' },
-  { key: 'description', label: 'Описание', kind: 'textarea' },
-  { key: 'country', label: 'Страна', kind: 'text' },
+  { key: 'name', label: 'Имя', labelKey: 'fields.designerName', kind: 'text' },
+  { key: 'description', label: 'Описание', labelKey: 'fields.description', kind: 'textarea' },
+  { key: 'country', label: 'Страна', labelKey: 'fields.country', kind: 'text' },
 ];
 
 /** Whitelist-поля CMS-страницы (совпадает с CMS_PAGE_TR_FIELDS). */
 export const CMS_PAGE_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'title', label: 'Заголовок', kind: 'text' },
-  { key: 'seoTitle', label: 'SEO Title', kind: 'text' },
-  { key: 'seoDescription', label: 'SEO Description', kind: 'textarea' },
-  { key: 'ogTitle', label: 'OG Title', kind: 'text' },
-  { key: 'ogDescription', label: 'OG Description', kind: 'textarea' },
+  { key: 'title', label: 'Заголовок', labelKey: 'fields.title', kind: 'text' },
+  { key: 'seoTitle', label: 'SEO Title', labelKey: 'fields.seoTitle', kind: 'text' },
+  { key: 'seoDescription', label: 'SEO Description', labelKey: 'fields.seoDescription', kind: 'textarea' },
+  { key: 'ogTitle', label: 'OG Title', labelKey: 'fields.ogTitle', kind: 'text' },
+  { key: 'ogDescription', label: 'OG Description', labelKey: 'fields.ogDescription', kind: 'textarea' },
 ];

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
@@ -42,12 +43,20 @@ function MetricCard({ title, value }: { title: string; value: number }) {
  * сообщениях с витрины. При наличии новых — подсвечивается янтарным и ведёт в
  * раздел «Заявки», чтобы владелец не пропустил обращения.
  */
-function LeadsCard({ value }: { value: number }) {
+function LeadsCard({
+  value,
+  title,
+  ariaLabel,
+}: {
+  value: number;
+  title: string;
+  ariaLabel: string;
+}) {
   const active = value > 0;
   return (
     <Link
       href="/admin/leads"
-      aria-label={`Новые заявки: ${value}. Перейти к заявкам`}
+      aria-label={ariaLabel}
       className={`block rounded-lg border p-5 transition hover:shadow-sm ${
         active
           ? 'border-amber-300 bg-amber-50 hover:bg-amber-100'
@@ -55,7 +64,7 @@ function LeadsCard({ value }: { value: number }) {
       }`}
     >
       <h2 className={`text-sm font-medium ${active ? 'text-amber-800' : 'text-gray-500'}`}>
-        Новые заявки
+        {title}
       </h2>
       <p className={`mt-2 text-3xl font-semibold ${active ? 'text-amber-900' : 'text-gray-900'}`}>
         {value}
@@ -66,6 +75,7 @@ function LeadsCard({ value }: { value: number }) {
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  const t = await getTranslations();
 
   // Модуль orders может быть выключен для магазина (ADMIK_MODULES). Таблица orders
   // существует всегда (миграции аддитивны и НЕ модуль-зависимы), поэтому без явного
@@ -110,54 +120,63 @@ export default async function DashboardPage() {
 
   // Быстрые ссылки — только те, на что есть право (owner видит всё).
   const links: { href: string; label: string; show: boolean }[] = [
-    { href: '/admin/catalog/products/new', label: '+ Создать товар', show: catalogOn && can(user, 'catalog.write') },
-    { href: '/admin/catalog', label: 'Каталог товаров', show: catalogOn && can(user, 'catalog.read') },
-    { href: '/admin/catalog/categories', label: 'Категории', show: catalogOn && can(user, 'catalog.read') },
-    { href: '/admin/orders', label: 'Заказы', show: ordersOn && can(user, 'orders.read') },
-    { href: '/admin/cdek', label: 'Доставка', show: cdekOn && can(user, 'cdek.manage') },
-    { href: '/admin/settings', label: 'Настройки', show: can(user, 'settings.manage') },
+    { href: '/admin/catalog/products/new', label: t('dashboard.quickActions.createProduct'), show: catalogOn && can(user, 'catalog.write') },
+    { href: '/admin/catalog', label: t('dashboard.quickActions.catalog'), show: catalogOn && can(user, 'catalog.read') },
+    { href: '/admin/catalog/categories', label: t('dashboard.quickActions.categories'), show: catalogOn && can(user, 'catalog.read') },
+    { href: '/admin/orders', label: t('dashboard.quickActions.orders'), show: ordersOn && can(user, 'orders.read') },
+    { href: '/admin/cdek', label: t('dashboard.quickActions.delivery'), show: cdekOn && can(user, 'cdek.manage') },
+    { href: '/admin/settings', label: t('dashboard.quickActions.settings'), show: can(user, 'settings.manage') },
   ].filter((l) => l.show);
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Дашборд</h1>
+      <h1 className="text-2xl font-semibold text-gray-900">{t('dashboard.title')}</h1>
       <p className="mt-2 text-gray-600">
-        Здравствуйте, <span className="font-medium">{user.email}</span>.
+        {t.rich('dashboard.greeting', {
+          name: user.email,
+          b: (chunks) => <span className="font-medium">{chunks}</span>,
+        })}
       </p>
 
       <section
-        aria-label="Показатели"
+        aria-label={t('dashboard.aria.metrics')}
         className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4"
       >
-        {products !== null ? <MetricCard title="Товаров в каталоге" value={products} /> : null}
-        {categories !== null ? <MetricCard title="Категорий" value={categories} /> : null}
-        {ordersToday !== null ? <MetricCard title="Заказов сегодня" value={ordersToday} /> : null}
-        {ordersTotal !== null ? <MetricCard title="Заказов всего" value={ordersTotal} /> : null}
-        {newLeads !== null ? <LeadsCard value={newLeads} /> : null}
+        {products !== null ? <MetricCard title={t('dashboard.metrics.products')} value={products} /> : null}
+        {categories !== null ? <MetricCard title={t('dashboard.metrics.categories')} value={categories} /> : null}
+        {ordersToday !== null ? <MetricCard title={t('dashboard.metrics.ordersToday')} value={ordersToday} /> : null}
+        {ordersTotal !== null ? <MetricCard title={t('dashboard.metrics.ordersTotal')} value={ordersTotal} /> : null}
+        {newLeads !== null ? (
+          <LeadsCard
+            value={newLeads}
+            title={t('dashboard.metrics.newLeads')}
+            ariaLabel={t('dashboard.aria.leads', { count: newLeads })}
+          />
+        ) : null}
       </section>
 
       {series ? (
-        <section aria-label="Графики за 14 дней" className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section aria-label={t('dashboard.aria.charts')} className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {ordersOn ? (
             <MiniBarChart
-              title="Заказы за 14 дней"
+              title={t('dashboard.charts.orders.title')}
               points={series.orders}
-              unit="заказов"
+              unit={t('dashboard.charts.orders.unit')}
               barClassName="fill-gray-800"
             />
           ) : null}
           <MiniBarChart
-            title="Посещения сайта за 14 дней"
+            title={t('dashboard.charts.visits.title')}
             points={series.views}
-            unit="просмотров"
+            unit={t('dashboard.charts.visits.unit')}
             barClassName="fill-blue-500"
           />
         </section>
       ) : null}
 
       {links.length > 0 ? (
-        <section aria-label="Быстрые действия" className="mt-8">
-          <h2 className="text-sm font-semibold text-gray-700">Быстрые действия</h2>
+        <section aria-label={t('dashboard.aria.quickActions')} className="mt-8">
+          <h2 className="text-sm font-semibold text-gray-700">{t('dashboard.quickActions.title')}</h2>
           <div className="mt-3 flex flex-wrap gap-3">
             {links.map((l) => (
               <Link

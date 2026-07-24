@@ -23,7 +23,19 @@ import { type ModuleName } from '@/lib/config/modules';
 /** Пункт навигации админки. */
 export interface NavItem {
   href: string;
+  /**
+   * Подпись на русском (default-locale). Оставлена как СТАБИЛЬНЫЙ дефолт и для
+   * обратной совместимости с потребителями, читающими её напрямую (тесты состава
+   * меню). Для отрисовки в UI используйте `labelKey` + next-intl (`t(labelKey)`),
+   * который на локали `ru` резолвится в тот же текст.
+   */
   label: string;
+  /**
+   * Ключ перевода подписи в каталоге интерфейса (`messages/*.json`, namespace
+   * `nav.*`). Данные-модуль не резолвит t() сам (остаётся чистым); подпись
+   * локализует потребитель (Sidebar) через `t(item.labelKey)`.
+   */
+  labelKey: string;
   /** Требуемое право; если не задано — доступно всем (напр. дашборд). */
   permission?: PermissionCode;
   /** Модуль, к которому относится пункт; если не задан — пункт ядра (core). */
@@ -41,40 +53,40 @@ export interface NavItem {
  * модульные пункты — заготовки под Этапы 2–5, но логика фильтрации уже готова.
  */
 export const NAV: NavItem[] = [
-  { href: '/admin', label: 'Дашборд' },
-  { href: '/admin/catalog', label: 'Каталог', permission: 'catalog.read', module: 'catalog' },
-  { href: '/admin/orders', label: 'Заказы', permission: 'orders.read', module: 'orders' },
-  { href: '/admin/promo', label: 'Промокоды', permission: 'orders.write', module: 'orders' },
+  { href: '/admin', label: 'Дашборд', labelKey: 'nav.dashboard' },
+  { href: '/admin/catalog', label: 'Каталог', labelKey: 'nav.catalog', permission: 'catalog.read', module: 'catalog' },
+  { href: '/admin/orders', label: 'Заказы', labelKey: 'nav.orders', permission: 'orders.read', module: 'orders' },
+  { href: '/admin/promo', label: 'Промокоды', labelKey: 'nav.promo', permission: 'orders.write', module: 'orders' },
   // «Подарочные сертификаты» — балансовый инструмент под модулем orders; право
   // gift.read (docs/24 §5). Список/выпуск/остаток/деактивация.
-  { href: '/admin/gift-certificates', label: 'Сертификаты', permission: 'gift.read', module: 'orders' },
+  { href: '/admin/gift-certificates', label: 'Сертификаты', labelKey: 'nav.giftCertificates', permission: 'gift.read', module: 'orders' },
   // «Заявки» — core (без module): сообщения с формы витрины; право orders.read (G-09).
-  { href: '/admin/leads', label: 'Заявки', permission: 'orders.read' },
+  { href: '/admin/leads', label: 'Заявки', labelKey: 'nav.leads', permission: 'orders.read' },
   // «Подписчики» — core: email-подписки из футера витрины; orders.read (G-12).
-  { href: '/admin/subscribers', label: 'Подписчики', permission: 'orders.read' },
-  { href: '/admin/cdek', label: 'Доставка', permission: 'cdek.manage', module: 'cdek' },
-  { href: '/admin/cms', label: 'Контент', permission: 'cms.read', module: 'cms' },
+  { href: '/admin/subscribers', label: 'Подписчики', labelKey: 'nav.subscribers', permission: 'orders.read' },
+  { href: '/admin/cdek', label: 'Доставка', labelKey: 'nav.cdek', permission: 'cdek.manage', module: 'cdek' },
+  { href: '/admin/cms', label: 'Контент', labelKey: 'nav.cms', permission: 'cms.read', module: 'cms' },
   // «Новости» — тумблируемый модуль news; право news.read (docs/24 §3). Страница
   // /admin/news существует (шаг 5), поэтому включённый модуль не даёт битой ссылки.
-  { href: '/admin/news', label: 'Новости', permission: 'news.read', module: 'news' },
+  { href: '/admin/news', label: 'Новости', labelKey: 'nav.news', permission: 'news.read', module: 'news' },
   // «Отзывы» — тумблируемый модуль reviews; право reviews.read (docs/24 §4).
   // Страница /admin/reviews существует (шаг 6), поэтому включённый модуль не даёт
   // битой ссылки.
-  { href: '/admin/reviews', label: 'Отзывы', permission: 'reviews.read', module: 'reviews' },
+  { href: '/admin/reviews', label: 'Отзывы', labelKey: 'nav.reviews', permission: 'reviews.read', module: 'reviews' },
   // «Покупатели» — модуль account; право customers.read (docs/24 §6). Просмотр
   // аккаунтов/гостевых контактов витрины. Страница /admin/customers существует
   // (шаг 7a), поэтому включённый модуль не даёт битой ссылки.
-  { href: '/admin/customers', label: 'Покупатели', permission: 'customers.read', module: 'account' },
-  { href: '/admin/users', label: 'Пользователи', permission: 'users.read' },
-  { href: '/admin/roles', label: 'Роли', permission: 'roles.manage' },
-  { href: '/admin/audit', label: 'Аудит', permission: 'audit.read' },
+  { href: '/admin/customers', label: 'Покупатели', labelKey: 'nav.customers', permission: 'customers.read', module: 'account' },
+  { href: '/admin/users', label: 'Пользователи', labelKey: 'nav.users', permission: 'users.read' },
+  { href: '/admin/roles', label: 'Роли', labelKey: 'nav.roles', permission: 'roles.manage' },
+  { href: '/admin/audit', label: 'Аудит', labelKey: 'nav.audit', permission: 'audit.read' },
   // «Настройки» — core (без module): не прячется за флагом, которым сам управляет
   // (self-lock guard, docs/11 §5.4.5). Виден при наличии settings.manage.
-  { href: '/admin/settings', label: 'Настройки', permission: 'settings.manage' },
+  { href: '/admin/settings', label: 'Настройки', labelKey: 'nav.settings', permission: 'settings.manage' },
   // «Языки» — core-подраздел настроек (набор языков магазина + покрытие переводов).
   // Отдельный пункт, т.к. владелец ищет языки как самостоятельную функцию, а не
   // как строку в длинной странице настроек. Право то же — settings.manage.
-  { href: '/admin/settings/languages', label: 'Языки', permission: 'settings.manage' },
+  { href: '/admin/settings/languages', label: 'Языки', labelKey: 'nav.languages', permission: 'settings.manage' },
 ];
 
 /** Опции построения меню. */

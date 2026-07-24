@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import type { NavItem } from '@/lib/admin/nav';
@@ -22,6 +23,7 @@ import type { NavItem } from '@/lib/admin/nav';
  */
 export function Sidebar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const t = useTranslations();
   const [open, setOpen] = useState(false);
 
   function isActive(href: string): boolean {
@@ -49,7 +51,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
               onClick={onClick}
               className={linkClass(active)}
             >
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           </li>
         );
@@ -61,7 +63,8 @@ export function Sidebar({ items }: { items: NavItem[] }) {
     <>
       {/* Десктоп: статичная колонка */}
       <nav
-        aria-label="Основная навигация"
+        data-testid="admin-primary-nav"
+        aria-label={t('layout.sidebar.mainNav')}
         className="hidden w-60 shrink-0 border-r border-gray-200 bg-gray-50 p-4 md:block"
       >
         {links()}
@@ -72,11 +75,11 @@ export function Sidebar({ items }: { items: NavItem[] }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Открыть меню"
+          aria-label={t('layout.sidebar.openMenu')}
           aria-expanded={open}
           className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700"
         >
-          <span aria-hidden="true">☰</span> Меню
+          <span aria-hidden="true">☰</span> {t('layout.sidebar.menu')}
         </button>
       </div>
 
@@ -89,14 +92,15 @@ export function Sidebar({ items }: { items: NavItem[] }) {
             aria-hidden="true"
           />
           <nav
-            aria-label="Основная навигация"
+            data-testid="admin-primary-nav"
+            aria-label={t('layout.sidebar.mainNav')}
             className="absolute left-0 top-0 h-full w-64 max-w-[80%] overflow-y-auto border-r border-gray-200 bg-white p-4 shadow-xl"
           >
             <div className="mb-3 flex justify-end">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Закрыть меню"
+                aria-label={t('layout.sidebar.closeMenu')}
                 className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
               >
                 ✕
