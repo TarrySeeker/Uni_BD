@@ -1,5 +1,9 @@
 {
   "common": {
+    "app": {
+      "title": "Admik — admin panel",
+      "description": "Universal admin panel for online stores"
+    },
     "actions": {
       "save": "Save",
       "cancel": "Cancel",

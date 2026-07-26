@@ -1,5 +1,9 @@
 {
   "common": {
+    "app": {
+      "title": "Admik — panneau d’administration",
+      "description": "Panneau d’administration universel pour boutiques en ligne"
+    },
     "actions": {
       "save": "Enregistrer",
       "cancel": "Annuler",
