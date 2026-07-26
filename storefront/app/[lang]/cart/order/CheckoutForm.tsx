@@ -56,7 +56,10 @@ type DeliveryChoice = 'courier' | 'pvz' | 'zone';
 /** Подсекция словаря чекаута — все локализованные подписи формы. */
 type CheckoutDict = Dictionary['checkout'];
 
-/** Подпись причины проблемы позиции (issues[].code из /cart/quote). */
+/**
+ * Подпись причины проблемы позиции (issues[].code из /cart/quote).
+ * 🔴 Неизвестный код НЕ показываем покупателю сырым — общий текст словаря.
+ */
 function issueLabel(t: CheckoutDict, code: string): string {
   const map: Record<string, string> = {
     out_of_stock: t.issueOutOfStock,
@@ -64,7 +67,7 @@ function issueLabel(t: CheckoutDict, code: string): string {
     not_found: t.issueNotFound,
     inactive: t.issueInactive,
   };
-  return map[code] ?? code;
+  return map[code] ?? t.issueInvalidItem;
 }
 
 /** Подпись причины отказа промокода (promo.reason из /cart/quote). */
@@ -79,6 +82,22 @@ function promoReasonLabel(t: CheckoutDict, reason: string): string {
     per_customer_limit: t.promoReasonPerCustomerLimit,
   };
   return map[reason] ?? t.promoNotApplied;
+}
+
+/**
+ * Подпись причины отказа подарочного сертификата (gift.reason из /cart/quote).
+ * 🔴 Сырой машинный код покупателю не показывается НИКОГДА: неизвестная причина
+ * (или новый код на сервере) падает в общий человекочитаемый текст словаря.
+ */
+function giftReasonLabel(t: CheckoutDict, reason: string): string {
+  const map: Record<string, string> = {
+    not_found: t.giftReasonNotFound,
+    expired: t.giftReasonExpired,
+    depleted: t.giftReasonDepleted,
+    disabled: t.giftReasonDisabled,
+    no_amount_due: t.giftReasonNoAmountDue,
+  };
+  return map[reason] ?? t.giftCodeNotApplied;
 }
 
 /** Человекочитаемая ошибка создания заказа (code из /orders → CreateOrderResult). */
@@ -134,6 +153,10 @@ export default function CheckoutForm({
   // ---- Промокод ----
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState('');
+
+  // ---- Подарочный сертификат (стекается ПОВЕРХ промокода, считает сервер) ----
+  const [giftInput, setGiftInput] = useState('');
+  const [appliedGift, setAppliedGift] = useState('');
 
   // ---- Расчёт / статус ----
   const [quote, setQuote] = useState<QuoteDto | null>(null);
@@ -205,8 +228,9 @@ export default function CheckoutForm({
         items: apiItems,
         delivery: buildDelivery(),
         promo: appliedPromo,
+        gift: appliedGift,
       }),
-    [apiItems, buildDelivery, appliedPromo],
+    [apiItems, buildDelivery, appliedPromo, appliedGift],
   );
 
   useEffect(() => {
@@ -222,6 +246,7 @@ export default function CheckoutForm({
         items: apiItems,
         delivery: buildDelivery(),
         ...(appliedPromo ? { promoCode: appliedPromo } : {}),
+        ...(appliedGift ? { giftCertificateCode: appliedGift } : {}),
       },
       locale,
     )
@@ -240,7 +265,7 @@ export default function CheckoutForm({
     return () => {
       cancelled = true;
     };
-    // recalcSignature инкапсулирует все зависимости (apiItems/delivery/promo).
+    // recalcSignature инкапсулирует все зависимости (apiItems/delivery/promo/gift).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recalcSignature, mounted]);
 
@@ -300,6 +325,14 @@ export default function CheckoutForm({
     setPromoInput('');
   }
 
+  function applyGift() {
+    setAppliedGift(giftInput.trim());
+  }
+  function removeGift() {
+    setAppliedGift('');
+    setGiftInput('');
+  }
+
   const fmt = (v: string | number | null | undefined) =>
     formatPrice(v, currencyCode, currencySymbol);
 
@@ -335,6 +368,7 @@ export default function CheckoutForm({
           // PayKeeper = онлайн-карта. Сервер по этому методу инициирует эквайринг.
           paymentMethod: 'card',
           ...(appliedPromo ? { promoCode: appliedPromo } : {}),
+          ...(appliedGift ? { giftCertificateCode: appliedGift } : {}),
         },
         idempotencyKey,
         locale,
@@ -343,12 +377,21 @@ export default function CheckoutForm({
       // 2) Куда вернуть покупателя после оплаты (mock demo-URL уважает returnUrl;
       //    боевой PayKeeper возвращает по настройкам ЛК). Страница успеха читает
       //    заказ по номеру+токену. Ссылка возврата — в текущей локали.
+      const successPath = `${localizedHref('/cart/success', locale)}?number=${encodeURIComponent(
+        order.number,
+      )}&token=${encodeURIComponent(order.accessToken)}`;
       const returnUrl =
-        typeof window !== 'undefined'
-          ? `${window.location.origin}${localizedHref('/cart/success', locale)}?number=${encodeURIComponent(
-              order.number,
-            )}&token=${encodeURIComponent(order.accessToken)}`
-          : undefined;
+        typeof window !== 'undefined' ? `${window.location.origin}${successPath}` : undefined;
+
+      // 2b) ПОЛНОЕ покрытие сертификатом: сервер создал заказ уже оплаченным
+      //     (paymentStatus='paid', provider manual) — платить нечего. Инициация
+      //     шлюза здесь вернула бы conflict «заказ уже оплачен» и покупатель
+      //     увидел бы ошибку по успешному заказу. Уходим прямо на страницу успеха.
+      if (order.paymentStatus === 'paid' || Number(order.grandTotal) === 0) {
+        clear();
+        window.location.href = successPath;
+        return;
+      }
 
       // 3) Инициировать оплату и получить invoice_url.
       const payment = await initPaykeeperPayment({
@@ -385,6 +428,12 @@ export default function CheckoutForm({
 
   const issuesBySku = new Map<number, string>();
   quote?.issues.forEach((iss) => issuesBySku.set(iss.index, iss.code));
+
+  // Итог применения сертификата считает СЕРВЕР (quote.gift); grandTotal в DTO
+  // уже уменьшен на списанную сумму. grandTotal = 0 → платить нечего.
+  const gift = quote?.gift ?? null;
+  const giftApplied = Boolean(gift?.applied);
+  const giftFullyCovered = Boolean(quote && giftApplied && Number(quote.grandTotal) === 0);
 
   return (
     <form className="sf-checkout" onSubmit={handleSubmit} noValidate>
@@ -614,6 +663,58 @@ export default function CheckoutForm({
               </div>
             )}
           </fieldset>
+
+          {/* --- Подарочный сертификат --- */}
+          <fieldset className="sf-checkout__section">
+            <legend className="sf-checkout__legend">{t.giftCode}</legend>
+            {appliedGift ? (
+              <div className="sf-promo-applied sf-promo-applied--stack">
+                <span>
+                  {t.giftCodeApplied} <strong>{appliedGift}</strong>
+                  {gift && !gift.applied && (
+                    <em className="sf-field__error">
+                      {' '}
+                      — {giftReasonLabel(t, gift.reason ?? '')}
+                    </em>
+                  )}
+                  {gift && gift.applied && (
+                    <>
+                      <span className="sf-field__hint">
+                        {fillTemplate(t.giftCodeCovered, { amount: fmt(gift.appliedAmount) })}
+                      </span>
+                      <span className="sf-field__hint">
+                        {fillTemplate(t.giftCodeRemaining, {
+                          amount: fmt(gift.balanceRemainingAfter),
+                        })}
+                      </span>
+                    </>
+                  )}
+                </span>
+                <button type="button" className="sf-btn-link" onClick={removeGift}>
+                  {t.giftCodeRemove}
+                </button>
+              </div>
+            ) : (
+              <div className="sf-promo-row">
+                <input
+                  className="sf-field__input"
+                  type="text"
+                  value={giftInput}
+                  onChange={(e) => setGiftInput(e.target.value)}
+                  placeholder={t.giftCodePlaceholder}
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  className="sf-btn-secondary"
+                  onClick={applyGift}
+                  disabled={giftInput.trim().length === 0}
+                >
+                  {t.giftCodeApply}
+                </button>
+              </div>
+            )}
+          </fieldset>
         </div>
 
         {/* ------------------------------- Правая колонка: итог -------------- */}
@@ -678,6 +779,9 @@ export default function CheckoutForm({
             </div>
           </div>
 
+          {giftFullyCovered && (
+            <div className="sf-checkout__hint">{t.giftCodeFullyCovered}</div>
+          )}
           {quoteLoading && (
             <div className="sf-checkout__hint">{t.recalculating}</div>
           )}
@@ -707,7 +811,7 @@ export default function CheckoutForm({
             className="sf-checkout__submit"
             disabled={!canSubmit}
           >
-            {submitting ? t.submitting : t.submit}
+            {submitting ? t.submitting : giftFullyCovered ? t.submitGiftCovered : t.submit}
           </button>
 
           <p className="sf-checkout__legal">{t.legal}</p>

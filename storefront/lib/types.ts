@@ -188,6 +188,12 @@ export interface DeliverySelectionInput {
 export interface CartQuoteRequest {
   items: CartLineInput[];
   promoCode?: string;
+  /**
+   * Код подарочного сертификата (giftCertificateCodeSchema). Стекается ПОВЕРХ
+   * промокода к остатку: сервер списывает min(остаток сертификата, нетто-товары
+   * после промо) — сумму считает только он (anti-tamper).
+   */
+  giftCertificateCode?: string;
   delivery?: DeliverySelectionInput;
 }
 
@@ -205,8 +211,32 @@ export interface CreateOrderRequest {
   delivery: DeliverySelectionInput;
   paymentMethod: CheckoutPaymentMethod;
   promoCode?: string;
+  /**
+   * Код подарочного сертификата. При создании заказа списывается атомарно в
+   * транзакции; сумму списания определяет сервер. Полное покрытие → заказ
+   * рождается уже оплаченным (paymentStatus='paid'), онлайн-шлюз не нужен.
+   */
+  giftCertificateCode?: string;
   comment?: string;
   idempotencyKey?: string;
+}
+
+/**
+ * Блок подарочного сертификата в ответе /cart/quote (GiftQuoteDto платформы).
+ * Номинал и суммарно потраченное НЕ раскрываются (бирер-инструмент) — витрина
+ * видит только факт применения, списанную сумму и остаток ПОСЛЕ заказа.
+ */
+export interface GiftQuoteDto {
+  /** Сертификат реально уменьшил сумму к оплате. */
+  applied: boolean;
+  /** Эхо переданного кода. */
+  code: string;
+  /** Списано сертификатом на этот заказ (NUMERIC-строка). */
+  appliedAmount: string;
+  /** Остаток сертификата ПОСЛЕ применения. */
+  balanceRemainingAfter: string;
+  /** Машинная причина отказа (not_found/expired/depleted/disabled/no_amount_due); null — применён. */
+  reason: string | null;
 }
 
 /** Позиция расчёта корзины (QuoteLineDto). */
@@ -235,7 +265,8 @@ export interface QuoteDto {
     discount: string;
     reason: string | null;
   };
-  gift: unknown | null;
+  /** Итог применения сертификата; null — код к корзине не применяли. */
+  gift: GiftQuoteDto | null;
   delivery: {
     free: boolean;
     freeThresholdMet: boolean;

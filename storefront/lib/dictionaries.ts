@@ -131,6 +131,17 @@ export interface Dictionary {
     promoRemove: string; // «Убрать»
     promoPlaceholder: string; // «Введите промокод»
     promoApply: string; // «Применить»
+    // --- Подарочный сертификат (код на чекауте) ---
+    giftCode: string; // «Подарочный сертификат» (легенда секции)
+    giftCodePlaceholder: string; // «Введите код сертификата»
+    giftCodeApply: string; // «Применить»
+    giftCodeRemove: string; // «Убрать»
+    giftCodeApplied: string; // «Применён:»
+    /** 🔴 Общий человекочитаемый текст отказа — фолбэк вместо сырого reason. */
+    giftCodeNotApplied: string;
+    giftCodeCovered: string; // шаблон «Списано с сертификата: {amount}»
+    giftCodeRemaining: string; // шаблон «Остаток на сертификате: {amount}»
+    giftCodeFullyCovered: string; // «Сертификат покрывает весь заказ — оплата не требуется.»
     // --- Итоги ---
     yourOrder: string; // «Ваш заказ»
     summaryItems: string; // «Товары»
@@ -146,6 +157,8 @@ export interface Dictionary {
     deliveryUnavailable: string; // «Не удалось рассчитать доставку — измените способ или адрес доставки.»
     unresolvableItems: string; // предупреждение о старых позициях корзины
     submit: string; // «Оплатить»
+    /** Кнопка, когда платить нечего (сертификат покрыл заказ полностью). */
+    submitGiftCovered: string; // «Оформить заказ»
     submitting: string; // «Переход к оплате…»
     legal: string; // легал-текст под кнопкой
     emptyCart: string; // «Ваша корзина пуста :(»
@@ -162,6 +175,12 @@ export interface Dictionary {
     promoReasonUsageLimit: string;
     promoReasonMinOrder: string;
     promoReasonPerCustomerLimit: string;
+    // --- Причины отказа сертификата (gift.reason из /cart/quote) ---
+    giftReasonNotFound: string;
+    giftReasonExpired: string;
+    giftReasonDepleted: string;
+    giftReasonDisabled: string;
+    giftReasonNoAmountDue: string;
     // --- Ошибки создания заказа (code из /orders) ---
     orderErrorOutOfStock: string;
     orderErrorInvalidItem: string;
@@ -201,9 +220,14 @@ export interface Dictionary {
   };
   notFound: {
     text: string; // «Страница не найдена.»
-    pageMetaTitle: string; // «Страница не найдена — carre» (fallback CMS)
-    productMetaTitle: string; // «Товар не найден — carre»
-    designerMetaTitle: string; // «Дизайнер не найден — carre»
+    /**
+     * <title> страниц-заглушек. 🔴 БЕЗ имени магазина: его один раз доклеит
+     * title.template корневого layout из настроек админки (см. lib/seo.ts).
+     * Зашитый здесь суффикс с именем магазина ломал мультитенантность и удваивался.
+     */
+    pageMetaTitle: string; // «Страница не найдена» (fallback CMS)
+    productMetaTitle: string; // «Товар не найден»
+    designerMetaTitle: string; // «Дизайнер не найден»
   };
 }
 
@@ -319,6 +343,15 @@ const ru: Dictionary = {
     promoRemove: 'Убрать',
     promoPlaceholder: 'Введите промокод',
     promoApply: 'Применить',
+    giftCode: 'Подарочный сертификат',
+    giftCodePlaceholder: 'Введите код сертификата',
+    giftCodeApply: 'Применить',
+    giftCodeRemove: 'Убрать',
+    giftCodeApplied: 'Применён:',
+    giftCodeNotApplied: 'Сертификат не применён.',
+    giftCodeCovered: 'Списано с сертификата: {amount}',
+    giftCodeRemaining: 'Остаток на сертификате: {amount}',
+    giftCodeFullyCovered: 'Сертификат покрывает весь заказ — оплата не требуется.',
     yourOrder: 'Ваш заказ',
     summaryItems: 'Товары',
     summaryDiscount: 'Скидка',
@@ -333,6 +366,7 @@ const ru: Dictionary = {
     unresolvableItems:
       'Некоторые товары добавлены в корзину в старой версии сайта и не могут быть оформлены. Пожалуйста, удалите их из корзины и добавьте заново со страницы товара.',
     submit: 'Оплатить',
+    submitGiftCovered: 'Оформить заказ',
     submitting: 'Переход к оплате…',
     legal:
       'Нажимая «Оплатить», вы соглашаетесь с условиями продажи. Оплата производится онлайн через защищённую платёжную страницу.',
@@ -348,6 +382,11 @@ const ru: Dictionary = {
     promoReasonUsageLimit: 'Лимит использований промокода исчерпан.',
     promoReasonMinOrder: 'Заказ не достигает минимальной суммы для промокода.',
     promoReasonPerCustomerLimit: 'Вы уже использовали этот промокод.',
+    giftReasonNotFound: 'Сертификат с таким кодом не найден.',
+    giftReasonExpired: 'Срок действия сертификата истёк.',
+    giftReasonDepleted: 'На сертификате не осталось средств.',
+    giftReasonDisabled: 'Сертификат отключён.',
+    giftReasonNoAmountDue: 'Сертификату нечего покрывать в этом заказе.',
     orderErrorOutOfStock:
       'Часть товаров закончилась, пока вы оформляли заказ. Обновите корзину.',
     orderErrorInvalidItem: 'Один из товаров стал недоступен. Уберите его из корзины.',
@@ -361,7 +400,7 @@ const ru: Dictionary = {
   },
   success: {
     title: 'Заказ оформлен',
-    metaTitle: 'Заказ оформлен — carre',
+    metaTitle: 'Заказ оформлен',
     noOrder: 'Не удалось определить заказ.',
     thanks: 'Спасибо! Ваш заказ №{number} принят.',
     emailNote:
@@ -385,9 +424,9 @@ const ru: Dictionary = {
   },
   notFound: {
     text: 'Страница не найдена.',
-    pageMetaTitle: 'Страница не найдена — carre',
-    productMetaTitle: 'Товар не найден — carre',
-    designerMetaTitle: 'Дизайнер не найден — carre',
+    pageMetaTitle: 'Страница не найдена',
+    productMetaTitle: 'Товар не найден',
+    designerMetaTitle: 'Дизайнер не найден',
   },
 };
 
@@ -503,6 +542,15 @@ const en: Dictionary = {
     promoRemove: 'Remove',
     promoPlaceholder: 'Enter promo code',
     promoApply: 'Apply',
+    giftCode: 'Gift certificate',
+    giftCodePlaceholder: 'Enter gift certificate code',
+    giftCodeApply: 'Apply',
+    giftCodeRemove: 'Remove',
+    giftCodeApplied: 'Applied:',
+    giftCodeNotApplied: 'The gift certificate has not been applied.',
+    giftCodeCovered: 'Paid with the gift certificate: {amount}',
+    giftCodeRemaining: 'Certificate balance left: {amount}',
+    giftCodeFullyCovered: 'The gift certificate covers the whole order — no payment required.',
     yourOrder: 'Your order',
     summaryItems: 'Items',
     summaryDiscount: 'Discount',
@@ -517,6 +565,7 @@ const en: Dictionary = {
     unresolvableItems:
       'Some items were added to the cart in an older version of the site and cannot be ordered. Please remove them from the cart and add them again from the product page.',
     submit: 'Pay',
+    submitGiftCovered: 'Place order',
     submitting: 'Redirecting to payment…',
     legal:
       'By clicking “Pay”, you agree to the terms of sale. Payment is made online via a secure payment page.',
@@ -532,6 +581,11 @@ const en: Dictionary = {
     promoReasonUsageLimit: 'The promo code usage limit has been reached.',
     promoReasonMinOrder: 'The order does not reach the minimum amount for this promo code.',
     promoReasonPerCustomerLimit: 'You have already used this promo code.',
+    giftReasonNotFound: 'No gift certificate found for this code.',
+    giftReasonExpired: 'The gift certificate has expired.',
+    giftReasonDepleted: 'The gift certificate has no funds left.',
+    giftReasonDisabled: 'The gift certificate has been disabled.',
+    giftReasonNoAmountDue: 'There is nothing for the gift certificate to cover in this order.',
     orderErrorOutOfStock:
       'Some items ran out while you were placing the order. Please refresh your cart.',
     orderErrorInvalidItem: 'One of the items became unavailable. Please remove it from the cart.',
@@ -545,7 +599,7 @@ const en: Dictionary = {
   },
   success: {
     title: 'Order placed',
-    metaTitle: 'Order placed — carre',
+    metaTitle: 'Order placed',
     noOrder: 'Could not identify the order.',
     thanks: 'Thank you! Your order #{number} has been received.',
     emailNote:
@@ -569,9 +623,9 @@ const en: Dictionary = {
   },
   notFound: {
     text: 'Page not found.',
-    pageMetaTitle: 'Page not found — carre',
-    productMetaTitle: 'Product not found — carre',
-    designerMetaTitle: 'Designer not found — carre',
+    pageMetaTitle: 'Page not found',
+    productMetaTitle: 'Product not found',
+    designerMetaTitle: 'Designer not found',
   },
 };
 
@@ -687,6 +741,16 @@ const fr: Dictionary = {
     promoRemove: 'Retirer',
     promoPlaceholder: 'Saisissez un code promo',
     promoApply: 'Appliquer',
+    giftCode: 'Carte cadeau',
+    giftCodePlaceholder: 'Saisissez le code de la carte cadeau',
+    giftCodeApply: 'Appliquer',
+    giftCodeRemove: 'Retirer',
+    giftCodeApplied: 'Appliquée :',
+    giftCodeNotApplied: 'La carte cadeau n’a pas été appliquée.',
+    giftCodeCovered: 'Déduit de la carte cadeau : {amount}',
+    giftCodeRemaining: 'Solde restant sur la carte cadeau : {amount}',
+    giftCodeFullyCovered:
+      'La carte cadeau couvre la totalité de la commande — aucun paiement n’est nécessaire.',
     yourOrder: 'Votre commande',
     summaryItems: 'Articles',
     summaryDiscount: 'Remise',
@@ -701,6 +765,7 @@ const fr: Dictionary = {
     unresolvableItems:
       'Certains articles ont été ajoutés au panier dans une ancienne version du site et ne peuvent pas être commandés. Veuillez les retirer du panier et les ajouter à nouveau depuis la page produit.',
     submit: 'Payer',
+    submitGiftCovered: 'Valider la commande',
     submitting: 'Redirection vers le paiement…',
     legal:
       'En cliquant sur « Payer », vous acceptez les conditions de vente. Le paiement s’effectue en ligne via une page de paiement sécurisée.',
@@ -716,6 +781,11 @@ const fr: Dictionary = {
     promoReasonUsageLimit: 'La limite d’utilisation du code promo est atteinte.',
     promoReasonMinOrder: 'La commande n’atteint pas le montant minimum pour ce code promo.',
     promoReasonPerCustomerLimit: 'Vous avez déjà utilisé ce code promo.',
+    giftReasonNotFound: 'Carte cadeau introuvable.',
+    giftReasonExpired: 'La carte cadeau a expiré.',
+    giftReasonDepleted: 'La carte cadeau n’a plus de solde.',
+    giftReasonDisabled: 'La carte cadeau a été désactivée.',
+    giftReasonNoAmountDue: 'Il n’y a rien à couvrir par la carte cadeau dans cette commande.',
     orderErrorOutOfStock:
       'Certains articles se sont épuisés pendant votre commande. Veuillez actualiser votre panier.',
     orderErrorInvalidItem: 'Un des articles est devenu indisponible. Retirez-le du panier.',
@@ -729,7 +799,7 @@ const fr: Dictionary = {
   },
   success: {
     title: 'Commande passée',
-    metaTitle: 'Commande passée — carre',
+    metaTitle: 'Commande passée',
     noOrder: 'Impossible d’identifier la commande.',
     thanks: 'Merci ! Votre commande n°{number} a bien été reçue.',
     emailNote:
@@ -753,9 +823,9 @@ const fr: Dictionary = {
   },
   notFound: {
     text: 'Page introuvable.',
-    pageMetaTitle: 'Page introuvable — carre',
-    productMetaTitle: 'Produit introuvable — carre',
-    designerMetaTitle: 'Créateur introuvable — carre',
+    pageMetaTitle: 'Page introuvable',
+    productMetaTitle: 'Produit introuvable',
+    designerMetaTitle: 'Créateur introuvable',
   },
 };
 

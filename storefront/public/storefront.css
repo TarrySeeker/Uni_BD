@@ -444,6 +444,9 @@
   gap: 12px;
   font-size: 15px;
 }
+/* Применённый сертификат: под кодом идут две строки (списано / остаток) —
+   кнопку «Убрать» держим у верхней строки, а не по центру блока. */
+.sf-promo-applied--stack { align-items: flex-start; }
 .sf-btn-secondary {
   border: 1px solid #000;
   background: #fff;
