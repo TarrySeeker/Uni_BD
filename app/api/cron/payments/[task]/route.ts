@@ -5,8 +5,13 @@
  *   POST|GET /api/cron/payments/<task>?key=<CRON_SECRET>
  *   либо заголовок X-Cron-Secret: <CRON_SECRET>
  *
- * <task> ∈ { reconcile-pending, reconcile-pending-paykeeper } — сверка статуса
- * оплаты по «зависшим» заказам соответствующего эквайера (tbank / paykeeper).
+ * <task> ∈ { reconcile-pending, reconcile-pending-paykeeper, reconcile-pending-alfabank }
+ * — сверка статуса оплаты по «зависшим» заказам соответствующего эквайера
+ * (tbank / paykeeper / alfabank). Инвариант: у КАЖДОГО платёжного адаптера с
+ * cron-воркером (lib/payments/<adapter>/cron.ts) должна быть своя задача здесь И
+ * строка в crontab cron-контейнера — иначе оплаты этого эквайера, не доехавшие
+ * колбэком, остаются «зависшими» навсегда (сторожат tests/payments/tbank/cron.test.ts
+ * и tests/build/cron-crontab-parity.guard.test.ts).
  *
  * Защита (как /api/cron/cdek):
  *   • cron-секрет не задан → 503 (роут выключен, не работаем открытым);
@@ -23,11 +28,16 @@ import { getCdekConfig } from '@/lib/cdek/config';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { runReconcilePending } from '@/lib/payments/tbank/cron';
 import { runReconcilePending as runReconcilePendingPaykeeper } from '@/lib/payments/paykeeper/cron';
+import { runReconcilePending as runReconcilePendingAlfabank } from '@/lib/payments/alfabank/cron';
 import { extractCronSecret, cronSecretMatches } from '@/lib/cron/secret';
 
 export const dynamic = 'force-dynamic';
 
-const TASKS = ['reconcile-pending', 'reconcile-pending-paykeeper'] as const;
+const TASKS = [
+  'reconcile-pending',
+  'reconcile-pending-paykeeper',
+  'reconcile-pending-alfabank',
+] as const;
 type CronTask = (typeof TASKS)[number];
 
 async function dispatch(task: CronTask): Promise<unknown> {
@@ -36,6 +46,8 @@ async function dispatch(task: CronTask): Promise<unknown> {
       return runReconcilePending();
     case 'reconcile-pending-paykeeper':
       return runReconcilePendingPaykeeper();
+    case 'reconcile-pending-alfabank':
+      return runReconcilePendingAlfabank();
   }
 }
 

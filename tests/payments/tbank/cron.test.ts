@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Тесты cron-сверки платежей Т-Банка (Фича #16, порт tests/cdek/cron*.test.ts).
@@ -8,6 +11,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     advisory-lock, устойчивость (исключение по одному заказу не валит прогон).
  * (б) Секрет-гейт роута /api/cron/payments/[task]: нет секрета → 503, неверный ключ →
  *     401, неизвестная задача → 404, верный ключ + модуль payments выключен → 200 skipped.
+ * (в) Диспетчеризация роута по эквайерам: задача каждого адаптера дёргает СВОЙ воркер,
+ *     и у каждого адаптера с lib/payments/<adapter>/cron.ts есть задача в TASKS. Без
+ *     этого воркер существует, но не вызывается — оплаты эквайера висят в pending.
  */
 
 import {
@@ -168,5 +174,108 @@ describe('cron route /api/cron/payments/[task] — защита секретом
     expect(body.ok).toBe(true);
     expect(body.skipped).toBe(true);
     expect(body.reason).toBe('module_disabled');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Диспетчеризация роута по эквайерам: у КАЖДОГО адаптера с cron-воркером должна
+// быть своя задача сверки. Пропущенная задача = «зависшие» оплаты этого эквайера
+// никогда не досверяются (деньги списаны, заказ остался pending).
+// ---------------------------------------------------------------------------
+
+describe('cron route /api/cron/payments/[task] — диспетчеризация по эквайерам', () => {
+  const ORIG = { ...process.env };
+  const SECRET = 's3cr3t';
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...ORIG };
+    process.env.CDEK_CRON_SECRET = SECRET;
+    vi.doMock('@/lib/config/settings', () => ({
+      isModuleEffectivelyEnabled: async () => true,
+    }));
+  });
+
+  afterEach(() => {
+    process.env = { ...ORIG };
+    vi.resetModules();
+    vi.doUnmock('@/lib/config/settings');
+    vi.doUnmock('@/lib/payments/tbank/cron');
+    vi.doUnmock('@/lib/payments/paykeeper/cron');
+    vi.doUnmock('@/lib/payments/alfabank/cron');
+  });
+
+  function emptyStats() {
+    return { checked: 0, advanced: 0, failed: 0, lockSkipped: false };
+  }
+
+  /** Мокает всех трёх воркеров и возвращает шпионы. */
+  function mockWorkers() {
+    const tbank = vi.fn(async () => emptyStats());
+    const paykeeper = vi.fn(async () => emptyStats());
+    const alfabank = vi.fn(async () => emptyStats());
+    vi.doMock('@/lib/payments/tbank/cron', () => ({ runReconcilePending: tbank }));
+    vi.doMock('@/lib/payments/paykeeper/cron', () => ({ runReconcilePending: paykeeper }));
+    vi.doMock('@/lib/payments/alfabank/cron', () => ({ runReconcilePending: alfabank }));
+    return { tbank, paykeeper, alfabank };
+  }
+
+  async function callPost(task: string): Promise<Response> {
+    const { POST } = await import('@/app/api/cron/payments/[task]/route');
+    const { NextRequest } = await import('next/server');
+    const req = new NextRequest(new URL(`http://localhost/api/cron/payments/${task}?key=${SECRET}`), {
+      method: 'POST',
+    });
+    return POST(req, { params: Promise.resolve({ task }) });
+  }
+
+  it('reconcile-pending → воркер Т-Банка (и только он)', async () => {
+    const w = mockWorkers();
+    const res = await callPost('reconcile-pending');
+    expect(res.status).toBe(200);
+    expect(w.tbank).toHaveBeenCalledTimes(1);
+    expect(w.paykeeper).not.toHaveBeenCalled();
+    expect(w.alfabank).not.toHaveBeenCalled();
+  });
+
+  it('reconcile-pending-paykeeper → воркер PayKeeper (и только он)', async () => {
+    const w = mockWorkers();
+    const res = await callPost('reconcile-pending-paykeeper');
+    expect(res.status).toBe(200);
+    expect(w.paykeeper).toHaveBeenCalledTimes(1);
+    expect(w.tbank).not.toHaveBeenCalled();
+    expect(w.alfabank).not.toHaveBeenCalled();
+  });
+
+  it('reconcile-pending-alfabank → воркер Альфа-Банка (и только он)', async () => {
+    const w = mockWorkers();
+    const res = await callPost('reconcile-pending-alfabank');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; task: string };
+    expect(body.ok).toBe(true);
+    expect(body.task).toBe('reconcile-pending-alfabank');
+    expect(w.alfabank).toHaveBeenCalledTimes(1);
+    expect(w.tbank).not.toHaveBeenCalled();
+    expect(w.paykeeper).not.toHaveBeenCalled();
+  });
+
+  it('у каждого адаптера с cron-воркером есть задача сверки в роуте', () => {
+    const ROOT = process.cwd();
+    // Адаптеры с файлом cron.ts (= есть что сверять по расписанию).
+    const withWorker = readdirSync(join(ROOT, 'lib/payments'), { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .filter((name) => existsSync(join(ROOT, 'lib/payments', name, 'cron.ts')));
+    expect(withWorker.length).toBeGreaterThan(1);
+
+    const route = readFileSync(join(ROOT, 'app/api/cron/payments/[task]/route.ts'), 'utf8');
+    const tasks = /const TASKS = \[([^\]]+)\]/.exec(route)?.[1] ?? '';
+    const declared = [...tasks.matchAll(/'([^']+)'/g)].map((m) => m[1]!);
+
+    for (const adapter of withWorker) {
+      // tbank — исторически базовая задача без суффикса.
+      const expected = adapter === 'tbank' ? 'reconcile-pending' : `reconcile-pending-${adapter}`;
+      expect(declared, `нет задачи сверки для адаптера ${adapter}`).toContain(expected);
+    }
   });
 });
