@@ -67,18 +67,23 @@ export default async function HomePage({
     getNewProducts(12, locale),
   ]);
 
-  const hero = settings?.home.hero;
-  const tiles = settings?.home.tiles;
-  const about = settings?.home.about;
-  const video = settings?.home.video;
-  const designers = settings?.home.designers;
-  const slider = settings?.home.slider;
-  const corpCert = settings?.home.corpCert;
-  const looks = settings?.home.looks;
+  const hero = settings?.home?.hero;
+  const tiles = settings?.home?.tiles;
+  const about = settings?.home?.about;
+  const video = settings?.home?.video;
+  const designers = settings?.home?.designers;
+  const slider = settings?.home?.slider;
+  const corpCert = settings?.home?.corpCert;
+  const looks = settings?.home?.looks;
 
   // Рендерим только безопасные href (defense-in-depth поверх схемной валидации).
   const sliderSlides = (slider?.slides ?? []).filter((s) => isSafeHref(s.href));
   const corpCertTiles = (corpCert?.tiles ?? []).filter((t) => isSafeHref(t.href));
+  // Списки внутри секций — тоже через `?? []`: секция может приехать без своего
+  // массива (version skew витрины и админки), а падение здесь = 500 главной.
+  const tileItems = tiles?.items ?? [];
+  const aboutParagraphs = about?.paragraphs ?? [];
+  const designerItems = designers?.items ?? [];
 
   // Href из настроек магазина оставляем как есть (управляемый контент, может быть
   // внешним/абсолютным); фиксированные внутренние ссылки локализуем через href().
@@ -105,9 +110,9 @@ export default async function HomePage({
       )}
 
       {/* 2. Плитки категорий (.dop-links--adaptive) — settings.home.tiles */}
-      {tiles?.enabled && tiles.items.length > 0 && (
+      {tiles?.enabled && tileItems.length > 0 && (
         <div className="dop-links dop-links--adaptive ">
-          {tiles.items.map((t) => (
+          {tileItems.map((t) => (
             <div className="dop-links__box" key={t.href}>
               <a href={t.href}>
                 <img alt="" className="lazy" src={t.imageUrl} />
@@ -125,7 +130,7 @@ export default async function HomePage({
             <h1>{about.title}</h1>
           </div>
           <div className="mainpage--about_us-info">
-            {about.paragraphs.map((p, i) => (
+            {aboutParagraphs.map((p, i) => (
               <div className="mainpage--about_us-info_text" key={i}>
                 {p}
               </div>
@@ -168,11 +173,11 @@ export default async function HomePage({
       )}
 
       {/* 6. Витрина дизайнеров (.mainpage--designers) — settings.home.designers */}
-      {designers?.enabled && designers.items.length > 0 && (
+      {designers?.enabled && designerItems.length > 0 && (
         <div className="mainpage--designers">
           <div className="mainpage--designers_head">{designers.title}</div>
           <div className="mainpage--designers_list">
-            {designers.items.map((d) => (
+            {designerItems.map((d) => (
               <div className="mainpage--designers_item" key={d.href}>
                 <a href={d.href}>{d.name}</a>
                 <div className="mainpage--designers_images">

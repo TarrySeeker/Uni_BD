@@ -43,7 +43,7 @@ export async function generateMetadata({
   return {
     // meta.title от Storefront API — уже с применённым titleTemplate (buildSeoMeta),
     // поэтому absolute: иначе шаблон layout наложится вторым слоем.
-    title: metaTitle(product.meta.title, product.name),
+    title: metaTitle(product.meta.title, product.name, settings),
     description: product.meta.description ?? undefined,
     alternates: alternatesFor(`/product/${slug}`, locale, enabledLocales),
     robots: product.meta.noindex ? { index: false, follow: false } : undefined,

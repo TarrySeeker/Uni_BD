@@ -21,6 +21,7 @@ import {
 } from '@/lib/tree';
 import { toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
+import { ownTitle } from '@/lib/seo';
 import CatalogView from '../CatalogView';
 
 export const dynamic = 'force-dynamic';
@@ -58,7 +59,9 @@ export async function generateMetadata({
   const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
   // canonical — ВСЕГДА канонический путь категории, а не сырой путь запроса.
   return {
-    title: cat ? cat.name : dict.catalog.title,
+    // Имя категории строкой (шаблон из настроек применит Next), но пустым <title>
+    // не бывает: безымянная категория уступает место заголовку раздела.
+    title: ownTitle(cat?.name, dict.catalog.title),
     alternates: alternatesFor(route.canonicalPath, locale, enabledLocales),
   };
 }

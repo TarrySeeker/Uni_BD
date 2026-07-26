@@ -40,14 +40,14 @@ export async function generateMetadata({
     // meta.title/meta.ogTitle от Storefront API — уже с применённым titleTemplate
     // (buildSeoMeta), поэтому absolute: иначе шаблон layout наложится вторым слоем.
     // og:title Next резолвит тем же шаблоном (resolve-opengraph), правило то же.
-    title: metaTitle(meta.title, page.title),
+    title: metaTitle(meta.title, page.title, settings),
     description: meta.description ?? undefined,
     alternates: meta.canonical
       ? { canonical: meta.canonical }
       : alternatesFor(`/${slug}`, locale, enabledLocales),
     robots: meta.noindex ? { index: false, follow: false } : undefined,
     openGraph: {
-      title: metaTitle(meta.ogTitle ?? meta.title, page.title),
+      title: metaTitle(meta.ogTitle ?? meta.title, page.title, settings),
       description: meta.ogDescription ?? meta.description ?? undefined,
       images: meta.ogImageUrl ? [{ url: meta.ogImageUrl }] : undefined,
     },
@@ -68,8 +68,8 @@ export default async function CmsPage({
   ]);
   if (!page) notFound();
 
-  const currencyCode = settings?.currency.code ?? 'RUB';
-  const currencySymbol = settings?.currency.symbol ?? null;
+  const currencyCode = settings?.currency?.code ?? 'RUB';
+  const currencySymbol = settings?.currency?.symbol ?? null;
 
   const crumbs: Crumb[] = [{ label: page.title }];
 

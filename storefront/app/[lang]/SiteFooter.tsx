@@ -30,10 +30,10 @@ export default function SiteFooter({
   locale,
   dict,
 }: Props) {
-  const socials = settings?.contacts.socials ?? [];
+  const socials = settings?.contacts?.socials ?? [];
   const href = (path: string) => localizedHref(path, locale);
   // Название магазина — из брендинга админки (мультитенантно), не хардкод.
-  const shopName = settings?.branding.shopName ?? '';
+  const shopName = settings?.branding?.shopName ?? '';
   const f = dict.footer;
   return (
     <footer className="footer">

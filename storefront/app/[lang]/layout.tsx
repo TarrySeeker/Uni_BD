@@ -18,7 +18,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCategories, getSettings } from '@/lib/api';
 import { rootCategories, topLevelCategories } from '@/lib/tree';
-import { siteTitle } from '@/lib/seo';
+import { rootTitle, siteDescription } from '@/lib/seo';
 import { CurrencyProvider } from '@/lib/currency';
 import {
   HTML_LANG,
@@ -35,6 +35,11 @@ import SiteFooter from './SiteFooter';
  * Заголовок/описание — из админки (settings.seo), как на проде (thread.seo_title).
  * `title.template` применяется к дочерним страницам, задающим свой title; `default`
  * — фолбэк для страниц без него.
+ *
+ * 🔴 Настройки читаем ТОЛЬКО через аксессоры lib/seo: `generateMetadata` исполняется
+ * на КАЖДОЙ странице, и любое исключение здесь = 500 всего сайта. Прежнее чтение
+ * titleTemplate одним уровнем optional chaining падало, если /settings приезжал без
+ * секции `seo` (version skew витрины и админки — это разные образы).
  */
 export async function generateMetadata({
   params,
@@ -43,15 +48,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const locale = toLocale((await params).lang);
   const settings = await getSettings(locale);
-  const name = siteTitle(settings);
-  const template = settings?.seo.titleTemplate ?? '%s';
 
   return {
-    title: {
-      default: name,
-      template: template.includes('%s') ? template : '%s',
-    },
-    description: settings?.seo.defaultDescription ?? undefined,
+    title: rootTitle(settings),
+    description: siteDescription(settings),
     icons: {
       icon: [
         { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },

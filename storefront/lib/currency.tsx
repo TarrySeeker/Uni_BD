@@ -36,8 +36,8 @@ function isBrowser(): boolean {
 
 /** Базовая валюта витрины (₽) из настроек магазина. rate=1 (сама с собой). */
 function baseCurrency(settings: PublicSettingsDto | null): DisplayCurrency {
-  const code = settings?.currency.code ?? 'RUB';
-  const symbol = settings?.currency.symbol ?? (code === 'RUB' ? '₽' : code);
+  const code = settings?.currency?.code ?? 'RUB';
+  const symbol = settings?.currency?.symbol ?? (code === 'RUB' ? '₽' : code);
   // Базовая — рубли: показываем целыми (0 знаков), как исторический рублёвый формат.
   return { code, symbol, rate: 1, fractionDigits: 0 };
 }
@@ -45,7 +45,7 @@ function baseCurrency(settings: PublicSettingsDto | null): DisplayCurrency {
 /** Все валюты для переключателя: базовая + доп.валюты отображения из настроек. */
 export function availableCurrencies(settings: PublicSettingsDto | null): DisplayCurrency[] {
   const base = baseCurrency(settings);
-  const display = (settings?.currency.displayCurrencies ?? []).map((d) => ({
+  const display = (settings?.currency?.displayCurrencies ?? []).map((d) => ({
     code: d.code,
     symbol: d.symbol,
     rate: d.rate,

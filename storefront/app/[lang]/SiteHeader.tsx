@@ -130,8 +130,8 @@ export default function SiteHeader({
     }
   };
 
-  const email = settings?.contacts.email ?? settings?.branding.supportEmail ?? '';
-  const phone = settings?.contacts.phone ?? settings?.branding.supportPhone ?? '';
+  const email = settings?.contacts?.email ?? settings?.branding?.supportEmail ?? '';
+  const phone = settings?.contacts?.phone ?? settings?.branding?.supportPhone ?? '';
   // Знак валюты в шапке = выбранная валюта отображения (до маунта — базовая ₽).
   const sign = selected.symbol;
   // Переключатель валют показываем, только если есть доп.валюты (иначе — статичный ₽).
@@ -146,7 +146,7 @@ export default function SiteHeader({
         </div>
         <div className="page-head-logo">
           <a href={href('/')}>
-            <img src="/images/logo.svg" alt={settings?.branding.shopName ?? 'carre'} />
+            <img src="/images/logo.svg" alt={settings?.branding?.shopName ?? dict.common.home} />
           </a>
         </div>
         <div className="page-head-settings">

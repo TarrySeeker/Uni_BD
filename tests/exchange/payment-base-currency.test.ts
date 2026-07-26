@@ -79,7 +79,10 @@ describe('чекаут витрины считает и показывает с�
   );
 
   it('валюта чекаута = базовая валюта магазина из настроек', () => {
-    expect(page).toContain('settings?.currency.code');
+    // Опциональная цепочка на КАЖДОМ звене: ответ /settings без ключа `currency`
+    // иначе бросает TypeError в серверном рендере (тот же класс дефекта, что
+    // латентный 500 из-за `settings?.seo.titleTemplate`).
+    expect(page).toContain('settings?.currency?.code');
     expect(page).toContain('currencyCode={currencyCode}');
   });
 

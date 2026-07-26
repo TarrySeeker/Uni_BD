@@ -36,7 +36,7 @@ export async function generateMetadata({
   return {
     // meta.title от Storefront API — уже с применённым titleTemplate (buildSeoMeta),
     // поэтому absolute. Сырые seoTitle/name — фолбэк, им шаблон Next ещё нужен.
-    title: metaTitle(designer.meta.title, designer.seoTitle ?? designer.name),
+    title: metaTitle(designer.meta.title, designer.seoTitle ?? designer.name, settings),
     description:
       designer.meta.description ?? designer.seoDescription ?? undefined,
     alternates: alternatesFor(`/designers/${slug}`, locale, enabledLocales),

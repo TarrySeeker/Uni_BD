@@ -39,8 +39,8 @@ export default async function OrderPage({
   const dict = getDictionary(locale);
   const settings = await getSettings(locale);
 
-  const currencyCode = settings?.currency.code ?? 'RUB';
-  const currencySymbol = settings?.currency.symbol ?? null;
+  const currencyCode = settings?.currency?.code ?? 'RUB';
+  const currencySymbol = settings?.currency?.symbol ?? null;
   const zones = settings?.delivery?.zones ?? [];
 
   return (
