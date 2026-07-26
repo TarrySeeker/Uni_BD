@@ -106,7 +106,7 @@ async function CoverageTable({
         <tbody>
           {matrix.map((row) => (
             <tr key={row.entity} className="border-b border-gray-100">
-              <td className="py-2 pr-4 text-gray-800">{row.label}</td>
+              <td className="py-2 pr-4 text-gray-800">{t(row.labelKey)}</td>
               <td className="py-2 pr-4 text-gray-500">{row.total}</td>
               {row.cells.map((cell) => (
                 <td key={cell.locale} className="py-2 pr-4">

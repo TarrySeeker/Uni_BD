@@ -1,3 +1,4 @@
+import type { MessageRef } from '@/lib/i18n/types';
 import {
   GIFT_SETTINGS_DEFAULTS,
   resolveGiftSettings,
@@ -23,9 +24,13 @@ export interface GiftFormState {
   allowIssueOnGiftPaidOrder: boolean;
 }
 
+/**
+ * Отказ несёт ССЫЛКУ на сообщение каталога, а не готовый текст: модуль чистый и
+ * не знает локали оператора — переводит компонент (`t(error.key, error.params)`).
+ */
 export type BuildResult =
   | { ok: true; value: { gift: ResolvedGiftSettings } }
-  | { ok: false; error: string };
+  | { ok: false; error: MessageRef };
 
 /** Сохранённое значение (оверрайд) → начальное состояние полей формы. */
 export function giftFormStateFrom(saved: unknown): GiftFormState {
@@ -56,11 +61,11 @@ export function buildGiftPayload(state: GiftFormState): BuildResult {
   if (raw !== '') {
     // Только целое без экспонент/плюсов: '1e3'/'1.5'/'-5' — не срок в днях.
     if (!/^\d+$/.test(raw)) {
-      return { ok: false, error: 'Срок действия — целое число дней (0 или пусто — бессрочно).' };
+      return { ok: false, error: { key: 'settings.giftGiftSettingsForm.errors.validDaysNotInteger' } };
     }
     validDays = Number(raw);
     if (!Number.isSafeInteger(validDays)) {
-      return { ok: false, error: 'Срок действия слишком большой — укажите разумное число дней.' };
+      return { ok: false, error: { key: 'settings.giftGiftSettingsForm.errors.validDaysTooLarge' } };
     }
   }
 

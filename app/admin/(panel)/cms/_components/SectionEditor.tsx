@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { CMS_SECTION_TYPES, type CmsSection, type CmsSectionType } from '@/lib/cms/types';
-import { SECTION_TYPE_LABELS } from '@/lib/cms/section-form';
+import { sectionTypeLabel } from '@/lib/cms/section-form';
 import type { ActionResult } from '@/lib/server/action';
 
 import { SectionForm } from './SectionForm';
@@ -190,9 +190,9 @@ export function SectionEditor({
               className="rounded border border-gray-300 px-3 py-1.5 text-sm"
               aria-label={t('cms.sectionEditor.typeAriaLabel')}
             >
-              {CMS_SECTION_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {SECTION_TYPE_LABELS[t]}
+              {CMS_SECTION_TYPES.map((sectionType) => (
+                <option key={sectionType} value={sectionType}>
+                  {sectionTypeLabel(sectionType, t)}
                 </option>
               ))}
             </select>
@@ -219,7 +219,7 @@ export function SectionEditor({
       {adding ? (
         <div className="mt-4 rounded-lg border border-gray-300 bg-gray-50 p-4">
           <p className="mb-3 text-sm font-medium text-gray-700">
-            {t('cms.sectionEditor.newSection', { type: SECTION_TYPE_LABELS[newType] })}
+            {t('cms.sectionEditor.newSection', { type: sectionTypeLabel(newType, t) })}
           </p>
           <SectionForm
             type={newType}
@@ -262,7 +262,7 @@ export function SectionEditor({
                   ⠿
                 </span>
                 <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                  {SECTION_TYPE_LABELS[section.type]}
+                  {sectionTypeLabel(section.type, t)}
                 </span>
                 <code className="text-xs text-gray-500">{section.sectionKey}</code>
                 {!section.enabled ? (

@@ -24,17 +24,22 @@ export async function guardCustomers(
   return { ok: true, user };
 }
 
-/** Русская подпись статуса аккаунта покупателя. */
-export function customerStatusLabel(status: string): string {
+/**
+ * Ключ подписи статуса аккаунта покупателя в каталоге интерфейса
+ * (`customers.status.*`). Возвращается КЛЮЧ, а не текст: подпись обязана следовать
+ * локали оператора, а этот модуль о локали ничего не знает.
+ *
+ * Незнакомый статус → null: страница покажет сам код (как и раньше), но не
+ * притворится, что перевод есть.
+ */
+export function customerStatusLabelKey(status: string): string | null {
   switch (status) {
     case 'guest':
-      return 'Гость';
     case 'active':
-      return 'Аккаунт';
     case 'disabled':
-      return 'Заблокирован';
+      return `customers.status.${status}`;
     default:
-      return status;
+      return null;
   }
 }
 

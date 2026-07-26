@@ -54,8 +54,8 @@ export function GiftCertificateForm({
 
   /** Переводимые поля сертификата для панели переводов (совпадает с GIFT_TR_FIELDS). */
   const GIFT_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-    { key: 'description', label: t('fields.description'), kind: 'textarea' },
-    { key: 'terms', label: t('giftCertificates.giftCertificateForm.termsLabel'), kind: 'textarea' },
+    { key: 'description', labelKey: 'fields.description', kind: 'textarea' },
+    { key: 'terms', labelKey: 'giftCertificates.giftCertificateForm.termsLabel', kind: 'textarea' },
   ];
 
   const [error, setError] = useState<Fail | null>(null);

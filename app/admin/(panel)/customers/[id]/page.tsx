@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { Forbidden } from '../../_components/Forbidden';
 import { PageHeader } from '../../_components/PageHeader';
-import { guardCustomers, customerStatusLabel, customerStatusBadgeClass } from '../_components/guard';
+import { guardCustomers, customerStatusLabelKey, customerStatusBadgeClass } from '../_components/guard';
 import { getCustomerById, listCustomerOrders } from '@/lib/customer-auth/repository';
 import { orderStatusLabel, paymentStatusLabel } from '@/lib/orders/labels';
 import { formatDateTime } from '@/lib/admin/order-format';
@@ -27,6 +27,12 @@ export default async function CustomerDetailPage({
   }
 
   const t = await getTranslations();
+
+  // Подпись статуса — ключом каталога; незнакомый код показываем как есть.
+  const statusLabel = (status: string): string => {
+    const key = customerStatusLabelKey(status);
+    return key ? t(key) : status;
+  };
 
   const { id } = await params;
   const customer = await getCustomerById(id);
@@ -61,7 +67,7 @@ export default async function CustomerDetailPage({
             <span
               className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${customerStatusBadgeClass(customer.status)}`}
             >
-              {customerStatusLabel(customer.status)}
+              {statusLabel(customer.status)}
             </span>
           </dd>
           <dt className="text-gray-500">{t('customers.detailPage.emailVerified')}</dt>

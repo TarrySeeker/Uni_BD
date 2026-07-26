@@ -63,9 +63,11 @@ describe('CheckoutForm — поле кода подарочного сертиф
     expect(src).toContain('t.giftCode');
     expect(src).toContain('t.giftCodeApply');
     expect(src).toContain('t.giftCodeRemove');
-    // Значение поля связано со состоянием (контролируемый input).
+    // Значение поля связано со состоянием (контролируемый input); обработчик
+    // ввода может быть как прямым сеттером, так и функцией-обёрткой.
     expect(src).toMatch(/value=\{giftInput\}/);
-    expect(src).toMatch(/setGiftInput\(e\.target\.value\)/);
+    expect(src).toMatch(/(setGiftInput|changeGiftInput)\(e\.target\.value\)/);
+    expect(src).toMatch(/function changeGiftInput|setGiftInput\(/);
   });
 
   it('🔴 код уходит в /cart/quote', () => {
@@ -136,6 +138,125 @@ describe('🔴 CheckoutForm — сырой машинный код не ренд
     const body = src.slice(at, src.indexOf('\n}', at));
     expect(body).not.toMatch(/\?\?\s*code\s*;/);
     expect(body).toMatch(/\?\?\s*t\./);
+  });
+});
+
+/**
+ * Тело <fieldset> секции подарочного сертификата (по легенде {t.giftCode}).
+ * Нужен именно этот блок: проверяем, ЧТО показано в ветке принятого кода, а что —
+ * в ветке отклонённого.
+ */
+function giftFieldset(src: string): string {
+  const legend = src.indexOf('{t.giftCode}');
+  expect(legend, 'нет секции сертификата').toBeGreaterThan(-1);
+  const start = src.lastIndexOf('<fieldset', legend);
+  const end = src.indexOf('</fieldset>', legend);
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+  return src.slice(start, end);
+}
+
+describe('🔴 CheckoutForm — отклонённый код НЕ выглядит применённым', () => {
+  const src = read(FORM);
+  const block = giftFieldset(src);
+  const split = block.indexOf(') : (');
+  const accepted = split > -1 ? block.slice(0, split) : block;
+  const rejected = split > -1 ? block.slice(split) : '';
+
+  it('секция разделена на ветки «код принят» / «код не принят»', () => {
+    expect(split, 'нет ветвления по факту применения').toBeGreaterThan(-1);
+    // Ветка «применён» условлена ФАКТОМ применения, а не наличием введённого кода.
+    expect(accepted).toMatch(/\{\s*(giftAccepted|giftApplied)\s*\?/);
+    expect(accepted).not.toMatch(/\{\s*appliedGift\s*\?/);
+  });
+
+  it('«Применён:» рендерится ТОЛЬКО в ветке принятого кода', () => {
+    expect(accepted).toContain('t.giftCodeApplied');
+    expect(rejected, 'самоотрицающая фраза «Применён: … — не найден»').not.toContain(
+      't.giftCodeApplied',
+    );
+    // Причина отказа НЕ имеет права стоять рядом с «Применён:» — это и была
+    // самоотрицающая фраза «Применён: ABCD-1234 — Сертификат … не найден.».
+    expect(accepted, 'причина отказа в ветке «применён»').not.toContain('giftReasonLabel');
+  });
+
+  it('при отказе НЕ рисуются «Списано …» / «Остаток …» с нулями', () => {
+    expect(accepted).toContain('t.giftCodeCovered');
+    expect(accepted).toContain('t.giftCodeRemaining');
+    for (const leak of ['t.giftCodeCovered', 't.giftCodeRemaining', 'appliedAmount', 'balanceRemainingAfter']) {
+      expect(rejected, `${leak} в ветке отказа`).not.toContain(leak);
+    }
+  });
+
+  it('при отказе поле ввода доступно, значение не потеряно, причина человекочитаема', () => {
+    expect(rejected).toMatch(/value=\{giftInput\}/);
+    expect(rejected).toContain('giftReasonLabel(');
+    // Явная подсказка «исправьте код и попробуйте снова» — из словаря.
+    expect(rejected).toContain('t.giftCodeRetry');
+  });
+
+  it('признак отказа опирается на applied=false И на эхо ИМЕННО этого кода', () => {
+    const at = src.indexOf('const giftRejected');
+    expect(at, 'нет флага giftRejected').toBeGreaterThan(-1);
+    const decl = src.slice(at, src.indexOf(';', at));
+    expect(decl).toMatch(/!gift\.applied/);
+    expect(decl).toMatch(/gift\.code === appliedGift|appliedGift === gift\.code/);
+  });
+});
+
+describe('🔴 CheckoutForm — код сертификата нормализуется к хранимому виду', () => {
+  const src = read(FORM);
+
+  it('форма использует normalizeGiftCode, а не сырой trim()', () => {
+    expect(src).toMatch(/normalizeGiftCode/);
+    expect(src).toMatch(/from '@\/lib\/gift-code'/);
+    const at = src.indexOf('function applyGift');
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, src.indexOf('\n  }', at));
+    expect(body).toContain('normalizeGiftCode');
+    expect(body, 'сырой trim() отправлял код с чужими разделителями').not.toMatch(
+      /giftInput\.trim\(\)/,
+    );
+  });
+
+  it('кнопка «Применить» включена по нормализованному значению', () => {
+    // disabled по сырой строке пропускал бы ввод из одних пробелов/тире.
+    expect(src).not.toMatch(/disabled=\{giftInput\.trim\(\)\.length === 0\}/);
+    expect(src).toMatch(/normalizedGift/);
+  });
+});
+
+describe('🔴 CheckoutForm — легал-текст соответствует кнопке', () => {
+  const src = read(FORM);
+
+  it('при полном покрытии сертификатом под кнопкой другой легал-текст', () => {
+    expect(src).toMatch(/giftFullyCovered \? t\.legalGiftCovered : t\.legal/);
+  });
+});
+
+describe('🔴 CheckoutForm — сырое серверное сообщение не доезжает до покупателя', () => {
+  const src = read(FORM);
+
+  it('humanError не возвращает err.message ни в одной ветке', () => {
+    const at = src.indexOf('function humanError');
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, src.indexOf('\n}', at));
+    expect(body, 'русский текст сервера уехал бы французу').not.toMatch(/err\.message/);
+    expect(body).toContain('t.orderErrorGeneric');
+    // Техническая информация — только в лог.
+    expect(body).toMatch(/console\.(error|warn)/);
+  });
+
+  it('во ВСЁМ файле нет ни одной утечки .message / сырого кода в UI', () => {
+    expect(src).not.toMatch(/err\.message/);
+    expect(src).not.toMatch(/\?\?\s*(code|reason|err)\b/);
+  });
+
+  it('сетевой сбой и rate-limit получили свои человекочитаемые тексты', () => {
+    const at = src.indexOf('function humanError');
+    const body = src.slice(at, src.indexOf('\n}', at));
+    expect(body).toContain('network: t.orderErrorNetwork');
+    expect(body).toContain('rate_limited: t.orderErrorRateLimited');
   });
 });
 
@@ -220,6 +341,56 @@ describe('словари витрины — блок сертификата во
       expect(values.length, key).toBe(3);
       for (const v of values) expect(v, `${key}: ${v}`).toContain('{amount}');
     }
+  });
+
+  it('🔴 новые ключи (отказ/легал/ошибки) есть во всех трёх локалях и различны', () => {
+    const newKeys = [
+      'giftCodeRetry',
+      'legalGiftCovered',
+      'orderErrorNetwork',
+      'orderErrorRateLimited',
+    ];
+    for (const key of newKeys) {
+      expect(dict.split(`${key}:`).length - 1, `${key}: интерфейс + ru/en/fr`).toBe(4);
+      const values = [...dict.matchAll(new RegExp(`${key}:\\s*'([^']+)'`, 'g'))].map((m) => m[1]!);
+      expect(values.length, `${key}: три значения`).toBe(3);
+      expect(new Set(values).size, `${key}: локали не должны совпадать`).toBe(3);
+      expect(values[0], `${key}: ru`).toMatch(/[А-Яа-яЁё]/);
+      expect(values[1], `${key}: en`).not.toMatch(/[А-Яа-яЁё]/);
+      expect(values[2], `${key}: fr`).not.toMatch(/[А-Яа-яЁё]/);
+    }
+  });
+
+  it('🔴 легал-текст цитирует РЕАЛЬНУЮ подпись кнопки в каждой локали', () => {
+    const values = (key: string): string[] =>
+      [...dict.matchAll(new RegExp(`${key}:\\s*'([^']+)'`, 'g'))].map((m) => m[1]!);
+    const pairs: [string, string][] = [
+      ['legal', 'submit'],
+      ['legalGiftCovered', 'submitGiftCovered'],
+    ];
+    for (const [legalKey, buttonKey] of pairs) {
+      const legals = values(legalKey);
+      const buttons = values(buttonKey);
+      expect(legals.length, legalKey).toBe(3);
+      expect(buttons.length, buttonKey).toBe(3);
+      for (let i = 0; i < 3; i++) {
+        expect(legals[i], `${legalKey}[${i}] должен цитировать «${buttons[i]}»`).toContain(
+          buttons[i]!,
+        );
+      }
+    }
+  });
+
+  it('🔴 легал полного покрытия не обещает онлайн-оплату', () => {
+    const covered = [...dict.matchAll(/legalGiftCovered:\s*'([^']+)'/g)].map((m) => m[1]!);
+    expect(covered.length).toBe(3);
+    for (const v of covered) {
+      expect(v, `обещание оплаты в «${v}»`).not.toMatch(
+        /Оплата производится онлайн|Payment is made online|paiement s’effectue en ligne/,
+      );
+    }
+    // ru-версия прямо говорит, что платить не нужно.
+    expect(covered[0]).toMatch(/не требуется|не нужн/i);
   });
 
   it('🔴 в добавленных ключах только строки (функции ломают prerender)', () => {

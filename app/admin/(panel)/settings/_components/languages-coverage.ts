@@ -15,7 +15,8 @@ import type { Locale } from '@/lib/i18n/types';
 /** Вход: посчитанное покрытие по одной сущности. */
 export interface CoverageEntry {
   entity: string;
-  label: string;
+  /** Ключ подписи сущности в messages/* (резолвится на render-сайте через t). */
+  labelKey: string;
   coverage: CoverageResult;
 }
 
@@ -37,7 +38,7 @@ export interface CoverageCell {
 /** Строка матрицы: одна сущность. */
 export interface CoverageRow {
   entity: string;
-  label: string;
+  labelKey: string;
   total: number;
   cells: CoverageCell[];
 }
@@ -68,7 +69,7 @@ export function buildCoverageMatrix(
 ): CoverageRow[] {
   return entries.map((entry) => ({
     entity: entry.entity,
-    label: entry.label,
+    labelKey: entry.labelKey,
     total: entry.coverage.total,
     cells: locales.map((locale) => {
       const localeCoverage = entry.coverage.locales[locale];

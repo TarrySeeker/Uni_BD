@@ -48,7 +48,7 @@ export function ReviewReplyForm({
   const REPLY_FIELD_DEFS: readonly TranslatableFieldDef[] = [
     {
       key: 'reply',
-      label: t('reviews.reviewReplyForm.replyFieldLabel'),
+      labelKey: 'reviews.reviewReplyForm.replyFieldLabel',
       kind: 'textarea',
     },
   ];

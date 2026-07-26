@@ -8,7 +8,9 @@ import {
   type TriState,
 } from '@/app/admin/(panel)/settings/_components/modules-form-state';
 import { ALL_MODULES, type ModuleName } from '@/lib/config/modules';
+import { MODULE_LABEL_KEYS } from '@/lib/config/module-labels';
 import type { ModuleOverrides } from '@/lib/settings/schemas';
+import ruMessages from '@/messages/ru.json';
 
 /**
  * Тесты чистой логики формы модулей (баг #2 волны 5).
@@ -28,15 +30,18 @@ describe('settings/modules-form-state — список модулей формы
     expect(names).toEqual([...ALL_MODULES].sort());
   });
 
-  it('payments присутствует в форме с человекочитаемой меткой', () => {
+  it('payments присутствует в форме с ключом подписи из каталога сообщений', () => {
     const payments = FORM_MODULES.find((m) => m.name === 'payments');
     expect(payments).toBeDefined();
-    expect(payments?.label).toBe('Оплата (Т-Банк)');
+    expect(payments?.labelKey).toBe(MODULE_LABEL_KEYS.payments);
+    expect(ruMessages.modules.payments.length).toBeGreaterThan(0);
   });
 
-  it('у каждого модуля непустая метка', () => {
-    for (const { label } of FORM_MODULES) {
-      expect(label.length).toBeGreaterThan(0);
+  it('у каждого модуля есть ключ подписи, резолвимый в ru-каталоге', () => {
+    for (const { name, labelKey } of FORM_MODULES) {
+      expect(labelKey).toBe(MODULE_LABEL_KEYS[name]);
+      const leaf = labelKey.split('.').pop() as keyof typeof ruMessages.modules;
+      expect(ruMessages.modules[leaf], `нет ключа ${labelKey} в messages/ru.json`).toBeTruthy();
     }
   });
 });
@@ -110,9 +115,14 @@ describe('settings/modules-form-state — modulesBeingTurnedOff', () => {
       reviews: 'inherit',
       account: 'inherit',
     };
-    const labels = modulesBeingTurnedOff(state);
-    expect(labels).toContain('Каталог');
-    expect(labels).toContain('Оплата (Т-Банк)');
-    expect(labels).not.toContain('Доставка (СДЭК)');
+    // Подписи резолвит переданный t — здесь эталон каталог ru (на en/fr будут en/fr).
+    const t = (key: string) => {
+      const leaf = key.split('.').pop() as keyof typeof ruMessages.modules;
+      return ruMessages.modules[leaf];
+    };
+    const labels = modulesBeingTurnedOff(state, t);
+    expect(labels).toContain(ruMessages.modules.catalog);
+    expect(labels).toContain(ruMessages.modules.payments);
+    expect(labels).not.toContain(ruMessages.modules.cdek);
   });
 });

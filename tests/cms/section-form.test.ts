@@ -15,7 +15,8 @@ import {
   SECTION_FIELD_SPECS,
   emptyFormStateFor,
   buildSectionContent,
-  SECTION_TYPE_LABELS,
+  SECTION_TYPE_LABEL_KEYS,
+  sectionTypeLabel,
   type SectionFormState,
 } from '@/lib/cms/section-form';
 import { CMS_SECTION_TYPES } from '@/lib/cms/types';
@@ -31,11 +32,19 @@ describe('SECTION_FIELD_SPECS — маппинг type → поля', () => {
     );
   });
 
-  it('каждый тип имеет человекочитаемую подпись', () => {
+  it('каждый тип имеет i18n-ключ подписи, резолвимый переводчиком', () => {
+    // Подпись живёт в messages/*.json (волна 6-Б): в дескрипторе — только ключ,
+    // текст резолвится на рендер-сайте. Здесь переводчик подменён заглушкой.
+    const t = (key: string) => `tr:${key}`;
     for (const type of CMS_SECTION_TYPES) {
-      expect(typeof SECTION_TYPE_LABELS[type]).toBe('string');
-      expect(SECTION_TYPE_LABELS[type].length).toBeGreaterThan(0);
+      expect(typeof SECTION_TYPE_LABEL_KEYS[type]).toBe('string');
+      expect(SECTION_TYPE_LABEL_KEYS[type].length).toBeGreaterThan(0);
+      expect(sectionTypeLabel(type, t)).toBe(`tr:${SECTION_TYPE_LABEL_KEYS[type]}`);
     }
+  });
+
+  it('неизвестный тип секции не даёт пустую подпись (фолбэк — сама строка)', () => {
+    expect(sectionTypeLabel('mystery_block', (k) => `tr:${k}`)).toBe('mystery_block');
   });
 
   it('text имеет ровно одно rich-text поле html', () => {

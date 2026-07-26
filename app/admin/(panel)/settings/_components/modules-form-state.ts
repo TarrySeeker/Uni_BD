@@ -12,31 +12,24 @@
  * Сейчас пуст: все ключи ALL_MODULES переключаемы.
  */
 
+import { MODULE_LABEL_KEYS } from '@/lib/config/module-labels';
 import { ALL_MODULES, type ModuleName } from '@/lib/config/modules';
 import type { ModuleOverrides } from '@/lib/settings/schemas';
 
 /** Три состояния переключателя модуля. */
 export type TriState = 'inherit' | 'on' | 'off';
 
-/** Человекочитаемые метки модулей формы. */
-export const MODULE_LABELS: Record<ModuleName, string> = {
-  catalog: 'Каталог',
-  orders: 'Заказы и промокоды',
-  cdek: 'Доставка (СДЭК)',
-  cms: 'Контент (CMS)',
-  payments: 'Оплата (Т-Банк)',
-  news: 'Новости',
-  reviews: 'Отзывы',
-  account: 'Личный кабинет покупателя',
-};
-
 /** Ключи ядра, исключаемые из формы (always-on). Сейчас пуст. */
 export const CORE_MODULES = new Set<string>();
 
-/** Список модулей формы (имя + метка), производный от ALL_MODULES без core-ключей. */
-export const FORM_MODULES: { name: ModuleName; label: string }[] = ALL_MODULES.filter(
+/**
+ * Список модулей формы (имя + КЛЮЧ подписи), производный от ALL_MODULES без
+ * core-ключей. Подписи живут в messages/* (lib/config/module-labels.ts), поэтому
+ * форма одинаково читаема на ru/en/fr.
+ */
+export const FORM_MODULES: { name: ModuleName; labelKey: string }[] = ALL_MODULES.filter(
   (name) => !CORE_MODULES.has(name),
-).map((name) => ({ name, label: MODULE_LABELS[name] }));
+).map((name) => ({ name, labelKey: MODULE_LABEL_KEYS[name] }));
 
 /**
  * Начальное состояние переключателей из существующего module_overrides.
@@ -70,7 +63,13 @@ export function buildModuleOverridesPayload(
   return moduleOverrides;
 }
 
-/** Метки модулей, которые форма собирается ВЫКЛЮЧИТЬ (для confirm-диалога). */
-export function modulesBeingTurnedOff(state: Record<ModuleName, TriState>): string[] {
-  return FORM_MODULES.filter(({ name }) => state[name] === 'off').map((m) => m.label);
+/**
+ * Метки модулей, которые форма собирается ВЫКЛЮЧИТЬ (для confirm-диалога).
+ * Подписи резолвит переданный `t` — предупреждение читается на языке интерфейса.
+ */
+export function modulesBeingTurnedOff(
+  state: Record<ModuleName, TriState>,
+  t: (key: string) => string,
+): string[] {
+  return FORM_MODULES.filter(({ name }) => state[name] === 'off').map(({ labelKey }) => t(labelKey));
 }

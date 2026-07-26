@@ -42,7 +42,8 @@ export function GiftSettingsForm({ saved }: { saved: unknown }) {
 
     const payload = buildGiftPayload(state);
     if (!payload.ok) {
-      setLocalError(payload.error);
+      // Чистый модуль вернул ссылку на сообщение — переводим здесь, в локали оператора.
+      setLocalError(t(payload.error.key, payload.error.params));
       return;
     }
 

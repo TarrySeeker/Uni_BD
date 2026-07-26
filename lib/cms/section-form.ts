@@ -8,7 +8,7 @@
  *
  * Здесь живут:
  *   - SECTION_FIELD_SPECS — для каждого `type` список полей (что рисовать в форме);
- *   - SECTION_TYPE_LABELS — человекочитаемые подписи типов;
+ *   - SECTION_TYPE_LABEL_KEYS — i18n-ключи подписей типов (+ sectionTypeLabel);
  *   - emptyFormStateFor — стартовое плоское состояние формы по type;
  *   - buildSectionContent — плоское состояние формы → типизированный `content`,
  *     валидированный тем же CmsSectionContentSchema, что и сервер.
@@ -16,6 +16,14 @@
  * Инвариант: `content` НИКОГДА не доверяется клиенту — это лишь удобная сборка
  * на клиенте; сервер (upsertCmsSection) повторно валидирует CmsSectionContentSchema
  * и санитизирует rich-text. Здесь — только UX-удобство и единый контракт полей.
+ *
+ * i18n (волна 6-Б, ОЧАГ 3): дескрипторы полей — ДАННЫЕ, поэтому подписи и подсказки
+ * в них хранятся i18n-КЛЮЧАМИ (`labelKey`/`hintKey`, пространство
+ * `cms.sectionTypes.*` / `cms.sectionFields.*`), а текст резолвится на рендер-сайте
+ * через переводчик next-intl — тот же паттерн, что LEAD_STATUS_LABELS/leadStatusLabel.
+ * Параметров у этих подписей нет, поэтому ключ хранится плоской строкой, без
+ * `{key, params}`-обёртки: незачем усложнять там, где подставлять нечего.
+ * Модуль остаётся чистым (без next-intl-импортов) — юниты работают без Next-контекста.
  */
 
 import { CmsSectionContentSchema } from './schemas';
@@ -35,37 +43,56 @@ export type SectionFieldKind =
   | 'pairs' // multiline «a|b» список (faq items / gallery images / slugs)
   | 'image'; // загрузчик изображения → S3-ключ (фолбэк: ручной ввод ключа)
 
+/** Вариант выпадающего списка: значение + i18n-ключ подписи. */
+export interface SectionFieldOption {
+  value: string;
+  /** i18n-ключ подписи варианта (резолвится через t() на рендер-сайте). */
+  labelKey: string;
+}
+
 /** Описание одного поля формы секции. */
 export interface SectionFieldSpec {
   /** Имя поля в плоском состоянии формы (= ключ content или служебное). */
   name: string;
-  /** Подпись для пользователя. */
-  label: string;
+  /** i18n-ключ подписи для пользователя (НЕ готовый текст). */
+  labelKey: string;
   /** Вид контрола. */
   kind: SectionFieldKind;
   /** Обязательное ли поле (для подсказки в UI; источник правды — Zod). */
   required?: boolean;
-  /** Подсказка под полем. */
-  hint?: string;
+  /** i18n-ключ подсказки под полем (НЕ готовый текст). */
+  hintKey?: string;
   /** Варианты для kind='select'. */
-  options?: { value: string; label: string }[];
+  options?: SectionFieldOption[];
 }
 
-/** Человекочитаемые подписи типов секций (для селектора «добавить секцию»). */
-export const SECTION_TYPE_LABELS: Record<CmsSectionType, string> = {
-  hero: 'Hero (баннер с заголовком)',
-  text: 'Текстовый блок',
-  banner: 'Баннер-картинка',
-  products_grid: 'Сетка товаров',
-  faq: 'Вопросы и ответы',
-  cta: 'Призыв к действию (CTA)',
-  gallery: 'Галерея изображений',
+/**
+ * i18n-ключи подписей типов секций (для селектора «добавить секцию» и бейджей).
+ * Текст — в messages/{ru,en,fr}.json → cms.sectionTypes.*; резолв — sectionTypeLabel.
+ */
+export const SECTION_TYPE_LABEL_KEYS: Record<CmsSectionType, string> = {
+  hero: 'cms.sectionTypes.hero',
+  text: 'cms.sectionTypes.text',
+  banner: 'cms.sectionTypes.banner',
+  products_grid: 'cms.sectionTypes.productsGrid',
+  faq: 'cms.sectionTypes.faq',
+  cta: 'cms.sectionTypes.cta',
+  gallery: 'cms.sectionTypes.gallery',
 };
 
-const PRODUCTS_GRID_MODE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'slugs', label: 'По списку товаров (slugs)' },
-  { value: 'category', label: 'По категории' },
-  { value: 'brand', label: 'По бренду' },
+/**
+ * Подпись типа секции на языке оператора. Фолбэк — сама строка типа: неизвестный
+ * тип из БД не должен превращаться в пустой бейдж (образец — leadStatusLabel).
+ */
+export function sectionTypeLabel(type: string, t: (key: string) => string): string {
+  const key = SECTION_TYPE_LABEL_KEYS[type as CmsSectionType];
+  return key ? t(key) : type;
+}
+
+const PRODUCTS_GRID_MODE_OPTIONS: SectionFieldOption[] = [
+  { value: 'slugs', labelKey: 'cms.sectionFields.mode.options.slugs' },
+  { value: 'category', labelKey: 'cms.sectionFields.mode.options.category' },
+  { value: 'brand', labelKey: 'cms.sectionFields.mode.options.brand' },
 ];
 
 /**
@@ -75,73 +102,103 @@ const PRODUCTS_GRID_MODE_OPTIONS: { value: string; label: string }[] = [
  */
 export const SECTION_FIELD_SPECS: Record<CmsSectionType, SectionFieldSpec[]> = {
   hero: [
-    { name: 'title', label: 'Заголовок', kind: 'text', required: true },
-    { name: 'subtitle', label: 'Подзаголовок', kind: 'text' },
-    { name: 'html', label: 'Текст (rich-text)', kind: 'richtext' },
+    { name: 'title', labelKey: 'cms.sectionFields.title.label', kind: 'text', required: true },
+    { name: 'subtitle', labelKey: 'cms.sectionFields.subtitle.label', kind: 'text' },
+    { name: 'html', labelKey: 'cms.sectionFields.html.label', kind: 'richtext' },
     {
       name: 'imageKey',
-      label: 'Изображение (hero)',
+      labelKey: 'cms.sectionFields.heroImage.label',
       kind: 'image',
-      hint: 'Загрузите файл или укажите S3-ключ (media/hero.webp)',
+      hintKey: 'cms.sectionFields.heroImage.hint',
     },
-    { name: 'ctaLabel', label: 'Текст кнопки', kind: 'text' },
-    { name: 'ctaHref', label: 'Ссылка кнопки', kind: 'text', hint: '/catalog или https://…' },
+    { name: 'ctaLabel', labelKey: 'cms.sectionFields.buttonLabel.label', kind: 'text' },
+    {
+      name: 'ctaHref',
+      labelKey: 'cms.sectionFields.buttonHref.label',
+      kind: 'text',
+      hintKey: 'cms.sectionFields.buttonHref.hint',
+    },
   ],
   text: [
-    { name: 'html', label: 'Текст (rich-text)', kind: 'richtext', required: true },
+    { name: 'html', labelKey: 'cms.sectionFields.html.label', kind: 'richtext', required: true },
   ],
   banner: [
     {
       name: 'imageKey',
-      label: 'Изображение (баннер)',
+      labelKey: 'cms.sectionFields.bannerImage.label',
       kind: 'image',
       required: true,
-      hint: 'Загрузите файл или укажите S3-ключ',
+      hintKey: 'cms.sectionFields.bannerImage.hint',
     },
-    { name: 'href', label: 'Ссылка', kind: 'text' },
-    { name: 'alt', label: 'Alt-текст', kind: 'text' },
+    { name: 'href', labelKey: 'cms.sectionFields.href.label', kind: 'text' },
+    { name: 'alt', labelKey: 'cms.sectionFields.alt.label', kind: 'text' },
   ],
   products_grid: [
     {
       name: 'mode',
-      label: 'Источник товаров',
+      labelKey: 'cms.sectionFields.mode.label',
       kind: 'select',
       required: true,
       options: PRODUCTS_GRID_MODE_OPTIONS,
     },
     {
       name: 'slugs',
-      label: 'Slugs товаров (через запятую)',
+      labelKey: 'cms.sectionFields.slugs.label',
       kind: 'text',
-      hint: "Для режима «По списку». Напр.: phone-1, phone-2",
+      hintKey: 'cms.sectionFields.slugs.hint',
     },
-    { name: 'categorySlug', label: 'Slug категории', kind: 'text', hint: 'Для режима «По категории»' },
-    { name: 'brandSlug', label: 'Slug бренда', kind: 'text', hint: 'Для режима «По бренду»' },
-    { name: 'limit', label: 'Лимит (1–48)', kind: 'number', hint: 'По умолчанию 12' },
-    { name: 'title', label: 'Заголовок блока', kind: 'text' },
+    {
+      name: 'categorySlug',
+      labelKey: 'cms.sectionFields.categorySlug.label',
+      kind: 'text',
+      hintKey: 'cms.sectionFields.categorySlug.hint',
+    },
+    {
+      name: 'brandSlug',
+      labelKey: 'cms.sectionFields.brandSlug.label',
+      kind: 'text',
+      hintKey: 'cms.sectionFields.brandSlug.hint',
+    },
+    {
+      name: 'limit',
+      labelKey: 'cms.sectionFields.limit.label',
+      kind: 'number',
+      hintKey: 'cms.sectionFields.limit.hint',
+    },
+    { name: 'title', labelKey: 'cms.sectionFields.blockTitle.label', kind: 'text' },
   ],
   faq: [
     {
       name: 'items',
-      label: 'Вопросы и ответы',
+      labelKey: 'cms.sectionFields.faqItems.label',
       kind: 'pairs',
       required: true,
-      hint: 'По строке на пару: Вопрос|Ответ (ответ — rich-text)',
+      hintKey: 'cms.sectionFields.faqItems.hint',
     },
   ],
   cta: [
-    { name: 'title', label: 'Заголовок', kind: 'text', required: true },
-    { name: 'html', label: 'Текст (rich-text)', kind: 'richtext' },
-    { name: 'buttonLabel', label: 'Текст кнопки', kind: 'text', required: true },
-    { name: 'buttonHref', label: 'Ссылка кнопки', kind: 'text', required: true },
+    { name: 'title', labelKey: 'cms.sectionFields.title.label', kind: 'text', required: true },
+    { name: 'html', labelKey: 'cms.sectionFields.html.label', kind: 'richtext' },
+    {
+      name: 'buttonLabel',
+      labelKey: 'cms.sectionFields.buttonLabel.label',
+      kind: 'text',
+      required: true,
+    },
+    {
+      name: 'buttonHref',
+      labelKey: 'cms.sectionFields.buttonHref.label',
+      kind: 'text',
+      required: true,
+    },
   ],
   gallery: [
     {
       name: 'images',
-      label: 'Изображения',
+      labelKey: 'cms.sectionFields.galleryImages.label',
       kind: 'image',
       required: true,
-      hint: 'Загрузите файлы или по строке: ключ-S3|alt (alt опционален)',
+      hintKey: 'cms.sectionFields.galleryImages.hint',
     },
   ],
 };

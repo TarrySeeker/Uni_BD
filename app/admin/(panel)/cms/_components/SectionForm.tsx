@@ -198,12 +198,18 @@ function FieldControl({
   error?: string;
   onChange: (v: string) => void;
 }) {
+  const t = useTranslations();
   const errNode = error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null;
+
+  // Дескриптор поля хранит i18n-КЛЮЧИ (данные без текста) — резолвим их здесь,
+  // на рендер-сайте, на языке оператора.
+  const label = t(field.labelKey);
+  const hint = field.hintKey ? t(field.hintKey) : undefined;
 
   return (
     <div>
       <label className={labelCls}>
-        {field.label}
+        {label}
         {field.required ? '*' : ''}
       </label>
 
@@ -211,13 +217,13 @@ function FieldControl({
         <ImageField field={field} value={value} onChange={onChange} />
       ) : field.kind === 'richtext' ? (
         <div className="mt-1">
-          <RichTextEditor value={value} onChange={onChange} ariaLabel={field.label} />
+          <RichTextEditor value={value} onChange={onChange} ariaLabel={label} />
         </div>
       ) : field.kind === 'select' ? (
         <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
           {(field.options ?? []).map((o) => (
             <option key={o.value} value={o.value}>
-              {o.label}
+              {t(o.labelKey)}
             </option>
           ))}
         </select>
@@ -227,7 +233,7 @@ function FieldControl({
           onChange={(e) => onChange(e.target.value)}
           rows={4}
           className={inputCls}
-          placeholder={field.hint}
+          placeholder={hint}
         />
       ) : field.kind === 'number' ? (
         <input
@@ -235,19 +241,19 @@ function FieldControl({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={inputCls}
-          placeholder={field.hint}
+          placeholder={hint}
         />
       ) : (
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={inputCls}
-          placeholder={field.hint}
+          placeholder={hint}
         />
       )}
 
-      {field.hint && field.kind !== 'pairs' && field.kind !== 'number' && field.kind !== 'image' ? (
-        <p className="mt-1 text-xs text-gray-400">{field.hint}</p>
+      {hint && field.kind !== 'pairs' && field.kind !== 'number' && field.kind !== 'image' ? (
+        <p className="mt-1 text-xs text-gray-400">{hint}</p>
       ) : null}
       {errNode}
     </div>
@@ -278,6 +284,8 @@ function ImageField({
 }) {
   const t = useTranslations();
   const isMulti = field.name === 'images';
+  const label = t(field.labelKey);
+  const hint = field.hintKey ? t(field.hintKey) : undefined;
 
   /** Добавляет загруженный ключ: для галереи — новой строкой, иначе заменяет. */
   function applyUploadedKey(key: string) {
@@ -297,23 +305,23 @@ function ImageField({
           onChange={(e) => onChange(e.target.value)}
           rows={4}
           className={inputCls}
-          placeholder={field.hint}
-          aria-label={field.label}
+          placeholder={hint}
+          aria-label={label}
         />
       ) : (
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={inputCls}
-          placeholder={field.hint}
-          aria-label={field.label}
+          placeholder={hint}
+          aria-label={label}
         />
       )}
       <CmsImageUploadButton
         label={isMulti ? t('cms.sectionForm.uploadAndAddImage') : t('cms.sectionForm.uploadImage')}
         onUploaded={applyUploadedKey}
       />
-      {field.hint ? <p className="mt-1 text-xs text-gray-400">{field.hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-gray-400">{hint}</p> : null}
     </div>
   );
 }

@@ -33,7 +33,8 @@ interface TranslationRow {
 
 interface CoverageSource {
   entity: string;
-  label: string;
+  /** Ключ подписи сущности в messages/* — страница резолвит его через t(...). */
+  labelKey: string;
   fields: readonly string[];
   load: () => Promise<TranslationRow[]>;
 }
@@ -41,7 +42,7 @@ interface CoverageSource {
 const SOURCES: readonly CoverageSource[] = [
   {
     entity: 'products',
-    label: 'Товары',
+    labelKey: 'settings.languagesPage.entities.products',
     fields: PRODUCT_TR_FIELDS,
     // Архивные товары не показываются покупателю — их перевод не нужен и не
     // должен портить статистику.
@@ -50,25 +51,25 @@ const SOURCES: readonly CoverageSource[] = [
   },
   {
     entity: 'categories',
-    label: 'Категории',
+    labelKey: 'settings.languagesPage.entities.categories',
     fields: CATEGORY_TR_FIELDS,
     load: () => sql<TranslationRow[]>`SELECT translations FROM categories`,
   },
   {
     entity: 'brands',
-    label: 'Бренды',
+    labelKey: 'settings.languagesPage.entities.brands',
     fields: BRAND_TR_FIELDS,
     load: () => sql<TranslationRow[]>`SELECT translations FROM brands`,
   },
   {
     entity: 'designers',
-    label: 'Дизайнеры',
+    labelKey: 'settings.languagesPage.entities.designers',
     fields: DESIGNER_TR_FIELDS,
     load: () => sql<TranslationRow[]>`SELECT translations FROM designers`,
   },
   {
     entity: 'cms_pages',
-    label: 'Страницы контента',
+    labelKey: 'settings.languagesPage.entities.cmsPages',
     fields: CMS_PAGE_TR_FIELDS,
     load: () => sql<TranslationRow[]>`SELECT translations FROM cms_pages`,
   },
@@ -96,7 +97,7 @@ export async function loadTranslationCoverage(
     }
     entries.push({
       entity: source.entity,
-      label: source.label,
+      labelKey: source.labelKey,
       coverage: computeCoverage(rows, locales, source.fields),
     });
   }

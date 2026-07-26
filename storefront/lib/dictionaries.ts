@@ -136,9 +136,15 @@ export interface Dictionary {
     giftCodePlaceholder: string; // «Введите код сертификата»
     giftCodeApply: string; // «Применить»
     giftCodeRemove: string; // «Убрать»
-    giftCodeApplied: string; // «Применён:»
+    giftCodeApplied: string; // «Применён:» — ТОЛЬКО когда сертификат реально применён
     /** 🔴 Общий человекочитаемый текст отказа — фолбэк вместо сырого reason. */
     giftCodeNotApplied: string;
+    /**
+     * 🔴 Подсказка при ОТКАЗЕ кода: поле остаётся доступным, значение сохранено —
+     * покупателю нужно сказать, что делать дальше. Без неё отказ выглядел тупиком
+     * (а вместе с «Применён:» — ещё и самоотрицающей фразой).
+     */
+    giftCodeRetry: string;
     giftCodeCovered: string; // шаблон «Списано с сертификата: {amount}»
     giftCodeRemaining: string; // шаблон «Остаток на сертификате: {amount}»
     giftCodeFullyCovered: string; // «Сертификат покрывает весь заказ — оплата не требуется.»
@@ -160,7 +166,13 @@ export interface Dictionary {
     /** Кнопка, когда платить нечего (сертификат покрыл заказ полностью). */
     submitGiftCovered: string; // «Оформить заказ»
     submitting: string; // «Переход к оплате…»
-    legal: string; // легал-текст под кнопкой
+    legal: string; // легал-текст под кнопкой (цитирует подпись submit)
+    /**
+     * 🔴 Легал-текст, когда платить нечего (сертификат покрыл заказ целиком):
+     * кнопка в этом случае — submitGiftCovered, и текст под ней ОБЯЗАН цитировать
+     * её же и не обещать онлайн-оплату, которой не будет.
+     */
+    legalGiftCovered: string;
     emptyCart: string; // «Ваша корзина пуста :(»
     // --- Причины проблем позиций (issues[].code) ---
     issueOutOfStock: string;
@@ -188,6 +200,13 @@ export interface Dictionary {
     orderErrorInvalidGift: string;
     orderErrorDeliveryUnavailable: string;
     orderErrorPaymentsDisabled: string;
+    orderErrorNetwork: string; // ApiError code 'network' (fetch не дошёл)
+    orderErrorRateLimited: string; // ApiError code 'rate_limited' (429 от API)
+    /**
+     * 🔴 Фолбэк на ЛЮБОЙ неизвестный код ошибки. Сырое `err.message` от сервера
+     * покупателю не показывается никогда: оно на языке сервера (русский) и уехало
+     * бы франкоязычному покупателю как есть.
+     */
     orderErrorGeneric: string; // «Произошла ошибка. Попробуйте ещё раз.»
   };
   success: {
@@ -349,6 +368,7 @@ const ru: Dictionary = {
     giftCodeRemove: 'Убрать',
     giftCodeApplied: 'Применён:',
     giftCodeNotApplied: 'Сертификат не применён.',
+    giftCodeRetry: 'Проверьте код и попробуйте снова.',
     giftCodeCovered: 'Списано с сертификата: {amount}',
     giftCodeRemaining: 'Остаток на сертификате: {amount}',
     giftCodeFullyCovered: 'Сертификат покрывает весь заказ — оплата не требуется.',
@@ -370,6 +390,8 @@ const ru: Dictionary = {
     submitting: 'Переход к оплате…',
     legal:
       'Нажимая «Оплатить», вы соглашаетесь с условиями продажи. Оплата производится онлайн через защищённую платёжную страницу.',
+    legalGiftCovered:
+      'Нажимая «Оформить заказ», вы соглашаетесь с условиями продажи. Оплата не требуется: заказ полностью покрыт подарочным сертификатом.',
     emptyCart: 'Ваша корзина пуста :(',
     issueOutOfStock: 'нет в наличии в нужном количестве',
     issueInvalidItem: 'товар недоступен',
@@ -396,6 +418,9 @@ const ru: Dictionary = {
       'Не удалось рассчитать доставку в выбранное место. Измените способ или адрес доставки.',
     orderErrorPaymentsDisabled:
       'Онлайн-оплата временно недоступна. Свяжитесь с магазином для оформления.',
+    orderErrorNetwork:
+      'Не удалось связаться с магазином. Проверьте соединение и попробуйте ещё раз.',
+    orderErrorRateLimited: 'Слишком много попыток. Подождите немного и попробуйте снова.',
     orderErrorGeneric: 'Произошла ошибка. Попробуйте ещё раз.',
   },
   success: {
@@ -548,6 +573,7 @@ const en: Dictionary = {
     giftCodeRemove: 'Remove',
     giftCodeApplied: 'Applied:',
     giftCodeNotApplied: 'The gift certificate has not been applied.',
+    giftCodeRetry: 'Check the code and try again.',
     giftCodeCovered: 'Paid with the gift certificate: {amount}',
     giftCodeRemaining: 'Certificate balance left: {amount}',
     giftCodeFullyCovered: 'The gift certificate covers the whole order — no payment required.',
@@ -569,6 +595,8 @@ const en: Dictionary = {
     submitting: 'Redirecting to payment…',
     legal:
       'By clicking “Pay”, you agree to the terms of sale. Payment is made online via a secure payment page.',
+    legalGiftCovered:
+      'By clicking “Place order”, you agree to the terms of sale. No payment is required: the order is fully covered by your gift certificate.',
     emptyCart: 'Your cart is empty :(',
     issueOutOfStock: 'not available in the requested quantity',
     issueInvalidItem: 'item unavailable',
@@ -595,6 +623,9 @@ const en: Dictionary = {
       'Could not calculate delivery to the selected location. Change the method or delivery address.',
     orderErrorPaymentsDisabled:
       'Online payment is temporarily unavailable. Please contact the store to place your order.',
+    orderErrorNetwork:
+      'Could not reach the store. Please check your connection and try again.',
+    orderErrorRateLimited: 'Too many attempts. Please wait a moment and try again.',
     orderErrorGeneric: 'An error occurred. Please try again.',
   },
   success: {
@@ -747,6 +778,7 @@ const fr: Dictionary = {
     giftCodeRemove: 'Retirer',
     giftCodeApplied: 'Appliquée :',
     giftCodeNotApplied: 'La carte cadeau n’a pas été appliquée.',
+    giftCodeRetry: 'Vérifiez le code et réessayez.',
     giftCodeCovered: 'Déduit de la carte cadeau : {amount}',
     giftCodeRemaining: 'Solde restant sur la carte cadeau : {amount}',
     giftCodeFullyCovered:
@@ -769,6 +801,8 @@ const fr: Dictionary = {
     submitting: 'Redirection vers le paiement…',
     legal:
       'En cliquant sur « Payer », vous acceptez les conditions de vente. Le paiement s’effectue en ligne via une page de paiement sécurisée.',
+    legalGiftCovered:
+      'En cliquant sur « Valider la commande », vous acceptez les conditions de vente. Aucun paiement n’est requis : la commande est intégralement couverte par votre carte cadeau.',
     emptyCart: 'Votre panier est vide :(',
     issueOutOfStock: 'indisponible dans la quantité demandée',
     issueInvalidItem: 'article indisponible',
@@ -795,6 +829,9 @@ const fr: Dictionary = {
       'Impossible de calculer la livraison vers le lieu choisi. Changez le mode ou l’adresse de livraison.',
     orderErrorPaymentsDisabled:
       'Le paiement en ligne est temporairement indisponible. Contactez la boutique pour passer commande.',
+    orderErrorNetwork:
+      'Impossible de joindre la boutique. Vérifiez votre connexion et réessayez.',
+    orderErrorRateLimited: 'Trop de tentatives. Patientez un instant puis réessayez.',
     orderErrorGeneric: 'Une erreur est survenue. Veuillez réessayer.',
   },
   success: {

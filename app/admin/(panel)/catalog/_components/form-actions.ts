@@ -39,7 +39,7 @@ import {
   deleteProductBlock,
   uploadProductBlockImage,
 } from '@/lib/product-blocks/actions';
-import type { ActionResult } from '@/lib/server/action';
+import { translateMessage, type ActionResult } from '@/lib/server/action';
 
 /**
  * Тонкие серверные обёртки над Server Actions каталога (lib/catalog/actions).
@@ -52,6 +52,19 @@ import type { ActionResult } from '@/lib/server/action';
  * Медиа/лого принимают FormData (файл нельзя сериализовать как обычный объект):
  * читаем bytes в Buffer на сервере и передаём в соответствующий Action.
  */
+
+/**
+ * Единый отказ «файл не выбран» — сообщение берётся из каталога интерфейса в
+ * ЯЗЫКЕ ОПЕРАТОРА. Отказ случается ДО defineAction (разбор FormData), поэтому его
+ * текст не проходит через локализацию пайплайна и переводится здесь.
+ */
+async function fileNotChosen(): Promise<Extract<ActionResult<never>, { ok: false }>> {
+  return {
+    ok: false,
+    error: 'validation',
+    fieldErrors: { file: [await translateMessage('catalog.common.chooseFile')] },
+  };
+}
 
 // --- Товары -----------------------------------------------------------------
 
@@ -120,7 +133,7 @@ export async function uploadMediaAction(
 ): Promise<ActionResult<{ id: string; url: string; key: string }>> {
   const file = formData.get('file');
   if (!(file instanceof File)) {
-    return { ok: false, error: 'validation', fieldErrors: { file: ['Файл не выбран.'] } };
+    return fileNotChosen();
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   return attachMedia({
@@ -160,7 +173,7 @@ export async function uploadBrandLogoAction(
 ): Promise<ActionResult<{ id: string; url: string; key: string }>> {
   const file = formData.get('file');
   if (!(file instanceof File)) {
-    return { ok: false, error: 'validation', fieldErrors: { file: ['Файл не выбран.'] } };
+    return fileNotChosen();
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   return uploadBrandLogo({ brandId, filename: file.name, bytes });
@@ -188,7 +201,7 @@ export async function uploadDesignerImageAction(
 ): Promise<ActionResult<{ id: string; url: string; key: string }>> {
   const file = formData.get('file');
   if (!(file instanceof File)) {
-    return { ok: false, error: 'validation', fieldErrors: { file: ['Файл не выбран.'] } };
+    return fileNotChosen();
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   return uploadDesignerImage({ designerId, filename: file.name, bytes });
@@ -215,7 +228,7 @@ export async function uploadProductBlockImageAction(
 ): Promise<ActionResult<{ id: string; url: string; key: string }>> {
   const file = formData.get('file');
   if (!(file instanceof File)) {
-    return { ok: false, error: 'validation', fieldErrors: { file: ['Файл не выбран.'] } };
+    return fileNotChosen();
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   return uploadProductBlockImage({ blockId, filename: file.name, bytes });

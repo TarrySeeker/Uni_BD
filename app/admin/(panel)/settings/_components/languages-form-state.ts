@@ -10,7 +10,7 @@
 
 // Импорт ИМЕННО из leaf-модуля: '@/lib/i18n/config' тянет БД в браузерный бандл.
 import { normalizeLocale } from '@/lib/i18n/locale-token';
-import type { Locale, LocaleConfig } from '@/lib/i18n/types';
+import type { Locale, LocaleConfig, MessageRef } from '@/lib/i18n/types';
 
 /** Язык справочника: тег + название на его собственном языке. */
 export interface LanguageOption {
@@ -122,11 +122,16 @@ export function toggleLocale(
   return enabled.filter((l) => l !== target);
 }
 
-/** Результат добавления языка вручную. */
+/**
+ * Результат добавления языка вручную. Отказ несёт ССЫЛКУ на сообщение каталога
+ * (ключ + ICU-параметры), а не готовую строку: модуль чистый и локали оператора не
+ * знает — текст собирает компонент через `t(error.key, error.params)`. Склеенная
+ * здесь строка была бы русской при любой локали админки.
+ */
 export interface AddLocaleResult {
   ok: boolean;
   enabled: Locale[];
-  error?: string;
+  error?: MessageRef;
 }
 
 /** Добавляет произвольный тег языка (для локалей вне справочника платформы). */
@@ -136,11 +141,15 @@ export function addCustomLocale(enabled: readonly Locale[], raw: string): AddLoc
     return {
       ok: false,
       enabled: [...enabled],
-      error: 'Код языка вида «ru», «en», «pt-br» (латиница, части через дефис)',
+      error: { key: 'settings.languagesForm.errors.invalidTag' },
     };
   }
   if (enabled.includes(code)) {
-    return { ok: false, enabled: [...enabled], error: `Язык «${code}» уже добавлен` };
+    return {
+      ok: false,
+      enabled: [...enabled],
+      error: { key: 'settings.languagesForm.errors.alreadyAdded', params: { code } },
+    };
   }
   return { ok: true, enabled: [...enabled, code] };
 }

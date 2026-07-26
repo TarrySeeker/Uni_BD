@@ -54,7 +54,7 @@ export function ModulesForm({
   async function save() {
     // Подтверждение при выключении модулей: выключение «Каталога»/«Заказов» и т.п.
     // скрывает разделы и может «сломать» витрину — предупреждаем заранее.
-    const turningOff = modulesBeingTurnedOff(state);
+    const turningOff = modulesBeingTurnedOff(state, t);
     if (turningOff.length > 0) {
       const ok = window.confirm(
         t('settings.modulesForm.confirmTurnOff', { modules: turningOff.join(', ') }),
@@ -111,10 +111,10 @@ export function ModulesForm({
       </p>
 
       <div className="space-y-3">
-        {MODULES.map(({ name, label }) => (
+        {MODULES.map(({ name, labelKey }) => (
           <div key={name} className="flex items-center justify-between rounded border border-gray-200 p-3">
             <div>
-              <div className="text-sm font-medium text-gray-800">{label}</div>
+              <div className="text-sm font-medium text-gray-800">{t(labelKey)}</div>
               <div className="text-xs text-gray-500">
                 {t('settings.modulesForm.defaultState', {
                   state: envSet.has(name)
@@ -124,7 +124,7 @@ export function ModulesForm({
               </div>
             </div>
             <select
-              aria-label={t('settings.modulesForm.moduleStateAria', { label })}
+              aria-label={t('settings.modulesForm.moduleStateAria', { label: t(labelKey) })}
               value={state[name]}
               onChange={(e) => setState((s) => ({ ...s, [name]: e.target.value as TriState }))}
               className="rounded border border-gray-300 px-3 py-2 text-sm"

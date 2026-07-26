@@ -922,7 +922,14 @@
       "coverageNoData": "No data to calculate yet.",
       "colSection": "Section",
       "colRecords": "Records",
-      "notTranslated": "not translated: {missing}"
+      "notTranslated": "not translated: {missing}",
+      "entities": {
+        "products": "Products",
+        "categories": "Categories",
+        "brands": "Brands",
+        "designers": "Designers",
+        "cmsPages": "Content pages"
+      }
     },
     "modulesForm": {
       "confirmTurnOff": "Turn off modules: {modules}? The corresponding admin sections and site features will become unavailable. Continue?",
@@ -956,7 +963,11 @@
       "categoriesHelp2": "If you leave the field empty, nothing is flagged by section. Codes will still be created for products whose gift-certificate flag is set on the product card itself. The only way to disable code issuance entirely is the «Create the code automatically upon payment» checkbox above.",
       "allowIssueLabel": "Create the code even when the order is paid with another certificate",
       "allowIssueHelp": "A customer can pay for a new certificate with the balance of an old one — effectively exchanging its value. Disable this if your store does not allow such exchanges.",
-      "saveButton": "Save certificate settings"
+      "saveButton": "Save certificate settings",
+      "errors": {
+        "validDaysNotInteger": "The validity period is a whole number of days (0 or empty — unlimited).",
+        "validDaysTooLarge": "The validity period is too large — enter a reasonable number of days."
+      }
     },
     "legalContactsForm": {
       "savedSuccess": "Legal details and contacts saved.",
@@ -1041,7 +1052,11 @@
       "addManualLabel": "Add a language manually",
       "customPlaceholder": "e.g. pt-br",
       "customHelp": "Standard language code: two or three Latin letters, optionally with a region after a hyphen.",
-      "saveButton": "Save languages"
+      "saveButton": "Save languages",
+      "errors": {
+        "invalidTag": "A language code like «ru», «en», «pt-br» (Latin letters, parts joined by a hyphen)",
+        "alreadyAdded": "Language «{code}» is already added"
+      }
     },
     "page": {
       "header": {
@@ -1113,6 +1128,42 @@
     },
     "settingsTranslationTabs": {
       "saved": "Translations saved."
+    },
+    "trFields": {
+      "shopName": "Shop name",
+      "siteName": "Site name",
+      "titleTemplate": "Page title template",
+      "defaultDescription": "Default description",
+      "address": "Address",
+      "workingHours": "Opening hours",
+      "heroTitle": "Cover — title",
+      "heroSubtitle": "Cover — subtitle",
+      "heroCtaLabel": "Cover — button text",
+      "aboutTitle": "About the brand — title",
+      "aboutParagraph": "About the brand — paragraph {n}",
+      "aboutValue": "About the brand — value {n}",
+      "qualityTitle": "Fabric quality — title",
+      "qualityItem": "Fabric quality — item {n}",
+      "deliveryItemTitle": "Delivery — item {n} (title)",
+      "deliveryItemText": "Delivery — item {n} (description)",
+      "valuesStripItemTitle": "Values strip — item {n} (title)",
+      "valuesStripItemText": "Values strip — item {n} (description)",
+      "philosophyEyebrow": "Philosophy — eyebrow",
+      "philosophyTitle": "Philosophy — title",
+      "philosophyText": "Philosophy — paragraph",
+      "philosophyLinkLabel": "Philosophy — link text",
+      "looksTitle": "Looks — title",
+      "looksCategoryTitle": "Looks — category {n} (title)",
+      "looksCategoryText": "Looks — category {n} (text)",
+      "tilesItemTitle": "Category tiles — tile {n}",
+      "designersTitle": "Designers — title",
+      "designersItemName": "Designers — name {n}",
+      "sliderSlideName": "Promo slider — slide {n} (name)",
+      "sliderSlideCaption": "Promo slider — slide {n} (caption)",
+      "corpCertTileTitle": "For corporate clients / certificates — tile {n}",
+      "navHeaderItem": "Header menu — item {n}",
+      "navFooterColumnTitle": "Footer — column {n} (title)",
+      "navFooterColumnLink": "Footer — column {n}, link {j}"
     }
   },
   "promo": {
@@ -1269,6 +1320,87 @@
       "saveButton": "Save section",
       "uploadAndAddImage": "Upload and add image",
       "uploadImage": "Upload image"
+    },
+    "sectionTypes": {
+      "hero": "Hero (banner with a heading)",
+      "text": "Text block",
+      "banner": "Image banner",
+      "productsGrid": "Product grid",
+      "faq": "Questions and answers",
+      "cta": "Call to action (CTA)",
+      "gallery": "Image gallery"
+    },
+    "sectionFields": {
+      "title": {
+        "label": "Heading"
+      },
+      "subtitle": {
+        "label": "Subheading"
+      },
+      "html": {
+        "label": "Text (rich text)"
+      },
+      "heroImage": {
+        "label": "Image (hero)",
+        "hint": "Upload a file or enter an S3 key (media/hero.webp)"
+      },
+      "buttonLabel": {
+        "label": "Button text"
+      },
+      "buttonHref": {
+        "label": "Button link",
+        "hint": "/catalog or https://…"
+      },
+      "bannerImage": {
+        "label": "Image (banner)",
+        "hint": "Upload a file or enter an S3 key"
+      },
+      "href": {
+        "label": "Link"
+      },
+      "alt": {
+        "label": "Alt text"
+      },
+      "mode": {
+        "label": "Product source",
+        "options": {
+          "slugs": "By product list (slugs)",
+          "category": "By category",
+          "brand": "By brand"
+        }
+      },
+      "slugs": {
+        "label": "Product slugs (comma-separated)",
+        "hint": "For the “By product list” mode. E.g.: phone-1, phone-2"
+      },
+      "categorySlug": {
+        "label": "Category slug",
+        "hint": "For the “By category” mode"
+      },
+      "brandSlug": {
+        "label": "Brand slug",
+        "hint": "For the “By brand” mode"
+      },
+      "limit": {
+        "label": "Limit (1–48)",
+        "hint": "Defaults to 12"
+      },
+      "blockTitle": {
+        "label": "Block heading"
+      },
+      "faqItems": {
+        "label": "Questions and answers",
+        "hint": "One pair per line: Question|Answer (the answer is rich text)",
+        "translationHint": "One pair per line: Question|Answer. Keep the line order of the main language; an empty line keeps the main text."
+      },
+      "galleryImages": {
+        "label": "Images",
+        "hint": "Upload files or one per line: S3 key|alt (alt is optional)"
+      },
+      "galleryAlts": {
+        "label": "Image alt texts",
+        "hint": "One alt text per line, in the same order. File keys are not translated."
+      }
     },
     "richTextEditor": {
       "toolbarAriaLabel": "Formatting",
@@ -1765,13 +1897,6 @@
   },
   "roles": {
     "roleForm": {
-      "modules": {
-        "core": "Core",
-        "catalog": "Catalog",
-        "orders": "Orders",
-        "cdek": "CDEK delivery",
-        "cms": "Content"
-      },
       "codeLabel": "Code*",
       "codePlaceholder": "e.g. support",
       "codeReadonlyHint": "The role code cannot be changed.",
@@ -1879,6 +2004,11 @@
       "colDate": "Date",
       "colPayment": "Payment",
       "colTotal": "Total"
+    },
+    "status": {
+      "guest": "Guest",
+      "active": "Account",
+      "disabled": "Blocked"
     }
   },
   "cdek": {
@@ -2107,5 +2237,16 @@
       "i18nRead": "View translations",
       "i18nManage": "Manage translations and languages"
     }
+  },
+  "modules": {
+    "core": "Core",
+    "catalog": "Catalog",
+    "orders": "Orders and promo codes",
+    "cdek": "Delivery (CDEK)",
+    "cms": "Content (CMS)",
+    "payments": "Payments (T-Bank)",
+    "news": "News",
+    "reviews": "Reviews",
+    "account": "Customer account"
   }
 }

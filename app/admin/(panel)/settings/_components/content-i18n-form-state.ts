@@ -31,19 +31,26 @@ export type ContentI18nSection = 'home' | 'navigation' | 'branding' | 'seo' | 'c
 // Порядок и набор ключей ОБЯЗАНЫ совпадать с SETTINGS_TR_FIELDS (guard-тест).
 // -----------------------------------------------------------------------------
 
+/**
+ * Подписи полей живут в каталогах messages/* под `settings.trFields.*` и
+ * НИКОГДА не хранятся строкой в коде: вкладку перевода владелец открывает в своей
+ * локали (в т.ч. fr) и должен видеть подписи полей на своём языке. Ключи выписаны
+ * целиком (а не собраны из префикса) — чтобы находиться обычным grep'ом.
+ */
+
 export const BRANDING_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'shopName', label: 'Название магазина', kind: 'text' },
+  { key: 'shopName', labelKey: 'settings.trFields.shopName', kind: 'text' },
 ];
 
 export const SEO_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'site_name', label: 'Название сайта', kind: 'text' },
-  { key: 'title_template', label: 'Шаблон заголовка страниц', kind: 'text' },
-  { key: 'default_description', label: 'Описание по умолчанию', kind: 'textarea' },
+  { key: 'site_name', labelKey: 'settings.trFields.siteName', kind: 'text' },
+  { key: 'title_template', labelKey: 'settings.trFields.titleTemplate', kind: 'text' },
+  { key: 'default_description', labelKey: 'settings.trFields.defaultDescription', kind: 'textarea' },
 ];
 
 export const CONTACTS_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'address', label: 'Адрес', kind: 'text' },
-  { key: 'workingHours', label: 'Часы работы', kind: 'text' },
+  { key: 'address', labelKey: 'settings.trFields.address', kind: 'text' },
+  { key: 'workingHours', labelKey: 'settings.trFields.workingHours', kind: 'text' },
 ];
 
 // -----------------------------------------------------------------------------
@@ -167,8 +174,12 @@ function asArray(v: unknown): unknown[] {
 
 /**
  * Переводимые листы блока «главной» → дескрипторы полей (key = точечный путь,
- * label = человекочитаемая подпись). Whitelist повторяет SETTINGS_TR_FIELDS.home;
+ * labelKey = ключ подписи в каталоге). Whitelist повторяет SETTINGS_TR_FIELDS.home;
  * href/imageKey/embedUrl/enabled НЕ включены (идентификаторы, не текст).
+ *
+ * Подписи повторяющихся элементов параметризованы номером (`labelParams.n`):
+ * позиция в массиве — данные, а не текст, поэтому номер подставляет ICU, а не
+ * конкатенация в коде. Номер человеческий (с 1), путь остаётся индексом (с 0).
  */
 export function buildHomeTrFieldDefs(home: AnyRec): TranslatableFieldDef[] {
   const defs: TranslatableFieldDef[] = [];
@@ -176,74 +187,144 @@ export function buildHomeTrFieldDefs(home: AnyRec): TranslatableFieldDef[] {
   const block = (key: string): AnyRec => (h[key] as AnyRec) ?? {};
 
   // hero
-  defs.push({ key: 'hero.title', label: 'Обложка — заголовок', kind: 'text' });
-  defs.push({ key: 'hero.subtitle', label: 'Обложка — подзаголовок', kind: 'text' });
-  defs.push({ key: 'hero.ctaLabel', label: 'Обложка — текст кнопки', kind: 'text' });
+  defs.push({ key: 'hero.title', labelKey: 'settings.trFields.heroTitle', kind: 'text' });
+  defs.push({ key: 'hero.subtitle', labelKey: 'settings.trFields.heroSubtitle', kind: 'text' });
+  defs.push({ key: 'hero.ctaLabel', labelKey: 'settings.trFields.heroCtaLabel', kind: 'text' });
 
   // about
   const about = block('about');
-  defs.push({ key: 'about.title', label: 'О бренде — заголовок', kind: 'text' });
+  defs.push({ key: 'about.title', labelKey: 'settings.trFields.aboutTitle', kind: 'text' });
   asArray(about.paragraphs).forEach((_, i) =>
-    defs.push({ key: `about.paragraphs.${i}`, label: `О бренде — абзац ${i + 1}`, kind: 'textarea' }),
+    defs.push({
+      key: `about.paragraphs.${i}`,
+      labelKey: 'settings.trFields.aboutParagraph',
+      labelParams: { n: i + 1 },
+      kind: 'textarea',
+    }),
   );
   asArray(about.values).forEach((_, i) =>
-    defs.push({ key: `about.values.${i}`, label: `О бренде — ценность ${i + 1}`, kind: 'text' }),
+    defs.push({
+      key: `about.values.${i}`,
+      labelKey: 'settings.trFields.aboutValue',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    }),
   );
 
   // quality
   const quality = block('quality');
-  defs.push({ key: 'quality.title', label: 'Качество ткани — заголовок', kind: 'text' });
+  defs.push({ key: 'quality.title', labelKey: 'settings.trFields.qualityTitle', kind: 'text' });
   asArray(quality.items).forEach((_, i) =>
-    defs.push({ key: `quality.items.${i}`, label: `Качество ткани — пункт ${i + 1}`, kind: 'text' }),
+    defs.push({
+      key: `quality.items.${i}`,
+      labelKey: 'settings.trFields.qualityItem',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    }),
   );
 
   // delivery
   asArray(block('delivery').items).forEach((_, i) => {
-    defs.push({ key: `delivery.items.${i}.title`, label: `Доставка — пункт ${i + 1} (заголовок)`, kind: 'text' });
-    defs.push({ key: `delivery.items.${i}.text`, label: `Доставка — пункт ${i + 1} (описание)`, kind: 'textarea' });
+    defs.push({
+      key: `delivery.items.${i}.title`,
+      labelKey: 'settings.trFields.deliveryItemTitle',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    });
+    defs.push({
+      key: `delivery.items.${i}.text`,
+      labelKey: 'settings.trFields.deliveryItemText',
+      labelParams: { n: i + 1 },
+      kind: 'textarea',
+    });
   });
 
   // valuesStrip
   asArray(block('valuesStrip').items).forEach((_, i) => {
-    defs.push({ key: `valuesStrip.items.${i}.title`, label: `Лента ценностей — пункт ${i + 1} (заголовок)`, kind: 'text' });
-    defs.push({ key: `valuesStrip.items.${i}.text`, label: `Лента ценностей — пункт ${i + 1} (описание)`, kind: 'text' });
+    defs.push({
+      key: `valuesStrip.items.${i}.title`,
+      labelKey: 'settings.trFields.valuesStripItemTitle',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    });
+    defs.push({
+      key: `valuesStrip.items.${i}.text`,
+      labelKey: 'settings.trFields.valuesStripItemText',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    });
   });
 
   // philosophy
-  defs.push({ key: 'philosophy.eyebrow', label: 'Философия — надзаголовок', kind: 'text' });
-  defs.push({ key: 'philosophy.title', label: 'Философия — заголовок', kind: 'text' });
-  defs.push({ key: 'philosophy.text', label: 'Философия — абзац', kind: 'textarea' });
-  defs.push({ key: 'philosophy.linkLabel', label: 'Философия — текст ссылки', kind: 'text' });
+  defs.push({ key: 'philosophy.eyebrow', labelKey: 'settings.trFields.philosophyEyebrow', kind: 'text' });
+  defs.push({ key: 'philosophy.title', labelKey: 'settings.trFields.philosophyTitle', kind: 'text' });
+  defs.push({ key: 'philosophy.text', labelKey: 'settings.trFields.philosophyText', kind: 'textarea' });
+  defs.push({ key: 'philosophy.linkLabel', labelKey: 'settings.trFields.philosophyLinkLabel', kind: 'text' });
 
   // looks
   const looks = block('looks');
-  defs.push({ key: 'looks.title', label: 'Образы — заголовок', kind: 'text' });
+  defs.push({ key: 'looks.title', labelKey: 'settings.trFields.looksTitle', kind: 'text' });
   asArray(looks.categories).forEach((_, i) => {
-    defs.push({ key: `looks.categories.${i}.title`, label: `Образы — категория ${i + 1} (заголовок)`, kind: 'text' });
-    defs.push({ key: `looks.categories.${i}.text`, label: `Образы — категория ${i + 1} (текст)`, kind: 'textarea' });
+    defs.push({
+      key: `looks.categories.${i}.title`,
+      labelKey: 'settings.trFields.looksCategoryTitle',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    });
+    defs.push({
+      key: `looks.categories.${i}.text`,
+      labelKey: 'settings.trFields.looksCategoryText',
+      labelParams: { n: i + 1 },
+      kind: 'textarea',
+    });
   });
 
   // tiles
   asArray(block('tiles').items).forEach((_, i) =>
-    defs.push({ key: `tiles.items.${i}.title`, label: `Плитки категорий — плитка ${i + 1}`, kind: 'text' }),
+    defs.push({
+      key: `tiles.items.${i}.title`,
+      labelKey: 'settings.trFields.tilesItemTitle',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    }),
   );
 
   // designers
   const designers = block('designers');
-  defs.push({ key: 'designers.title', label: 'Дизайнеры — заголовок', kind: 'text' });
+  defs.push({ key: 'designers.title', labelKey: 'settings.trFields.designersTitle', kind: 'text' });
   asArray(designers.items).forEach((_, i) =>
-    defs.push({ key: `designers.items.${i}.name`, label: `Дизайнеры — имя ${i + 1}`, kind: 'text' }),
+    defs.push({
+      key: `designers.items.${i}.name`,
+      labelKey: 'settings.trFields.designersItemName',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    }),
   );
 
   // slider
   asArray(block('slider').slides).forEach((_, i) => {
-    defs.push({ key: `slider.slides.${i}.name`, label: `Промо-слайдер — слайд ${i + 1} (название)`, kind: 'text' });
-    defs.push({ key: `slider.slides.${i}.caption`, label: `Промо-слайдер — слайд ${i + 1} (подпись)`, kind: 'text' });
+    defs.push({
+      key: `slider.slides.${i}.name`,
+      labelKey: 'settings.trFields.sliderSlideName',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    });
+    defs.push({
+      key: `slider.slides.${i}.caption`,
+      labelKey: 'settings.trFields.sliderSlideCaption',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    });
   });
 
   // corpCert
   asArray(block('corpCert').tiles).forEach((_, i) =>
-    defs.push({ key: `corpCert.tiles.${i}.title`, label: `Корпоративным / сертификаты — плитка ${i + 1}`, kind: 'text' }),
+    defs.push({
+      key: `corpCert.tiles.${i}.title`,
+      labelKey: 'settings.trFields.corpCertTileTitle',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    }),
   );
 
   return defs;
@@ -253,21 +334,34 @@ export function buildHomeTrFieldDefs(home: AnyRec): TranslatableFieldDef[] {
  * Переводимые листы навигации → дескрипторы. Whitelist повторяет
  * SETTINGS_TR_FIELDS.navigation: метки пунктов шапки, заголовки колонок футера и
  * метки ссылок футера. href НЕ переводится.
+ *
+ * Подписи параметризованы номерами: колонка — `n`, ссылка внутри колонки — `j`.
  */
 export function buildNavigationTrFieldDefs(navigation: AnyRec): TranslatableFieldDef[] {
   const defs: TranslatableFieldDef[] = [];
   const nav = (navigation ?? {}) as AnyRec;
 
   asArray(nav.header).forEach((_, i) =>
-    defs.push({ key: `header.${i}.label`, label: `Меню шапки — пункт ${i + 1}`, kind: 'text' }),
+    defs.push({
+      key: `header.${i}.label`,
+      labelKey: 'settings.trFields.navHeaderItem',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    }),
   );
 
   asArray(nav.footer).forEach((col, i) => {
-    defs.push({ key: `footer.${i}.title`, label: `Футер — колонка ${i + 1} (заголовок)`, kind: 'text' });
+    defs.push({
+      key: `footer.${i}.title`,
+      labelKey: 'settings.trFields.navFooterColumnTitle',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    });
     asArray((col as AnyRec)?.links).forEach((_, j) =>
       defs.push({
         key: `footer.${i}.links.${j}.label`,
-        label: `Футер — колонка ${i + 1}, ссылка ${j + 1}`,
+        labelKey: 'settings.trFields.navFooterColumnLink',
+        labelParams: { n: i + 1, j: j + 1 },
         kind: 'text',
       }),
     );

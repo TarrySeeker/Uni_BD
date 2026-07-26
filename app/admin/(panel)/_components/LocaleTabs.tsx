@@ -35,10 +35,20 @@ export {
 export interface TranslatableFieldDef {
   /** Ключ поля (совпадает с whitelist и ключом оверлея, camelCase). */
   key: string;
-  /** Человекочитаемая подпись (фолбэк, если нет labelKey). */
-  label: string;
-  /** i18n-ключ подписи (fields.*); LocaleTabs рендерит t(labelKey). */
-  labelKey?: string;
+  /**
+   * i18n-ключ подписи — ОБЯЗАТЕЛЕН. LocaleTabs рендерит `t(labelKey, labelParams)`.
+   *
+   * Готовой строки-подписи здесь СОЗНАТЕЛЬНО нет: пока `label` был допустим,
+   * дескрипторы панели переводов настроек несли русский текст, и владелец с
+   * локалью fr видел русские подписи полей. Обязательность ключа делает такой
+   * долг ошибкой компиляции, а не находкой в браузере.
+   */
+  labelKey: string;
+  /**
+   * Значения ICU-плейсхолдеров подписи. Нужны генерируемым дескрипторам, где
+   * подпись зависит от фактического наполнения массива («Плитка {n}»).
+   */
+  labelParams?: Record<string, string | number>;
   /** Вид ввода: однострочный (по умолчанию) или многострочный. */
   kind?: 'text' | 'textarea';
 }
@@ -171,7 +181,7 @@ export function LocaleTabs({
               return (
                 <div key={f.key}>
                   <label htmlFor={id} className={labelCls}>
-                    {f.labelKey ? t(f.labelKey) : f.label}
+                    {t(f.labelKey, f.labelParams)}
                   </label>
                   {f.kind === 'textarea' ? (
                     <textarea
@@ -259,26 +269,26 @@ export function translationsPayload(
 
 /** Whitelist-поля товара/бренда/категории для панели переводов (совпадает с *_TR_FIELDS). */
 export const CATALOG_ENTITY_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'name', label: 'Название', labelKey: 'fields.name', kind: 'text' },
-  { key: 'description', label: 'Описание', labelKey: 'fields.description', kind: 'textarea' },
-  { key: 'seoTitle', label: 'SEO Title', labelKey: 'fields.seoTitle', kind: 'text' },
-  { key: 'seoDescription', label: 'SEO Description', labelKey: 'fields.seoDescription', kind: 'textarea' },
-  { key: 'ogTitle', label: 'OG Title', labelKey: 'fields.ogTitle', kind: 'text' },
-  { key: 'ogDescription', label: 'OG Description', labelKey: 'fields.ogDescription', kind: 'textarea' },
+  { key: 'name', labelKey: 'fields.name', kind: 'text' },
+  { key: 'description', labelKey: 'fields.description', kind: 'textarea' },
+  { key: 'seoTitle', labelKey: 'fields.seoTitle', kind: 'text' },
+  { key: 'seoDescription', labelKey: 'fields.seoDescription', kind: 'textarea' },
+  { key: 'ogTitle', labelKey: 'fields.ogTitle', kind: 'text' },
+  { key: 'ogDescription', labelKey: 'fields.ogDescription', kind: 'textarea' },
 ];
 
 /** Whitelist-поля дизайнера для панели переводов (совпадает с DESIGNER_TR_FIELDS). */
 export const DESIGNER_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'name', label: 'Имя', labelKey: 'fields.designerName', kind: 'text' },
-  { key: 'description', label: 'Описание', labelKey: 'fields.description', kind: 'textarea' },
-  { key: 'country', label: 'Страна', labelKey: 'fields.country', kind: 'text' },
+  { key: 'name', labelKey: 'fields.designerName', kind: 'text' },
+  { key: 'description', labelKey: 'fields.description', kind: 'textarea' },
+  { key: 'country', labelKey: 'fields.country', kind: 'text' },
 ];
 
 /** Whitelist-поля CMS-страницы (совпадает с CMS_PAGE_TR_FIELDS). */
 export const CMS_PAGE_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-  { key: 'title', label: 'Заголовок', labelKey: 'fields.title', kind: 'text' },
-  { key: 'seoTitle', label: 'SEO Title', labelKey: 'fields.seoTitle', kind: 'text' },
-  { key: 'seoDescription', label: 'SEO Description', labelKey: 'fields.seoDescription', kind: 'textarea' },
-  { key: 'ogTitle', label: 'OG Title', labelKey: 'fields.ogTitle', kind: 'text' },
-  { key: 'ogDescription', label: 'OG Description', labelKey: 'fields.ogDescription', kind: 'textarea' },
+  { key: 'title', labelKey: 'fields.title', kind: 'text' },
+  { key: 'seoTitle', labelKey: 'fields.seoTitle', kind: 'text' },
+  { key: 'seoDescription', labelKey: 'fields.seoDescription', kind: 'textarea' },
+  { key: 'ogTitle', labelKey: 'fields.ogTitle', kind: 'text' },
+  { key: 'ogDescription', labelKey: 'fields.ogDescription', kind: 'textarea' },
 ];

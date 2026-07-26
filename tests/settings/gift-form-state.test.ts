@@ -99,7 +99,9 @@ describe('gift-form-state — buildGiftPayload', () => {
         allowIssueOnGiftPaidOrder: true,
       });
       expect(res.ok, `значение ${validDaysText}`).toBe(false);
-      if (!res.ok) expect(res.error).toMatch(/срок/i);
+      // Ошибка — ССЫЛКА на сообщение каталога (перевод делает компонент), а не
+      // русский текст: иначе владелец с локалью en/fr видел бы русскую фразу.
+      if (!res.ok) expect(res.error.key).toMatch(/^settings\.giftGiftSettingsForm\.errors\./);
     }
   });
 

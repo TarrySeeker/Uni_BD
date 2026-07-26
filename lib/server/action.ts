@@ -128,9 +128,9 @@ export interface ActionDeps {
    * Локализовать сообщение об ошибке в язык оператора админки (волна 6-Б, подход B).
    * Вход трактуется как i18n-КЛЮЧ: есть ключ в каталоге → перевод, иначе строка
    * возвращается КАК ЕСТЬ (безопасный фолбэк для ещё не переведённых сообщений).
-   * Дефолт — next-intl getTranslations (defaultTranslate); в юнит-тестах
+   * Дефолт — next-intl getTranslations (translateMessage); в юнит-тестах
    * переопределяется. Необязательна: если не задана, defineAction берёт
-   * defaultTranslate — существующие тесты с частичным набором deps не ломаются.
+   * translateMessage — существующие тесты с частичным набором deps не ломаются.
    */
   translate?: (
     key: string,
@@ -181,8 +181,12 @@ async function defaultGetRequestMeta(): Promise<RequestMeta> {
  * — поэтому ещё не переведённые (сырые) сообщения показываются как прежде, и
  * пайплайн ничего не ломает при частичной миграции. next-intl/server
  * импортируется ДИНАМИЧЕСКИ — чтобы юнит-импорт action.ts не тянул серверный API.
+ *
+ * ЭКСПОРТИРУЕТСЯ: серверным обёрткам форм, которые отказывают ДО defineAction
+ * (например «файл не выбран» при разборе FormData), нужен тот же переводчик —
+ * иначе такие сообщения остаются на языке автора кода.
  */
-async function defaultTranslate(
+export async function translateMessage(
   key: string,
   params?: Record<string, string | number>,
 ): Promise<string> {
@@ -201,7 +205,7 @@ export const defaultDeps: ActionDeps = {
   writeAudit: defaultWriteAudit,
   revalidate: defaultRevalidate,
   getRequestMeta: defaultGetRequestMeta,
-  translate: defaultTranslate,
+  translate: translateMessage,
 };
 
 // -----------------------------------------------------------------------------
@@ -237,7 +241,7 @@ export function defineAction<I, O>(
   opts: DefineActionOptions<I, O>,
 ): (raw: unknown) => Promise<ActionResult<O>> {
   const deps: ActionDeps = { ...defaultDeps, ...opts.deps };
-  const translate = deps.translate ?? defaultTranslate;
+  const translate = deps.translate ?? translateMessage;
 
   return async function action(raw: unknown): Promise<ActionResult<O>> {
     try {

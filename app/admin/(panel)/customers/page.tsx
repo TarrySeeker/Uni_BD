@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
-import { guardCustomers, customerStatusLabel, customerStatusBadgeClass } from './_components/guard';
+import { guardCustomers, customerStatusLabelKey, customerStatusBadgeClass } from './_components/guard';
 import { listCustomers, countCustomers } from '@/lib/customer-auth/repository';
 import { formatDateTime } from '@/lib/admin/order-format';
 import { listTruncationNotice } from '@/lib/admin/list-truncation';
@@ -28,6 +28,12 @@ export default async function CustomersPage({
   }
 
   const t = await getTranslations();
+
+  // Подпись статуса — ключом каталога; незнакомый код показываем как есть.
+  const statusLabel = (status: string): string => {
+    const key = customerStatusLabelKey(status);
+    return key ? t(key) : status;
+  };
 
   const { q } = await searchParams;
   const query = (q ?? '').trim();
@@ -100,7 +106,7 @@ export default async function CustomersPage({
                     <span
                       className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${customerStatusBadgeClass(c.status)}`}
                     >
-                      {customerStatusLabel(c.status)}
+                      {statusLabel(c.status)}
                     </span>
                   </td>
                   <td className="px-4 py-2 text-gray-700">{c.ordersCount}</td>

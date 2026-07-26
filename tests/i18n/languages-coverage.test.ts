@@ -33,8 +33,8 @@ describe('languages-coverage — buildCoverageMatrix', () => {
 
   const matrix = buildCoverageMatrix(
     [
-      { entity: 'products', label: 'Товары', coverage: products },
-      { entity: 'brands', label: 'Бренды', coverage: brands },
+      { entity: 'products', labelKey: 'settings.languagesPage.entities.products', coverage: products },
+      { entity: 'brands', labelKey: 'settings.languagesPage.entities.brands', coverage: brands },
     ],
     ['en', 'fr'],
   );
@@ -42,6 +42,13 @@ describe('languages-coverage — buildCoverageMatrix', () => {
   it('строка на сущность, ячейка на язык — в переданном порядке', () => {
     expect(matrix.map((r) => r.entity)).toEqual(['products', 'brands']);
     expect(matrix[0].cells.map((c) => c.locale)).toEqual(['en', 'fr']);
+  });
+
+  it('КЛЮЧ подписи сущности доезжает до строки матрицы (подпись резолвит render-сайт)', () => {
+    expect(matrix.map((r) => r.labelKey)).toEqual([
+      'settings.languagesPage.entities.products',
+      'settings.languagesPage.entities.brands',
+    ]);
   });
 
   it('несёт число строк и абсолютные счётчики (не только проценты)', () => {
@@ -68,7 +75,7 @@ describe('languages-coverage — buildCoverageMatrix', () => {
 
   it('сущность без строк не делит на ноль', () => {
     const empty = buildCoverageMatrix(
-      [{ entity: 'news', label: 'Новости', coverage: coverageOf([]) }],
+      [{ entity: 'news', labelKey: 'nav.news', coverage: coverageOf([]) }],
       ['en'],
     );
     expect(empty[0].total).toBe(0);
@@ -77,7 +84,7 @@ describe('languages-coverage — buildCoverageMatrix', () => {
 
   it('язык, которого нет в результате покрытия, даёт пустую ячейку, а не падение', () => {
     const m = buildCoverageMatrix(
-      [{ entity: 'products', label: 'Товары', coverage: products }],
+      [{ entity: 'products', labelKey: 'settings.languagesPage.entities.products', coverage: products }],
       ['en', 'de'],
     );
     expect(m[0].cells[1].locale).toBe('de');

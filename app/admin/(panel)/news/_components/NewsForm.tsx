@@ -65,14 +65,14 @@ export function NewsForm({
 
   /** Переводимые поля новости для LocaleTabs (совпадает с NEWS_TRANSLATABLE_FIELDS). */
   const NEWS_TR_FIELD_DEFS: readonly TranslatableFieldDef[] = [
-    { key: 'title', label: t('news.newsForm.fields.title'), kind: 'text' },
-    { key: 'groupLabel', label: t('news.newsForm.fields.group'), kind: 'text' },
-    { key: 'excerpt', label: t('news.newsForm.fields.excerpt'), kind: 'textarea' },
-    { key: 'body', label: t('news.newsForm.fields.body'), kind: 'textarea' },
-    { key: 'seoTitle', label: t('fields.seoTitle'), kind: 'text' },
-    { key: 'seoDescription', label: t('fields.seoDescription'), kind: 'textarea' },
-    { key: 'ogTitle', label: t('fields.ogTitle'), kind: 'text' },
-    { key: 'ogDescription', label: t('fields.ogDescription'), kind: 'textarea' },
+    { key: 'title', labelKey: 'news.newsForm.fields.title', kind: 'text' },
+    { key: 'groupLabel', labelKey: 'news.newsForm.fields.group', kind: 'text' },
+    { key: 'excerpt', labelKey: 'news.newsForm.fields.excerpt', kind: 'textarea' },
+    { key: 'body', labelKey: 'news.newsForm.fields.body', kind: 'textarea' },
+    { key: 'seoTitle', labelKey: 'fields.seoTitle', kind: 'text' },
+    { key: 'seoDescription', labelKey: 'fields.seoDescription', kind: 'textarea' },
+    { key: 'ogTitle', labelKey: 'fields.ogTitle', kind: 'text' },
+    { key: 'ogDescription', labelKey: 'fields.ogDescription', kind: 'textarea' },
   ];
 
   const [translations, setTranslations] = useState<TranslationsState>(

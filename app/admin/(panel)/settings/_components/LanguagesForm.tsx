@@ -53,7 +53,8 @@ export function LanguagesForm({ config }: { config: LocaleConfig }) {
   function onAddCustom() {
     const res = addCustomLocale(enabled, customTag);
     setEnabled(res.enabled);
-    setNotice(res.ok ? null : (res.error ?? null));
+    // Чистый модуль вернул ссылку на сообщение — текст собираем в локали оператора.
+    setNotice(res.ok || !res.error ? null : t(res.error.key, res.error.params));
     if (res.ok) setCustomTag('');
   }
 

@@ -19,6 +19,7 @@ import { useCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/format';
 import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 import { getDictionary, fillTemplate, type Dictionary } from '@/lib/dictionaries';
+import { normalizeGiftCode } from '@/lib/gift-code';
 import {
   ApiError,
   cdekCities,
@@ -100,7 +101,15 @@ function giftReasonLabel(t: CheckoutDict, reason: string): string {
   return map[reason] ?? t.giftCodeNotApplied;
 }
 
-/** Человекочитаемая ошибка создания заказа (code из /orders → CreateOrderResult). */
+/**
+ * Человекочитаемая ошибка создания заказа (code из /orders → CreateOrderResult).
+ *
+ * 🔴 Покупателю показываем ТОЛЬКО строки словаря витрины. Раньше неизвестный код
+ * падал на сырое сообщение из ApiError — а это текст сервера на РУССКОМ
+ * («Подарочный сертификат не найден.», «Сеть недоступна: …»), который уезжал
+ * франкоязычному покупателю как есть. Теперь сырое сообщение и машинный код идут
+ * исключительно в консоль браузера (для поддержки), а в интерфейс — словарь.
+ */
 function humanError(t: CheckoutDict, err: unknown): string {
   const map: Record<string, string> = {
     out_of_stock: t.orderErrorOutOfStock,
@@ -109,11 +118,14 @@ function humanError(t: CheckoutDict, err: unknown): string {
     invalid_gift: t.orderErrorInvalidGift,
     delivery_unavailable: t.orderErrorDeliveryUnavailable,
     payments_disabled: t.orderErrorPaymentsDisabled,
+    network: t.orderErrorNetwork,
+    rate_limited: t.orderErrorRateLimited,
   };
-  if (err instanceof ApiError) {
-    return map[err.code] ?? err.message;
-  }
-  return err instanceof Error ? err.message : t.orderErrorGeneric;
+  const known = err instanceof ApiError ? map[err.code] : undefined;
+  if (known) return known;
+  // Диагностика — в лог, не в интерфейс.
+  console.error('[checkout] неизвестная ошибка запроса', err);
+  return t.orderErrorGeneric;
 }
 
 /** Простейшая валидация телефона/email на клиенте (сервер валидирует строже). */
@@ -325,12 +337,27 @@ export default function CheckoutForm({
     setPromoInput('');
   }
 
+  // Код приводим к ХРАНИМОМУ виду (см. storefront/lib/gift-code.ts): поиск в БД
+  // точный (`WHERE code = $1`), а покупатель приносит код с пробелами вместо
+  // дефисов, слитно или с юникодным тире из письма.
+  const normalizedGift = normalizeGiftCode(giftInput);
+
   function applyGift() {
-    setAppliedGift(giftInput.trim());
+    setAppliedGift(normalizeGiftCode(giftInput));
   }
   function removeGift() {
     setAppliedGift('');
     setGiftInput('');
+  }
+  /**
+   * Правка кода после отказа. Сообщение об отказе привязано к содержимому поля
+   * (см. giftRejected ниже), поэтому первое же изменение ввода убирает его — текст
+   * не висит над уже другим значением. Полностью очищенное поле = код снят: убираем
+   * и appliedGift, иначе отклонённый код продолжал бы уходить в /cart/quote.
+   */
+  function changeGiftInput(value: string) {
+    setGiftInput(value);
+    if (normalizeGiftCode(value) === '') setAppliedGift('');
   }
 
   const fmt = (v: string | number | null | undefined) =>
@@ -432,8 +459,27 @@ export default function CheckoutForm({
   // Итог применения сертификата считает СЕРВЕР (quote.gift); grandTotal в DTO
   // уже уменьшен на списанную сумму. grandTotal = 0 → платить нечего.
   const gift = quote?.gift ?? null;
-  const giftApplied = Boolean(gift?.applied);
-  const giftFullyCovered = Boolean(quote && giftApplied && Number(quote.grandTotal) === 0);
+  // 🔴 ДВА РАЗНЫХ СОСТОЯНИЯ, которые раньше рисовались одним блоком:
+  //   giftAccepted — код принят и реально уменьшил сумму (можно писать «Применён:»);
+  //   giftRejected — код отправлен, но сервер его отклонил (никакого «Применён:»,
+  //                  никаких «Списано/Остаток» с нулями — только причина и поле
+  //                  ввода, чтобы исправить код).
+  // Сверка gift.code с appliedGift обязательна: пока летит пересчёт, в quote лежит
+  // ответ на ПРЕДЫДУЩИЙ код, и без сверки отказ показывался бы на чужой код.
+  const giftAccepted = gift && gift.applied && gift.code === appliedGift ? gift : null;
+  // Отказ показываем, только пока в поле лежит ИМЕННО отклонённый код: стоило
+  // покупателю начать правку — сообщение уходит вместе с причиной, а кнопка
+  // «Применить» снова становится активной (canApplyGift ниже — то же условие).
+  const giftRejected =
+    appliedGift !== '' &&
+    normalizedGift === appliedGift &&
+    gift !== null &&
+    !gift.applied &&
+    gift.code === appliedGift;
+  const giftFullyCovered = Boolean(quote && giftAccepted && Number(quote.grandTotal) === 0);
+  // Применять нечего, если поле пустое или этот же код уже отправлен (иначе кнопка
+  // была бы «живой», но ничего не делала — тупик для покупателя).
+  const canApplyGift = normalizedGift !== '' && normalizedGift !== appliedGift;
 
   return (
     <form className="sf-checkout" onSubmit={handleSubmit} noValidate>
@@ -667,52 +713,57 @@ export default function CheckoutForm({
           {/* --- Подарочный сертификат --- */}
           <fieldset className="sf-checkout__section">
             <legend className="sf-checkout__legend">{t.giftCode}</legend>
-            {appliedGift ? (
+            {giftAccepted ? (
+              // Код ПРИНЯТ: только здесь уместны «Применён:», «Списано», «Остаток».
               <div className="sf-promo-applied sf-promo-applied--stack">
                 <span>
                   {t.giftCodeApplied} <strong>{appliedGift}</strong>
-                  {gift && !gift.applied && (
-                    <em className="sf-field__error">
-                      {' '}
-                      — {giftReasonLabel(t, gift.reason ?? '')}
-                    </em>
-                  )}
-                  {gift && gift.applied && (
-                    <>
-                      <span className="sf-field__hint">
-                        {fillTemplate(t.giftCodeCovered, { amount: fmt(gift.appliedAmount) })}
-                      </span>
-                      <span className="sf-field__hint">
-                        {fillTemplate(t.giftCodeRemaining, {
-                          amount: fmt(gift.balanceRemainingAfter),
-                        })}
-                      </span>
-                    </>
-                  )}
+                  <span className="sf-field__hint">
+                    {fillTemplate(t.giftCodeCovered, { amount: fmt(giftAccepted.appliedAmount) })}
+                  </span>
+                  <span className="sf-field__hint">
+                    {fillTemplate(t.giftCodeRemaining, {
+                      amount: fmt(giftAccepted.balanceRemainingAfter),
+                    })}
+                  </span>
                 </span>
                 <button type="button" className="sf-btn-link" onClick={removeGift}>
                   {t.giftCodeRemove}
                 </button>
               </div>
             ) : (
-              <div className="sf-promo-row">
-                <input
-                  className="sf-field__input"
-                  type="text"
-                  value={giftInput}
-                  onChange={(e) => setGiftInput(e.target.value)}
-                  placeholder={t.giftCodePlaceholder}
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  className="sf-btn-secondary"
-                  onClick={applyGift}
-                  disabled={giftInput.trim().length === 0}
-                >
-                  {t.giftCodeApply}
-                </button>
-              </div>
+              // Код НЕ принят (не введён либо отклонён сервером): поле остаётся
+              // доступным, введённое значение сохранено, причина — под полем.
+              <>
+                <div className="sf-promo-row">
+                  <input
+                    className="sf-field__input"
+                    type="text"
+                    value={giftInput}
+                    onChange={(e) => changeGiftInput(e.target.value)}
+                    placeholder={t.giftCodePlaceholder}
+                    autoComplete="off"
+                    aria-invalid={giftRejected || undefined}
+                  />
+                  <button
+                    type="button"
+                    className="sf-btn-secondary"
+                    onClick={applyGift}
+                    disabled={!canApplyGift}
+                  >
+                    {t.giftCodeApply}
+                  </button>
+                </div>
+                {giftRejected && (
+                  <p className="sf-field__error">
+                    {giftReasonLabel(t, gift?.reason ?? '')}
+                    {/* «Проверьте код» — только когда проблема ИМЕННО в коде.
+                        no_amount_due означает, что код рабочий, но в этом заказе
+                        покрывать нечего: советовать исправить код было бы ложью. */}
+                    {gift?.reason === 'no_amount_due' ? null : <> {t.giftCodeRetry}</>}
+                  </p>
+                )}
+              </>
             )}
           </fieldset>
         </div>
@@ -814,7 +865,12 @@ export default function CheckoutForm({
             {submitting ? t.submitting : giftFullyCovered ? t.submitGiftCovered : t.submit}
           </button>
 
-          <p className="sf-checkout__legal">{t.legal}</p>
+          {/* 🔴 Легал-текст обязан соответствовать ФАКТИЧЕСКОМУ действию кнопки:
+              при полном покрытии сертификатом кнопка — «Оформить заказ», а онлайн-
+              оплаты не будет вовсе (заказ рождается оплаченным). */}
+          <p className="sf-checkout__legal">
+            {giftFullyCovered ? t.legalGiftCovered : t.legal}
+          </p>
         </aside>
       </div>
     </form>

@@ -58,36 +58,41 @@ const PAIRS_FIELDS = new Set(['items', 'images']);
  * Описание полей перевода для формы секции. Состав ОБЯЗАН совпадать с
  * CMS_SECTION_TR_FIELDS (whitelist write-path) — сторожит тест: форма не может
  * показать поле, которое сервер не примет, и наоборот.
+ *
+ * Подписи/подсказки — i18n-КЛЮЧИ (`cms.sectionFields.*`), как в SECTION_FIELD_SPECS:
+ * оба набора рисует один и тот же FieldControl, значит схема у них обязана быть одна.
  */
 export const SECTION_TR_FIELD_SPECS: Record<CmsSectionType, readonly SectionFieldSpec[]> = {
   hero: [
-    { name: 'title', label: 'Заголовок', kind: 'text' },
-    { name: 'subtitle', label: 'Подзаголовок', kind: 'text' },
-    { name: 'html', label: 'Текст (rich-text)', kind: 'richtext' },
-    { name: 'ctaLabel', label: 'Текст кнопки', kind: 'text' },
+    { name: 'title', labelKey: 'cms.sectionFields.title.label', kind: 'text' },
+    { name: 'subtitle', labelKey: 'cms.sectionFields.subtitle.label', kind: 'text' },
+    { name: 'html', labelKey: 'cms.sectionFields.html.label', kind: 'richtext' },
+    { name: 'ctaLabel', labelKey: 'cms.sectionFields.buttonLabel.label', kind: 'text' },
   ],
-  text: [{ name: 'html', label: 'Текст (rich-text)', kind: 'richtext' }],
-  banner: [{ name: 'alt', label: 'Alt-текст', kind: 'text' }],
-  products_grid: [{ name: 'title', label: 'Заголовок блока', kind: 'text' }],
+  text: [{ name: 'html', labelKey: 'cms.sectionFields.html.label', kind: 'richtext' }],
+  banner: [{ name: 'alt', labelKey: 'cms.sectionFields.alt.label', kind: 'text' }],
+  products_grid: [
+    { name: 'title', labelKey: 'cms.sectionFields.blockTitle.label', kind: 'text' },
+  ],
   faq: [
     {
       name: 'items',
-      label: 'Вопросы и ответы',
+      labelKey: 'cms.sectionFields.faqItems.label',
       kind: 'pairs',
-      hint: 'По строке на пару: Вопрос|Ответ. Порядок строк — как в основном языке; пустая строка оставит основной текст.',
+      hintKey: 'cms.sectionFields.faqItems.translationHint',
     },
   ],
   cta: [
-    { name: 'title', label: 'Заголовок', kind: 'text' },
-    { name: 'html', label: 'Текст (rich-text)', kind: 'richtext' },
-    { name: 'buttonLabel', label: 'Текст кнопки', kind: 'text' },
+    { name: 'title', labelKey: 'cms.sectionFields.title.label', kind: 'text' },
+    { name: 'html', labelKey: 'cms.sectionFields.html.label', kind: 'richtext' },
+    { name: 'buttonLabel', labelKey: 'cms.sectionFields.buttonLabel.label', kind: 'text' },
   ],
   gallery: [
     {
       name: 'images',
-      label: 'Alt-тексты изображений',
+      labelKey: 'cms.sectionFields.galleryAlts.label',
       kind: 'pairs',
-      hint: 'По строке alt-текст для каждого изображения, в том же порядке. Ключи файлов не переводятся.',
+      hintKey: 'cms.sectionFields.galleryAlts.hint',
     },
   ],
 };

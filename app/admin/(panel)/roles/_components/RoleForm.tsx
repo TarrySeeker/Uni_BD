@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 
 import type { ActionResult } from '@/lib/server/action';
 import { ALL_PERMISSIONS, type PermissionDef } from '@/lib/auth/permissions';
+import { moduleLabel } from '@/lib/config/module-labels';
 import type { RoleWithPermissions } from '@/lib/auth/admin-repository';
 
 import { createRoleAction, updateRoleAction } from './form-actions';
@@ -22,16 +23,14 @@ import { errorMessage, fieldError } from './action-result';
  */
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
-/** Модули с человекочитаемыми подписями (см. roles.roleForm.modules.*). */
-const KNOWN_MODULES = ['core', 'catalog', 'orders', 'cdek', 'cms'];
-
 export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
   const t = useTranslations();
   const router = useRouter();
 
-  function moduleLabel(module: string): string {
-    return KNOWN_MODULES.includes(module) ? t(`roles.roleForm.modules.${module}`) : module;
-  }
+  // Подписи модулей — из единого каталога lib/config/module-labels.ts. Локальный
+  // список знал лишь core/catalog/orders/cdek/cms, поэтому группы прав news,
+  // reviews и account печатались сырым техническим кодом на ЛЮБОЙ локали.
+  const groupLabel = (module: string): string => moduleLabel(module, t);
   const isEdit = role !== null;
 
   const [error, setError] = useState<Fail | null>(null);
@@ -153,7 +152,7 @@ export function RoleForm({ role }: { role: RoleWithPermissions | null }) {
           {groups.map(([module, perms]) => (
             <fieldset key={module} className="rounded-lg border border-gray-200 p-4">
               <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                {moduleLabel(module)}
+                {groupLabel(module)}
               </legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {perms.map((perm) => (
