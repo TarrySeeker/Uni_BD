@@ -27,6 +27,16 @@ vi.mock('@/lib/cdek/services/delivery-status', () => ({
   advanceDeliveryStatus: (...a: unknown[]) => advanceDeliveryStatusMock(...(a as [])),
 }));
 
+// Находка №25: pull-трекинг обязан вытаскивать и СОХРАНЯТЬ entity.cdek_number.
+const saveTrackNumberMock = vi.fn(async () => true);
+vi.mock('@/lib/cdek/services/track', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/cdek/services/track')>();
+  return {
+    ...actual,
+    saveTrackNumber: (...a: unknown[]) => saveTrackNumberMock(...(a as [])),
+  };
+});
+
 import {
   TrackingService,
   parseStatuses,
@@ -105,5 +115,67 @@ describe('cdek/tracking — refreshStatus (mock-трекинг)', () => {
     getShipmentMock.mockResolvedValue(null);
     const svc = new TrackingService(new CdekManager({ config: mockCfg }));
     await expect(svc.refreshStatus('ord-1')).rejects.toThrow();
+  });
+});
+
+describe('🔴 №25: cdek/tracking — боевой ответ отдаёт трек, и он сохраняется', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getShipmentMock.mockResolvedValue({ orderId: 'ord-1', cdekUuid: 'u-1' });
+    advanceDeliveryStatusMock.mockResolvedValue(true);
+  });
+
+  /** Боевой (НЕ mock) CdekManager: ключи заданы, HTTP-клиент подменён ответом СДЭК. */
+  function realManager(raw: unknown): CdekManager {
+    const realCfg = getCdekConfig({
+      NODE_ENV: 'test',
+      CDEK_ACCOUNT: 'acc',
+      CDEK_SECRET: 'sec',
+    });
+    const mgr = new CdekManager({ config: realCfg });
+    expect(mgr.isMock).toBe(false);
+    Object.defineProperty(mgr, 'client', {
+      configurable: true,
+      get: () => ({ request: async () => raw }),
+    });
+    return mgr;
+  }
+
+  const RAW = {
+    entity: {
+      uuid: 'u-1',
+      cdek_number: '1106109745',
+      statuses: [
+        { code: 'ACCEPTED', name: 'Принят', date_time: '2026-06-16T09:00:00+0300' },
+        { code: 'DELIVERED', name: 'Вручён', date_time: '2026-06-18T15:00:00+0300' },
+      ],
+    },
+  };
+
+  it('fetchTracking отдаёт и статусы, и cdek_number', async () => {
+    const svc = new TrackingService(realManager(RAW));
+    const snap = await svc.fetchTracking('u-1');
+    expect(snap.statuses).toHaveLength(2);
+    expect(snap.cdekNumber).toBe('1106109745');
+  });
+
+  it('refreshStatus сохраняет трек (иначе покупателю нечего показать)', async () => {
+    const svc = new TrackingService(realManager(RAW));
+    await svc.refreshStatus('ord-1');
+    expect(saveTrackNumberMock).toHaveBeenCalledWith('ord-1', '1106109745');
+  });
+
+  it('трек ещё не присвоен → saveTrackNumber не вызывается (не затираем NULL-ом)', async () => {
+    const svc = new TrackingService(
+      realManager({ entity: { uuid: 'u-1', statuses: RAW.entity.statuses } }),
+    );
+    await svc.refreshStatus('ord-1');
+    expect(saveTrackNumberMock).not.toHaveBeenCalled();
+  });
+
+  it('fetchStatuses (совместимость) продолжает работать', async () => {
+    const svc = new TrackingService(realManager(RAW));
+    const statuses = await svc.fetchStatuses('u-1');
+    expect(statuses.map((s) => s.code)).toEqual(['ACCEPTED', 'DELIVERED']);
   });
 });

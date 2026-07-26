@@ -8,6 +8,7 @@ import { OrderService } from './services/order';
 import { TrackingService } from './services/tracking';
 import { PrintService } from './services/print';
 import { CdekError } from './errors';
+import { isUserFacingCdekCode } from './user-facing';
 
 /**
  * Server Actions модуля cdek (docs/08 §10.1).
@@ -28,37 +29,36 @@ import { CdekError } from './errors';
 // Общие хелперы.
 // -----------------------------------------------------------------------------
 
-/** Бросает, если модуль cdek выключен (env ⊕ БД-оверрайд). */
-async function assertCdekEnabled(): Promise<void> {
-  if (!(await isModuleEffectivelyEnabled('cdek'))) {
-    throw new CdekError('module_disabled', 'Модуль «СДЭК» выключен.');
-  }
-}
-
 /**
- * Коды CdekError, чьё сообщение безопасно и полезно показать оператору в форме
- * (бизнес-правило сознательно отклонило действие — это НЕ внутренняя ошибка).
- * Главный кейс — `cdek_precondition_failed` при неоплаченном заказе (FF.md):
- * без этого defineAction свернул бы CdekError в безликий `internal`.
+ * Бросает, если модуль cdek выключен (env ⊕ БД-оверрайд).
+ *
+ * Через ту же обёртку, что и вызовы сервисов: иначе выключенный модуль читался
+ * оператором как «внутренняя ошибка» вместо «Модуль «СДЭК» выключен» (аудит №32).
  */
-const USER_FACING_CDEK_CODES = new Set([
-  'cdek_precondition_failed',
-  'cdek_missing_pvz',
-  'cdek_invalid_phone',
-  'cdek_no_shipment',
-]);
+async function assertCdekEnabled(): Promise<void> {
+  await withUserFacingCdekError(async () => {
+    if (!(await isModuleEffectivelyEnabled('cdek'))) {
+      throw new CdekError('module_disabled', 'Модуль «СДЭК» выключен.');
+    }
+  });
+}
 
 /**
  * Выполняет операцию СДЭК, переводя «понятные» доменные CdekError в
  * PublicActionError → форма покажет текст пользователю; прочие ошибки уходят в
  * `internal` (детали — только в лог сервера).
+ *
+ * Набор «понятных» кодов — lib/cdek/user-facing.ts (этот модуль 'use server' и
+ * не может экспортировать константу). Аудит №32: раньше в наборе было 4 кода,
+ * из-за чего осмысленные отказы («PDF ещё не готов», «отмена в пути запрещена»)
+ * показывались оператору как «внутренняя ошибка».
  */
 async function withUserFacingCdekError<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (err) {
-    if (err instanceof CdekError && USER_FACING_CDEK_CODES.has(err.code)) {
-      throw new PublicActionError(err.message);
+    if (isUserFacingCdekCode(err)) {
+      throw new PublicActionError((err as CdekError).message);
     }
     throw err;
   }
@@ -146,7 +146,11 @@ export const refreshCdekStatus = defineAction({
   input: OrderIdSchema,
   handler: async ({ orderId }) => {
     await assertCdekEnabled();
-    const res = await new TrackingService().refreshStatus(orderId);
+    // Аудит №32: обёртка нужна и здесь — иначе доменный отказ синхронизации
+    // (напр. выключенный модуль) оператор видит как «внутреннюю ошибку».
+    const res = await withUserFacingCdekError(() =>
+      new TrackingService().refreshStatus(orderId),
+    );
     return {
       result: res,
       revalidate: [orderPath(orderId)],
@@ -173,7 +177,11 @@ export const getCdekLabel = defineAction({
   input: LabelSchema,
   handler: async ({ orderId, kind }) => {
     await assertCdekEnabled();
-    const { url } = await new PrintService().getShipmentLabel(orderId, { kind });
+    // Аудит №32: 'cdek_print_not_ready' («PDF ещё не готов — повторите позже»)
+    // обязан доехать до оператора текстом, а не безликим internal.
+    const { url } = await withUserFacingCdekError(() =>
+      new PrintService().getShipmentLabel(orderId, { kind }),
+    );
     return {
       result: { url },
       // печать не меняет данные заказа — инвалидация не нужна (URL вернётся клиенту);

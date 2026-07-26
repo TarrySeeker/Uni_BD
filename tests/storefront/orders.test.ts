@@ -53,6 +53,7 @@ function makeOrder(over: Partial<Order> = {}): Order {
     paymentStatus: 'pending',
     paidAt: null,
     paymentRef: 'secret-pay-ref',
+    paymentInitiatedAt: null,
     paymentProvider: null,
     deliveryType: 'pvz',
     isPostamat: false,

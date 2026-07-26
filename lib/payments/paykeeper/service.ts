@@ -202,6 +202,11 @@ export class PaymentService {
       cart,
       clientPhone: order.customerPhone?.trim() || undefined,
       clientEmail: order.customerEmail?.trim() || undefined,
+      // Пер-заказный адрес возврата (с number/token). Раньше он использовался ТОЛЬКО
+      // в mock-ветке, и боевой PayKeeper возвращал покупателя на статический адрес из
+      // ЛК — без номера заказа страница успеха бесполезна, а код подарочного
+      // сертификата не показывался никогда (модуля e-mail в платформе нет).
+      returnUrl: opts.returnUrl,
     });
     await setPaymentRefAndProvider(order.id, res.invoiceId);
     return {

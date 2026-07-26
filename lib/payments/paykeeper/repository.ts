@@ -260,6 +260,11 @@ export async function getOrderGrandTotalById(orderId: string): Promise<string | 
  * Сохраняет invoice_id PayKeeper (orders.payment_ref) и провайдера
  * (orders.payment_provider='paykeeper') после успешного создания счёта.
  * Идемпотентно. Не меняет payment_status.
+ *
+ * Заодно ставит `payment_initiated_at = now()` (0058) — ВРЕМЯ ПОСЛЕДНЕЙ инициации.
+ * Витрина по нему отличает «оплатил и вернулся раньше вебхука» от «не платил
+ * вовсе» и не показывает кнопку оплаты поверх уже идущего платежа. Обновляется
+ * при КАЖДОЙ попытке: окно ожидания подтверждения отсчитывается от последней.
  */
 export async function setPaymentRefAndProvider(
   orderId: string,
@@ -269,6 +274,7 @@ export async function setPaymentRefAndProvider(
     UPDATE orders
        SET payment_ref = ${invoiceId},
            payment_provider = 'paykeeper',
+           payment_initiated_at = now(),
            updated_at = now()
      WHERE id = ${orderId}
   `;

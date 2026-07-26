@@ -20,6 +20,7 @@ import { CdekError } from '../errors';
 import { getShipmentByOrderId, getShipmentByCdekUuid, updateShipmentByOrderId } from '../repository';
 import { mapCdekStatus, displayName } from './status-map';
 import { advanceDeliveryStatus } from './delivery-status';
+import { saveTrackNumber, trackFromTrackingResponse } from './track';
 import type { CdekShipment } from '../types';
 
 /** Один статус трекинга (нормализованный). */
@@ -74,23 +75,46 @@ export function latestStatus(statuses: readonly TrackStatus[]): TrackStatus | nu
   return statuses[statuses.length - 1]!;
 }
 
+/**
+ * Снимок трекинга: статусы + трек-номер из ОДНОГО ответа СДЭК (находка №25).
+ * Раньше из ответа брались только статусы, а `entity.cdek_number` — единственный
+ * источник трека в боевом режиме, кроме вебхука — терялся.
+ */
+export interface TrackSnapshot {
+  statuses: TrackStatus[];
+  /** Трек-номер отправления; null — СДЭК его ещё не присвоил. */
+  cdekNumber: string | null;
+}
+
 export class TrackingService {
   constructor(private readonly manager: CdekManager = getCdekManager()) {}
 
-  /** Запрашивает статусы по uuid отправления (mock/real), нормализует. */
-  async fetchStatuses(cdekUuid: string): Promise<TrackStatus[]> {
+  /**
+   * Запрашивает трекинг по uuid отправления (mock/real) и нормализует ВЕСЬ
+   * полезный результат: статусы и трек-номер. В mock-режиме номер присваивается
+   * при создании накладной (mockCreateShipment), поэтому здесь его нет.
+   */
+  async fetchTracking(cdekUuid: string): Promise<TrackSnapshot> {
     if (this.manager.isMock) {
-      return this.manager.mock.mockTrackStatuses().map((s) => ({
-        code: s.code,
-        name: s.name,
-        dateTime: parseDateTime(s.dateTime),
-      }));
+      return {
+        statuses: this.manager.mock.mockTrackStatuses().map((s) => ({
+          code: s.code,
+          name: s.name,
+          dateTime: parseDateTime(s.dateTime),
+        })),
+        cdekNumber: null,
+      };
     }
     const raw = await this.manager.client.request<Record<string, unknown>>(
       'GET',
       `/v2/orders/${cdekUuid}`,
     );
-    return parseStatuses(raw);
+    return { statuses: parseStatuses(raw), cdekNumber: trackFromTrackingResponse(raw) };
+  }
+
+  /** Запрашивает статусы по uuid отправления (mock/real), нормализует. */
+  async fetchStatuses(cdekUuid: string): Promise<TrackStatus[]> {
+    return (await this.fetchTracking(cdekUuid)).statuses;
   }
 
   /**
@@ -119,7 +143,15 @@ export class TrackingService {
   }
 
   private async applyFromUuid(orderId: string, cdekUuid: string): Promise<RefreshResult> {
-    const statuses = await this.fetchStatuses(cdekUuid);
+    const { statuses, cdekNumber } = await this.fetchTracking(cdekUuid);
+
+    // ТРЕК-НОМЕР (находка №25) — до разбора статусов: он приходит и тогда, когда
+    // статусов ещё нет, а без него покупателю нечего показать в «где посылка».
+    // Идемпотентно; null/пустое не затирает уже сохранённый номер.
+    if (cdekNumber) {
+      await saveTrackNumber(orderId, cdekNumber);
+    }
+
     const latest = latestStatus(statuses);
     if (!latest) {
       return { statusCode: null, appliedDeliveryStatus: null, transitioned: false };

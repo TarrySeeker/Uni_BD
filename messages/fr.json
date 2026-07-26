@@ -1542,8 +1542,17 @@
         "changePaymentStatus": "Changement du statut de paiement",
         "changeDeliveryStatus": "Changement du statut de livraison"
       },
-      "confirmCancel": "Annuler la commande ? La réservation de stock sera libérée.",
-      "confirmRefund": "Effectuer un remboursement ? Le statut du paiement passera à « Remboursé »."
+      "confirmCancel": "Annuler la commande ? La réservation de stock sera libérée. Cette action ne rembourse PAS l’argent : pour une commande payée, utilisez « Remboursement ».",
+      "confirmRefund": "Effectuer un remboursement ? Le système appellera la passerelle de paiement pour rendre l’argent au client, libérera la réservation et annulera les cartes-cadeaux émises pour cette commande.",
+      "forceTitle": "Le stock de cette ligne est indisponible",
+      "forceHint": "La réservation n'a pas pu être déduite — par exemple, la déclinaison a été supprimée du catalogue avec sa ligne de stock. Chaque nouvelle tentative échouera. Vous pouvez expédier la commande sans déduire le stock : les SKU concernés sont inscrits dans l'historique de la commande et dans le journal d'audit, et leur stock devra être corrigé manuellement.",
+      "forceButton": "Expédier sans déduire le stock",
+      "forceCommentRequired": "Indiquez un commentaire justificatif — il sera inscrit dans l'historique de la commande.",
+      "confirmForce": "Expédier sans déduire le stock ? Le stock de ces lignes devra être corrigé manuellement.",
+      "confirmManualRefund": "Confirmer que l’argent a déjà été rendu au client EN DEHORS du système (virement/caisse) ? La commande sera marquée comme remboursée et votre confirmation sera inscrite dans le journal d’audit.",
+      "manualRefundTitle": "La passerelle ne remboursera pas automatiquement",
+      "manualRefundHint": "Pour cette commande, la passerelle de paiement n’effectue pas de remboursement (par exemple paiement hors ligne ou acquéreur sans remboursement automatique). Rendez l’argent au client vous-même — par virement ou en caisse — et confirmez seulement ensuite. La confirmation est inscrite dans le journal d’audit.",
+      "manualRefundButton": "Argent rendu hors du système — confirmer"
     },
     "page": {
       "moduleDisabled": "commandes (module désactivé)",
@@ -1686,7 +1695,8 @@
       "customer": {
         "email": "E-mail",
         "phone": "Téléphone",
-        "comment": "Commentaire"
+        "comment": "Commentaire",
+        "phoneNotCdek": "Le téléphone du client ne convient pas à un bordereau CDEK (numéro russe +7XXXXXXXXXX requis). Corrigez-le avant de créer l’expédition."
       },
       "delivery": {
         "type": "Type",
@@ -1714,6 +1724,23 @@
       "subtitle": "Ajoutez des produits, renseignez le client et la livraison. Le serveur vérifiera le total, les stocks et les prix à la création.",
       "backLabel": "Retour aux commandes",
       "moduleDisabled": "commandes (module désactivé)"
+    },
+    "orderContactForm": {
+      "heading": "Corriger les coordonnées et l’adresse",
+      "intro": "Seules les coordonnées du client et l’adresse de livraison sont modifiées. Les articles, les montants et les statuts restent inchangés.",
+      "name": "Nom du client",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "phoneNotCdek": "CDEK n’acceptera pas ce numéro : un numéro russe au format +7XXXXXXXXXX est requis.",
+      "city": "Ville de livraison",
+      "address": "Adresse de livraison",
+      "addressRequired": "Adresse de livraison (obligatoire pour le coursier)",
+      "reason": "Motif de la modification (inscrit dans l’historique)",
+      "submit": "Enregistrer",
+      "cancel": "Annuler",
+      "success": "Coordonnées de la commande mises à jour.",
+      "cdekShipmentWarning": "Un bordereau CDEK existe déjà pour cette commande — la modification ici ne le change pas. Corrigez les données dans CDEK ou annulez l’expédition et recréez-la.",
+      "deliveryCostNotice": "Les frais de livraison ne sont pas recalculés : la commande a été payée au montant convenu."
     }
   },
   "news": {

@@ -255,11 +255,22 @@ describe('isOrderPayable — backend-инвариант оплачиваемос
     expect(isOrderPayable('paid', 'refunded')).toBe(false);
   });
 
-  it('ДОПУСКАЕТ активный заказ с pending/failed/authorized (вкл. ретрай failed)', () => {
+  it('ДОПУСКАЕТ активный заказ с pending/failed (вкл. ретрай failed)', () => {
     expect(isOrderPayable('new', 'pending')).toBe(true);
     expect(isOrderPayable('awaiting_payment', 'pending')).toBe(true);
     expect(isOrderPayable('paid', 'failed')).toBe(true); // ретрай неуспешной оплаты
-    expect(isOrderPayable('new', 'authorized')).toBe(true);
+  });
+
+  /**
+   * 🔴 Регресс-тест двойной оплаты (третий цикл аудита): раньше здесь стояло
+   * `isOrderPayable('new', 'authorized') === true`. `authorized` — это ХОЛД:
+   * деньги уже удержаны на карте покупателя, и вторая инициация выставила бы
+   * второй счёт по тому же заказу. Полный перебор алфавита × решение —
+   * tests/orders/payment-payable-alphabet.test.ts.
+   */
+  it('🔴 БЛОКИРУЕТ оплату при ХОЛДЕ (authorized — деньги уже удержаны)', () => {
+    expect(isOrderPayable('new', 'authorized')).toBe(false);
+    expect(isOrderPayable('awaiting_payment', 'authorized')).toBe(false);
   });
 });
 

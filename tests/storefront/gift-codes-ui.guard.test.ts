@@ -102,10 +102,31 @@ describe('🔴 OrderPublicDto не расширяется кодом серти�
     throw new Error(`не удалось выделить тело ${header}`);
   }
 
-  it('ни интерфейс, ни маппер не содержат code (кроме промокода)', () => {
+  /**
+   * Поля с «code» в имени, которые к деньгам на предъявителя отношения НЕ имеют
+   * и в публичном DTO законны. Список закрытый — новое поле с «code» обязано
+   * попасть сюда осознанно (ревью), иначе тест падает.
+   *   promoCode — денормализованный снимок промокода (был здесь изначально);
+   *   pvzCode   — код пункта выдачи/постамата: покупателю нужно знать, КУДА
+   *               едет посылка (находка аудита №5).
+   */
+  const ALLOWED_CODE_FIELDS = ['deliveryPvzCode', 'promoCode', 'pvzCode'] as const;
+
+  it('ни интерфейс, ни маппер не содержат code (кроме разрешённых полей)', () => {
     for (const header of ['export interface OrderPublicDto', 'export function toOrderPublicDto']) {
-      const body = block(dto, header).replace(/promoCode/g, '');
+      let body = block(dto, header);
+      for (const allowed of ALLOWED_CODE_FIELDS) {
+        body = body.replaceAll(allowed, '');
+      }
       expect(body, header).not.toMatch(/code/i);
+    }
+  });
+
+  it('🔴 код сертификата не появляется в DTO ни под каким именем', () => {
+    for (const header of ['export interface OrderPublicDto', 'export function toOrderPublicDto']) {
+      const body = block(dto, header);
+      expect(body, header).not.toMatch(/gift[A-Za-z]*code/i);
+      expect(body, header).not.toMatch(/certificate[A-Za-z]*code/i);
     }
   });
 

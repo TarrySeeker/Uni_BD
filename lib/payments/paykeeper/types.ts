@@ -78,6 +78,13 @@ export interface CreateInvoiceInput {
   clientPhone?: string;
   /** Email покупателя (для чека). */
   clientEmail?: string;
+  /**
+   * Пер-заказный адрес возврата покупателя после оплаты (с `number`/`token`).
+   * Уезжает form-полем переопределения адреса перенаправления
+   * (PaykeeperConfig.returnParam, штатно `user_result_callback`). Пусто → поле не
+   * отправляется, PayKeeper вернёт покупателя по настройкам ЛК (как раньше).
+   */
+  returnUrl?: string;
 }
 
 /** Результат создания счёта. */

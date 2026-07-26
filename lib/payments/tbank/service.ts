@@ -207,7 +207,12 @@ export class PaymentService {
       Description: `Заказ ${order.number}`,
       PayType: cfg.payType,
       ...(cfg.notificationUrl ? { NotificationURL: cfg.notificationUrl } : {}),
-      ...(cfg.successUrl ? { SuccessURL: cfg.successUrl } : {}),
+      // Адрес возврата: приоритет — пер-заказный (несёт number/token, без них
+      // страница успеха не покажет ни заказ, ни код подарочного сертификата), фолбэк —
+      // статический TBANK_SUCCESS_URL.
+      ...(opts.returnUrl || cfg.successUrl
+        ? { SuccessURL: opts.returnUrl ?? cfg.successUrl! }
+        : {}),
       ...(cfg.failUrl ? { FailURL: cfg.failUrl } : {}),
       RedirectDueDate: redirectDueDate(cfg.redirectDueMin),
     };

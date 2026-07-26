@@ -92,6 +92,7 @@ export class PaykeeperClient implements IPaykeeperClient {
   private readonly authHeader: string;
   private readonly serviceName: string;
   private readonly lang: string;
+  private readonly returnParam: string | null;
   private readonly fetchImpl: typeof fetch;
 
   constructor(opts: PaykeeperClientOptions) {
@@ -106,6 +107,7 @@ export class PaykeeperClient implements IPaykeeperClient {
     this.authHeader = basicAuthHeader(config.login, config.password);
     this.serviceName = config.serviceName;
     this.lang = config.lang;
+    this.returnParam = config.returnParam;
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
 
@@ -130,6 +132,10 @@ export class PaykeeperClient implements IPaykeeperClient {
     form.set('service_name', buildServiceName(input, this.serviceName, this.lang));
     if (input.clientPhone) form.set('client_phone', input.clientPhone);
     if (input.clientEmail) form.set('client_email', input.clientEmail);
+    // Адрес возврата покупателя (с number/token) — без него PayKeeper вернёт его на
+    // статический адрес из ЛК и страница успеха не сможет показать ни заказ, ни код
+    // подарочного сертификата. Поле НЕ логируется (несёт токен доступа к заказу).
+    if (input.returnUrl && this.returnParam) form.set(this.returnParam, input.returnUrl);
     form.set('token', token);
 
     const decoded = await this.request<{ invoice_id?: string | number; invoice_url?: string }>(

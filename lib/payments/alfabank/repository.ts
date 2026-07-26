@@ -260,6 +260,11 @@ export async function getOrderGrandTotalById(orderId: string): Promise<string | 
  * Сохраняет orderId Альфа-Банка (orders.payment_ref) и провайдера
  * (orders.payment_provider='alfabank') после успешной регистрации заказа.
  * Идемпотентно. Не меняет payment_status.
+ *
+ * Заодно ставит `payment_initiated_at = now()` (0058) — ВРЕМЯ ПОСЛЕДНЕЙ инициации.
+ * Витрина по нему отличает «оплатил и вернулся раньше вебхука» от «не платил
+ * вовсе» и не показывает кнопку оплаты поверх уже идущего платежа. Обновляется
+ * при КАЖДОЙ попытке: окно ожидания подтверждения отсчитывается от последней.
  */
 export async function setPaymentRefAndProvider(
   orderId: string,
@@ -269,6 +274,7 @@ export async function setPaymentRefAndProvider(
     UPDATE orders
        SET payment_ref = ${orderRef},
            payment_provider = 'alfabank',
+           payment_initiated_at = now(),
            updated_at = now()
      WHERE id = ${orderId}
   `;

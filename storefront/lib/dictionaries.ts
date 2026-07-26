@@ -177,16 +177,22 @@ export interface Dictionary {
     // --- Причины проблем позиций (issues[].code) ---
     issueOutOfStock: string;
     issueInvalidItem: string;
-    issueNotFound: string;
+    issueNotFound: string; // домен: product_not_found
+    /** Домен: variant_not_found — товар есть, а выбранного варианта уже нет. */
+    issueVariantNotFound: string;
     issueInactive: string;
     // --- Причины отказа промокода (promo.reason) ---
     promoReasonNotFound: string;
     promoReasonExpired: string;
     promoReasonNotStarted: string;
     promoReasonInactive: string;
-    promoReasonUsageLimit: string;
-    promoReasonMinOrder: string;
-    promoReasonPerCustomerLimit: string;
+    promoReasonUsageLimit: string; // домен: usage_limit_reached
+    promoReasonMinOrder: string; // домен: below_min_total
+    promoReasonPerCustomerLimit: string; // домен: per_customer_limit_reached
+    /** Домен: below_min_qty — не хватает ЕДИНИЦ товара (а не суммы). */
+    promoReasonBelowMinQty: string;
+    /** Домен: invalid_kind — тип скидки не применим к этой корзине. */
+    promoReasonInvalidKind: string;
     // --- Причины отказа сертификата (gift.reason из /cart/quote) ---
     giftReasonNotFound: string;
     giftReasonExpired: string;
@@ -199,7 +205,20 @@ export interface Dictionary {
     orderErrorInvalidPromo: string;
     orderErrorInvalidGift: string;
     orderErrorDeliveryUnavailable: string;
+    /** Домен: invalid_zone — прислана зона доставки, которой нет в настройках. */
+    orderErrorInvalidZone: string;
     orderErrorPaymentsDisabled: string;
+    /** Домен: order_not_found — заказ не найден либо ссылка/токен не подошли. */
+    orderErrorOrderNotFound: string;
+    /** Домен: order_not_payable — заказ уже оплачен или возвращён. */
+    orderErrorOrderNotPayable: string;
+    /** Домен: payment_init_failed — шлюз не принял инициацию оплаты. */
+    orderErrorPaymentInitFailed: string;
+    /**
+     * Домен: payment_in_progress — по заказу УЖЕ идёт оплата, деньги удержаны
+     * банком (холд). Не «нельзя оплатить», а «повторять не нужно, деньги целы».
+     */
+    orderErrorPaymentInProgress: string;
     orderErrorNetwork: string; // ApiError code 'network' (fetch не дошёл)
     orderErrorRateLimited: string; // ApiError code 'rate_limited' (429 от API)
     /**
@@ -224,6 +243,40 @@ export interface Dictionary {
     statusPayment: string; // «Оплата»
     statusTotal: string; // «Сумма»
 
+    /**
+     * ---- Исход оплаты (аудит 2026-07-26, находка №1: тупик отменённой оплаты)
+     *
+     * Заголовок и текст выбираются ПО ИСХОДУ (storefront/lib/payment-result.ts):
+     * оплачено / подтверждается / ожидает / отменено / не прошло / заказ закрыт.
+     * Раньше все шесть случаев выглядели как «Спасибо! Ваш заказ принят».
+     * Тексты — шаблоны с {number}, без единого технического кода.
+     */
+    titleAwaiting: string; // «Заказ ожидает оплаты»
+    titleCancelled: string; // «Оплата не завершена»
+    titleFailed: string; // «Оплата не прошла»
+    titleClosed: string; // «Заказ закрыт»
+    textPaid: string; // «Спасибо! Заказ №{number} оплачен.»
+    textSettling: string; // «Оплата подтверждается…»
+    textAwaiting: string; // «Заказ №{number} принят, оплата пока не получена.»
+    textCancelled: string; // «Вы отменили оплату. Заказ сохранён…»
+    textFailed: string; // «Платёж не прошёл. Заказ сохранён…»
+    textClosed: string; // «Заказ отменён, оплата по нему невозможна.»
+    /** Ссылка «Проверить статус ещё раз» (пока идёт подтверждение). */
+    refreshStatus: string;
+    /**
+     * 🔴 ВЫХОД ИЗ ОЖИДАНИЯ. Пока подтверждение платежа в пути, кнопки оплаты нет
+     * (иначе двойное списание). Чтобы это ожидание не выглядело новым тупиком,
+     * покупателю прямо говорим: если оплата не прошла, возможность оплатить
+     * вернётся сама через несколько минут.
+     */
+    settlingHint: string;
+    /** Кнопка повторной оплаты уже созданного заказа. */
+    payAgain: string;
+    payAgainBusy: string; // «Переходим к оплате…»
+    payAgainError: string; // общий человекочитаемый отказ
+    payAgainNotPayable: string; // «этот заказ оплатить уже нельзя»
+    payAgainInProgress: string; // «оплата уже обрабатывается, деньги удержаны»
+
     // ---- Блок кода подарочного сертификата (ТЗ п.11) ----
     giftTitle: string; // «Ваш подарочный сертификат»
     giftPending: string; // «Оплата подтверждается, код появится здесь автоматически»
@@ -236,6 +289,51 @@ export interface Dictionary {
     giftCopy: string; // «Скопировать»
     giftCopied: string; // «Скопировано»
     giftWarning: string; // «сохраните код — он равносилен деньгам»
+  };
+  /**
+   * Страница заказа и блок «где моя посылка» (находка аудита №5). Покупателю
+   * негде было узнать статус доставки и трек-номер: письма о смене статуса
+   * платформа не шлёт, ЛК на витрине нет. Отсюда — постоянная страница заказа
+   * по номеру и токену + подписи статусов доставки ПО КОДУ во всех локалях
+   * (серверные подписи всегда русские — их рендерить нельзя).
+   */
+  order: {
+    title: string; // «Ваш заказ»
+    metaTitle: string; // <title> страницы
+    needLink: string; // «откройте заказ по персональной ссылке»
+    notFound: string; // «заказ не найден: ссылка недействительна»
+
+    statusOrder: string; // «Статус заказа»
+    statusPayment: string; // «Оплата»
+    statusDelivery: string; // «Доставка»
+    statusTotal: string; // «Сумма»
+    placedAt: string; // «Оформлен»
+
+    method: string; // «Способ доставки»
+    destination: string; // «Куда»
+    track: string; // «Трек-номер»
+    trackHint: string; // «по номеру можно отследить на сайте службы доставки»
+    noTrackYet: string; // «трек появится, когда посылку передадут в доставку»
+
+    linkTitle: string; // «Ссылка на ваш заказ»
+    linkHint: string; // «сохраните её — вернётесь к статусу в любой момент»
+    linkOpen: string; // «Открыть страницу заказа →»
+
+    // Способ доставки (delivery.type + флаг постамата).
+    methodCourier: string;
+    methodPvz: string;
+    methodPostamat: string;
+    methodPickup: string;
+    methodUnknown: string; // код способа неизвестен витрине
+
+    // Статус доставки ПО КОДУ (delivery_status домена).
+    deliveryStatusPending: string;
+    deliveryStatusRegistered: string;
+    deliveryStatusInTransit: string;
+    deliveryStatusDelivered: string;
+    deliveryStatusReturned: string;
+    deliveryStatusCancelled: string;
+    deliveryStatusUnknown: string; // код неизвестен и витрине, и серверной подписи
   };
   notFound: {
     text: string; // «Страница не найдена.»
@@ -396,6 +494,7 @@ const ru: Dictionary = {
     issueOutOfStock: 'нет в наличии в нужном количестве',
     issueInvalidItem: 'товар недоступен',
     issueNotFound: 'товар больше не найден в каталоге',
+    issueVariantNotFound: 'выбранный вариант товара недоступен',
     issueInactive: 'товар снят с продажи',
     promoReasonNotFound: 'Промокод не найден.',
     promoReasonExpired: 'Срок действия промокода истёк.',
@@ -404,6 +503,9 @@ const ru: Dictionary = {
     promoReasonUsageLimit: 'Лимит использований промокода исчерпан.',
     promoReasonMinOrder: 'Заказ не достигает минимальной суммы для промокода.',
     promoReasonPerCustomerLimit: 'Вы уже использовали этот промокод.',
+    promoReasonBelowMinQty:
+      'Для этого промокода нужно больше единиц товара — добавьте ещё.',
+    promoReasonInvalidKind: 'Этот промокод неприменим к вашей корзине.',
     giftReasonNotFound: 'Сертификат с таким кодом не найден.',
     giftReasonExpired: 'Срок действия сертификата истёк.',
     giftReasonDepleted: 'На сертификате не осталось средств.',
@@ -418,6 +520,15 @@ const ru: Dictionary = {
       'Не удалось рассчитать доставку в выбранное место. Измените способ или адрес доставки.',
     orderErrorPaymentsDisabled:
       'Онлайн-оплата временно недоступна. Свяжитесь с магазином для оформления.',
+    orderErrorInvalidZone:
+      'Выбранная зона доставки больше недоступна. Обновите страницу и выберите её заново.',
+    orderErrorOrderNotFound:
+      'Заказ не найден. Проверьте ссылку из письма или свяжитесь с магазином.',
+    orderErrorOrderNotPayable: 'Этот заказ оплатить нельзя: он уже оплачен или закрыт.',
+    orderErrorPaymentInitFailed:
+      'Не удалось начать оплату. Попробуйте ещё раз через минуту или свяжитесь с магазином.',
+    orderErrorPaymentInProgress:
+      'Оплата этого заказа уже обрабатывается: банк зарезервировал деньги. Платить второй раз не нужно — обновите страницу через несколько минут.',
     orderErrorNetwork:
       'Не удалось связаться с магазином. Проверьте соединение и попробуйте ещё раз.',
     orderErrorRateLimited: 'Слишком много попыток. Подождите немного и попробуйте снова.',
@@ -434,6 +545,25 @@ const ru: Dictionary = {
     statusOrder: 'Статус заказа',
     statusPayment: 'Оплата',
     statusTotal: 'Сумма',
+    titleAwaiting: 'Заказ ожидает оплаты',
+    titleCancelled: 'Оплата не завершена',
+    titleFailed: 'Платёж не прошёл',
+    titleClosed: 'Заказ закрыт',
+    textPaid: 'Спасибо! Заказ №{number} принят и полностью оплачен.',
+    textSettling:
+      'Заказ №{number} принят. Банк подтверждает платёж — обычно это занимает до минуты.',
+    textAwaiting: 'Заказ №{number} сохранён, но деньги за него ещё не получены.',
+    textCancelled: 'Вы прервали оплату. Заказ №{number} сохранён — его можно оплатить сейчас.',
+    textFailed: 'Банк отклонил платёж. Заказ №{number} сохранён — попробуйте оплатить ещё раз.',
+    textClosed: 'Заказ №{number} закрыт. Оформите новый или свяжитесь с нами.',
+    refreshStatus: 'Проверить статус ещё раз',
+    settlingHint: 'Если оплата так и не прошла, обновите страницу через несколько минут — возможность оплатить заказ вернётся.',
+    payAgain: 'Оплатить заказ',
+    payAgainBusy: 'Переходим к оплате…',
+    payAgainError: 'Не удалось перейти к оплате. Попробуйте ещё раз или свяжитесь с нами.',
+    payAgainNotPayable: 'Этот заказ больше не требует оплаты — обновите страницу.',
+    payAgainInProgress:
+      'Оплата уже обрабатывается: банк зарезервировал деньги. Платить второй раз не нужно.',
     giftTitle: 'Ваш подарочный сертификат',
     giftPending: 'Оплата подтверждается, код появится здесь автоматически.',
     giftRefresh: 'Обновить',
@@ -446,6 +576,45 @@ const ru: Dictionary = {
     giftCopy: 'Скопировать',
     giftCopied: 'Скопировано',
     giftWarning: 'Сохраните код — он равносилен деньгам. Не показывайте его посторонним.',
+  },
+  order: {
+    title: 'Ваш заказ',
+    metaTitle: 'Заказ',
+    needLink:
+      'Чтобы открыть заказ, перейдите по персональной ссылке из подтверждения заказа.',
+    notFound: 'Заказ не найден: ссылка недействительна или устарела.',
+
+    statusOrder: 'Статус заказа',
+    statusPayment: 'Оплата',
+    statusDelivery: 'Доставка',
+    statusTotal: 'Сумма',
+    placedAt: 'Оформлен',
+
+    method: 'Способ доставки',
+    destination: 'Куда',
+    track: 'Трек-номер',
+    trackHint: 'По этому номеру посылку можно отследить на сайте службы доставки.',
+    noTrackYet:
+      'Трек-номер появится здесь, как только посылку передадут в службу доставки.',
+
+    linkTitle: 'Ссылка на ваш заказ',
+    linkHint:
+      'Сохраните её: по этой ссылке вы в любой момент вернётесь к статусу заказа и трек-номеру.',
+    linkOpen: 'Открыть страницу заказа →',
+
+    methodCourier: 'Курьер',
+    methodPvz: 'Пункт выдачи',
+    methodPostamat: 'Постамат',
+    methodPickup: 'Самовывоз',
+    methodUnknown: 'Доставка',
+
+    deliveryStatusPending: 'Готовится к отправке',
+    deliveryStatusRegistered: 'Передана в службу доставки',
+    deliveryStatusInTransit: 'В пути',
+    deliveryStatusDelivered: 'Доставлена',
+    deliveryStatusReturned: 'Возвращена отправителю',
+    deliveryStatusCancelled: 'Отменена',
+    deliveryStatusUnknown: 'Уточняется',
   },
   notFound: {
     text: 'Страница не найдена.',
@@ -601,6 +770,7 @@ const en: Dictionary = {
     issueOutOfStock: 'not available in the requested quantity',
     issueInvalidItem: 'item unavailable',
     issueNotFound: 'item is no longer in the catalog',
+    issueVariantNotFound: 'the selected option is no longer available',
     issueInactive: 'item has been discontinued',
     promoReasonNotFound: 'Promo code not found.',
     promoReasonExpired: 'The promo code has expired.',
@@ -609,6 +779,9 @@ const en: Dictionary = {
     promoReasonUsageLimit: 'The promo code usage limit has been reached.',
     promoReasonMinOrder: 'The order does not reach the minimum amount for this promo code.',
     promoReasonPerCustomerLimit: 'You have already used this promo code.',
+    promoReasonBelowMinQty:
+      'This promo code requires more items — please add a few more.',
+    promoReasonInvalidKind: 'This promo code does not apply to your cart.',
     giftReasonNotFound: 'No gift certificate found for this code.',
     giftReasonExpired: 'The gift certificate has expired.',
     giftReasonDepleted: 'The gift certificate has no funds left.',
@@ -623,6 +796,15 @@ const en: Dictionary = {
       'Could not calculate delivery to the selected location. Change the method or delivery address.',
     orderErrorPaymentsDisabled:
       'Online payment is temporarily unavailable. Please contact the store to place your order.',
+    orderErrorInvalidZone:
+      'The selected delivery area is no longer available. Refresh the page and pick it again.',
+    orderErrorOrderNotFound:
+      'Order not found. Check the link from your email or contact the store.',
+    orderErrorOrderNotPayable: 'This order cannot be paid: it has already been paid or closed.',
+    orderErrorPaymentInitFailed:
+      'Could not start the payment. Try again in a minute or contact the store.',
+    orderErrorPaymentInProgress:
+      'This order is already being paid: the bank is holding the funds. There is no need to pay twice — please refresh the page in a few minutes.',
     orderErrorNetwork:
       'Could not reach the store. Please check your connection and try again.',
     orderErrorRateLimited: 'Too many attempts. Please wait a moment and try again.',
@@ -639,6 +821,26 @@ const en: Dictionary = {
     statusOrder: 'Order status',
     statusPayment: 'Payment',
     statusTotal: 'Amount',
+    titleAwaiting: 'Order awaiting payment',
+    titleCancelled: 'Payment not completed',
+    titleFailed: 'Payment declined',
+    titleClosed: 'Order closed',
+    textPaid: 'Thank you! Order #{number} has been received and paid in full.',
+    textSettling:
+      'Order #{number} has been received. The bank is confirming the payment — this usually takes under a minute.',
+    textAwaiting: 'Order #{number} is saved, but we have not received the money for it yet.',
+    textCancelled:
+      'You stopped the payment. Order #{number} is saved — you can pay for it right now.',
+    textFailed: 'The bank declined the payment. Order #{number} is saved — please try paying again.',
+    textClosed: 'Order #{number} is closed. Please place a new one or contact us.',
+    refreshStatus: 'Check the status again',
+    settlingHint: 'If the payment did not go through after all, refresh this page in a few minutes — the option to pay will come back.',
+    payAgain: 'Pay for the order',
+    payAgainBusy: 'Taking you to the payment page…',
+    payAgainError: 'We could not open the payment page. Please try again or contact us.',
+    payAgainNotPayable: 'This order no longer needs payment — please refresh the page.',
+    payAgainInProgress:
+      'The payment is already being processed: the bank is holding the funds. There is no need to pay twice.',
     giftTitle: 'Your gift certificate',
     giftPending: 'Payment is being confirmed, the code will appear here automatically.',
     giftRefresh: 'Refresh',
@@ -651,6 +853,45 @@ const en: Dictionary = {
     giftCopy: 'Copy',
     giftCopied: 'Copied',
     giftWarning: 'Keep this code safe — it is equivalent to money. Do not share it.',
+  },
+  order: {
+    title: 'Your order',
+    metaTitle: 'Order',
+    needLink:
+      'To open your order, follow the personal link from your order confirmation.',
+    notFound: 'Order not found: the link is invalid or has expired.',
+
+    statusOrder: 'Order status',
+    statusPayment: 'Payment',
+    statusDelivery: 'Delivery',
+    statusTotal: 'Total',
+    placedAt: 'Placed on',
+
+    method: 'Delivery method',
+    destination: 'Destination',
+    track: 'Tracking number',
+    trackHint: 'Use this number to track the parcel on the carrier’s website.',
+    noTrackYet:
+      'The tracking number will appear here as soon as the parcel is handed over to the carrier.',
+
+    linkTitle: 'Link to your order',
+    linkHint:
+      'Save it: this link brings you back to the order status and the tracking number at any time.',
+    linkOpen: 'Open the order page →',
+
+    methodCourier: 'Courier',
+    methodPvz: 'Pickup point',
+    methodPostamat: 'Parcel locker',
+    methodPickup: 'Store pickup',
+    methodUnknown: 'Delivery method',
+
+    deliveryStatusPending: 'Preparing for dispatch',
+    deliveryStatusRegistered: 'Handed over to the carrier',
+    deliveryStatusInTransit: 'In transit',
+    deliveryStatusDelivered: 'Delivered',
+    deliveryStatusReturned: 'Returned to sender',
+    deliveryStatusCancelled: 'Cancelled',
+    deliveryStatusUnknown: 'Being confirmed',
   },
   notFound: {
     text: 'Page not found.',
@@ -807,6 +1048,7 @@ const fr: Dictionary = {
     issueOutOfStock: 'indisponible dans la quantité demandée',
     issueInvalidItem: 'article indisponible',
     issueNotFound: 'article introuvable dans le catalogue',
+    issueVariantNotFound: 'la déclinaison choisie n’est plus disponible',
     issueInactive: 'article retiré de la vente',
     promoReasonNotFound: 'Code promo introuvable.',
     promoReasonExpired: 'Le code promo a expiré.',
@@ -815,6 +1057,9 @@ const fr: Dictionary = {
     promoReasonUsageLimit: 'La limite d’utilisation du code promo est atteinte.',
     promoReasonMinOrder: 'La commande n’atteint pas le montant minimum pour ce code promo.',
     promoReasonPerCustomerLimit: 'Vous avez déjà utilisé ce code promo.',
+    promoReasonBelowMinQty:
+      'Ce code promo exige davantage d’articles — ajoutez-en quelques-uns.',
+    promoReasonInvalidKind: 'Ce code promo ne s’applique pas à votre panier.',
     giftReasonNotFound: 'Carte cadeau introuvable.',
     giftReasonExpired: 'La carte cadeau a expiré.',
     giftReasonDepleted: 'La carte cadeau n’a plus de solde.',
@@ -829,6 +1074,15 @@ const fr: Dictionary = {
       'Impossible de calculer la livraison vers le lieu choisi. Changez le mode ou l’adresse de livraison.',
     orderErrorPaymentsDisabled:
       'Le paiement en ligne est temporairement indisponible. Contactez la boutique pour passer commande.',
+    orderErrorInvalidZone:
+      'La zone de livraison choisie n’est plus disponible. Actualisez la page et sélectionnez-la à nouveau.',
+    orderErrorOrderNotFound:
+      'Commande introuvable. Vérifiez le lien reçu par e-mail ou contactez la boutique.',
+    orderErrorOrderNotPayable: 'Cette commande ne peut pas être réglée : elle est déjà payée ou clôturée.',
+    orderErrorPaymentInitFailed:
+      'Impossible de lancer le paiement. Réessayez dans une minute ou contactez la boutique.',
+    orderErrorPaymentInProgress:
+      'Le paiement de cette commande est déjà en cours : la banque a réservé les fonds. Inutile de payer une seconde fois — actualisez la page dans quelques minutes.',
     orderErrorNetwork:
       'Impossible de joindre la boutique. Vérifiez votre connexion et réessayez.',
     orderErrorRateLimited: 'Trop de tentatives. Patientez un instant puis réessayez.',
@@ -845,6 +1099,29 @@ const fr: Dictionary = {
     statusOrder: 'Statut de la commande',
     statusPayment: 'Paiement',
     statusTotal: 'Montant',
+    titleAwaiting: 'Commande en attente de paiement',
+    titleCancelled: 'Paiement interrompu',
+    titleFailed: 'Paiement refusé',
+    titleClosed: 'Commande clôturée',
+    textPaid: 'Merci ! La commande n°{number} a bien été reçue et intégralement réglée.',
+    textSettling:
+      'La commande n°{number} a bien été reçue. La banque confirme le paiement — cela prend généralement moins d’une minute.',
+    textAwaiting:
+      'La commande n°{number} est enregistrée, mais nous n’avons pas encore reçu le règlement.',
+    textCancelled:
+      'Vous avez interrompu le paiement. La commande n°{number} est conservée — vous pouvez la régler dès maintenant.',
+    textFailed:
+      'La banque a refusé le paiement. La commande n°{number} est conservée — réessayez de la régler.',
+    textClosed:
+      'La commande n°{number} est clôturée. Passez une nouvelle commande ou contactez-nous.',
+    refreshStatus: 'Vérifier à nouveau le statut',
+    settlingHint: 'Si le paiement n’a finalement pas abouti, actualisez cette page dans quelques minutes : la possibilité de régler la commande réapparaîtra.',
+    payAgain: 'Régler la commande',
+    payAgainBusy: 'Redirection vers le paiement…',
+    payAgainError: 'Impossible d’ouvrir la page de paiement. Réessayez ou contactez-nous.',
+    payAgainNotPayable: 'Cette commande ne nécessite plus de paiement — actualisez la page.',
+    payAgainInProgress:
+      'Le paiement est déjà en cours de traitement : la banque a réservé les fonds. Inutile de payer une seconde fois.',
     giftTitle: 'Votre carte cadeau',
     giftPending: 'Le paiement est en cours de confirmation, le code apparaîtra ici automatiquement.',
     giftRefresh: 'Actualiser',
@@ -857,6 +1134,45 @@ const fr: Dictionary = {
     giftCopy: 'Copier',
     giftCopied: 'Copié',
     giftWarning: 'Conservez ce code — il équivaut à de l’argent. Ne le partagez pas.',
+  },
+  order: {
+    title: 'Votre commande',
+    metaTitle: 'Commande',
+    needLink:
+      'Pour ouvrir votre commande, utilisez le lien personnel figurant dans la confirmation de commande.',
+    notFound: 'Commande introuvable : le lien est invalide ou a expiré.',
+
+    statusOrder: 'Statut de la commande',
+    statusPayment: 'Paiement',
+    statusDelivery: 'Livraison',
+    statusTotal: 'Total à payer',
+    placedAt: 'Passée le',
+
+    method: 'Mode de livraison',
+    destination: 'Lieu de livraison',
+    track: 'Numéro de suivi',
+    trackHint: 'Ce numéro permet de suivre le colis sur le site du transporteur.',
+    noTrackYet:
+      'Le numéro de suivi apparaîtra ici dès que le colis sera remis au transporteur.',
+
+    linkTitle: 'Lien vers votre commande',
+    linkHint:
+      'Conservez-le : ce lien vous ramène à tout moment au statut de la commande et au numéro de suivi.',
+    linkOpen: 'Ouvrir la page de la commande →',
+
+    methodCourier: 'Coursier',
+    methodPvz: 'Point de retrait',
+    methodPostamat: 'Consigne automatique',
+    methodPickup: 'Retrait en boutique',
+    methodUnknown: 'Mode d’expédition',
+
+    deliveryStatusPending: 'En cours de préparation',
+    deliveryStatusRegistered: 'Remis au transporteur',
+    deliveryStatusInTransit: 'En cours d’acheminement',
+    deliveryStatusDelivered: 'Livré',
+    deliveryStatusReturned: 'Retourné à l’expéditeur',
+    deliveryStatusCancelled: 'Annulé',
+    deliveryStatusUnknown: 'En cours de confirmation',
   },
   notFound: {
     text: 'Page introuvable.',

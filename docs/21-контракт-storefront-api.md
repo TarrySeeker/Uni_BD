@@ -33,7 +33,30 @@ docker-сети на `http://app:3000/api/storefront/v1/*`; браузерные
   (удобно для локального demo/CI; на бою задай ключ/Origin).
 
 **Формат ответов:** успех — `{ "data": <...>, "pagination"?: {...}, "count"?: n }`;
-ошибка — `{ "error": "<code>", "message"?: "<...>", "fieldErrors"?: {...} }`.
+ошибка — `{ "error": { "code": "<транспорт>", "message": "<диагностика>", "reason"?: "<домен>" } }`.
+
+**Два кода в ошибке (важно для локализации витрины):**
+
+| поле | что это | как использовать |
+|---|---|---|
+| `code` | ТРАНСПОРТНЫЙ код: `unauthorized`, `forbidden`, `not_found`, `rate_limited`, `bad_request`, `module_disabled`, `conflict`, `unprocessable` | ветвление по HTTP-семантике |
+| `reason` | ДОМЕННАЯ причина из публичного алфавита (**необязательное** поле) | ключ для выбора строки в словаре витрины |
+| `message` | текст на языке магазина | логи/поддержка; **покупателю не показывать** |
+
+Публичный алфавит `reason` (`lib/storefront/error-reasons.ts`): `out_of_stock`,
+`invalid_item`, `invalid_promo`, `invalid_gift`, `delivery_unavailable`,
+`invalid_zone`, `payments_disabled`, `order_not_found`, `order_not_payable`,
+`payment_init_failed`, `payment_in_progress`. Расширяется ТОЛЬКО аддитивно; витрина
+обязана иметь фолбэк на неизвестное значение. Транспорт выбирается по причине:
+`out_of_stock`, `order_not_payable` и `payment_in_progress` → `409 conflict`,
+остальные доменные отказы → `422 unprocessable`.
+
+Машинные причины ВНУТРИ успешного `POST /cart/quote` (200) — те же правила «ключ →
+строка словаря»: `issues[].code` ∈ {`product_not_found`, `variant_not_found`,
+`inactive`, `out_of_stock`}; `promo.reason` ∈ {`not_found`, `inactive`,
+`not_started`, `expired`, `below_min_total`, `below_min_qty`, `usage_limit_reached`,
+`per_customer_limit_reached`, `invalid_kind`}; `gift.reason` ∈ {`not_found`,
+`expired`, `depleted`, `disabled`, `no_amount_due`}.
 
 **Деньги — в копейках** (целые); конвертацию в рубли делает витрина по
 `settings.currency`. Изображения отдаются как **публичные URL** (ключи S3 уже
@@ -104,15 +127,56 @@ fulfillable, issues:[]`. Цены/остатки/габариты — из ка�
 ```
 `data`: `{ number, status, paymentStatus, grandTotal, currency, accessToken }`.
 `201` новый / `200` повтор по idempotency. `409` нет остатка; `422` валидация.
+Тело ошибки несёт доменную причину `error.reason` (`out_of_stock`, `invalid_item`,
+`invalid_promo`, `invalid_gift`, `delivery_unavailable`, `invalid_zone`,
+`payments_disabled`) — именно по ней витрина выбирает переведённое сообщение.
 Сервер: ревалидация цен/остатков из каталога → атомарный резерв → номер
 (`ПРЕФИКС-ГОД-NNNNNN`) → снимок позиций → учёт промокода. **Сохрани `accessToken`**
 на витрине — он нужен для трекинга и инициации оплаты.
 
 ### `GET /orders/:number` — статус/трекинг заказа
 Query: `token` (accessToken, приоритет) ИЛИ `email`. `data`: `number, status,
-paymentStatus, deliveryStatus, grandTotal, currency, items:[{ sku, name, qty,
-price, lineTotal }], delivery:{ type, address, trackingUrl }`. Anti-enumeration:
-неверный token/email → `404`.
+paymentStatus, deliveryStatus, statusLabel, paymentStatusLabel,
+deliveryStatusLabel, itemsTotal, discountTotal, giftDiscountTotal, deliveryTotal,
+grandTotal, currency, promoCode, paymentMethod, paymentInitiatedAt,
+items:[{ name, sku, attributes,
+unitPrice, compareAtPrice, qty, lineTotal, isGift }], createdAt,
+delivery:{ type, isPostamat, city, zoneId, zoneLabel, address, pvzCode, track }`.
+Anti-enumeration: неверный token/email → `404`.
+
+**`delivery.address` / `delivery.pvzCode` — добавлены АДДИТИВНО** (аудит
+2026-07-26, находка №5: покупатель не мог узнать, где его посылка). Витрина
+показывает «куда едет посылка». Клиенты старых версий поля просто игнорируют.
+
+🔴 **Два уровня доступа.** `token` — СИЛЬНОЕ подтверждение (HMAC), `email` —
+слабое: номера заказов последовательны, а email покупателя часто известен.
+Поэтому ЧУВСТВИТЕЛЬНЫЕ поля `delivery.address` и `delivery.pvzCode` (физическое
+место покупателя) отдаются ТОЛЬКО по `token`; по `email` они приходят как `null`,
+а остальной трекинг (статусы, город, суммы, позиции, трек) — как прежде. Форма
+ответа одинакова в обоих случаях: ключи на месте, скрытое = `null`. Тот же приём,
+что у кодов подарочных сертификатов (`allowEmail:false`). Список чувствительных
+полей — `SENSITIVE_DELIVERY_FIELDS` в `lib/storefront/order-dto.ts`.
+
+🔴 **`paymentInitiatedAt` — добавлено АДДИТИВНО** (миграция 0058,
+`orders.payment_initiated_at`): ISO-время ПОСЛЕДНЕЙ инициации платежа по заказу
+(`null` — счёт не выставляли). Нужно против ДВОЙНОЙ ОПЛАТЫ: покупатель может
+вернуться со шлюза раньше вебхука, и тогда `paymentStatus` ещё `pending`, хотя
+деньги уже списаны. Витрина обязана НЕ предлагать оплату, пока с этого момента
+прошло мало времени (эталон реализации — `storefront/lib/payment-result.ts`,
+окно 15 минут), и вернуть кнопку по истечении окна, иначе получится тупик.
+`paymentRef`/`paymentProvider` наружу по-прежнему НЕ отдаются — только эта
+производная отметка времени. Клиенты старых версий поле игнорируют.
+
+🔴 **`paymentStatus` — закрытый алфавит платформы**: `pending`, `authorized`,
+`paid`, `failed`, `refunded` (CHECK в `0012_orders.sql` = `PAYMENT_STATUS_TRANSITIONS`
+в `lib/orders/status.ts`). `authorized` — ХОЛД: деньги уже удержаны на карте,
+предлагать оплату по такому заказу НЕЛЬЗЯ. Незнакомое значение клиент обязан
+трактовать консервативно (не «оплачено» и не «можно платить»).
+
+🔴 `*Label` приходят на языке магазина (сервер, `lib/orders/labels.ts`).
+Многоязычная витрина обязана переводить статус ПО КОДУ (`deliveryStatus`,
+`status`, `paymentStatus`) своим словарём, а серверную подпись использовать
+только как фолбэк для незнакомого кода.
 
 ### `GET /promotions` — публичные активные акции
 `data`: `{ publicLabel, kind, applyScope, bogoBuyQty, bogoPayQty,
@@ -147,9 +211,40 @@ etaDays, periodMin, periodMax }`. Anti-tamper: `from_location` всегда се
 ### `POST /payments/tbank/init` — инициация оплаты
 Тело: `{ orderNumber, accessToken|email, returnUrl? }`. `data`: `{ paymentUrl,
 paymentId, status, isMock }`. Сумма берётся сервером из `orders.grand_total`
-(не из тела). Доступ — по accessToken/email (иначе `404`). `409` — уже
-оплачен/возвращён; `422` — ошибка инициации. В mock — demo-`paymentUrl`
+(не из тела). Доступ — по accessToken/email (иначе `404`). `409` — счёт выставлять
+нельзя; `422` — ошибка инициации. В mock — demo-`paymentUrl`
 (страница `app/mock/tbank/pay`), весь путь оплаты проходится без боевых ключей.
+
+🔴 **ЗАЩИТА ОТ ДВОЙНОЙ ОПЛАТЫ (сервер, а не витрина).** Инициация отклоняется, если
+по заказу уже есть деньги покупателя. Решение по ВСЕМУ алфавиту `payment_status`
+(`paymentBlockFor`, `lib/orders/status.ts`) для живого заказа:
+
+| `payment_status` | счёт выставляется | `error.reason` |
+|---|---|---|
+| `pending` | ✅ да (штатная оплата и ретрай) | — |
+| `failed` | ✅ да (повторная попытка) | — |
+| `authorized` | ❌ нет — ХОЛД, деньги удержаны на карте | `payment_in_progress` |
+| `paid` | ❌ нет — уже оплачено | `order_not_payable` |
+| `refunded` | ❌ нет — деньги возвращены | `order_not_payable` |
+
+Отменённый/возвращённый ЗАКАЗ (`status` ∈ `cancelled`/`refunded`) не оплачивается
+ни при каком `payment_status` → `order_not_payable`. Незавершённый холд не запирает
+заказ: крон-сверка `reconcile-pending` (Т-Банк, Альфа-Банк) берёт заказы в
+`pending` И `authorized` и доводит статус (снятая авторизация → `failed`, то есть
+заказ снова оплачиваем), а оператор может сменить статус вручную
+(`authorized → paid|failed`).
+
+🔴 **`returnUrl` — НЕДОВЕРЕННОЕ значение: из него берётся ТОЛЬКО безопасный ПУТЬ**
+(он несёт локаль витрины, `/en/cart/success`). Origin адреса возврата сервер берёт
+исключительно из настроек владельца: «Настройки → SEO → Адрес сайта»
+(`shop_settings.seo.site_url`), иначе первый домен `STOREFRONT_ALLOWED_ORIGINS`.
+Заголовки прокси (`X-Forwarded-Host`) доверенными НЕ считаются. Если доверенного
+origin нет — шлюзу адрес НЕ передаётся вовсе (покупатель вернётся на статический
+адрес из ЛК эквайера) и в лог пишется предупреждение. Иначе подменённый origin
+превратил бы возврат со шлюза в open redirect с утечкой `number`/`token` заказа.
+`number`/`token` подставляет сервер, значения из тела игнорируются; `token` кладётся
+только если доступ подтверждён самим токеном (по `email` — нет). См.
+`lib/payments/return-url.ts`. То же верно для `paykeeper`/`alfabank`.
 
 > Статус оплаты приходит в Admik через webhook `app/api/payments/tbank/webhook`
 > (идемпотентно по `payment_id+status`); витрина отражает его через `GET /orders/:number`.

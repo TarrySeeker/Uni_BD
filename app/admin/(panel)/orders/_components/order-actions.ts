@@ -6,6 +6,7 @@ import {
   refundOrder,
   setPaymentStatus,
   setDeliveryStatus,
+  updateOrderContact,
   createManualOrder,
   createPromoCode,
   updatePromoCode,
@@ -50,6 +51,16 @@ export async function setPaymentStatusAction(input: unknown): Promise<ActionResu
 }
 export async function setDeliveryStatusAction(input: unknown): Promise<ActionResult<unknown>> {
   return setDeliveryStatus(input);
+}
+
+/**
+ * Правка контактов покупателя и адреса доставки (orders.write).
+ *
+ * Без неё оплаченный заказ с телефоном, который не принимает СДЭК, было
+ * невозможно ни отгрузить, ни исправить (аудит-находка #8).
+ */
+export async function updateOrderContactAction(input: unknown): Promise<ActionResult<unknown>> {
+  return updateOrderContact(input);
 }
 
 // --- Ручное создание заказа (orders.write) -----------------------------------

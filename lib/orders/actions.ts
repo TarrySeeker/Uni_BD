@@ -13,6 +13,7 @@ import {
   SetPaymentStatusSchema,
   SetDeliveryStatusSchema,
   ManualOrderSchema,
+  UpdateOrderContactSchema,
   PromoCreateSchema,
   PromoUpdateSchema,
   PromoIdSchema,
@@ -25,8 +26,16 @@ import {
   createOrder,
   type OrderWithItems,
 } from './repository';
-import { canTransition, paymentStatusOnSettle } from './status';
-import { settleRefundEffectsTx } from './refund-settle';
+import { canTransition, paymentStatusOnSettle, RESERVE_HELD_STATUSES } from './status';
+import { isRussianPhone } from './phone';
+import { settleOrderClosureTx } from './refund-settle';
+import {
+  classifyRefundOutcome,
+  manualRefundRequiredMessage,
+  refundNeedsManualAck,
+  refundOutcomeNote,
+  type RefundMoneyOutcome,
+} from './refund-policy';
 import { releaseGiftTx, revokeIssuedGiftsTx } from '@/lib/gift-certificates/repository';
 import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
 import { logger } from '@/lib/logger';
@@ -87,6 +96,14 @@ const CancelOrderSchema = z.object({
 const RefundOrderSchema = z.object({
   id: uuidSchema,
   reason: z.string().trim().max(2000).optional(),
+  /**
+   * 🔴 Подтверждение оператора: «деньги возвращены покупателю ВНЕ системы».
+   * Требуется, когда платёжный шлюз возврат не выполняет (заглушка PayKeeper,
+   * офлайн/COD, ручной платёж) — иначе возврат отклоняется, чтобы не получилось
+   * «бумажного возврата» (аудит 2026-07-26, критичное №7 + major №38). Факт
+   * подтверждения уходит в журнал аудита.
+   */
+  manualRefundAcknowledged: z.boolean().optional(),
 });
 
 /** Код нарушения уникальности PostgreSQL (дубликат кода промокода). */
@@ -111,15 +128,12 @@ type StockEffect = 'none' | 'release' | 'commit';
  * Статусы заказа, ДО входа в которые резерв этого заказа ещё ДЕРЖИТСЯ на
  * inventory (reserved += qty при createOrder, ещё НЕ списан commit-ом). commit
  * выполняется ровно при входе в 'shipped' (см. ниже), поэтому из этих статусов
- * cancel/refund обязан вернуть резерв (release). Имена статусов — из status.ts
- * (ORDER_STATUS_TRANSITIONS) и types.ts.
+ * cancel/refund обязан вернуть резерв (release).
+ *
+ * Список переехал в status.ts (RESERVE_HELD_STATUSES / OPEN_ORDER_STATUSES):
+ * тот же самый набор нужен гейту удаления товара/варианта в каталоге
+ * (аудит-находка #9), а две копии разъехались бы.
  */
-const RESERVE_HELD_STATUSES: ReadonlySet<Order['status']> = new Set([
-  'new',
-  'awaiting_payment',
-  'paid',
-  'packed',
-]);
 
 /**
  * Какое действие над резервом выполнять при переходе `from → to` (§6).
@@ -206,7 +220,27 @@ async function applyOrderStatusTransition(args: {
    * загружаем сами (поведение прочих переходов не меняется).
    */
   preloaded?: OrderWithItems;
-}): Promise<{ before: Order; after: OrderWithItems }> {
+  /**
+   * Разрешить переход, даже если списать резерв по позиции не удалось
+   * (аудит-находка #9). Влияет ТОЛЬКО на эффект 'commit' и ТОЛЬКО на те позиции,
+   * по которым commitReservation вернул false; всё остальное (валидация
+   * перехода, guarded UPDATE, release, промо, сертификаты) работает как обычно.
+   */
+  forceStockCommit?: boolean;
+  /**
+   * 🔴 ДЕНЬГИ. Подтверждение вызывающего, что судьба денег УЖЕ решена денежным
+   * путём (performRefund: обращение к платёжному шлюзу + классификация исхода +
+   * подтверждение ручного возврата). Только с этим флагом переход имеет право
+   * проставить payment_status='refunded'.
+   *
+   * Без флага любой переход, который по paymentStatusOnSettle пометил бы деньги
+   * возвращёнными (отмена/возврат ОПЛАЧЕННОГО заказа), отклоняется — см. гард
+   * ниже. Это закрывает «бумажный возврат» (аудит 2026-07-26, критичное №7):
+   * заказ становился терминальным с payment_status='refunded', а перевода в банк
+   * не было и сделать его было уже нечем.
+   */
+  moneySettled?: boolean;
+}): Promise<{ before: Order; after: OrderWithItems; forcedSkips: string[] }> {
   const current = args.preloaded ?? (await getOrderById(args.id));
   if (!current) {
     throw new OrderError('not_found', 'Заказ не найден.');
@@ -230,7 +264,33 @@ async function applyOrderStatusTransition(args: {
   const fromPayment = current.order.paymentStatus;
   const toPayment = paymentStatusOnSettle(fromPayment, args.to);
 
+  // 🔴 ГАРД «БУМАЖНОГО ВОЗВРАТА» (критичное №7). Пометить деньги возвращёнными
+  // может ТОЛЬКО денежный путь performRefund — он обращается к платёжному шлюзу,
+  // классифицирует реальный исход и требует подтверждения, если шлюз возврат не
+  // выполняет. Отмена оплаченного заказа и changeOrderStatus сюда не проходят:
+  // иначе заказ становился терминальным с payment_status='refunded' БЕЗ перевода
+  // денег, а инициировать настоящий возврат было уже нечем (refunded/cancelled —
+  // терминальны). Неоплаченные заказы (COD/pending/failed) не затронуты:
+  // paymentStatusOnSettle отдаёт для них null.
+  if (toPayment === 'refunded' && args.moneySettled !== true) {
+    throw new OrderError(
+      'refund_required',
+      'Заказ оплачен: пометить деньги возвращёнными в обход платёжного шлюза нельзя. ' +
+        'Используйте действие «Возврат» — оно обращается к шлюзу, фиксирует исход в ' +
+        'журнале и требует подтверждения, если перевод придётся сделать вручную.',
+    );
+  }
+
+  /**
+   * SKU позиций, по которым списание остатка НЕ прошло и было пропущено по
+   * явному распоряжению оператора (forceStockCommit). Наполняется внутри
+   * транзакции; чистится на входе, чтобы повторный прогон колбэка (ретрай
+   * драйвера) не накопил дублей.
+   */
+  const forcedSkips: string[] = [];
+
   await sql.begin(async (tx: TransactionSql) => {
+    forcedSkips.length = 0;
     // (a) GUARDED UPDATE: переход применяется ТОЛЬКО если статус не сменился
     // конкурентным запросом (WHERE ... AND status = from). 0 строк → конфликт.
     const updated = toPayment
@@ -272,10 +332,19 @@ async function applyOrderStatusTransition(args: {
         } else {
           const ok = await commitReservation(tx, unit);
           if (!ok) {
-            throw new OrderError(
-              'commit_failed',
-              `Не удалось списать остаток позиции ${item.skuSnapshot}.`,
-            );
+            // Тупик #9: строки остатка может не быть вовсе (вариант удалён из
+            // каталога → inventory снесён каскадом вместе с резервом), и тогда
+            // списывать физически нечего — обычная повторная попытка будет
+            // падать ВЕЧНО. Осознанный форс оператора пропускает такую позицию,
+            // но громко: SKU уходит в историю заказа и в аудит.
+            if (!args.forceStockCommit) {
+              throw new OrderError(
+                'commit_failed',
+                `Не удалось списать остаток позиции ${item.skuSnapshot}: строка остатка недоступна ` +
+                  `(например, вариант удалён из каталога). Проверьте остаток или отгрузите без списания.`,
+              );
+            }
+            forcedSkips.push(item.skuSnapshot);
           }
         }
       }
@@ -301,12 +370,18 @@ async function applyOrderStatusTransition(args: {
       await revokeIssuedGiftsTx(tx, { orderId: args.id });
     }
 
-    // (d) История статуса заказа.
+    // (d) История статуса заказа. Пропущенные списания дописываются в тот же
+    // комментарий — иначе по ленте заказа было бы не видно, что остаток по этим
+    // SKU остался несписанным (расхождение склада нужно объяснимым, а не тихим).
+    const historyComment =
+      forcedSkips.length > 0
+        ? `${args.comment} [отгружено без списания остатка: ${forcedSkips.join(', ')}]`.trim()
+        : args.comment;
     await tx`
       INSERT INTO order_status_history
         (order_id, kind, from_status, to_status, actor_user_id, comment)
       VALUES
-        (${args.id}, 'order', ${from}, ${args.to}, ${args.actorUserId}, ${args.comment})
+        (${args.id}, 'order', ${from}, ${args.to}, ${args.actorUserId}, ${historyComment})
     `;
 
     // (d2) История ОПЛАТЫ — когда отмена/возврат повлёк возврат денег
@@ -321,11 +396,20 @@ async function applyOrderStatusTransition(args: {
     }
   });
 
+  if (forcedSkips.length > 0) {
+    logger.warn('переход статуса выполнен БЕЗ списания остатка', {
+      orderId: args.id,
+      to: args.to,
+      skus: forcedSkips,
+      actorUserId: args.actorUserId,
+    });
+  }
+
   const after = await getOrderById(args.id);
   if (!after) {
     throw new OrderError('not_found', 'Заказ не найден после обновления.');
   }
-  return { before: current.order, after };
+  return { before: current.order, after, forcedSkips };
 }
 
 /**
@@ -388,11 +472,12 @@ export const changeOrderStatus = defineAction({
   input: ChangeOrderStatusSchema,
   handler: async (data, ctx) => {
     await assertOrdersEnabled();
-    const { before, after } = await applyOrderStatusTransition({
+    const { before, after, forcedSkips } = await applyOrderStatusTransition({
       id: data.id,
       to: data.to,
       comment: data.comment ?? '',
       actorUserId: ctx.user.id,
+      forceStockCommit: data.forceStockCommit === true,
     });
     return {
       result: orderDetailResult(after),
@@ -402,7 +487,10 @@ export const changeOrderStatus = defineAction({
         entityType: 'order',
         entityId: data.id,
         before: { status: before.status },
-        after: { status: after.order.status },
+        // forcedStockCommit — поимённый список SKU, отгруженных БЕЗ списания
+        // остатка (пусто при обычной отгрузке). Расхождение склада обязано быть
+        // видно в журнале, иначе «форс» превратится в тихую дыру в учёте.
+        after: { status: after.order.status, forcedStockCommit: forcedSkips },
       },
     };
   },
@@ -433,83 +521,232 @@ export const cancelOrder = defineAction({
   },
 });
 
+/**
+ * 🔴 ЕДИНСТВЕННЫЙ ДЕНЕЖНЫЙ ПУТЬ ВОЗВРАТА (аудит 2026-07-26: критичное №7, major №38).
+ *
+ * Раньше «возврат» существовал в трёх видах с разными последствиями: refundOrder
+ * (дёргал шлюз), setPaymentStatus→refunded и отмена оплаченного заказа (штамповали
+ * payment_status='refunded' БЕЗ шлюза). После любого из них заказ становился
+ * терминальным, а настоящий возврат — недоступным: покупатель без денег, система
+ * считает возврат состоявшимся. Теперь любая пометка «деньги возвращены» проходит
+ * ЗДЕСЬ, а applyOrderStatusTransition принимает её только с moneySettled.
+ *
+ * Порядок (важен):
+ *   1) ЗАКРЫТЫЙ заказ / уже возвращённая оплата → отказ ДО шлюза (идемпотентность:
+ *      повторное нажатие не делает второй reverse и не возвращает баланс дважды);
+ *   2) переход в 'refunded' должен быть либо допустим статус-машиной, либо заказ
+ *      РЕАЛЬНО оплачен (payment='paid'): второй случай — штатный «Т-Банк CONFIRMED
+ *      пометил оплату, не двигая order.status», и без него оплаченный заказ в
+ *      статусе 'new' было бы не вернуть вовсе (тупик). Для НЕоплаченных заказов
+ *      предпроверка сохраняется как была (холд/деньги не трогаем зря);
+ *   3) обращение к шлюзу через dispatchRefund (маршрут по payment_provider);
+ *   4) КЛАССИФИКАЦИЯ фактического исхода (шлюз вернул / нужен ручной перевод /
+ *      возвращать нечего / шлюз отказал) и требование подтверждения оператора,
+ *      когда деньги придётся возвращать руками;
+ *   5) сетл: переход заказа в 'refunded' (moneySettled) либо — если статус-машина
+ *      этого не позволяет — прямой сетл оплаты + закрытие заказа в одной транзакции.
+ *
+ * Возвращает данные для аудита: денежный исход и трассировку шлюза.
+ */
+async function performRefund(args: {
+  id: string;
+  reason?: string;
+  /** Оператор подтвердил, что деньги возвращены ВНЕ системы (перевод/касса). */
+  manualAck: boolean;
+  actorUserId: string | null;
+  /** Уже загруженный заказ (setPaymentStatus читает его для валидации перехода). */
+  preloaded?: OrderWithItems;
+}): Promise<{
+  before: Order;
+  after: OrderWithItems;
+  outcome: RefundMoneyOutcome;
+  gateway: { status: string | null; skipped: boolean; isMock: boolean; reason?: string };
+}> {
+  const cur = args.preloaded ?? (await getOrderById(args.id));
+  if (!cur) {
+    throw new OrderError('not_found', 'Заказ не найден.');
+  }
+  const order = cur.order;
+
+  // (1) Заказ уже закрыт / оплата уже возвращена → второй раз не возвращаем.
+  if (order.status === 'cancelled' || order.status === 'refunded') {
+    throw new OrderError(
+      'order_closed',
+      `Заказ уже ${order.status === 'cancelled' ? 'отменён' : 'возвращён'}: ` +
+        'повторный возврат невозможен.',
+    );
+  }
+  if (order.paymentStatus === 'refunded') {
+    throw new OrderError('already_refunded', 'Возврат оплаты по этому заказу уже оформлен.');
+  }
+
+  // (2) Допустимость возврата. Оплаченный заказ возвращаем всегда (иначе тупик),
+  // неоплаченный — только по статус-машине (предпроверка ДО шлюза сохранена).
+  const canSettleByTransition = canTransition('order', order.status, 'refunded');
+  if (!canSettleByTransition && order.paymentStatus !== 'paid') {
+    throw new OrderError(
+      'invalid_transition',
+      `Недопустимый переход статуса заказа: "${order.status}" → "refunded".`,
+    );
+  }
+
+  // (3) ШЛЮЗОВОЙ ВОЗВРАТ (ADR-P1-3): маршрут по order.payment_provider; неизвестный
+  // НЕ-null провайдер → безопасная ошибка (НЕ дефолт-tbank). Суммы СЕРВЕРНЫЕ
+  // (копейки из grand_total, anti-tamper). payment_status шлюз НЕ меняет.
+  const amountKop = toKopecks(order.grandTotal);
+  const gateway = await dispatchRefund({
+    orderId: order.id,
+    orderNumber: order.number,
+    paymentStatus: order.paymentStatus,
+    paymentProvider: order.paymentProvider ?? null,
+    paymentRef: order.paymentRef,
+    amountKop,
+  });
+
+  // (4) Что РЕАЛЬНО произошло с деньгами.
+  const outcome = classifyRefundOutcome({
+    paymentStatus: order.paymentStatus,
+    amountKop,
+    gateway,
+  });
+
+  if (outcome === 'gateway_failed') {
+    throw new OrderError(
+      'payment_refund_failed',
+      'Не удалось вернуть оплату через платёжный шлюз. Возврат заказа отменён, повторите позже.',
+    );
+  }
+
+  // Деньги получены, а шлюз их не вернёт (заглушка PayKeeper / офлайн / COD-оплата
+  // наличными): без явного подтверждения оператора НЕ помечаем заказ возвращённым —
+  // это и есть «бумажный возврат». Ни одного эффекта ещё не применено (шлюз пропущен).
+  if (refundNeedsManualAck(outcome) && !args.manualAck) {
+    throw new OrderError(
+      'manual_refund_required',
+      manualRefundRequiredMessage({
+        paymentProvider: order.paymentProvider ?? null,
+        amountLabel: `${order.grandTotal} ${order.currency}`,
+      }),
+    );
+  }
+
+  // (5) Сетл. Денежный след пишем в комментарий истории: по ленте заказа должно
+  // быть видно, ушли деньги через шлюз или их вернули вручную.
+  const note = refundOutcomeNote(outcome);
+  const comment = args.reason ? `${args.reason} — ${note}` : note;
+  const gatewayTrace = {
+    status: gateway.status,
+    skipped: gateway.skipped ?? false,
+    isMock: gateway.isMock,
+    reason: gateway.reason,
+  };
+
+  if (canSettleByTransition) {
+    const { before, after } = await applyOrderStatusTransition({
+      id: args.id,
+      to: 'refunded',
+      comment,
+      actorUserId: args.actorUserId,
+      preloaded: cur,
+      moneySettled: true,
+    });
+    return { before, after, outcome, gateway: gatewayTrace };
+  }
+
+  // ФОЛБЭК: заказ РЕАЛЬНО оплачен, но order.status ещё не дошёл до состояния, из
+  // которого статус-машина допускает 'refunded' (вебхук эквайера ставит
+  // payment_status='paid', не продвигая заказ). Без этой ветки такой заказ было бы
+  // не вернуть вовсе. Одна транзакция: guarded сетл оплаты + закрытие заказа
+  // (резерв, промокод, БАЛАНС СЕРТИФИКАТА, гашение выпущенных кодов).
+  const fromPayment = order.paymentStatus;
+  await sql.begin(async (tx: TransactionSql) => {
+    const updated = await tx<{ id: string }[]>`
+      UPDATE orders
+         SET payment_status = 'refunded', updated_at = now()
+       WHERE id = ${args.id} AND payment_status = ${fromPayment}
+      RETURNING id
+    `;
+    if (updated.length !== 1) {
+      throw new OrderError(
+        'conflict',
+        `Статус оплаты изменился параллельно: переход из "${fromPayment}" более неактуален.`,
+      );
+    }
+    await tx`
+      INSERT INTO order_status_history
+        (order_id, kind, from_status, to_status, actor_user_id, comment)
+      VALUES
+        (${args.id}, 'payment', ${fromPayment}, 'refunded', ${args.actorUserId}, ${comment})
+    `;
+    await settleOrderClosureTx(tx, args.id, {
+      to: 'refunded',
+      actorUserId: args.actorUserId,
+      comment,
+    });
+  });
+
+  const after = await getOrderById(args.id);
+  if (!after) {
+    throw new OrderError('not_found', 'Заказ не найден после обновления.');
+  }
+  return { before: order, after, outcome, gateway: gatewayTrace };
+}
+
+/** Аудит-запись денежного возврата: исход + трассировка шлюза + факт подтверждения. */
+function refundAuditEntry(input: {
+  action: 'order.refund';
+  orderId: string;
+  before: Order;
+  after: OrderWithItems;
+  outcome: RefundMoneyOutcome;
+  gateway: { status: string | null; skipped: boolean; isMock: boolean; reason?: string };
+  manualAck: boolean;
+}) {
+  return {
+    action: input.action,
+    entityType: 'order' as const,
+    entityId: input.orderId,
+    before: { status: input.before.status, paymentStatus: input.before.paymentStatus },
+    after: {
+      status: input.after.order.status,
+      paymentStatus: input.after.order.paymentStatus,
+      // Трассировка возврата: по журналу обязано быть видно, ушли ли деньги.
+      gatewayRefund: {
+        status: input.gateway.status,
+        skipped: input.gateway.skipped,
+        isMock: input.gateway.isMock,
+        reason: input.gateway.reason ?? null,
+        outcome: input.outcome,
+        // true → деньги возвращены ВНЕ системы под ответственность оператора.
+        manualAcknowledged: input.manualAck && input.outcome === 'manual_required',
+      },
+    },
+  };
+}
+
 export const refundOrder = defineAction({
   permission: 'orders.write',
   input: RefundOrderSchema,
   handler: async (data, ctx) => {
     await assertOrdersEnabled();
-
-    // Загружаем заказ ОДИН раз: нужен для (а) шлюзового возврата Т-Банка и (б)
-    // передаётся в applyOrderStatusTransition (preloaded) — без второго SELECT.
-    const cur = await getOrderById(data.id);
-    if (!cur) {
-      throw new OrderError('not_found', 'Заказ не найден.');
-    }
-
-    // ПРЕДПРОВЕРКА ПЕРЕХОДА ДО ШЛЮЗА (security-fix MEDIUM). Cancel дёргаем ТОЛЬКО если
-    // переход заказа в 'refunded' допустим. Иначе (например authorized-заказ в статусе
-    // new/awaiting_payment, откуда refunded недопустим) Cancel снял бы холд в банке, а
-    // applyOrderStatusTransition затем бросил бы invalid_transition → деньги/холд отпущены,
-    // а заказ не возвращён. applyOrderStatusTransition ниже перепроверит переход под
-    // guarded-UPDATE (двойная проверка — норма против гонок).
-    if (!canTransition('order', cur.order.status, 'refunded')) {
-      throw new OrderError(
-        'invalid_transition',
-        `Недопустимый переход статуса заказа: "${cur.order.status}" → "refunded".`,
-      );
-    }
-
-    // ШЛЮЗОВОЙ ВОЗВРАТ (Фича #15 + ADR-P1-3): возвращаем деньги ДО смены статуса,
-    // МАРШРУТИЗИРУЯ по order.payment_provider через dispatchRefund (tbank/paykeeper/
-    // manual/gift; неизвестный НЕ-null → безопасная ошибка, НЕ дефолт-tbank). refund
-    // ТОЛЬКО дёргает шлюз/пишет аудит-лог — payment_status он НЕ меняет (внутренний
-    // сетл делает applyOrderStatusTransition ниже → двойного сетла нет). Суммы —
-    // СЕРВЕРНЫЕ (копейки из grand_total, anti-tamper). Для COD/manual/gift вернёт
-    // skipped, и внутренний сетл всё равно отработает.
-    const refundRes = await dispatchRefund({
-      orderId: cur.order.id,
-      orderNumber: cur.order.number,
-      paymentStatus: cur.order.paymentStatus,
-      paymentProvider: cur.order.paymentProvider ?? null,
-      paymentRef: cur.order.paymentRef,
-      amountKop: toKopecks(cur.order.grandTotal),
-    });
-
-    // Деньги НЕ вернулись (шлюз отказал) → НЕ помечаем заказ refunded (не врём про
-    // возврат): переход не выполняется, оператор повторит позже.
-    if (!refundRes.ok) {
-      throw new OrderError(
-        'payment_refund_failed',
-        'Не удалось вернуть оплату через платёжный шлюз. Возврат заказа отменён, повторите позже.',
-      );
-    }
-
-    const { before, after } = await applyOrderStatusTransition({
+    const { before, after, outcome, gateway } = await performRefund({
       id: data.id,
-      to: 'refunded',
-      comment: data.reason ?? '',
+      reason: data.reason,
+      manualAck: data.manualRefundAcknowledged === true,
       actorUserId: ctx.user.id,
-      preloaded: cur,
     });
     return {
       result: orderDetailResult(after),
       revalidate: [ORDERS_LIST_PATH, orderPath(data.id)],
-      audit: {
+      audit: refundAuditEntry({
         action: 'order.refund',
-        entityType: 'order',
-        entityId: data.id,
-        before: { status: before.status, paymentStatus: before.paymentStatus },
-        after: {
-          status: after.order.status,
-          paymentStatus: after.order.paymentStatus,
-          // Трассировка шлюзового возврата (для аудита/разбора).
-          gatewayRefund: {
-            status: refundRes.status,
-            skipped: refundRes.skipped ?? false,
-            isMock: refundRes.isMock,
-          },
-        },
-      },
+        orderId: data.id,
+        before,
+        after,
+        outcome,
+        gateway,
+        manualAck: data.manualRefundAcknowledged === true,
+      }),
     };
   },
 });
@@ -552,30 +789,33 @@ export const setPaymentStatus = defineAction({
       );
     }
 
-    // ВОЗВРАТ ОПЛАТЫ = ВОЗВРАТ ЗАКАЗА (БАГ #3, аудит волны 15). Раньше paid→refunded
-    // через статус-машину ОПЛАТЫ менял только payment_status — резерв остатков НЕ
-    // освобождался (склад навсегда заблокирован) и промокод НЕ откатывался. Делегируем
-    // единой, протестированной логике сетла заказа: она освобождает/списывает резерв по
-    // текущему статусу, откатывает промокод, ставит order.status='refunded' И
-    // payment_status='refunded' (через paymentStatusOnSettle). Тот же эффект, что у
-    // кнопки «Статус заказа → Возврат».
-    if (data.to === 'refunded' && canTransition('order', current.order.status, 'refunded')) {
-      const { before, after } = await applyOrderStatusTransition({
+    // 🔴 ВОЗВРАТ ОПЛАТЫ = ДЕНЕЖНАЯ ОПЕРАЦИЯ, А НЕ СМЕНА СТАТУСА (критичное №7).
+    // Раньше эта ветка (и fall-through ниже) штамповала payment_status='refunded'
+    // БЕЗ обращения к платёжному шлюзу — «Статус оплаты → Возврат» и «Статус заказа
+    // → Возврат» выглядели одинаково, но означали разное: деньги оставались у
+    // магазина, а заказ становился терминальным, и настоящий возврат был уже
+    // недоступен. Теперь оба входа ведут в ОДИН исполнитель performRefund: шлюз,
+    // классификация исхода, подтверждение ручного перевода, единый след в аудите.
+    if (data.to === 'refunded') {
+      const { before, after, outcome, gateway } = await performRefund({
         id: data.id,
-        to: 'refunded',
-        comment: data.comment ?? '',
+        reason: data.comment,
+        manualAck: data.manualRefundAcknowledged === true,
         actorUserId: ctx.user.id,
+        preloaded: current, // заказ уже прочитан выше — без второго SELECT
       });
       return {
         result: orderDetailResult(after),
         revalidate: [ORDERS_LIST_PATH, orderPath(data.id)],
-        audit: {
-          action: 'order.payment.change',
-          entityType: 'order',
-          entityId: data.id,
-          before: { status: before.status, paymentStatus: before.paymentStatus },
-          after: { status: after.order.status, paymentStatus: after.order.paymentStatus },
-        },
+        audit: refundAuditEntry({
+          action: 'order.refund',
+          orderId: data.id,
+          before,
+          after,
+          outcome,
+          gateway,
+          manualAck: data.manualRefundAcknowledged === true,
+        }),
       };
     }
 
@@ -610,18 +850,9 @@ export const setPaymentStatus = defineAction({
         VALUES
           (${data.id}, 'payment', ${from}, ${data.to}, ${ctx.user.id}, ${data.comment ?? ''})
       `;
-
-      // ОСТАТОЧНЫЙ ПРОБЕЛ СЕТЛА (аудит цикла 2). Делегация выше (стр. 447) ловит
-      // возврат только когда order.status допускает переход → 'refunded'. Но Т-Банк
-      // CONFIRMED-webhook ставит payment_status='paid', НЕ продвигая order.status —
-      // заказ может быть 'new'/'awaiting_payment' при оплаченном статусе. Тогда
-      // canTransition('order', ...,'refunded') = false → попадаем сюда, и без этого
-      // вызова резерв НЕ освобождался бы, промокод НЕ откатывался, order.status НЕ
-      // менялся (резерв заблокирован навсегда). settleRefundEffectsTx идемпотентна
-      // (FOR UPDATE; refunded/cancelled/нет заказа → no-op), поэтому безопасна и тут.
-      if (data.to === 'refunded') {
-        await settleRefundEffectsTx(tx, data.id, ctx.user.id);
-      }
+      // NB: ветки `to === 'refunded'` здесь БОЛЬШЕ НЕТ — возврат целиком уехал в
+      // performRefund (выше), вместе с обязательным обращением к шлюзу и сетлом
+      // закрытия заказа. Сюда доходят только неденежные переходы оплаты.
     });
 
     // ПОСЛЕ КОММИТА: переход в paid реально применён (guarded UPDATE выше иначе
@@ -734,6 +965,147 @@ export const createManualOrder = defineAction({
           number: created.order.number,
           grandTotal: created.order.grandTotal,
           source: created.order.source,
+        },
+      },
+    };
+  },
+});
+
+// =============================================================================
+// ПРАВКА КОНТАКТОВ ЗАКАЗА (orders.write) — выход из тупика #8.
+// =============================================================================
+
+/** Статусы, в которых заказ считается закрытым и контакты уже не редактируются. */
+const CONTACT_LOCKED_STATUSES: ReadonlySet<Order['status']> = new Set<Order['status']>([
+  'cancelled',
+  'refunded',
+]);
+
+/**
+ * Правка контактов покупателя и адреса доставки уже созданного заказа.
+ *
+ * ЗАЧЕМ (аудит-находка #8). В модуле не было НИ ОДНОГО экшена правки полей
+ * заказа. Покупатель, указавший городской номер «2223344», спокойно проходил и
+ * Zod, и проверку витрины, оплачивал заказ — а затем «Создать отправление»
+ * навсегда падало на нормализации телефона СДЭК. Оплаченный заказ нельзя было
+ * ни отгрузить, ни починить: оставалось вернуть деньги или лезть в БД руками.
+ *
+ * ГРАНИЦЫ (сознательно узкие):
+ *   • правятся ТОЛЬКО операционные контакты и адрес. Позиции, цены, суммы,
+ *     промокод, сертификат и статусы — снимок сделки (ADR-010) и правятся
+ *     своими путями;
+ *   • стоимость доставки НЕ пересчитывается: заказ уже оплачен на согласованную
+ *     сумму, тихо менять её задним числом нельзя. Смена города — операционное
+ *     решение менеджера, поэтому оно поимённо пишется в аудит;
+ *   • закрытые заказы (отменён/возврат) не редактируются: это уже история;
+ *   • курьерская доставка без адреса запрещена — иначе накладную снова не
+ *     создать, то есть мы бы починили один тупик и открыли другой.
+ *
+ * Телефон валидируется МЯГКО (см. schemas.phoneSchema): российский формат не
+ * навязывается, потому что магазин трёхъязычный, а СДЭК — лишь один из способов
+ * доставки. Пригодность номера для накладной показывается предупреждением в
+ * карточке заказа (isRussianPhone), и это возвращается вызывающему.
+ */
+export const updateOrderContact = defineAction({
+  permission: 'orders.write',
+  input: UpdateOrderContactSchema,
+  handler: async (data, ctx) => {
+    await assertOrdersEnabled();
+    const current = await getOrderById(data.id);
+    if (!current) {
+      throw new OrderError('not_found', 'Заказ не найден.');
+    }
+    const order = current.order;
+    if (CONTACT_LOCKED_STATUSES.has(order.status)) {
+      throw new OrderError(
+        'conflict',
+        'Заказ закрыт (отменён или возвращён) — контакты больше не редактируются.',
+      );
+    }
+
+    // undefined = «поле не прислали» → оставляем как было; пустая строка = очистить.
+    const nextCity = data.deliveryCity === undefined ? order.deliveryCity : data.deliveryCity || null;
+    const nextAddress =
+      data.deliveryAddress === undefined ? order.deliveryAddress : data.deliveryAddress || null;
+
+    if (order.deliveryType === 'courier' && !nextAddress) {
+      throw new OrderError(
+        'invalid_address',
+        'Для курьерской доставки нужен адрес — без него отправление не создать.',
+      );
+    }
+
+    const comment = data.reason
+      ? `Правка контактов: ${data.reason}`
+      : 'Правка контактов заказа.';
+
+    await sql.begin(async (tx: TransactionSql) => {
+      // GUARDED UPDATE: заказ мог закрыться (отмена/возврат) между чтением и
+      // записью — тогда правка не применяется вовсе, а не «дописывается поверх
+      // истории». 0 строк → конфликт и ROLLBACK вместе с записью в ленту.
+      const updated = await tx<{ id: string }[]>`
+        UPDATE orders
+           SET customer_name  = ${data.customerName},
+               customer_email = ${data.customerEmail},
+               customer_phone = ${data.customerPhone},
+               delivery_city    = ${nextCity},
+               delivery_address = ${nextAddress},
+               updated_at = now()
+         WHERE id = ${data.id}
+           AND status NOT IN ('cancelled', 'refunded')
+        RETURNING id
+      `;
+      if (updated.length !== 1) {
+        throw new OrderError(
+          'conflict',
+          'Заказ закрыт параллельно (отменён или возвращён) — правка не применена.',
+        );
+      }
+      // Лента заказа — то, что смотрит оператор. Без записи здесь правка была бы
+      // видна только в общем журнале аудита, куда в карточке заказа не ходят.
+      await tx`
+        INSERT INTO order_status_history
+          (order_id, kind, from_status, to_status, actor_user_id, comment)
+        VALUES
+          (${data.id}, 'order', ${order.status}, ${order.status}, ${ctx.user.id}, ${comment})
+      `;
+    });
+
+    const after = await getOrderById(data.id);
+    if (!after) {
+      throw new OrderError('not_found', 'Заказ не найден после обновления.');
+    }
+
+    return {
+      result: {
+        order: after.order,
+        /** Телефон непригоден для накладной СДЭК — UI покажет предупреждение. */
+        phoneUsableForCdek: isRussianPhone(data.customerPhone),
+        /**
+         * Накладная уже создана: правка в нашей БД её НЕ меняет — данные нужно
+         * поправить и на стороне СДЭК (или отменить и создать отправление заново).
+         */
+        cdekShipmentExists: Boolean(order.cdekUuid),
+      },
+      revalidate: [ORDERS_LIST_PATH, orderPath(data.id)],
+      audit: {
+        action: 'order.contact.update',
+        entityType: 'order',
+        entityId: data.id,
+        before: {
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          customerPhone: order.customerPhone,
+          deliveryCity: order.deliveryCity,
+          deliveryAddress: order.deliveryAddress,
+        },
+        after: {
+          customerName: data.customerName,
+          customerEmail: data.customerEmail,
+          customerPhone: data.customerPhone,
+          deliveryCity: nextCity,
+          deliveryAddress: nextAddress,
+          reason: data.reason ?? null,
         },
       },
     };

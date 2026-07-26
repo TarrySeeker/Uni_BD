@@ -4,7 +4,10 @@
  *  authorizeStorefront → 401/403; isModuleEffectivelyEnabled('catalog') → 404;
  *  rate-limit по ключу/ip → 429; CORS-заголовки в каждом ответе; preflight.
  *
- * Формат успеха: { data, ...meta }.  Формат ошибки: { error: { code, message } }.
+ * Формат успеха: { data, ...meta }.
+ * Формат ошибки: { error: { code, message, reason? } }, где code — ТРАНСПОРТНЫЙ
+ * (HTTP-семантика), а reason — необязательная ДОМЕННАЯ причина из публичного
+ * алфавита (./error-reasons) для локализации на витрине.
  */
 
 import { NextResponse } from 'next/server';
@@ -15,6 +18,8 @@ import {
   registerStorefrontHit,
 } from '@/lib/auth/rate-limit';
 import { normalizeClientIp } from '@/lib/server/request-ip';
+import { transportForReason } from './error-reasons';
+import type { StorefrontErrorReason } from './error-reasons';
 import { authorizeStorefront, extractApiKey } from './auth';
 import type { AuthorizeResult } from './auth';
 import { resolveStorefrontLocale } from './locale';
@@ -63,17 +68,43 @@ export function jsonData(
   );
 }
 
-/** JSON-ответ ошибки { error: { code, message } } с CORS-заголовками. */
+/**
+ * JSON-ответ ошибки { error: { code, message, reason? } } с CORS-заголовками.
+ *
+ * `reason` (аудит №3/№6) — НЕОБЯЗАТЕЛЬНОЕ аддитивное поле с ДОМЕННОЙ причиной из
+ * публичного алфавита (lib/storefront/error-reasons). Транспортный `code` при
+ * этом НЕ меняется: он остаётся HTTP-семантикой, на которую опираются другие
+ * потребители контракта. Без reason форма тела ровно прежняя (поле не
+ * добавляется вовсе), поэтому старые клиенты не ломаются.
+ */
 export function jsonError(
   code: StorefrontErrorCode,
   message: string,
   cors: Record<string, string>,
   extraHeaders: Record<string, string> = {},
+  reason?: StorefrontErrorReason,
 ): NextResponse {
   return NextResponse.json(
-    { error: { code, message } },
+    { error: { code, message, ...(reason ? { reason } : {}) } },
     { status: STATUS_BY_CODE[code], headers: { ...cors, ...extraHeaders } },
   );
+}
+
+/**
+ * Ответ ДОМЕННОГО отказа: транспортный код выбирается по причине, сама причина
+ * едет наружу в `error.reason`.
+ *
+ * Роуты обязаны пользоваться этим хелпером вместо ручного выбора
+ * 'conflict'/'unprocessable' — иначе доменный код снова потеряется по дороге
+ * (первопричина находок №3/№6: `jsonError('unprocessable', result.message)`).
+ */
+export function jsonDomainError(
+  reason: StorefrontErrorReason,
+  message: string,
+  cors: Record<string, string>,
+  extraHeaders: Record<string, string> = {},
+): NextResponse {
+  return jsonError(transportForReason(reason), message, cors, extraHeaders, reason);
 }
 
 /** Контекст, переданный в обработчик после прохождения конвейера. */

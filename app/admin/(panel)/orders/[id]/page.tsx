@@ -20,6 +20,7 @@ import {
   deliveryStatusLabel,
 } from '@/lib/admin/order-format';
 import { getOrderById } from '@/lib/orders/repository';
+import { isRussianPhone } from '@/lib/orders/phone';
 import type { OrderStatusHistory } from '@/lib/orders/types';
 
 import { Forbidden } from '../../_components/Forbidden';
@@ -48,6 +49,7 @@ import {
   type GiftIssueItemView,
   type IssuedCertificateView,
 } from './_components/GiftIssueBlock';
+import { OrderContactForm } from './_components/OrderContactForm';
 
 /**
  * Карточка заказа админки (docs/07 §5, Пакет 3.E).
@@ -178,6 +180,10 @@ export default async function OrderDetailPage({
   // UI-гейт панели действий (право orders.write); сервер всё равно проверяет
   // право внутри каждого Server Action — это лишь скрытие кнопок без права.
   const canWrite = can(guard.user, 'orders.write');
+
+  // Нужен ли этому заказу телефон, пригодный для накладной СДЭК (курьер/ПВЗ).
+  // Для самовывоза номер не участвует в логистике — не тревожим оператора зря.
+  const needsCdekPhone = order.deliveryType === 'courier' || order.deliveryType === 'pvz';
 
   // Блок СДЭК: виден только при включённом модуле cdek и праве cdek.manage
   // (сервер всё равно проверяет право внутри каждого Server Action).
@@ -377,6 +383,30 @@ export default async function OrderDetailPage({
               <Row label={t('orders.detailPage.customer.phone')} value={order.customerPhone} />
               {order.comment ? <Row label={t('orders.detailPage.customer.comment')} value={order.comment} /> : null}
             </dl>
+            {/*
+              Предупреждение ДО отгрузки (аудит-находка #8): накладную СДЭК
+              создаёт только российский номер (+7XXXXXXXXXX). Раньше об этом
+              сообщал сбой «Создать отправление» — уже после оплаты и без
+              возможности что-либо исправить. Это предупреждение, а не запрет:
+              магазин трёхъязычный, для самовывоза/зоны иностранный номер валиден.
+            */}
+            {needsCdekPhone && !isRussianPhone(order.customerPhone) ? (
+              <p role="status" className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                {t('orders.detailPage.customer.phoneNotCdek')}
+              </p>
+            ) : null}
+            {canWrite ? (
+              <OrderContactForm
+                orderId={order.id}
+                customerName={order.customerName}
+                customerEmail={order.customerEmail}
+                customerPhone={order.customerPhone}
+                deliveryCity={order.deliveryCity}
+                deliveryAddress={order.deliveryAddress}
+                requiresAddress={order.deliveryType === 'courier'}
+                hasCdekShipment={Boolean(order.cdekUuid)}
+              />
+            ) : null}
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-4">

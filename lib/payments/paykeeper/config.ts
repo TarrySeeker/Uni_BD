@@ -31,6 +31,11 @@ export interface PaykeeperConfig {
   defaultTax: string;
   /** Язык в service_name счёта. */
   lang: string;
+  /**
+   * Имя form-поля переопределения адреса возврата покупателя (штатное
+   * `user_result_callback`). Пусто → поле не отправляется (см. PAYKEEPER_RETURN_PARAM).
+   */
+  returnParam: string | null;
 
   /** Доп. IP/CIDR whitelist колбэка (csv). */
   webhookAllowedIps: string[];
@@ -81,6 +86,7 @@ export function getPaykeeperConfig(
     serviceName: env.PAYKEEPER_SERVICE_NAME,
     defaultTax: env.PAYKEEPER_DEFAULT_TAX,
     lang: env.PAYKEEPER_LANG,
+    returnParam: nonEmpty(env.PAYKEEPER_RETURN_PARAM),
 
     webhookAllowedIps: parseCsvStrings(env.PAYKEEPER_WEBHOOK_IPS),
     webhookTrustProxy: env.PAYKEEPER_WEBHOOK_TRUST_PROXY,

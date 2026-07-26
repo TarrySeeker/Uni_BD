@@ -7,6 +7,12 @@
  * ?token=<accessToken> (из ответа POST /orders) ИЛИ ?email=<email покупателя>.
  * Неверное/отсутствующее подтверждение → 404 (не раскрываем существование заказа).
  *
+ * ДВА УРОВНЯ ДОСТУПА. Email — слабое подтверждение (номера последовательны, email
+ * часто известен), поэтому под ним отдаётся только трекинг: статусы, город, суммы,
+ * позиции, трек. ЧУВСТВИТЕЛЬНЫЕ поля (адрес доставки, пункт выдачи — физическое
+ * место покупателя) требуют СИЛЬНОГО подтверждения: HMAC-токена заказа. См.
+ * SENSITIVE_DELIVERY_FIELDS в lib/storefront/order-dto.ts.
+ *
  * Ответ: публичный DTO (номер, статусы заказа/оплаты/доставки, позиции-снимок,
  * суммы, трек). Без ip/idempotency_key/внутренних id (order-dto не отдаёт).
  */
@@ -38,7 +44,17 @@ export async function GET(
         return jsonError('not_found', 'Заказ не найден.', cors);
       }
 
-      const dto = toOrderPublicDto(found.order, found.items);
+      // Чувствительные поля доставки (адрес покупателя, пункт выдачи) — ТОЛЬКО по
+      // СИЛЬНОМУ подтверждению, то есть по HMAC-токену заказа. Email-путь слабый:
+      // номера последовательны, email известен → перебором утекал бы физический
+      // адрес человека. Тот же приём, что у кодов сертификатов (allowEmail:false).
+      const tokenProven = verifyOrderAccess(found.order, { token }, process.env, {
+        allowEmail: false,
+      });
+
+      const dto = toOrderPublicDto(found.order, found.items, {
+        includeSensitiveDelivery: tokenProven,
+      });
       return jsonData(dto, {}, cors);
     },
     { module: 'orders', methods: STOREFRONT_WRITE_METHODS },

@@ -263,6 +263,11 @@ export async function recordWebhookEvent(input: {
  * Сохраняет PaymentId Т-Банка (orders.payment_ref) и провайдера
  * (orders.payment_provider='tbank') после успешного Init. Идемпотентно
  * (перезапись теми же значениями безопасна). Не меняет payment_status.
+ *
+ * Заодно ставит `payment_initiated_at = now()` (0058) — ВРЕМЯ ПОСЛЕДНЕЙ инициации.
+ * Витрина по нему отличает «оплатил и вернулся раньше вебхука» от «не платил
+ * вовсе» и не показывает кнопку оплаты поверх уже идущего платежа. Обновляется
+ * при КАЖДОЙ попытке: окно ожидания подтверждения отсчитывается от последней.
  */
 export async function setPaymentRefAndProvider(
   orderId: string,
@@ -272,6 +277,7 @@ export async function setPaymentRefAndProvider(
     UPDATE orders
        SET payment_ref = ${paymentId},
            payment_provider = 'tbank',
+           payment_initiated_at = now(),
            updated_at = now()
      WHERE id = ${orderId}
   `;

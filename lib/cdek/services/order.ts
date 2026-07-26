@@ -28,6 +28,7 @@ import {
   bumpShipmentRetry,
 } from '../repository';
 import { getOrderById, type OrderWithItems } from '@/lib/orders/repository';
+import { normalizeRussianPhone } from '@/lib/orders/phone';
 import { tariffForMode } from '../config';
 import { canTransitionDelivery } from '@/lib/orders/status';
 import type { Order, OrderItem } from '@/lib/orders/types';
@@ -48,16 +49,18 @@ import { aggregatePackage, type CartLineDims } from './calculator';
  *   • 10 цифр → префикс +7;
  *   • 11 цифр, начинается с 8 или 7 → ведущая заменяется на 7, префикс +;
  *   • иначе (< 10 / непонятный формат) → CdekError.
+ *
+ * Сами ПРАВИЛА живут в lib/orders/phone (normalizeRussianPhone) — там же, где их
+ * читает админка, чтобы предупредить менеджера ДО отгрузки (аудит-находка #8:
+ * раньше правило знал только этот модуль и сообщал о нарушении уже после оплаты,
+ * когда исправить контакты было нечем). Здесь — только доменное исключение СДЭК.
  */
 export function normalizePhone(raw: string): string {
-  const digits = (raw ?? '').replace(/\D+/g, '');
-  if (digits.length === 10) {
-    return `+7${digits}`;
+  const normalized = normalizeRussianPhone(raw);
+  if (!normalized) {
+    throw new CdekError('cdek_invalid_phone', `Некорректный телефон получателя: "${raw}".`);
   }
-  if (digits.length === 11 && (digits[0] === '8' || digits[0] === '7')) {
-    return `+7${digits.slice(1)}`;
-  }
-  throw new CdekError('cdek_invalid_phone', `Некорректный телефон получателя: "${raw}".`);
+  return normalized;
 }
 
 // -----------------------------------------------------------------------------

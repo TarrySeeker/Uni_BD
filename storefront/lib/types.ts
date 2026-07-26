@@ -345,20 +345,51 @@ export interface OrderPublicDto {
   currency: string;
   promoCode: string | null;
   paymentMethod: string;
+  /**
+   * Время ПОСЛЕДНЕЙ инициации платежа (ISO); null — счёт не выставляли.
+   *
+   * 🔴 Единственный способ отличить «оплатил и вернулся раньше вебхука» от «не
+   * платил вовсе»: пока с этого момента прошло мало времени, кнопку «оплатить»
+   * показывать нельзя — это второе списание (см. lib/payment-result).
+   *
+   * НЕОБЯЗАТЕЛЬНОЕ: поле добавлено в DTO позже (миграция 0058), а витрина и
+   * админка выкатываются независимо — старый сервер его не пришлёт. undefined
+   * означает «сервер не знает» и трактуется как отсутствие инициации.
+   */
+  paymentInitiatedAt?: string | null;
   delivery: {
     type: string;
     isPostamat: boolean;
     city: string | null;
+    /**
+     * Адрес курьерской доставки. НЕОБЯЗАТЕЛЬНОЕ: поле добавлено в DTO позже
+     * (аудит №5), а витрина и админка выкатываются независимо — старый сервер
+     * его не пришлёт. Рендер обязан переживать undefined (см. order-view).
+     */
+    address?: string | null;
+    /** Код пункта выдачи/постамата. Необязательное — как address (version skew). */
+    pvzCode?: string | null;
     track: string | null;
   };
   items: OrderItemDto[];
   createdAt: string;
 }
 
-/** Форма ошибки Storefront API: { error: { code, message } }. */
+/**
+ * Форма ошибки Storefront API: { error: { code, message, reason? } }.
+ *
+ * `code` — ТРАНСПОРТНЫЙ код (unprocessable/conflict/not_found/…): HTTP-семантика,
+ * по нему нельзя понять причину отказа.
+ * `reason` — ДОМЕННАЯ причина из публичного алфавита платформы (out_of_stock,
+ * invalid_promo, invalid_gift, delivery_unavailable, …). Необязательное поле:
+ * старый сервер его не присылает. Именно по нему витрина выбирает свой перевод.
+ * `message` — диагностика на языке магазина; ПОКУПАТЕЛЮ НЕ ПОКАЗЫВАЕТСЯ (иначе
+ * франкоязычный покупатель читает русскую серверную строку — аудит №3/№6).
+ */
 export interface StorefrontApiError {
   code: string;
   message: string;
+  reason?: string;
 }
 
 // -----------------------------------------------------------------------------

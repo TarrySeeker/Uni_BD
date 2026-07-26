@@ -8,13 +8,16 @@
  * Body: { items[], customer:{name,email,phone}, delivery:{type,city,address?,pvzCode?},
  *         paymentMethod, promoCode?, comment?, idempotencyKey? }
  * Ответ: { number, status, paymentStatus, grandTotal, currency, accessToken }.
- * Ошибки: нет остатка → 409; невалидная позиция/промокод → 422.
+ * Ошибки: нет остатка → 409; невалидная позиция/промокод → 422. В теле ошибки
+ * едет доменная причина `error.reason` (out_of_stock / invalid_promo / ... —
+ * lib/storefront/error-reasons), по которой витрина выбирает перевод.
  */
 
 import {
   runStorefront,
   jsonData,
   jsonError,
+  jsonDomainError,
   handlePreflight,
   parseJsonBody,
 } from '@/lib/storefront/response';
@@ -93,11 +96,12 @@ export async function POST(req: Request): Promise<Response> {
       });
 
       if (!result.ok) {
-        // Нет остатка → 409 conflict; невалидная позиция/промокод → 422.
-        if (result.code === 'out_of_stock') {
-          return jsonError('conflict', result.message, cors);
-        }
-        return jsonError('unprocessable', result.message, cors);
+        // Доменный код едет наружу в error.reason (аудит №3/№6) — без него витрина
+        // видела только транспортный 'conflict'/'unprocessable', не могла выбрать
+        // перевод и печатала покупателю на /en и /fr русский серверный текст.
+        // Транспорт (409 нет остатка / 422 остальное) выбирает transportForReason.
+        // `message` остаётся диагностикой для логов, покупателю его не показывают.
+        return jsonDomainError(result.code, result.message, cors);
       }
 
       const dto = toOrderCreatedDto(result.order);

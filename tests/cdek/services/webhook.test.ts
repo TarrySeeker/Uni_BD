@@ -37,6 +37,17 @@ vi.mock('@/lib/cdek/services/delivery-status', () => ({
   advanceDeliveryStatus: (...a: unknown[]) => advanceDeliveryStatusMock(...(a as [])),
 }));
 
+// Находка №25: трек-номер из события вебхука ДОЛЖЕН сохраняться (раньше парсился
+// в CdekEvent.cdekNumber и молча выбрасывался).
+const saveTrackNumberMock = vi.fn(async () => true);
+vi.mock('@/lib/cdek/services/track', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/cdek/services/track')>();
+  return {
+    ...actual,
+    saveTrackNumber: (...a: unknown[]) => saveTrackNumberMock(...(a as [])),
+  };
+});
+
 import {
   verifyWebhookIp,
   parseEvent,
@@ -203,6 +214,39 @@ describe('cdek/webhook — handleWebhookEvent идемпотентность', (
     expect(r).toEqual({ processed: false, duplicate: false });
     expect(insertStatusLogMock).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('🔴 №25: attributes.cdek_number из события СОХРАНЯЕТСЯ (трек больше не выбрасывается)', async () => {
+    insertStatusLogMock.mockResolvedValue({ inserted: true, entry: { id: 'log-t1' } });
+    await svc.handleWebhookEvent({
+      type: 'ORDER_STATUS',
+      uuid: 'u-1',
+      attributes: {
+        number: 'TC-2026-000123',
+        cdek_number: '1106109745',
+        code: 'ACCEPTED',
+        status_date_time: '2026-06-16T09:00:00+0300',
+      },
+    });
+    expect(saveTrackNumberMock).toHaveBeenCalledWith('ord-1', '1106109745');
+  });
+
+  it('№25: события без cdek_number трек не трогают (нечего затирать)', async () => {
+    insertStatusLogMock.mockResolvedValue({ inserted: true, entry: { id: 'log-t2' } });
+    await svc.handleWebhookEvent(payload);
+    expect(saveTrackNumberMock).not.toHaveBeenCalled();
+  });
+
+  it('№25: трек сохраняется и у ДУБЛИКАТА события (ретрай чинит потерянный трек)', async () => {
+    insertStatusLogMock.mockResolvedValue({ inserted: false, entry: null });
+    findStatusLogByKeyMock.mockResolvedValue({ id: 'log-x', processed: true });
+    const r = await svc.handleWebhookEvent({
+      type: 'ORDER_STATUS',
+      uuid: 'u-1',
+      attributes: { number: 'TC-2026-000123', cdek_number: '1106109745', code: 'DELIVERED' },
+    });
+    expect(r.duplicate).toBe(true);
+    expect(saveTrackNumberMock).toHaveBeenCalledWith('ord-1', '1106109745');
   });
 
   it('payload без uuid/кода → no-op без записи в лог', async () => {

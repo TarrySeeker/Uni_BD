@@ -478,6 +478,10 @@ export function ManualOrderForm({
               value={address}
               onChange={setAddress}
               error={fe('delivery.address')}
+              // Аудит №33: адрес для курьера ОБЯЗАТЕЛЕН на уровне схемы
+              // (refineCourierAddress) — обязательность обязана быть видна в форме,
+              // а не выясняться отказом сервера.
+              required
               className="sm:col-span-2"
             />
           ) : null}

@@ -63,6 +63,21 @@ export function OrderActionsPanel({
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [comment, setComment] = useState('');
+  /**
+   * Целевой статус, переход в который сорвался на списании остатка
+   * (аудит-находка #9). Пока он выставлен, панель предлагает единственный
+   * оставшийся выход — отгрузку БЕЗ списания остатка. Ставится строго по
+   * машиночитаемому коду ответа, а не по тексту сообщения (текст переводится).
+   */
+  const [forceTarget, setForceTarget] = useState<string | null>(null);
+  /**
+   * 🔴 ДЕНЬГИ (аудит 2026-07-26, критичное №7 + major №38). Сервер отклонил возврат,
+   * потому что платёжный шлюз деньги НЕ вернёт (заглушка PayKeeper, офлайн/COD,
+   * ручной платёж) и перевод придётся сделать человеку. Пока флаг выставлен, панель
+   * показывает ЯВНОЕ подтверждение «деньги возвращены вне системы» — только оно
+   * разрешает пометить заказ возвращённым. Ставится по машиночитаемому коду ответа.
+   */
+  const [manualRefundNeeded, setManualRefundNeeded] = useState(false);
 
   const orderNext = nextStatuses('order', status);
   const paymentNext = nextStatuses('payment', paymentStatus);
@@ -80,6 +95,8 @@ export function OrderActionsPanel({
     label: string,
     fn: () => Promise<ActionResult<unknown>>,
     confirmText?: string,
+    /** Статус, в который шёл переход — нужен, чтобы предложить форс именно для него. */
+    target?: string,
   ) {
     if (confirmText && !window.confirm(confirmText)) return;
     setPending(true);
@@ -90,10 +107,58 @@ export function OrderActionsPanel({
     if (result.ok) {
       setSuccess(t('orders.orderActionsPanel.actionDone', { label }));
       setComment('');
+      setForceTarget(null);
+      setManualRefundNeeded(false);
       router.refresh();
     } else {
       setError(result);
+      // Остаток по позиции недоступен (например, вариант удалён из каталога и
+      // резерв ушёл вместе со строкой inventory). Повторные попытки будут
+      // падать вечно — предлагаем осознанный выход.
+      setForceTarget(result.code === 'commit_failed' && target ? target : null);
+      // Возврат требует ручного перевода: показываем отдельное подтверждение.
+      setManualRefundNeeded(result.code === 'manual_refund_required');
     }
+  }
+
+  /**
+   * 🔴 ЕДИНСТВЕННОЕ действие возврата денег на всю панель. И «Статус заказа →
+   * Возврат», и «Статус оплаты → Возврат» ведут СЮДА: раньше это были две
+   * одинаковые с виду кнопки с разным денежным смыслом — вторая помечала деньги
+   * возвращёнными, не обращаясь к платёжному шлюзу, после чего настоящий возврат
+   * был уже невозможен (заказ терминален).
+   *
+   * `manualAck` = оператор подтвердил, что вернул деньги ВНЕ системы. Сервер
+   * требует его только там, где шлюз возврат не выполняет, и пишет факт в аудит.
+   */
+  async function runRefund(manualAck: boolean) {
+    await run(
+      t('orders.orderActionsPanel.labels.refund'),
+      () =>
+        refundOrderAction({
+          id: orderId,
+          reason: comment || undefined,
+          manualRefundAcknowledged: manualAck || undefined,
+        }),
+      manualAck
+        ? t('orders.orderActionsPanel.confirmManualRefund')
+        : t('orders.orderActionsPanel.confirmRefund'),
+    );
+  }
+
+  /** Отгрузка без списания остатка — только с комментарием-обоснованием. */
+  async function forceShip(to: string) {
+    if (!comment.trim()) {
+      setSuccess(null);
+      window.alert(t('orders.orderActionsPanel.forceCommentRequired'));
+      return;
+    }
+    await run(
+      t('orders.orderActionsPanel.forceButton'),
+      () => changeOrderStatusAction({ id: orderId, to, comment, forceStockCommit: true }),
+      t('orders.orderActionsPanel.confirmForce'),
+      to,
+    );
   }
 
   return (
@@ -190,17 +255,17 @@ export function OrderActionsPanel({
                           t('orders.orderActionsPanel.confirmCancel'),
                         )
                       : isRefund
-                        ? run(
-                            t('orders.orderActionsPanel.labels.refund'),
-                            () => refundOrderAction({ id: orderId, reason: comment || undefined }),
-                            t('orders.orderActionsPanel.confirmRefund'),
-                          )
-                        : run(t('orders.orderActionsPanel.labels.changeStatus'), () =>
-                            changeOrderStatusAction({
-                              id: orderId,
-                              to,
-                              comment: comment || undefined,
-                            }),
+                        ? runRefund(false)
+                        : run(
+                            t('orders.orderActionsPanel.labels.changeStatus'),
+                            () =>
+                              changeOrderStatusAction({
+                                id: orderId,
+                                to,
+                                comment: comment || undefined,
+                              }),
+                            undefined,
+                            to,
                           )
                   }
                   className={`rounded px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
@@ -215,6 +280,56 @@ export function OrderActionsPanel({
             })
           )}
         </div>
+
+        {/*
+          Выход из тупика #9. Если списать резерв нечем (строка inventory ушла
+          вместе с удалённым вариантом), обычная кнопка будет падать ВСЕГДА, и
+          оплаченный собранный заказ не отгрузить никогда. Даём осознанный форс:
+          виден только после реального commit_failed, требует комментария и
+          подтверждения, а несписанные SKU уходят в историю заказа и в аудит.
+        */}
+        {forceTarget ? (
+          <div
+            role="alert"
+            className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            <p className="font-medium">{t('orders.orderActionsPanel.forceTitle')}</p>
+            <p className="mt-1 text-xs">{t('orders.orderActionsPanel.forceHint')}</p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => forceShip(forceTarget)}
+              className="mt-2 rounded border border-amber-500 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+            >
+              {t('orders.orderActionsPanel.forceButton')}
+            </button>
+          </div>
+        ) : null}
+
+        {/*
+          🔴 ДЕНЬГИ (критичное №7 + major №38). Сервер отказал: шлюз возврат не
+          выполняет, перевод придётся сделать человеку. Пока оператор явно это не
+          подтвердит, заказ НЕ помечается возвращённым — иначе получается «бумажный
+          возврат»: система считает деньги отданными, покупатель их не получил, а
+          повторить возврат уже нечем (refunded/cancelled терминальны).
+        */}
+        {manualRefundNeeded ? (
+          <div
+            role="alert"
+            className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900"
+          >
+            <p className="font-medium">{t('orders.orderActionsPanel.manualRefundTitle')}</p>
+            <p className="mt-1 text-xs">{t('orders.orderActionsPanel.manualRefundHint')}</p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => runRefund(true)}
+              className="mt-2 rounded border border-red-500 px-3 py-1.5 text-sm font-medium text-red-900 hover:bg-red-100 disabled:opacity-50"
+            >
+              {t('orders.orderActionsPanel.manualRefundButton')}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* --- Переходы статуса оплаты --- */}
@@ -232,9 +347,15 @@ export function OrderActionsPanel({
                 type="button"
                 disabled={pending}
                 onClick={() =>
-                  run(t('orders.orderActionsPanel.labels.changePaymentStatus'), () =>
-                    setPaymentStatusAction({ id: orderId, to, comment: comment || undefined }),
-                  )
+                  // 🔴 «Возврат» в статусах ОПЛАТЫ — та же денежная операция, что и
+                  // «Статус заказа → Возврат»: тот же обработчик, то же подтверждение,
+                  // то же обращение к платёжному шлюзу. Раньше это была отдельная
+                  // кнопка без подтверждения, которая просто штамповала «возвращено».
+                  to === 'refunded'
+                    ? runRefund(false)
+                    : run(t('orders.orderActionsPanel.labels.changePaymentStatus'), () =>
+                        setPaymentStatusAction({ id: orderId, to, comment: comment || undefined }),
+                      )
                 }
                 className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >

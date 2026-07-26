@@ -25,6 +25,7 @@ import {
 import { getOrderByNumber } from '@/lib/orders/repository';
 import { mapCdekStatus, displayName } from './status-map';
 import { advanceDeliveryStatus } from './delivery-status';
+import { saveTrackNumber } from './track';
 
 // =============================================================================
 // verifyWebhookIp — ЧИСТАЯ. IP-whitelist (точные IPv4 + CIDR). docs/08 §8.2.
@@ -210,6 +211,15 @@ export class WebhookService {
         `[cdek] webhook: заказ не найден (number=${event.orderNumber}, uuid=${event.cdekUuid}).`,
       );
       return { processed: false, duplicate: false };
+    }
+
+    // 1.5) ТРЕК-НОМЕР (находка №25). `attributes.cdek_number` раньше разбирался в
+    // CdekEvent и молча выбрасывался — в боевом режиме orders.cdek_track оставался
+    // NULL навсегда, и покупателю было нечего показать. Сохраняем ДО дедупа: если
+    // прошлая доставка события упала после записи в лог, ретрай (duplicate) обязан
+    // всё равно донести номер. saveTrackNumber идемпотентен и не затирает пустым.
+    if (event.cdekNumber) {
+      await saveTrackNumber(orderId, event.cdekNumber);
     }
 
     // 2) Идемпотентная запись в лог.

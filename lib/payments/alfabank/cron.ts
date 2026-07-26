@@ -79,9 +79,19 @@ export async function withAdvisoryLock<T>(
 
 /**
  * «Зависшие» оплачиваемые alfabank-заказы для сверки:
- *   payment_provider='alfabank', payment_status='pending', есть payment_ref,
- *   заказ не отменён/возвращён, создан за последние 3 дня.
+ *   payment_provider='alfabank', payment_status ∈ (pending, authorized), есть
+ *   payment_ref, заказ не отменён/возвращён, создан за последние 3 дня.
  * Сумма из grand_total → копейки воркером. ORDER BY created_at LIMIT.
+ *
+ * 🔴 ПОЧЕМУ И `authorized` (как в tbank/cron.ts). У RBS двухстадийная оплата:
+ * orderStatus=1 — деньги УДЕРЖАНЫ (холд), и такой заказ платформа больше не даёт
+ * оплатить повторно (paymentBlockFor → funds_held, иначе второе списание). Значит
+ * незавершённый холд обязан выводиться из этого состояния БЕЗ покупателя: сверка
+ * спросит getOrderStatusExtended и доведёт статус — снятая/отклонённая
+ * авторизация (orderStatus 3/6) → 'failed' (заказ снова оплачиваем), полная (2) →
+ * 'paid'. Без этой строки истёкший холд запирал бы заказ до ручного вмешательства
+ * оператора. Повтор того же статуса ничего не делает: canTransition отсекает
+ * authorized → authorized.
  */
 export async function findPendingAlfabankPayments(
   limit: number = RECONCILE_PENDING_LIMIT,
@@ -92,7 +102,7 @@ export async function findPendingAlfabankPayments(
     SELECT o.id, o.number, o.payment_ref, o.grand_total
       FROM orders o
      WHERE o.payment_provider = 'alfabank'
-       AND o.payment_status = 'pending'
+       AND o.payment_status IN ('pending', 'authorized')
        AND o.payment_ref IS NOT NULL
        AND o.status NOT IN ('cancelled', 'refunded')
        AND o.created_at > now() - interval '3 days'

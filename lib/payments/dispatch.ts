@@ -34,6 +34,7 @@
 import { PaymentService as TbankPaymentService } from '@/lib/payments/tbank';
 import { PaymentService as PaykeeperPaymentService } from '@/lib/payments/paykeeper';
 import { PaymentService as AlfabankPaymentService } from '@/lib/payments/alfabank';
+import { isRefundProvider, type RefundProvider } from '@/lib/payments/refund-capability';
 import { OrderError } from '@/lib/orders/errors';
 
 /** Вход шлюзового возврата (единый контракт tbank/paykeeper `refundPayment`). */
@@ -60,21 +61,12 @@ export interface RefundDispatchResult {
 }
 
 /**
- * Провайдеры с определённым путём возврата: `PaymentProvider`
- * (`tbank`|`paykeeper`|`manual`) + forward-compat `gift` (ADR-P1-3, шаг 4). NB: не
- * равно реестру `PAYMENT_PROVIDERS` (там нет `gift`) — `gift` здесь заглушка.
+ * Провайдеры с определённым путём возврата (`RefundProvider`) и предикат берутся из
+ * ЧИСТОГО реестра `lib/payments/refund-capability` — там же объявлена способность
+ * каждого провайдера вернуть деньги САМ (gateway) или только руками (manual), которую
+ * читают политика возврата и карточка заказа. Одна копия списка на весь код: новый
+ * эквайер без записи в реестре не соберётся (exhaustive switch ниже).
  */
-type RefundProvider = 'tbank' | 'paykeeper' | 'alfabank' | 'manual' | 'gift';
-
-function isRefundProvider(v: string): v is RefundProvider {
-  return (
-    v === 'tbank' ||
-    v === 'paykeeper' ||
-    v === 'alfabank' ||
-    v === 'manual' ||
-    v === 'gift'
-  );
-}
 
 /** Внутренний (без шлюза) возврат: реальный возврат делает сетл в вызывающем экшене. */
 function internalRefund(reason: string): RefundDispatchResult {

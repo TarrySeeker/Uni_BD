@@ -187,6 +187,21 @@ export interface OrderPublicDto {
 
   promoCode: string | null;
   paymentMethod: Order['paymentMethod'];
+  /**
+   * Время ПОСЛЕДНЕЙ инициации платежа (orders.payment_initiated_at, 0058), ISO;
+   * null — по заказу счёт не выставляли (или он старше миграции).
+   *
+   * 🔴 ЗАЧЕМ НАРУЖУ. Витрина обязана отличать «покупатель заплатил и вернулся
+   * раньше вебхука» от «покупатель не платил вовсе»: в первом случае показывать
+   * кнопку «оплатить» нельзя — это второе списание. Подсказка шлюза для этого не
+   * годится (её шлёт только наш mock; боевой эквайер возвращает по настройкам
+   * своего ЛК), поэтому нужен серверный ФАКТ.
+   *
+   * НЕ УТЕЧКА: отдаётся производная отметка времени, а не `paymentRef` (id счёта
+   * у эквайера) — он по-прежнему остаётся внутренним. Периметр тот же: заказ
+   * виден лишь по номеру + HMAC-токену/email покупателя.
+   */
+  paymentInitiatedAt: string | null;
 
   delivery: {
     type: Order['deliveryType'];
@@ -199,6 +214,18 @@ export interface OrderPublicDto {
      */
     zoneId: string | null;
     zoneLabel: string | null;
+    /**
+     * Адрес курьерской доставки (АДДИТИВНО, находка №5). ЧУВСТВИТЕЛЬНОЕ поле —
+     * см. SENSITIVE_DELIVERY_FIELDS: отдаётся ТОЛЬКО при сильном подтверждении
+     * доступа (токен заказа), иначе null. null также для ПВЗ/самовывоза.
+     */
+    address: string | null;
+    /**
+     * Код выбранного пункта выдачи/постамата (АДДИТИВНО, находка №5). ЧУВСТВИТЕЛЬНОЕ
+     * поле (куда покупатель физически придёт) — отдаётся только по токену, иначе null.
+     * null также для курьера/самовывоза.
+     */
+    pvzCode: string | null;
     /** Трек-номер СДЭК (если присвоен, Этап 4). */
     track: string | null;
   };
@@ -240,10 +267,47 @@ export function toOrderItemDto(item: OrderItem): OrderItemDto {
 }
 
 /**
+ * ЧУВСТВИТЕЛЬНЫЕ поля блока delivery — выдаются ТОЛЬКО при сильном подтверждении
+ * доступа (HMAC-токен заказа), как коды подарочных сертификатов (`allowEmail:false`).
+ *
+ * ПОЧЕМУ. GET /orders/:number пускает ещё и по ?email= — это слабое подтверждение:
+ * номера заказов последовательны (ПРЕФИКС-ГОД-NNNNNN), а email покупателя часто
+ * известен (утечка базы, оператор, сам покупатель по чужому заказу). Для трекинга
+ * (статус/трек/город/суммы) такой доступ приемлем и остаётся, но ФИЗИЧЕСКОЕ МЕСТО
+ * человека — домашний адрес и пункт, куда он придёт, — под ним отдавать нельзя.
+ *
+ * Оба поля добавлены той же правкой, что и эта защита, поэтому слабая ветка отдаёт
+ * ровно тот набор, что был до неё: ни один сценарий тенанта не сломан.
+ *
+ * Новое поле в delivery → решить, чувствительное ли оно, и при необходимости внести
+ * сюда (гард в tests/storefront/order-sensitive-delivery.test.ts не даст забыть).
+ */
+export const SENSITIVE_DELIVERY_FIELDS = ['address', 'pvzCode'] as const;
+
+/** Опции публичного DTO заказа. */
+export interface OrderPublicDtoOptions {
+  /**
+   * Разрешить чувствительные поля доставки (SENSITIVE_DELIVERY_FIELDS).
+   * По умолчанию FALSE — fail-closed: новый вызывающий обязан ОСОЗНАННО доказать
+   * сильный доступ, а не получить персональные данные по умолчанию.
+   */
+  includeSensitiveDelivery?: boolean;
+}
+
+/**
  * Заказ + позиции → публичный DTO трекинга. НЕ включает ip/idempotencyKey/
  * внутренние id/customerId/paymentRef/cdekUuid (утечка запрещена, §4.2).
+ *
+ * Форма ответа НЕ зависит от уровня доступа (ключи всегда те же, скрытое = null) —
+ * иначе витрина ловила бы «то есть поле, то нет», а сам факт наличия поля выдавал бы
+ * тип доставки.
  */
-export function toOrderPublicDto(order: Order, items: OrderItem[]): OrderPublicDto {
+export function toOrderPublicDto(
+  order: Order,
+  items: OrderItem[],
+  options: OrderPublicDtoOptions = {},
+): OrderPublicDto {
+  const sensitive = options.includeSensitiveDelivery === true;
   return {
     number: order.number,
     status: order.status,
@@ -262,6 +326,8 @@ export function toOrderPublicDto(order: Order, items: OrderItem[]): OrderPublicD
 
     promoCode: order.promoCode,
     paymentMethod: order.paymentMethod,
+    // Факт «оплата уже начата» (без id счёта) — витрине для защиты от двойной оплаты.
+    paymentInitiatedAt: order.paymentInitiatedAt ? order.paymentInitiatedAt.toISOString() : null,
 
     delivery: {
       type: order.deliveryType,
@@ -269,6 +335,8 @@ export function toOrderPublicDto(order: Order, items: OrderItem[]): OrderPublicD
       city: order.deliveryCity,
       zoneId: order.deliveryZoneId,
       zoneLabel: order.deliveryZoneLabel,
+      address: sensitive ? order.deliveryAddress : null,
+      pvzCode: sensitive ? order.deliveryPvzCode : null,
       track: order.cdekTrack,
     },
 

@@ -19,13 +19,18 @@ import {
   runStorefront,
   jsonData,
   jsonError,
+  jsonDomainError,
   handlePreflight,
   parseJsonBody,
 } from '@/lib/storefront/response';
 import { STOREFRONT_WRITE_METHODS } from '@/lib/storefront/cors';
 import { getOrderByNumber } from '@/lib/orders/repository';
-import { verifyOrderAccess } from '@/lib/storefront/order-dto';
+import { paymentBlockFor } from '@/lib/orders/status';
+import { reasonForPaymentBlock } from '@/lib/storefront/error-reasons';
+import { orderAccessToken, verifyOrderAccess } from '@/lib/storefront/order-dto';
 import { PaymentService } from '@/lib/payments/alfabank/service';
+import { resolveOrderReturnUrl } from '@/lib/payments/return-url';
+import { resolveMockPageOrigin } from '@/lib/payments/app-origin';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,25 +39,12 @@ const InitSchema = z
     orderNumber: z.string().trim().min(1, 'Требуется orderNumber.'),
     accessToken: z.string().trim().optional(),
     email: z.string().trim().optional(),
-    // Куда вернуть покупателя после оплаты (register.do returnUrl). В mock прокидывается
-    // в demo-URL; в боевом — используется как returnUrl регистрации заказа.
+    // Куда вернуть покупателя после оплаты. НЕДОВЕРЕННОЕ значение: из него берётся
+    // ТОЛЬКО безопасный путь (локаль витрины) — origin и параметры заказа подставляет
+    // сервер из настроек магазина (см. resolveOrderReturnUrl).
     returnUrl: z.string().trim().url().optional(),
   })
   .strip();
-
-/** Origin для абсолютного mock-URL (по своему ПУБЛИЧНОМУ домену, без хардкода). */
-function requestOrigin(req: Request): string | undefined {
-  const host = req.headers.get('x-forwarded-host');
-  if (host) {
-    const proto = (req.headers.get('x-forwarded-proto') ?? 'https').split(',')[0]!.trim();
-    return `${proto}://${host.split(',')[0]!.trim()}`;
-  }
-  try {
-    return new URL(req.url).origin;
-  } catch {
-    return undefined;
-  }
-}
 
 export async function POST(req: Request): Promise<Response> {
   return runStorefront(
@@ -80,22 +72,61 @@ export async function POST(req: Request): Promise<Response> {
       // доступа (зеркалит GET /orders/:number) — чтобы перебор номеров не отличал
       // «нет заказа» от «нет доступа».
       if (!found || !verifyOrderAccess(found.order, { token: accessToken, email })) {
-        return jsonError('not_found', 'Заказ не найден.', cors);
+        // Доменная причина рядом с транспортным 404 (аудит №3/№6): витрина
+        // выбирает свой перевод, а не печатает серверную русскую строку.
+        return jsonError('not_found', 'Заказ не найден.', cors, {}, 'order_not_found');
       }
 
-      // Уже оплачен/возвращён — повторная инициация бессмысленна.
-      if (found.order.paymentStatus === 'paid' || found.order.paymentStatus === 'refunded') {
-        return jsonError(
-          'conflict',
-          `Заказ уже в статусе оплаты «${found.order.paymentStatus}».`,
+      // Оплатить можно только ЖИВОЙ заказ, по которому НЕТ денег покупателя. Тот же
+      // инвариант, что в service.initPayment (paymentBlockFor) — но проверить его
+      // ОБЯЗАН и роут: init-эндпоинт публичный, запрос шлётся и мимо витрины.
+      // 🔴 Кроме отменённого/возвращённого заказа и уже оплаченного/возвращённого
+      // платежа гард отсекает ХОЛД (authorized): деньги уже удержаны на карте, и
+      // вторая инициация выставила бы ВТОРОЙ счёт по тому же заказу. Покупателю
+      // при этом уходит доменная причина («оплата обрабатывается» ≠ «нельзя
+      // оплатить»), а не общий «не удалось инициировать оплату».
+      const payBlock = paymentBlockFor(found.order.status, found.order.paymentStatus);
+      if (payBlock) {
+        return jsonDomainError(
+          reasonForPaymentBlock(payBlock),
+          `Заказ нельзя оплатить (статус заказа «${found.order.status}», оплаты «${found.order.paymentStatus}», причина «${payBlock}»).`,
           cors,
         );
       }
 
+      // АДРЕС ВОЗВРАТА покупателя со шлюза. origin — ТОЛЬКО из ДОВЕРЕННЫХ источников
+      // владельца (shop_settings.seo.site_url, иначе STOREFRONT_ALLOWED_ORIGINS);
+      // из запроса берётся лишь безопасный ПУТЬ (несёт локаль), number/token —
+      // СЕРВЕРНЫЕ. Origin из тела/заголовков запроса НЕ используется: шлюз редиректит
+      // покупателя с легитимной платёжной формы, подмена origin = open redirect с
+      // утечкой number/token (см. lib/payments/return-url.ts). Токен кладётся ТОЛЬКО
+      // если доступ подтверждён самим токеном: доступ по email слабее (номера
+      // последовательны, email известен) и не должен превращаться в токен, открывающий
+      // коды подарочных сертификатов (order-dto: allowEmail:false).
+      const tokenProven = verifyOrderAccess(found.order, { token: accessToken }, process.env, {
+        allowEmail: false,
+      });
+      const resolvedReturnUrl = await resolveOrderReturnUrl({
+        orderNumber: found.order.number,
+        accessToken: tokenProven ? orderAccessToken(found.order.id) : null,
+        requestedUrl: returnUrl,
+      });
+
+      // АДРЕС DEMO-СТРАНИЦЫ оплаты — ДРУГОЙ адрес и другой источник: страницы
+      // app/mock/<провайдер>/pay лежат в ЭТОМ приложении, а витрина — отдельный
+      // контейнер на ДРУГОМ хосте (admin.<домен> против <домена> магазина). Origin
+      // витрины сюда подставлять НЕЛЬЗЯ — demo-оплата уводила бы покупателя на сайт,
+      // где такой страницы нет (404). Берём публичный адрес приложения из env
+      // владельца, иначе origin запроса (см. lib/payments/app-origin.ts). В боевом
+      // режиме значение не используется вовсе: ссылку на оплату даёт сам шлюз.
+      const mockPageOrigin = resolveMockPageOrigin(req);
+
       try {
         const res = await new PaymentService().initPayment(found.order, found.items, {
-          baseOrigin: requestOrigin(req),
-          returnUrl,
+          baseOrigin: mockPageOrigin,
+          // Без доверенного origin адрес НЕ передаётся вовсе (как было до пер-заказного
+          // возврата). Сырой returnUrl из тела сюда не попадает НИКОГДА.
+          returnUrl: resolvedReturnUrl,
         });
         return jsonData(
           {
@@ -108,7 +139,7 @@ export async function POST(req: Request): Promise<Response> {
           cors,
         );
       } catch {
-        return jsonError('unprocessable', 'Не удалось инициировать оплату.', cors);
+        return jsonDomainError('payment_init_failed', 'Не удалось инициировать оплату.', cors);
       }
     },
     { module: 'payments', methods: STOREFRONT_WRITE_METHODS },

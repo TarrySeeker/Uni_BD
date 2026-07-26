@@ -237,14 +237,26 @@ export async function getNewProducts(
 // buildHeaders на клиенте его не добавляет (см. выше).
 // -----------------------------------------------------------------------------
 
-/** Ошибка Storefront API с машиночитаемым кодом (для веток UI чекаута). */
+/**
+ * Ошибка Storefront API с машиночитаемым кодом (для веток UI чекаута).
+ *
+ * ДВА кода, не один (аудит №3/№6):
+ *  • `code` — транспортный (conflict/unprocessable/not_found/network/…);
+ *  • `reason` — доменная причина из публичного алфавита платформы, если сервер её
+ *    прислал (out_of_stock, invalid_promo, invalid_gift, delivery_unavailable…).
+ * UI выбирает подпись ПРИОРИТЕТНО по `reason`, транспортный код — фолбэк.
+ * `message` — серверная диагностика (язык магазина): годится для консоли, но
+ * НИКОГДА не показывается покупателю.
+ */
 export class ApiError extends Error {
   readonly code: string;
+  readonly reason?: string;
   readonly status: number;
   constructor(status: number, err: StorefrontApiError) {
     super(err.message || 'Ошибка запроса.');
     this.name = 'ApiError';
     this.code = err.code || 'error';
+    this.reason = err.reason || undefined;
     this.status = status;
   }
 }

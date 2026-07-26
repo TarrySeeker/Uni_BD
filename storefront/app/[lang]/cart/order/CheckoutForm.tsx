@@ -18,8 +18,15 @@ import type { FormEvent } from 'react';
 import { useCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/format';
 import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
-import { getDictionary, fillTemplate, type Dictionary } from '@/lib/dictionaries';
+import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 import { normalizeGiftCode } from '@/lib/gift-code';
+import {
+  giftReasonLabel,
+  issueLabel,
+  orderErrorLabel,
+  promoReasonLabel,
+  type CheckoutDict,
+} from '@/lib/checkout-errors';
 import {
   ApiError,
   cdekCities,
@@ -54,75 +61,20 @@ interface Props {
 /** Способ доставки в UI. 'zone' — псевдо-тип (курьер по зоне Москвы). */
 type DeliveryChoice = 'courier' | 'pvz' | 'zone';
 
-/** Подсекция словаря чекаута — все локализованные подписи формы. */
-type CheckoutDict = Dictionary['checkout'];
-
 /**
- * Подпись причины проблемы позиции (issues[].code из /cart/quote).
- * 🔴 Неизвестный код НЕ показываем покупателю сырым — общий текст словаря.
- */
-function issueLabel(t: CheckoutDict, code: string): string {
-  const map: Record<string, string> = {
-    out_of_stock: t.issueOutOfStock,
-    invalid_item: t.issueInvalidItem,
-    not_found: t.issueNotFound,
-    inactive: t.issueInactive,
-  };
-  return map[code] ?? t.issueInvalidItem;
-}
-
-/** Подпись причины отказа промокода (promo.reason из /cart/quote). */
-function promoReasonLabel(t: CheckoutDict, reason: string): string {
-  const map: Record<string, string> = {
-    not_found: t.promoReasonNotFound,
-    expired: t.promoReasonExpired,
-    not_started: t.promoReasonNotStarted,
-    inactive: t.promoReasonInactive,
-    usage_limit: t.promoReasonUsageLimit,
-    min_order: t.promoReasonMinOrder,
-    per_customer_limit: t.promoReasonPerCustomerLimit,
-  };
-  return map[reason] ?? t.promoNotApplied;
-}
-
-/**
- * Подпись причины отказа подарочного сертификата (gift.reason из /cart/quote).
- * 🔴 Сырой машинный код покупателю не показывается НИКОГДА: неизвестная причина
- * (или новый код на сервере) падает в общий человекочитаемый текст словаря.
- */
-function giftReasonLabel(t: CheckoutDict, reason: string): string {
-  const map: Record<string, string> = {
-    not_found: t.giftReasonNotFound,
-    expired: t.giftReasonExpired,
-    depleted: t.giftReasonDepleted,
-    disabled: t.giftReasonDisabled,
-    no_amount_due: t.giftReasonNoAmountDue,
-  };
-  return map[reason] ?? t.giftCodeNotApplied;
-}
-
-/**
- * Человекочитаемая ошибка создания заказа (code из /orders → CreateOrderResult).
+ * Человекочитаемая ошибка запроса чекаута.
  *
- * 🔴 Покупателю показываем ТОЛЬКО строки словаря витрины. Раньше неизвестный код
- * падал на сырое сообщение из ApiError — а это текст сервера на РУССКОМ
- * («Подарочный сертификат не найден.», «Сеть недоступна: …»), который уезжал
- * франкоязычному покупателю как есть. Теперь сырое сообщение и машинный код идут
- * исключительно в консоль браузера (для поддержки), а в интерфейс — словарь.
+ * 🔴 Покупателю показываем ТОЛЬКО строки словаря витрины. Подпись выбирается по
+ * ДОМЕННОЙ причине (`error.reason`) и лишь затем — по транспортному коду; сырое
+ * сообщение сервера (оно на языке магазина, обычно русском) и машинный код
+ * уходят ИСКЛЮЧИТЕЛЬНО в консоль браузера, для поддержки.
+ *
+ * Карты кодов вынесены в @/lib/checkout-errors — чистый модуль, покрытый тестами
+ * на все три локали (аудит №3/№6: раньше карта была здесь и не срабатывала ни разу).
  */
 function humanError(t: CheckoutDict, err: unknown): string {
-  const map: Record<string, string> = {
-    out_of_stock: t.orderErrorOutOfStock,
-    invalid_item: t.orderErrorInvalidItem,
-    invalid_promo: t.orderErrorInvalidPromo,
-    invalid_gift: t.orderErrorInvalidGift,
-    delivery_unavailable: t.orderErrorDeliveryUnavailable,
-    payments_disabled: t.orderErrorPaymentsDisabled,
-    network: t.orderErrorNetwork,
-    rate_limited: t.orderErrorRateLimited,
-  };
-  const known = err instanceof ApiError ? map[err.code] : undefined;
-  if (known) return known;
+  const label = orderErrorLabel(t, err instanceof ApiError ? err : null);
+  if (label) return label;
   // Диагностика — в лог, не в интерфейс.
   console.error('[checkout] неизвестная ошибка запроса', err);
   return t.orderErrorGeneric;

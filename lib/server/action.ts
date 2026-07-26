@@ -63,6 +63,19 @@ export type ActionResult<O> =
   | {
       ok: false;
       error: ActionError;
+      /**
+       * МАШИНОЧИТАЕМЫЙ код доменного отказа (OrderError.code / CatalogError.code
+       * и т.п.), если ошибка его несёт. Поле ДОБАВОЧНОЕ и необязательное:
+       * существующие потребители читают error/message как раньше.
+       *
+       * Зачем: без него UI различал бы отказы только по человеческому тексту.
+       * Например, «Отгружен» может не пройти по двум совершенно разным причинам —
+       * конкурентная смена статуса (conflict, надо просто обновить страницу) и
+       * недоступный остаток (commit_failed, нужен осознанный форс). Панель
+       * статусов предлагает выход только во втором случае — по коду, а не по
+       * подстроке сообщения (которое ещё и переводится).
+       */
+      code?: string;
       fieldErrors?: Record<string, string[]>;
       message?: string;
     };
@@ -199,6 +212,60 @@ export async function translateMessage(
   }
 }
 
+/**
+ * Машиночитаемый код доменного отказа, если ошибка его несёт.
+ *
+ * Базовый PublicActionError поля `code` не имеет — его добавляют доменные
+ * наследники (OrderError, CatalogError, …). Читаем структурно, чтобы ядро не
+ * зависело от конкретных доменов.
+ */
+function domainCode(error: PublicActionError): string | undefined {
+  const candidate = (error as unknown as { code?: unknown }).code;
+  return typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
+}
+
+/**
+ * Ошибки полей из issues Zod — по ПОЛНОМУ пути и по верхнему уровню сразу.
+ *
+ * ЗАЧЕМ (аудит 2026-07-26, находка №33). Раньше здесь стоял
+ * `parsed.error.flatten().fieldErrors`, который раскладывает сообщения по ПЕРВОМУ
+ * сегменту пути: ошибка `['delivery','address']` попадала под ключ 'delivery'.
+ * Формы же читают ошибку по полному имени поля (`fe('delivery.address')`,
+ * `fe('customer.email')`), поэтому под полем не появлялось НИЧЕГО, и точная
+ * доменная фраза («Для курьерской доставки требуется адрес доставки.»)
+ * подменялась общим «Проверьте корректность полей формы».
+ *
+ * Расширение АДДИТИВНОЕ: ключ верхнего уровня по-прежнему заполняется (формы,
+ * читающие `fe('items')`, работают как раньше), рядом появляется полный
+ * dotted-путь ('items.0.qty', 'delivery.pvzCode'). Ошибки уровня всей формы
+ * (path=[]) в fieldErrors не попадают — как и прежде.
+ */
+function collectFieldErrors(
+  issues: readonly { path: readonly PropertyKey[]; message: string }[],
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  const push = (key: string, message: string): void => {
+    const bucket = (out[key] ??= []);
+    // Одно и то же сообщение не дублируем (полный путь и верхний уровень могут
+    // совпасть, и одно поле может собрать несколько одинаковых issue).
+    if (!bucket.includes(message)) {
+      bucket.push(message);
+    }
+  };
+  for (const issue of issues) {
+    if (issue.path.length === 0) {
+      continue;
+    }
+    const full = issue.path.map((seg) => String(seg)).join('.');
+    push(full, issue.message);
+    const top = String(issue.path[0]);
+    if (top !== full) {
+      push(top, issue.message);
+    }
+  }
+  return out;
+}
+
 /** Набор зависимостей по умолчанию (продакшен-окружение). */
 export const defaultDeps: ActionDeps = {
   getCurrentUser: defaultGetCurrentUser,
@@ -268,11 +335,9 @@ export function defineAction<I, O>(
       // (подход B); не-ключи проходят как есть (безопасный фолбэк).
       const parsed = opts.input.safeParse(raw);
       if (!parsed.success) {
-        const { fieldErrors } = parsed.error.flatten();
+        const fieldErrors = collectFieldErrors(parsed.error.issues);
         const localized: Record<string, string[]> = {};
-        for (const [field, msgs] of Object.entries(
-          fieldErrors as Record<string, string[]>,
-        )) {
+        for (const [field, msgs] of Object.entries(fieldErrors)) {
           localized[field] = await Promise.all(
             (msgs ?? []).map((m) => translate(m)),
           );
@@ -316,7 +381,10 @@ export function defineAction<I, O>(
       // (дубликат email, защита владельца и т.п.), сообщение безопасно для UI.
       if (error instanceof PublicActionError) {
         const message = await translate(error.message, error.params);
-        return { ok: false, error: 'validation', message };
+        const code = domainCode(error);
+        return code
+          ? { ok: false, error: 'validation', code, message }
+          : { ok: false, error: 'validation', message };
       }
       // Любая неожиданная ошибка → 'internal'; детали только в лог сервера.
       // Структурный JSON-лог (наблюдаемость, §6.3): permission/action — контекст,

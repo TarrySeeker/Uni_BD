@@ -214,6 +214,13 @@ services:
   #       сбой), эта задача выпустит его сама и отправит покупателю; уже
   #       выпущенные коды повторно НЕ создаются. Смотрит только оплаченные
   #       заказы за последние 30 дней;
+  #     • orders/expire-unpaid — 3 раза в час: отменяет заказы витрины с онлайн-
+  #       оплатой, не оплаченные за ORDERS_UNPAID_TTL_MINUTES (по умолчанию сутки).
+  #       Это ВОЗВРАТ ЗАСТРЯВШЕГО: покупателю — списанный при оформлении баланс
+  #       подарочного сертификата, магазину — резерв склада (товар снова
+  #       продаётся) и лимит промокода. Оплаченные заказы, наложенный платёж,
+  #       счета и заказы, созданные оператором вручную, задача НЕ трогает;
+  #       ORDERS_UNPAID_TTL_MINUTES=0 полностью её выключает;
   #     • exchange/update-rates — раз в сутки: тянет курсы валют отображения с ЦБ РФ
   #       (ЦБ публикует курс раз в день). Без этой задачи курс «замерзает» на дате
   #       последнего ручного сохранения формы в админке. No-op, если автокурс
@@ -242,6 +249,7 @@ services:
   #   5,20,35,50 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/payments/reconcile-pending-paykeeper?key=СЕКРЕТ"
   #   10,25,40,55 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/payments/reconcile-pending-alfabank?key=СЕКРЕТ"
   #   */10 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/gift/issue-pending?key=СЕКРЕТ"
+  #   7,27,47 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/orders/expire-unpaid?key=СЕКРЕТ"
   #   30  5 * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/exchange/update-rates?key=СЕКРЕТ"
   # ---------------------------------------------------------------------------
   cron:
@@ -286,6 +294,7 @@ services:
           echo "5,20,35,50 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/payments/reconcile-pending-paykeeper\" >/proc/1/fd/1 2>&1";
           echo "10,25,40,55 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/payments/reconcile-pending-alfabank\" >/proc/1/fd/1 2>&1";
           echo "*/10 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/gift/issue-pending\" >/proc/1/fd/1 2>&1";
+          echo "7,27,47 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/orders/expire-unpaid\" >/proc/1/fd/1 2>&1";
           echo "30   5 * * * $$HIT \"$$CDEK_CRON_URL/api/cron/exchange/update-rates\"      >/proc/1/fd/1 2>&1";
         } > /etc/crontabs/root
         echo "[cdek-cron] расписание установлено; запуск crond"

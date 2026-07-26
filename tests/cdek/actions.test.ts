@@ -11,7 +11,8 @@ import type { PermissionCode } from '@/lib/auth/permissions';
  *   • owner (с cdek.manage) проходит → вызывается нужный сервис (замокан);
  *   • аудит пишется с правильным action ('cdek.*') и entityId;
  *   • revalidate карточки заказа вызывается;
- *   • выключенный модуль cdek → ошибка (handler бросает CdekError → 'internal').
+ *   • выключенный модуль cdek → отказ с ПОНЯТНЫМ текстом (аудит №32: раньше это
+ *     был безликий 'internal', и оператор не понимал, что модуль просто выключен).
  *
  * Сервисы (OrderService/TrackingService/PrintService) мокаются целиком — мы
  * проверяем оркестрацию пайплайна, а не их внутреннюю логику (она в пакете D).
@@ -190,11 +191,17 @@ describe('cdek actions — валидация и module-gate', () => {
     expect(createShipmentMock).not.toHaveBeenCalled();
   });
 
-  it('модуль cdek выключен → internal (handler бросает CdekError), сервис не вызван', async () => {
+  it('модуль cdek выключен → validation с понятным текстом, сервис не вызван', async () => {
+    // Аудит №32: 'module_disabled' входит в USER_FACING_CDEK_CODES, поэтому
+    // оператор читает «Модуль «СДЭК» выключен.», а не «внутреннюю ошибку»
+    // (повторять которую бессмысленно — нужно включить модуль в настройках).
     isModuleEnabledMock.mockResolvedValue(false);
     const res = await createCdekShipment({ orderId: ORDER_ID });
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.error).toBe('internal');
+    if (!res.ok) {
+      expect(res.error).toBe('validation');
+      expect(res.message).toContain('СДЭК');
+    }
     expect(createShipmentMock).not.toHaveBeenCalled();
   });
 

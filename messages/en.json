@@ -1542,8 +1542,17 @@
         "changePaymentStatus": "Payment status change",
         "changeDeliveryStatus": "Delivery status change"
       },
-      "confirmCancel": "Cancel the order? The stock reservation will be released.",
-      "confirmRefund": "Issue a refund? The payment status will change to «Refunded»."
+      "confirmCancel": "Cancel the order? The stock reservation will be released. This action does NOT refund money: for a paid order use «Refund».",
+      "confirmRefund": "Issue a refund? The system will call the payment gateway to return the money to the customer, release the reservation and revoke gift codes issued for this order.",
+      "forceTitle": "Stock for this line is unavailable",
+      "forceHint": "The reservation could not be written off — for example, the product variant was deleted from the catalogue together with its stock row. Retrying will fail every time. You can ship the order without writing off stock: the affected SKUs go into the order history and the audit log, and their stock has to be corrected manually.",
+      "forceButton": "Ship without writing off stock",
+      "forceCommentRequired": "Add a comment explaining why — it goes into the order history.",
+      "confirmForce": "Ship without writing off stock? Stock for these lines will have to be corrected manually.",
+      "confirmManualRefund": "Confirm that the money has already been returned to the customer OUTSIDE the system (bank transfer/cash desk)? The order will be marked refunded and your confirmation will be written to the audit log.",
+      "manualRefundTitle": "The gateway will not refund automatically",
+      "manualRefundHint": "For this order the payment gateway does not perform refunds (for example, an offline payment or an acquirer without automatic refunds). Return the money to the customer yourself — by transfer or from the cash desk — and only then confirm. The confirmation is recorded in the audit log.",
+      "manualRefundButton": "Money returned outside the system — confirm"
     },
     "page": {
       "moduleDisabled": "orders (module disabled)",
@@ -1686,7 +1695,8 @@
       "customer": {
         "email": "Email",
         "phone": "Phone",
-        "comment": "Comment"
+        "comment": "Comment",
+        "phoneNotCdek": "The customer phone is not usable for a CDEK waybill (a Russian +7XXXXXXXXXX number is required). Fix it before creating the shipment."
       },
       "delivery": {
         "type": "Type",
@@ -1714,6 +1724,23 @@
       "subtitle": "Add products, specify the customer and delivery. The server will verify the total, stock and prices on creation.",
       "backLabel": "Back to orders",
       "moduleDisabled": "orders (module disabled)"
+    },
+    "orderContactForm": {
+      "heading": "Fix contacts and address",
+      "intro": "Only customer contacts and the delivery address are edited. Items, totals and order statuses stay untouched.",
+      "name": "Customer name",
+      "email": "E-mail",
+      "phone": "Phone",
+      "phoneNotCdek": "CDEK will not accept this number: a Russian number in the +7XXXXXXXXXX format is required.",
+      "city": "Delivery city",
+      "address": "Delivery address",
+      "addressRequired": "Delivery address (required for courier)",
+      "reason": "Reason for the change (goes into the order history)",
+      "submit": "Save",
+      "cancel": "Cancel",
+      "success": "Order contacts updated.",
+      "cdekShipmentWarning": "A CDEK waybill already exists for this order — editing here does not change it. Update the data in CDEK or cancel the shipment and create it again.",
+      "deliveryCostNotice": "Delivery cost is not recalculated: the order was paid at the agreed amount."
     }
   },
   "news": {

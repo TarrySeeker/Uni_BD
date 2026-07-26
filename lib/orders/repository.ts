@@ -35,7 +35,7 @@ import {
   type PromoScopeTargets,
   type QuoteResult,
 } from './pricing';
-import { validatePromo, type PromoValidationResult } from './promo';
+import { validatePromo, promoNotFound, type PromoValidationResult } from './promo';
 import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
 import { GIFT_ITEM_MARKER_KEYS } from '@/lib/gift-certificates/origin';
 import { findByCode as findGiftByCode, redeemGiftTx } from '@/lib/gift-certificates/repository';
@@ -147,6 +147,8 @@ export function mapOrder(row: Record<string, unknown>): Order {
     paidAt: row.paid_at ? asDate(row.paid_at) : null,
     paymentRef: strOrNull(row.payment_ref),
     paymentProvider: strOrNull(row.payment_provider),
+    // Инициация платежа (0058): у заказов до миграции колонки нет вовсе → null.
+    paymentInitiatedAt: row.payment_initiated_at ? asDate(row.payment_initiated_at) : null,
     deliveryType: row.delivery_type as Order['deliveryType'],
     isPostamat: Boolean(row.is_postamat),
     deliveryStatus: row.delivery_status as Order['deliveryStatus'],
@@ -844,11 +846,9 @@ export async function quoteCart(
   if (input.promoCode) {
     const found = await getPromoWithTargets(input.promoCode, input.customerEmail);
     if (!found) {
-      promoResult = {
-        valid: false,
-        reason: 'inactive',
-        message: 'Промокод не найден.',
-      };
+      // Аудит №15: причина именно «не найден», а не «неактивен» — иначе покупатель
+      // видит «не применён» без настоящей причины (и перевод not_found мёртв).
+      promoResult = promoNotFound();
     } else {
       // minQty сверяем с кол-вом единиц В SCOPE промокода (та же разметка
       // lineInScope, что и в фактическом расчёте скидки) — баг A волны 7. Для

@@ -26,6 +26,12 @@ const read = (p: string): string => readFileSync(resolve(ROOT, p), 'utf8');
 const FORM = 'storefront/app/[lang]/cart/order/CheckoutForm.tsx';
 const TYPES = 'storefront/lib/types.ts';
 const DICT = 'storefront/lib/dictionaries.ts';
+/**
+ * Карты «машинный код → строка словаря» переехали из компонента в чистый модуль
+ * (аудит №3/№6: внутри клиентского компонента они не тестировались и разошлись с
+ * доменным алфавитом). Инвариант тот же — сторожим его по новому месту.
+ */
+const ERRORS = 'storefront/lib/checkout-errors.ts';
 
 /** Причины отказа сертификата, реально достижимые в /cart/quote. */
 const GIFT_REASONS = ['not_found', 'expired', 'depleted', 'disabled', 'no_amount_due'] as const;
@@ -112,13 +118,14 @@ describe('CheckoutForm — поле кода подарочного сертиф
   });
 });
 
-describe('🔴 CheckoutForm — сырой машинный код не рендерится покупателю', () => {
+describe('🔴 Подписи ошибок — сырой машинный код не рендерится покупателю', () => {
   const src = read(FORM);
+  const labels = read(ERRORS);
 
   it('подпись причины отказа сертификата падает в текст словаря, а не в код', () => {
-    const at = src.indexOf('function giftReasonLabel');
+    const at = labels.indexOf('function giftReasonLabel');
     expect(at, 'нет giftReasonLabel').toBeGreaterThan(-1);
-    const body = src.slice(at, src.indexOf('\n}', at));
+    const body = labels.slice(at, labels.indexOf('\n}', at));
     for (const reason of GIFT_REASONS) {
       expect(body, `нет ветки ${reason}`).toContain(`${reason}: t.${reasonKey(reason)}`);
     }
@@ -133,9 +140,9 @@ describe('🔴 CheckoutForm — сырой машинный код не ренд
   });
 
   it('старая утечка «?? code» в подписи проблем позиций устранена', () => {
-    const at = src.indexOf('function issueLabel');
+    const at = labels.indexOf('function issueLabel');
     expect(at).toBeGreaterThan(-1);
-    const body = src.slice(at, src.indexOf('\n}', at));
+    const body = labels.slice(at, labels.indexOf('\n}', at));
     expect(body).not.toMatch(/\?\?\s*code\s*;/);
     expect(body).toMatch(/\?\?\s*t\./);
   });
@@ -253,8 +260,10 @@ describe('🔴 CheckoutForm — сырое серверное сообщение
   });
 
   it('сетевой сбой и rate-limit получили свои человекочитаемые тексты', () => {
-    const at = src.indexOf('function humanError');
-    const body = src.slice(at, src.indexOf('\n}', at));
+    const labels = read(ERRORS);
+    const at = labels.indexOf('function orderErrorLabel');
+    expect(at, 'нет orderErrorLabel').toBeGreaterThan(-1);
+    const body = labels.slice(at, labels.indexOf('\n}', at));
     expect(body).toContain('network: t.orderErrorNetwork');
     expect(body).toContain('rate_limited: t.orderErrorRateLimited');
   });

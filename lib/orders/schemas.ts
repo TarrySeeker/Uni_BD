@@ -26,6 +26,7 @@ import {
   PROMO_TARGET_TYPES,
 } from './types';
 import type { PromoApplyScope, PromoTargetType } from './types';
+import { MIN_PHONE_DIGITS, looksLikePhone } from './phone';
 
 // -----------------------------------------------------------------------------
 // Переиспользуемые примитивы.
@@ -71,11 +72,28 @@ export const promoCodeSchema = z.string().trim().min(1).max(64);
  */
 export const giftCertificateCodeSchema = z.string().trim().min(1).max(64);
 
+/**
+ * Телефон покупателя.
+ *
+ * Проверка НАМЕРЕННО мягкая (см. lib/orders/phone): требуем лишь достаточное
+ * число цифр. Российский формат (+7XXXXXXXXXX) здесь НЕ навязывается — магазин
+ * трёхъязычный, и заказ с французским номером на самовывоз/зону обязан пройти.
+ * Жёсткий гейт нужен только накладной СДЭК, и он живёт там же — плюс админка
+ * предупреждает о непригодном для СДЭК номере ДО отгрузки и даёт его исправить
+ * (updateOrderContact), чтобы оплаченный заказ не превращался в тупик (#8).
+ */
+export const phoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40)
+  .refine(looksLikePhone, `телефон: нужно не менее ${MIN_PHONE_DIGITS} цифр`);
+
 /** Контакты покупателя (гостевой чекаут — хранятся в заказе). */
 export const customerContactSchema = z.object({
   name: z.string().trim().min(1).max(200),
   email: z.string().trim().email(),
-  phone: z.string().trim().min(1).max(40),
+  phone: phoneSchema,
 });
 
 /**
@@ -211,17 +229,71 @@ export type ManualOrderInput = z.infer<typeof ManualOrderSchema>;
 // Смена статусов (Server Actions §4.1; каждая пишет историю + audit).
 // -----------------------------------------------------------------------------
 
-export const ChangeOrderStatusSchema = z.object({
-  id: uuidSchema,
-  to: z.enum(ORDER_STATUSES),
-  comment: z.string().trim().max(2000).optional(),
-});
+export const ChangeOrderStatusSchema = z
+  .object({
+    id: uuidSchema,
+    to: z.enum(ORDER_STATUSES),
+    comment: z.string().trim().max(2000).optional(),
+    /**
+     * АДДИТИВНОЕ поле (по умолчанию false — поведение прежнее): разрешить переход
+     * в «Отгружен», даже если списать резерв остатка не удалось (аудит-находка
+     * #9: удалённый вариант унёс строку inventory каскадом, и commitReservation
+     * возвращает false ВЕЧНО — заказ навсегда застревал в «Собран»).
+     *
+     * Это не «выключатель проверок»: обычный путь по-прежнему обязан списать
+     * остаток, форс применяется ТОЛЬКО к позициям, по которым списание не
+     * прошло, требует комментария-обоснования и попадает в историю заказа и в
+     * аудит поимённо (какие SKU остались несписанными).
+     */
+    forceStockCommit: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.forceStockCommit && !val.comment) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['comment'],
+        message: 'Отгрузка без списания остатка требует комментария-обоснования.',
+      });
+    }
+  });
 export type ChangeOrderStatusInput = z.infer<typeof ChangeOrderStatusSchema>;
+
+/**
+ * Правка КОНТАКТОВ и адреса доставки уже созданного заказа (аудит-находка #8).
+ *
+ * До этого в модуле не было НИ ОДНОГО экшена правки полей заказа: покупатель с
+ * городским номером «2223344» оплачивал заказ, накладная СДЭК падала на
+ * нормализации телефона, и отгрузить его было нельзя никогда — оставалось
+ * возвращать деньги или править БД руками.
+ *
+ * Правятся только операционные контакты и адрес. Позиции, цены, суммы и статусы
+ * НЕ трогаются: они снимок сделки (ADR-010) и меняются своими путями.
+ */
+export const UpdateOrderContactSchema = z.object({
+  id: uuidSchema,
+  customerName: z.string().trim().min(1).max(200),
+  customerEmail: z.string().trim().email().max(200),
+  customerPhone: phoneSchema,
+  /** Пустая строка = очистить поле (для самовывоза/ПВЗ адрес не обязателен). */
+  deliveryCity: z.string().trim().max(200).optional(),
+  deliveryAddress: z.string().trim().max(500).optional(),
+  /** Обоснование правки — уходит в историю заказа и в аудит. */
+  reason: z.string().trim().max(2000).optional(),
+});
+export type UpdateOrderContactInput = z.infer<typeof UpdateOrderContactSchema>;
 
 export const SetPaymentStatusSchema = z.object({
   id: uuidSchema,
   to: z.enum(PAYMENT_STATUSES),
   comment: z.string().trim().max(2000).optional(),
+  /**
+   * Подтверждение оператора «деньги возвращены вне системы» — только для to='refunded'
+   * (этот переход делегируется единому денежному пути performRefund, который
+   * обращается к платёжному шлюзу). Поле АДДИТИВНОЕ и опциональное: старые вызовы
+   * работают как раньше, но возврат без подтверждения там, где шлюз деньги не
+   * вернёт, будет отклонён (аудит 2026-07-26, критичное №7).
+   */
+  manualRefundAcknowledged: z.boolean().optional(),
 });
 export type SetPaymentStatusInput = z.infer<typeof SetPaymentStatusSchema>;
 

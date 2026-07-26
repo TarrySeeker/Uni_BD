@@ -38,6 +38,38 @@ export async function settleRefundEffectsTx(
   orderId: string,
   actorUserId: string | null,
 ): Promise<void> {
+  await settleOrderClosureTx(tx, orderId, {
+    to: 'refunded',
+    actorUserId,
+    comment: 'Возврат оплаты',
+  });
+}
+
+/**
+ * ОБОБЩЁННЫЙ сетл ЗАКРЫТИЯ заказа (возврат ИЛИ отмена) — тело settleRefundEffectsTx.
+ *
+ * Аудит 2026-07-26 (критичное №4 + major №13) добавил второго потребителя тех же
+ * эффектов: авто-отмену просроченного неоплаченного заказа (lib/orders/expire.ts).
+ * Брошенный заказ обязан вернуть ровно то же самое — резерв склада, применение
+ * промокода, СПИСАННЫЙ БАЛАНС ПОДАРОЧНОГО СЕРТИФИКАТА — но перейти в 'cancelled',
+ * а не в 'refunded'. Чтобы не заводить вторую (расходящуюся) копию денежных
+ * эффектов, тело вынесено сюда и параметризовано целевым статусом.
+ *
+ * Идемпотентно и атомарно: строка заказа читается FOR UPDATE, UPDATE гардится по
+ * прочитанному `from`, а releaseGiftTx/revokeIssuedGiftsTx/откат промо сами
+ * идемпотентны (reversed_at / RETURNING / статус-гард).
+ */
+export async function settleOrderClosureTx(
+  tx: TransactionSql,
+  orderId: string,
+  opts: {
+    /** Терминальный статус закрытия: 'refunded' (возврат) или 'cancelled' (отмена). */
+    to: Extract<OrderStatus, 'refunded' | 'cancelled'>;
+    actorUserId: string | null;
+    /** Комментарий в order_status_history. */
+    comment: string;
+  },
+): Promise<void> {
   const rows = await tx<{ status: OrderStatus; promo_code_id: string | null }[]>`
     SELECT status, promo_code_id FROM orders WHERE id = ${orderId} FOR UPDATE
   `;
@@ -94,15 +126,31 @@ export async function settleRefundEffectsTx(
   // Идемпотентно (UPDATE ... WHERE status IN ('active','depleted')).
   await revokeIssuedGiftsTx(tx, { orderId });
 
-  // (c) order.status → refunded (guarded по from) + история заказа.
-  await tx`
-    UPDATE orders SET status = 'refunded', updated_at = now()
-     WHERE id = ${orderId} AND status = ${from}
-  `;
-  await tx`
-    INSERT INTO order_status_history
-      (order_id, kind, from_status, to_status, actor_user_id, comment)
-    VALUES
-      (${orderId}, 'order', ${from}, 'refunded', ${actorUserId}, 'Возврат оплаты')
-  `;
+  // (c) order.status → to (guarded по from) + история заказа. Литералы 'refunded'/
+  // 'cancelled' разведены по веткам намеренно: статус — не пользовательский ввод,
+  // а значение из узкого типа; так запрос остаётся статически читаемым (и тесты
+  // сторожат его текст), а параметризация значений сохраняется для from/actor.
+  if (opts.to === 'refunded') {
+    await tx`
+      UPDATE orders SET status = 'refunded', updated_at = now()
+       WHERE id = ${orderId} AND status = ${from}
+    `;
+    await tx`
+      INSERT INTO order_status_history
+        (order_id, kind, from_status, to_status, actor_user_id, comment)
+      VALUES
+        (${orderId}, 'order', ${from}, 'refunded', ${opts.actorUserId}, ${opts.comment})
+    `;
+  } else {
+    await tx`
+      UPDATE orders SET status = 'cancelled', updated_at = now()
+       WHERE id = ${orderId} AND status = ${from}
+    `;
+    await tx`
+      INSERT INTO order_status_history
+        (order_id, kind, from_status, to_status, actor_user_id, comment)
+      VALUES
+        (${orderId}, 'order', ${from}, 'cancelled', ${opts.actorUserId}, ${opts.comment})
+    `;
+  }
 }

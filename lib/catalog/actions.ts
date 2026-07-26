@@ -46,6 +46,10 @@ import {
   BrandIdSchema,
   BrandLogoUploadSchema,
 } from './schemas';
+import {
+  findOpenOrderNumbersForProduct,
+  findOpenOrderNumbersForVariant,
+} from '@/lib/orders/open-orders';
 import { countCategoryChildren } from './repository';
 import { CatalogError } from './errors';
 import { parseStoredColors, toJsonColors } from './colors';
@@ -528,10 +532,17 @@ export const deleteProduct = defineAction({
     const mediaKeys = await sql<{ storage_key: string }[]>`
       SELECT storage_key FROM product_media WHERE product_id = ${data.id}
     `;
-    const rows = await sql<{ id: string }[]>`
-      DELETE FROM products WHERE id = ${data.id}
-      RETURNING id
-    `;
+    // Тот же гейт, что и у варианта (#9). Для товара тупик выглядит иначе, но
+    // вреден не меньше: order_items.product_id обнуляется, позиция теряет связь
+    // с остатком и при отгрузке молча пропускается — заказ уезжает, а склад
+    // остаётся с неверным остатком.
+    const rows = await sql.begin(async (tx: TransactionSql) => {
+      await assertNoOpenOrders(tx, { productId: data.id });
+      return tx<{ id: string }[]>`
+        DELETE FROM products WHERE id = ${data.id}
+        RETURNING id
+      `;
+    });
     if (!rows[0]) {
       throw new CatalogError('not_found', 'Товар не найден.');
     }
@@ -842,15 +853,78 @@ export const updateVariant = defineAction({
   },
 });
 
+/**
+ * Гейт удаления позиции каталога, на которую ещё едет заказ (аудит-находка #9).
+ *
+ * Что ломалось. `inventory.variant_id ... ON DELETE CASCADE` (0010) уносит строку
+ * остатка ВМЕСТЕ С РЕЗЕРВОМ, а `order_items.variant_id ... ON DELETE SET NULL`
+ * (0012) оставляет позицию заказа без ссылки. После этого перевод заказа в
+ * «Отгружен» вызывает commitReservation, тот не находит строку остатка и
+ * возвращает false ВСЕГДА → OrderError('commit_failed') → ROLLBACK. Заказ
+ * навсегда застревал в «Собран», а поднять reserved из админки нечем
+ * (setInventory/adjustInventory управляют только quantity).
+ *
+ * Как закрыто (без изменения схемы):
+ *   1) SELECT ... FOR UPDATE по строкам остатка удаляемой позиции. Это не
+ *      «просто чтение»: reserveUnit внутри createOrder UPDATE-ит ровно эти
+ *      строки, поэтому блокировка СЕРИАЛИЗУЕТ удаление с параллельным
+ *      оформлением заказа. Либо заказ успел зарезервировать (увидим reserved>0
+ *      и откажем), либо он ждёт нас и после удаления не найдёт строку остатка
+ *      (0 строк → штатный отказ «нет остатка»), а не потеряет резерв молча;
+ *   2) незакрытый заказ на эту позицию → отказ с НОМЕРАМИ заказов;
+ *   3) живой резерв без найденного заказа → тоже отказ (резерв мог остаться от
+ *      заказа, чью ссылку уже обнулило удаление товара — терять его молча нельзя).
+ *
+ * Проверка и сам DELETE обязаны идти в ОДНОЙ транзакции, иначе блокировка
+ * снимется до удаления и гонка вернётся.
+ */
+async function assertNoOpenOrders(
+  tx: TransactionSql,
+  target: { variantId: string } | { productId: string },
+): Promise<void> {
+  const inventoryRows =
+    'variantId' in target
+      ? await tx<{ reserved: number }[]>`
+          SELECT reserved FROM inventory WHERE variant_id = ${target.variantId} FOR UPDATE
+        `
+      : await tx<{ reserved: number }[]>`
+          SELECT reserved FROM inventory WHERE product_id = ${target.productId} FOR UPDATE
+        `;
+  const reserved = inventoryRows.reduce((sum, row) => sum + Number(row.reserved ?? 0), 0);
+
+  const numbers =
+    'variantId' in target
+      ? await findOpenOrderNumbersForVariant(tx, target.variantId)
+      : await findOpenOrderNumbersForProduct(tx, target.productId);
+
+  if (numbers.length > 0) {
+    throw new CatalogError(
+      'conflict',
+      `Удаление невозможно: позиция входит в незакрытые заказы (${numbers.join(', ')}). ` +
+        'Сначала отгрузите, отмените или верните их — иначе резерв исчезнет и отгрузить эти заказы будет уже нельзя.',
+    );
+  }
+  if (reserved > 0) {
+    throw new CatalogError(
+      'conflict',
+      `Удаление невозможно: на позиции висит резерв (${reserved} шт.). ` +
+        'Разберитесь с заказами, которые его держат, либо снимите резерв.',
+    );
+  }
+}
+
 export const deleteVariant = defineAction({
   permission: 'catalog.write',
   input: VariantIdSchema,
   handler: async (data, _ctx) => {
     await assertCatalogEnabled();
-    const rows = await sql<{ id: string; product_id: string }[]>`
-      DELETE FROM product_variants WHERE id = ${data.id}
-      RETURNING id, product_id
-    `;
+    const rows = await sql.begin(async (tx: TransactionSql) => {
+      await assertNoOpenOrders(tx, { variantId: data.id });
+      return tx<{ id: string; product_id: string }[]>`
+        DELETE FROM product_variants WHERE id = ${data.id}
+        RETURNING id, product_id
+      `;
+    });
     if (!rows[0]) {
       throw new CatalogError('not_found', 'Вариант не найден.');
     }

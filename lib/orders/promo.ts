@@ -14,8 +14,21 @@ import { toMinor } from './money';
 import type { AppliedPromo } from './pricing';
 import type { PromoCode } from './types';
 
-/** Причина отказа в применении промокода (машиночитаемая). */
+/**
+ * Причина отказа в применении промокода (машиночитаемая).
+ *
+ * Публичный алфавит: значения уезжают на витрину в QuoteDto.promo.reason и там
+ * резолвятся в строку словаря (см. lib/storefront/error-reasons.ts —
+ * PROMO_REJECT_REASONS, сверка алфавитов закреплена тестом). Расширять можно
+ * только аддитивно.
+ */
 export type PromoRejectReason =
+  /**
+   * Кода нет в магазине. Аудит №15: раньше этот случай подменялся на 'inactive'
+   * («Промокод неактивен»), поэтому покупатель видел «не применён» без реальной
+   * причины, а ключ витрины promoReasonNotFound не выбирался никогда.
+   */
+  | 'not_found'
   | 'inactive'
   | 'not_started'
   | 'expired'
@@ -44,7 +57,12 @@ export type PromoValidationResult =
   | { valid: true; promo: AppliedPromo }
   | { valid: false; reason: PromoRejectReason; message: string };
 
-const REASON_MESSAGE: Record<PromoRejectReason, string> = {
+/**
+ * Человекочитаемое сообщение на каждую причину алфавита (язык магазина).
+ * Экспортируется, чтобы полнота набора проверялась тестом, а не «на глаз».
+ */
+export const PROMO_REASON_MESSAGE: Record<PromoRejectReason, string> = {
+  not_found: 'Промокод не найден.',
   inactive: 'Промокод неактивен.',
   not_started: 'Промокод ещё не действует.',
   expired: 'Срок действия промокода истёк.',
@@ -58,7 +76,16 @@ const REASON_MESSAGE: Record<PromoRejectReason, string> = {
 };
 
 function reject(reason: PromoRejectReason): PromoValidationResult {
-  return { valid: false, reason, message: REASON_MESSAGE[reason] };
+  return { valid: false, reason, message: PROMO_REASON_MESSAGE[reason] };
+}
+
+/**
+ * Отказ «такого промокода нет» — для вызывающих, которые ищут код В БД и потому
+ * не могут вызвать validatePromo (промокода-то нет). Единая точка гарантирует,
+ * что причина не подменяется чем-то похожим (аудит №15: было 'inactive').
+ */
+export function promoNotFound(): PromoValidationResult {
+  return reject('not_found');
 }
 
 /**

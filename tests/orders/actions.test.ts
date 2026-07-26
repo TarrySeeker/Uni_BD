@@ -473,33 +473,54 @@ describe('резерв остатков при переходах', () => {
     expect(commitReservationMock).not.toHaveBeenCalled();
   });
 
-  it('отмена ОПЛАЧЕННОГО заказа (payment=paid) оформляет возврат: payment→refunded + история оплаты', async () => {
-    H.state.getOrderByIdQueue = [
-      orderDetail({ status: 'paid', paymentStatus: 'paid' }),
-      orderDetail({ status: 'cancelled', paymentStatus: 'refunded' }),
-    ];
+  it('🔴 №7: отмена ОПЛАЧЕННОГО заказа НЕ штампует возврат денег — отказ с указанием на «Возврат»', async () => {
+    // БЫЛО (баг «бумажного возврата»): cancelOrder оплаченного заказа молча ставил
+    // payment_status='refunded' БЕЗ обращения к платёжному шлюзу. Заказ становился
+    // терминальным (cancelled), сертификаты гасились, а перевода в банк не было — и
+    // сделать его было уже нечем (из cancelled/refunded переходов нет).
+    // СТАЛО: пометить деньги возвращёнными может только денежный путь (refundOrder).
+    H.state.getOrderByIdQueue = [orderDetail({ status: 'paid', paymentStatus: 'paid' })];
     const res = await cancelOrder({ id: UUID, reason: 'возврат денег' });
-    expect(res.ok).toBe(true);
-    // UPDATE orders выставил payment_status='refunded' (деньги не «зависли»).
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('Возврат');
+    // Ни одного эффекта: транзакция не открывалась, резерв не тронут, аудита нет.
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+    expect(releaseReservationMock).not.toHaveBeenCalled();
+    expect(writeAuditSpy).not.toHaveBeenCalled();
+  });
+
+  it('🔴 №7: changeOrderStatus(→cancelled) оплаченного заказа тоже отклоняется (обход через общий экшен)', async () => {
+    H.state.getOrderByIdQueue = [orderDetail({ status: 'paid', paymentStatus: 'paid' })];
+    const res = await changeOrderStatus({ id: UUID, to: 'cancelled' });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('Возврат');
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+  });
+
+  it('отмена НЕоплаченного заказа (payment=pending) работает как прежде', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'paid', paymentStatus: 'pending' }),
+      orderDetail({ status: 'cancelled', paymentStatus: 'pending' }),
+    ];
+    const res = await cancelOrder({ id: UUID, reason: 'передумал' });
+    expect(res.ok, JSON.stringify(res)).toBe(true);
+    expect(releaseReservationMock).toHaveBeenCalledTimes(1);
+    // payment_status не трогаем — денег не было.
     const upd = H.state.txCallsWithArgs.find(
       (c) => c.strings.join('|').includes('UPDATE orders') && c.strings.join('|').includes('payment_status'),
     );
-    expect(upd).toBeTruthy();
-    expect(upd!.args).toContain('refunded');
-    // Запись истории ОПЛАТЫ (kind='payment', paid→refunded) — возврат виден в истории.
-    const payHist = H.state.txCallsWithArgs.find(
-      (c) => c.strings.join('|').includes('order_status_history') && c.strings.join('|').includes("'payment'"),
-    );
-    expect(payHist).toBeTruthy();
-    expect(payHist!.args).toContain('refunded');
-    expect(payHist!.args).toContain('paid');
+    expect(upd).toBeFalsy();
   });
 
   it('V1: setPaymentStatus(→refunded) для paid-заказа в awaiting_payment СЕТТЛИТ резерв/промо/статус', async () => {
     // Заказ оплачен (payment=paid через webhook), но order.status НЕ продвинут
     // ('awaiting_payment'): canTransition('order','awaiting_payment','refunded')=false
-    // → делегация выше пропускает, попадаем в fall-through. БЕЗ фикса резерв оставался
-    // бы заблокирован. Проверяем, что settleRefundEffectsTx отрабатывает и тут.
+    // → попадаем в фолбэк-ветку денежного пути performRefund. БЕЗ фикса резерв
+    // оставался бы заблокирован. Проверяем, что сетл закрытия отрабатывает и тут.
+    // manualRefundAcknowledged: провайдер не задан (офлайн-оплата) → шлюз деньги не
+    // вернёт, и без подтверждения оператора возврат теперь отклоняется (№7/№38).
     const PROMO = '22222222-2222-4222-8222-222222222222';
     H.state.getOrderByIdQueue = [
       orderDetail({ status: 'awaiting_payment', paymentStatus: 'paid' }),
@@ -512,7 +533,11 @@ describe('резерв остатков при переходах', () => {
       [{ product_id: 'p-1', variant_id: null, quantity: 2 }], // 4) settle: SELECT order_items
       [{ id: 'red-1' }], // 5) settle: DELETE promo_redemptions RETURNING id
     ];
-    const res = await setPaymentStatus({ id: UUID, to: 'refunded' });
+    const res = await setPaymentStatus({
+      id: UUID,
+      to: 'refunded',
+      manualRefundAcknowledged: true,
+    });
     expect(res.ok, JSON.stringify(res)).toBe(true);
 
     // (a) Резерв освобождён по позиции снимка заказа.
@@ -538,19 +563,22 @@ describe('резерв остатков при переходах', () => {
     expect(ordUpd).toContain("status = 'refunded'");
   });
 
-  it('V1: идемпотентно — заказ уже cancelled → сетл no-op (без release)', async () => {
-    H.state.getOrderByIdQueue = [
-      orderDetail({ status: 'cancelled', paymentStatus: 'paid' }),
-      orderDetail({ status: 'cancelled', paymentStatus: 'refunded' }),
-    ];
-    H.state.txResultQueue = [
-      [{ id: 'pay' }], // UPDATE payment_status
-      [{ id: 'hist' }], // INSERT payment history
-      [{ status: 'cancelled', promo_code_id: null }], // settle SELECT → терминальный → no-op
-    ];
-    const res = await setPaymentStatus({ id: UUID, to: 'refunded' });
-    expect(res.ok).toBe(true);
+  it('V1: идемпотентно — заказ уже cancelled → возврат отклонён ДО шлюза, эффектов нет', async () => {
+    // Раньше это был «успешный no-op»: payment_status штамповался, сетл ничего не
+    // делал. Теперь закрытый заказ отсекается на входе денежного пути — так повторное
+    // нажатие не делает второй reverse в банке и не возвращает баланс сертификата дважды.
+    H.state.getOrderByIdQueue = [orderDetail({ status: 'cancelled', paymentStatus: 'paid' })];
+    const res = await setPaymentStatus({
+      id: UUID,
+      to: 'refunded',
+      manualRefundAcknowledged: true,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('уже отменён');
     expect(releaseReservationMock).not.toHaveBeenCalled();
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+    expect(sqlBeginMock).not.toHaveBeenCalled();
   });
 
   it('возврат COD-заказа (payment=pending) НЕ штампует refunded и не пишет ложную историю оплаты', async () => {
@@ -598,7 +626,8 @@ describe('резерв остатков при переходах', () => {
       orderDetail({ status: 'shipped', paymentStatus: 'paid' }),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded' }),
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     expect(releaseReservationMock).not.toHaveBeenCalled();
     expect(commitReservationMock).not.toHaveBeenCalled();
@@ -609,7 +638,8 @@ describe('резерв остатков при переходах', () => {
       orderDetail({ status: 'delivered', paymentStatus: 'paid' }),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded' }),
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     expect(releaseReservationMock).not.toHaveBeenCalled();
   });
@@ -619,7 +649,8 @@ describe('резерв остатков при переходах', () => {
       orderDetail({ status: 'completed', paymentStatus: 'paid' }),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded' }),
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     expect(releaseReservationMock).not.toHaveBeenCalled();
   });
@@ -629,7 +660,8 @@ describe('резерв остатков при переходах', () => {
       orderDetail({ status: 'paid', paymentStatus: 'paid' }),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded' }),
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     expect(releaseReservationMock).toHaveBeenCalledTimes(1);
   });
@@ -639,7 +671,8 @@ describe('резерв остатков при переходах', () => {
       orderDetail({ status: 'packed', paymentStatus: 'paid' }),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded' }),
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     expect(releaseReservationMock).toHaveBeenCalledTimes(1);
   });
@@ -704,7 +737,8 @@ describe('резерв остатков при переходах', () => {
         items: [{ productId: 'p-1', variantId: null, quantity: 3, skuSnapshot: 'SKU-1' }],
       },
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     // Резерв заказа B (4 ед.) НЕ тронут — release не вызывался (дефолтные
     // реализации release/commit реинсталлируются в afterEach — изоляция).
@@ -831,7 +865,8 @@ describe('откат used_count/promo_redemptions при cancel/refund', () => {
       orderDetail({ status: 'delivered', paymentStatus: 'paid', promoCodeId: PROMO_ID }),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded', promoCodeId: PROMO_ID }),
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     const text = txText();
     expect(text).toContain('DELETE FROM promo_redemptions');
@@ -1355,19 +1390,42 @@ describe('refundOrder: шлюзовой возврат Т-Банка', () => {
     expect(releaseReservationMock).toHaveBeenCalledTimes(1);
   });
 
-  it('paykeeper: dispatchRefund зовёт PayKeeper-сервис (НЕ tbank), переход идёт', async () => {
+  /** Оплаченный PayKeeper-заказ (его reverse — заглушка: skipped:'manual'). */
+  function paykeeperPaidOrder() {
+    return orderDetail({
+      status: 'paid',
+      paymentStatus: 'paid',
+      paymentProvider: 'paykeeper',
+      paymentRef: 'inv-42',
+      grandTotal: '700.00',
+    });
+  }
+
+  it('🔴 №38: PayKeeper (reverse-заглушка) БЕЗ подтверждения → отказ, заказ НЕ помечен возвращённым', async () => {
+    // Раньше здесь рапортовалось «Возврат: выполнено»: dispatchRefund возвращал
+    // ok:true, skipped:true (денег не двигал), а заказ становился терминальным —
+    // покупатель без денег, повторить возврат уже нечем.
+    H.state.getOrderByIdQueue = [paykeeperPaidOrder()];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('вручную');
+    expect(res.message).toContain('700.00');
+    // Маршрут проверен, но НИ ОДНОГО эффекта: статус не менялся, резерв цел, аудита нет.
+    expect(paykeeperRefundMock).toHaveBeenCalledTimes(1);
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+    expect(releaseReservationMock).not.toHaveBeenCalled();
+    expect(writeAuditSpy).not.toHaveBeenCalled();
+  });
+
+  it('paykeeper + подтверждение ручного возврата: переход идёт, аудит помечает outcome=manual_required', async () => {
     H.state.getOrderByIdQueue = [
-      orderDetail({
-        status: 'paid',
-        paymentStatus: 'paid',
-        paymentProvider: 'paykeeper',
-        paymentRef: 'inv-42',
-        grandTotal: '700.00',
-      }),
+      paykeeperPaidOrder(),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'paykeeper' }),
     ];
-    const res = await refundOrder({ id: UUID });
-    expect(res.ok).toBe(true);
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
+    expect(res.ok, JSON.stringify(res)).toBe(true);
     // Маршрут: PayKeeper вызван, tbank НЕ вызван (не перепутали шлюз).
     expect(paykeeperRefundMock).toHaveBeenCalledTimes(1);
     expect(refundPaymentMock).not.toHaveBeenCalled();
@@ -1375,6 +1433,15 @@ describe('refundOrder: шлюзовой возврат Т-Банка', () => {
     expect(arg).toMatchObject({ paymentProvider: 'paykeeper', paymentRef: 'inv-42', amountKop: 70000 });
     // Внутренний сетл возврата отработал (paid→refunded, резерв держится → release).
     expect(releaseReservationMock).toHaveBeenCalledTimes(1);
+    // Аудит обязан отличать «шлюз вернул» от «вернули руками».
+    const [entry] = writeAuditSpy.mock.calls[0] as [
+      { after: { gatewayRefund?: { outcome?: string; manualAcknowledged?: boolean; skipped?: boolean } } },
+    ];
+    expect(entry.after.gatewayRefund).toMatchObject({
+      outcome: 'manual_required',
+      manualAcknowledged: true,
+      skipped: true,
+    });
   });
 
   it('неизвестный НЕ-null провайдер → validation, НИ один шлюз не вызван, перехода нет', async () => {
@@ -1397,6 +1464,173 @@ describe('refundOrder: шлюзовой возврат Т-Банка', () => {
     // Возврат отклонён ДО транзакции перехода.
     expect(sqlBeginMock).not.toHaveBeenCalled();
     expect(releaseReservationMock).not.toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// 🔴 ЕДИНЫЙ ДЕНЕЖНЫЙ ПУТЬ ВОЗВРАТА (аудит 2026-07-26: критичное №7, major №38).
+//
+// Проверяем ровно то, чего не хватало: обе кнопки «Возврат» означают ОДНО И ТО ЖЕ,
+// деньги нельзя пометить возвращёнными в обход шлюза, повторный возврат невозможен,
+// а на каждое денежное действие есть аудит-запись с честным исходом.
+// =============================================================================
+
+describe('единый денежный путь возврата (№7/№38)', () => {
+  type RefundAudit = {
+    action: string;
+    after: {
+      gatewayRefund?: {
+        status: string | null;
+        skipped: boolean;
+        outcome: string;
+        manualAcknowledged: boolean;
+      };
+    };
+  };
+
+  function paidTbankOrder(over: Record<string, unknown> = {}) {
+    return orderDetail({
+      status: 'paid',
+      paymentStatus: 'paid',
+      paymentProvider: 'tbank',
+      paymentRef: 'pay-1',
+      grandTotal: '1000.00',
+      ...over,
+    });
+  }
+
+  it('«Статус оплаты → Возврат» ТЕПЕРЬ обращается к шлюзу (раньше — нет: бумажный возврат)', async () => {
+    H.state.getOrderByIdQueue = [
+      paidTbankOrder(),
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'tbank' }),
+    ];
+    const res = await setPaymentStatus({ id: UUID, to: 'refunded', comment: 'клиент отказался' });
+    expect(res.ok, JSON.stringify(res)).toBe(true);
+    // Ключевая проверка находки: шлюз ВЫЗВАН именно с этого входа.
+    expect(refundPaymentMock).toHaveBeenCalledTimes(1);
+    expect(refundPaymentMock.mock.calls[0]![0]).toMatchObject({
+      paymentProvider: 'tbank',
+      paymentRef: 'pay-1',
+      amountKop: 100000,
+    });
+    // Аудит несёт денежный след (раньше запись 'order.payment.change' была без него).
+    const [entry] = writeAuditSpy.mock.calls[0] as [RefundAudit];
+    expect(entry.action).toBe('order.refund');
+    expect(entry.after.gatewayRefund).toMatchObject({
+      outcome: 'gateway_refunded',
+      skipped: false,
+      manualAcknowledged: false,
+    });
+  });
+
+  it('«Статус оплаты → Возврат» при отказе шлюза НЕ помечает деньги возвращёнными', async () => {
+    refundPaymentMock.mockResolvedValueOnce({
+      ok: false,
+      status: null,
+      isMock: false,
+      reason: 'cancel_failed',
+    });
+    H.state.getOrderByIdQueue = [paidTbankOrder()];
+    const res = await setPaymentStatus({ id: UUID, to: 'refunded' });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('платёжный шлюз');
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+    expect(writeAuditSpy).not.toHaveBeenCalled();
+  });
+
+  it('идемпотентность: повторный возврат уже возвращённого заказа отклонён ДО шлюза', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'tbank' }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('уже возвращён');
+    // Второго reverse в банке НЕ делаем, баланс сертификата второй раз НЕ возвращаем.
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+    expect(sqlBeginMock).not.toHaveBeenCalled();
+  });
+
+  it('идемпотентность: заказ живой, но оплата уже refunded → отказ ДО шлюза', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'paid', paymentStatus: 'refunded', paymentProvider: 'tbank' }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('уже оформлен');
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+  });
+
+  it('конкурентность: параллельный переход статуса → conflict, эффекты откатываются', async () => {
+    H.state.getOrderByIdQueue = [paidTbankOrder()];
+    // Guarded UPDATE вернул 0 строк — статус успел измениться параллельно.
+    H.state.txResultQueue = [[]];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('параллельно');
+  });
+
+  it('конкурентность фолбэк-ветки: guarded UPDATE оплаты вернул 0 строк → conflict', async () => {
+    // Оплаченный заказ в статусе 'new' (вебхук пометил оплату, не двигая заказ):
+    // сетл идёт прямым UPDATE payment_status, и он тоже обязан гардиться.
+    H.state.getOrderByIdQueue = [paidTbankOrder({ status: 'new' })];
+    H.state.txResultQueue = [[]];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('ожидался отказ');
+    expect(res.message).toContain('параллельно');
+  });
+
+  it('оплаченный заказ в статусе «new» ВОЗВРАЩАЕТСЯ (нет тупика: кнопки статуса заказа нет)', async () => {
+    H.state.getOrderByIdQueue = [
+      paidTbankOrder({ status: 'new' }),
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'tbank' }),
+    ];
+    H.state.txResultQueue = [
+      [{ id: 'pay' }], // 1) guarded UPDATE payment_status RETURNING id
+      [{ id: 'hist' }], // 2) INSERT истории оплаты
+      [{ status: 'new', promo_code_id: null }], // 3) сетл: SELECT orders FOR UPDATE
+      [{ product_id: 'p-1', variant_id: null, quantity: 2 }], // 4) сетл: SELECT order_items
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok, JSON.stringify(res)).toBe(true);
+    expect(refundPaymentMock).toHaveBeenCalledTimes(1);
+    // Сетл закрытия отработал: резерв освобождён, статус заказа переведён.
+    expect(releaseReservationMock).toHaveBeenCalledTimes(1);
+    const joined = H.state.txCalls.map((s) => s.join(' ')).join('\n');
+    expect(joined).toContain("status = 'refunded'");
+  });
+
+  it('COD (оплата не поступала): подтверждение НЕ требуется, аудит помечает nothing_to_return', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({ status: 'paid', paymentStatus: 'pending', paymentProvider: null, grandTotal: '500.00' }),
+      orderDetail({ status: 'refunded', paymentStatus: 'pending' }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok, JSON.stringify(res)).toBe(true);
+    const [entry] = writeAuditSpy.mock.calls[0] as [RefundAudit];
+    expect(entry.after.gatewayRefund).toMatchObject({
+      outcome: 'nothing_to_return',
+      manualAcknowledged: false,
+    });
+  });
+
+  it('денежный след попадает в комментарий истории (по ленте видно, ушли ли деньги)', async () => {
+    H.state.getOrderByIdQueue = [
+      paidTbankOrder(),
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'tbank' }),
+    ];
+    await refundOrder({ id: UUID, reason: 'брак' });
+    const hist = H.state.txCallsWithArgs.find((c) =>
+      c.strings.join('|').includes('order_status_history'),
+    );
+    expect(hist).toBeTruthy();
+    const comment = hist!.args.find((a) => typeof a === 'string' && a.includes('брак'));
+    expect(comment).toBeTruthy();
+    expect(String(comment)).toContain('шлюзом');
   });
 });
 
@@ -1448,7 +1682,8 @@ describe('сертификаты: автовыпуск после оплаты �
       orderDetail({ status: 'paid', paymentStatus: 'paid', paymentProvider: null }),
       orderDetail({ status: 'refunded', paymentStatus: 'refunded' }),
     ];
-    const res = await refundOrder({ id: UUID });
+    // Оплата офлайн (провайдер не задан) → шлюз деньги не вернёт: нужен явный ack (№7/№38).
+    const res = await refundOrder({ id: UUID, manualRefundAcknowledged: true });
     expect(res.ok).toBe(true);
     expect(txText()).toContain('UPDATE gift_certificates');
     expect(txText()).toContain("status = 'disabled'");

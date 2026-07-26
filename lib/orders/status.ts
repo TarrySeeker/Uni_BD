@@ -36,6 +36,26 @@ export const ORDER_STATUS_TRANSITIONS: Readonly<
 };
 
 /**
+ * НЕЗАКРЫТЫЕ статусы заказа — те, из которых заказ ещё поедет покупателю и
+ * резерв остатка на inventory ЕЩЁ ДЕРЖИТСЯ (commit выполняется на входе в
+ * 'shipped'). Единый источник истины для двух вещей:
+ *   • какой эффект над резервом даёт переход (stockEffectFor, actions.ts);
+ *   • можно ли удалять товар/вариант из каталога (аудит-находка #9): удаление
+ *     каскадом уносит строку inventory вместе с резервом такого заказа, после
+ *     чего его НЕЛЬЗЯ перевести в «Отгружен» — commitReservation навсегда
+ *     возвращает false.
+ */
+export const OPEN_ORDER_STATUSES: readonly OrderStatus[] = [
+  'new',
+  'awaiting_payment',
+  'paid',
+  'packed',
+];
+
+/** Набор для быстрых проверок принадлежности (тот же список). */
+export const RESERVE_HELD_STATUSES: ReadonlySet<OrderStatus> = new Set(OPEN_ORDER_STATUSES);
+
+/**
  * (B) Статус оплаты (orders.payment_status), §2.8 B.
  *   pending ─► authorized ─► paid; ветви → failed; paid → refunded.
  *   На Этапе 3 переходы ручные/mock (нет провайдера). paid проставляет paid_at.
@@ -259,21 +279,77 @@ export function detectStatusContradictions(input: {
 }
 
 /**
- * Можно ли инициировать оплату заказа (backend-инвариант для initPayment/webhook).
+ * ПОЧЕМУ по заказу нельзя выставить счёт (`null` — можно).
  *
- * БЛОКИРУЕТ:
- *  - отменённый/возвращённый ЗАКАЗ (order.status ∈ cancelled/refunded) — иначе
- *    отменённый заказ можно было бы оплатить (init не проверял order.status);
- *  - уже оплаченный/возвращённый ПЛАТЁЖ (payment_status ∈ paid/refunded) — повторная
- *    оплата не нужна/некорректна.
- * ДОПУСКАЕТ ретрай неуспешной оплаты (payment='failed' на активном заказе): пара к
- * isPayable(failed) на витрине и машине failed→pending/paid.
+ *  • `order_closed`    — заказ отменён/возвращён: платить не за что;
+ *  • `payment_settled` — расчёт по заказу завершён (деньги получены или уже
+ *                        возвращены покупателю);
+ *  • `funds_held`      — ХОЛД: деньги удержаны на карте, ждём подтверждения.
+ *
+ * Причина нужна не только домену: витрина показывает покупателю РАЗНЫЙ текст для
+ * «уже оплачено» и «оплата в обработке» (lib/storefront/error-reasons.ts).
+ */
+export type PaymentBlock = 'order_closed' | 'payment_settled' | 'funds_held';
+
+/**
+ * Единственный источник истины «можно ли выставлять счёт по заказу» — гард
+ * initPayment у ВСЕХ эквайеров и их HTTP-роутов.
+ *
+ * 🔴 ДЕНЬГИ. Разбирается ВЕСЬ алфавит `payment_status` (CHECK в
+ * db/migrations/0012_orders.sql = ключи PAYMENT_STATUS_TRANSITIONS), явным
+ * switch: новый статус не скомпилируется без осознанного решения, а сторож
+ * tests/orders/payment-payable-alphabet.test.ts фиксирует решения по каждому.
+ *
+ *  pending    — ✅ счёт не оплачен, деньги НЕ удержаны: штатная оплата и штатный
+ *               ретрай «ушёл на шлюз и вернулся ни с чем».
+ *  authorized — ❌ ХОЛД (двухстадийная оплата Т-Банка/Альфа-Банка, orderStatus=1
+ *               у RBS). Деньги УЖЕ удержаны на карте покупателя; вторая инициация
+ *               выставит второй счёт по тому же заказу → второе списание.
+ *               Прежняя редакция гарда пропускала этот статус — это и была дыра
+ *               двойной оплаты: витрина кнопку спрятала, а сервер счёт выставлял.
+ *  paid       — ❌ деньги получены.
+ *  failed     — ✅ попытка не удалась, денег на заказе нет (машина допускает
+ *               failed → pending/authorized/paid) — ретрай покупателя легитимен.
+ *  refunded   — ❌ деньги возвращены покупателю, расчёт закрыт.
+ *
+ * ⚠️ НЕ ТУПИК. Незавершённый холд (истёк, шлюз потерял подтверждение) не запирает
+ * заказ навсегда — платформа выводит его из `authorized` БЕЗ покупателя:
+ *   1) крон-сверка reconcile-pending (lib/payments/{tbank,alfabank}/cron.ts) берёт
+ *      заказы в pending И authorized, спрашивает шлюз и доводит статус: снятый/
+ *      отклонённый холд → 'failed' (снова оплачиваемо), подтверждённый → 'paid';
+ *   2) оператор в админке: PAYMENT_STATUS_TRANSITIONS.authorized = paid | failed —
+ *      ручная смена статуса возвращает заказ в оплачиваемое состояние;
+ *   3) отмена/возврат заказа снимает холд (REVERSED) — заказ закрывается честно.
+ * Покупатель при этом видит не «сбой», а доменную причину «оплата обрабатывается».
+ */
+export function paymentBlockFor(
+  orderStatus: OrderStatus,
+  paymentStatus: PaymentStatus,
+): PaymentBlock | null {
+  // Мёртвый заказ важнее статуса оплаты: платить по нему нельзя ничем.
+  if (orderStatus === 'cancelled' || orderStatus === 'refunded') return 'order_closed';
+
+  switch (paymentStatus) {
+    case 'pending':
+      return null;
+    case 'failed':
+      return null;
+    case 'authorized':
+      return 'funds_held';
+    case 'paid':
+      return 'payment_settled';
+    case 'refunded':
+      return 'payment_settled';
+  }
+}
+
+/**
+ * Можно ли инициировать оплату заказа (backend-инвариант для initPayment/webhook).
+ * Тонкая обёртка над `paymentBlockFor` — решение одно и живёт в одном месте.
  */
 export function isOrderPayable(
   orderStatus: OrderStatus,
   paymentStatus: PaymentStatus,
 ): boolean {
-  if (orderStatus === 'cancelled' || orderStatus === 'refunded') return false;
-  if (paymentStatus === 'paid' || paymentStatus === 'refunded') return false;
-  return true;
+  return paymentBlockFor(orderStatus, paymentStatus) === null;
 }
