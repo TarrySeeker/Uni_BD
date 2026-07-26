@@ -50,6 +50,27 @@ if (!BASE || !EMAIL || !PASSWORD) {
 }
 
 /**
+ * Модули, под которыми живут разделы. Раздел выключенного модуля закрыт серверным
+ * гвардом (`guardNews`/`guardReviews`/…: `module_disabled`) — это НЕ дефект локализации,
+ * а конфигурация магазина. Такие разделы помечаем «пропущен», иначе инструмент шумит
+ * на каждом прогоне (на стенде ADMIK_MODULES=catalog,orders,cdek,cms,payments —
+ * news/reviews/account выключены).
+ */
+const SECTION_MODULE = {
+  '/admin/catalog': 'catalog',
+  '/admin/catalog/categories': 'catalog',
+  '/admin/catalog/designers': 'catalog',
+  '/admin/orders': 'orders',
+  '/admin/promo': 'orders',
+  '/admin/gift-certificates': 'orders',
+  '/admin/cdek': 'cdek',
+  '/admin/cms': 'cms',
+  '/admin/news': 'news',
+  '/admin/reviews': 'reviews',
+  '/admin/customers': 'account',
+};
+
+/**
  * Разделы админки: путь → ключ ru.json, по которому опознаём успешный рендер.
  * Ключ должен быть строкой БОКОВОГО МЕНЮ (nav.*) — она присутствует на каждой
  * странице панели, в отличие от заголовков разделов, которые живут в своих
@@ -126,6 +147,7 @@ async function login(page) {
 async function main() {
   const browser = await chromium.launch();
   const findings = [];
+  const skipped = [];
   let checked = 0;
 
   try {
@@ -168,7 +190,13 @@ async function main() {
 
         const expected = at(ru, expectKey);
         if (locale === 'ru' && typeof expected === 'string' && expected && !body.includes(expected)) {
-          findings.push({ locale, path, kind: 'no-l10n', detail: `не найдена ожидаемая строка «${expected}»` });
+          // Раздел выключенного модуля закрыт гвардом — пропускаем, а не считаем дефектом.
+          const mod = SECTION_MODULE[path];
+          if (mod) {
+            skipped.push({ locale, path, module: mod });
+          } else {
+            findings.push({ locale, path, kind: 'no-l10n', detail: `не найдена ожидаемая строка «${expected}»` });
+          }
         }
 
         if (locale !== 'ru') {
@@ -199,6 +227,10 @@ async function main() {
   }
 
   console.log(`Проверено ${checked} страниц (${SECTIONS.length} разделов × ${LOCALES.length} локали).`);
+  if (skipped.length > 0) {
+    const mods = [...new Set(skipped.map((s) => s.module))].join(', ');
+    console.log(`Пропущено ${skipped.length} (разделы выключенных модулей: ${mods}).`);
+  }
   console.log(`Эталонных строк интерфейса в ru.json: ${RU_UI.length}.`);
   if (findings.length === 0) {
     console.log('✅ Дефектов локализации не найдено.');
@@ -207,7 +239,7 @@ async function main() {
     for (const f of findings) console.log(`  [${f.kind}] ${f.locale} ${f.path} — ${f.detail}`);
   }
   if (OUT) {
-    writeFileSync(OUT, JSON.stringify({ checked, findings }, null, 1));
+    writeFileSync(OUT, JSON.stringify({ checked, findings, skipped }, null, 1));
     console.log(`Отчёт: ${OUT}`);
   }
   process.exit(findings.length === 0 ? 0 : 1);
