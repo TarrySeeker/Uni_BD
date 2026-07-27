@@ -278,6 +278,10 @@ export function toPublicSettingsDto(
   const contacts = localizeFlat(eff.contacts, patch?.contacts, SETTINGS_TR_FIELDS.contacts);
   const home = loc ? localizeStruct(eff.home, patch?.home, loc) : eff.home;
   const navigation = loc ? localizeStruct(eff.navigation, patch?.navigation, loc) : eff.navigation;
+  // Зоны доставки: локализуем ПОДПИСЬ (label) тем же движком, что home/navigation
+  // (массивы сливаются по индексу). id/price/freeThreshold патч не несёт — деньги и
+  // машинный ключ зоны остаются базовыми при любой локали покупателя.
+  const delivery = loc ? localizeStruct(eff.delivery, patch?.delivery, loc) : eff.delivery;
 
   return {
     branding: {
@@ -328,9 +332,13 @@ export function toPublicSettingsDto(
     },
     delivery: {
       freeDeliveryThreshold: eff.delivery.freeDeliveryThreshold,
-      zones: eff.delivery.zones.map((z) => ({
+      // 🔴 Деньги берём из БАЗОВЫХ настроек (eff.delivery), а подпись — из
+      // локализованных: даже если оверлей переводов принесёт price/freeThreshold,
+      // они не должны влиять на стоимость. Сопоставление по индексу — тот же
+      // контракт, что у localizeStructured для массивов.
+      zones: eff.delivery.zones.map((z, i) => ({
         id: z.id,
-        label: z.label,
+        label: delivery.zones[i]?.label ?? z.label,
         price: z.price,
         freeThreshold: z.freeThreshold ?? null,
       })),

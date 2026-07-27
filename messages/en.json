@@ -1163,7 +1163,8 @@
       "corpCertTileTitle": "For corporate clients / certificates — tile {n}",
       "navHeaderItem": "Header menu — item {n}",
       "navFooterColumnTitle": "Footer — column {n} (title)",
-      "navFooterColumnLink": "Footer — column {n}, link {j}"
+      "navFooterColumnLink": "Footer — column {n}, link {j}",
+      "deliveryZoneLabel": "Delivery zone “{zone}” (label)"
     }
   },
   "promo": {

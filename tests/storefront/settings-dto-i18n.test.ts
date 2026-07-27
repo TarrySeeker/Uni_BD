@@ -230,4 +230,93 @@ describe('storefront/settings-dto — локализация через content_
     const dto = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`);
     expect(dto.i18n).toEqual({ defaultLocale: 'ru', locales: ['ru', 'fr'] });
   });
+
+  // ---------------------------------------------------------------------------
+  // Зоны доставки (ТЗ_1): подпись переводится, деньги — НЕТ.
+  // Дефект docs/37 minor №11: покупатель на /fr видел «В пределах МКАД».
+  // ---------------------------------------------------------------------------
+
+  it('подпись зоны доставки переводится оверлеем, id/цена остаются базовыми', () => {
+    const eff = makeEffective();
+    eff.delivery = {
+      freeDeliveryThreshold: 0,
+      zones: [
+        { id: 'mkad', label: 'В пределах МКАД', price: 50000 },
+        { id: 'oblast', label: 'За МКАД + область', price: 90000, freeThreshold: 1500000 },
+      ],
+    };
+    eff.contentI18n = {
+      en: { delivery: { zones: [{ label: 'Within the MKAD' }, { label: 'Beyond the MKAD + region' }] } },
+    };
+
+    const dto = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`, EN);
+
+    expect(dto.delivery.zones.map((z) => z.label)).toEqual([
+      'Within the MKAD',
+      'Beyond the MKAD + region',
+    ]);
+    // Машинный ключ и деньги не зависят от локали покупателя.
+    expect(dto.delivery.zones.map((z) => z.id)).toEqual(['mkad', 'oblast']);
+    expect(dto.delivery.zones.map((z) => z.price)).toEqual([50000, 90000]);
+    expect(dto.delivery.zones[1].freeThreshold).toBe(1500000);
+  });
+
+  it('перевод одной зоны не затирает подпись остальных (массив по индексу)', () => {
+    const eff = makeEffective();
+    eff.delivery = {
+      freeDeliveryThreshold: 0,
+      zones: [
+        { id: 'mkad', label: 'В пределах МКАД', price: 50000 },
+        { id: 'oblast', label: 'За МКАД + область', price: 90000 },
+      ],
+    };
+    // Переведена только ВТОРАЯ зона (дыра в первой позиции — так патч кладёт форма,
+    // когда владелец заполнил не все поля).
+    eff.contentI18n = { en: { delivery: { zones: [null, { label: 'Beyond the MKAD' }] } } };
+
+    const dto = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`, EN);
+
+    expect(dto.delivery.zones[0].label).toBe('В пределах МКАД');
+    expect(dto.delivery.zones[1].label).toBe('Beyond the MKAD');
+  });
+
+  it('🔴 оверлей НЕ может подменить цену зоны: деньги берутся только из базы', () => {
+    const eff = makeEffective();
+    eff.delivery = {
+      freeDeliveryThreshold: 0,
+      zones: [{ id: 'mkad', label: 'В пределах МКАД', price: 50000, freeThreshold: 1000000 }],
+    };
+    // Враждебный/ошибочный патч пытается принести деньги и чужой id.
+    eff.contentI18n = {
+      en: {
+        delivery: {
+          zones: [{ label: 'Within the MKAD', price: 1, freeThreshold: 1, id: 'hacked' }],
+        },
+      },
+    };
+
+    const dto = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`, EN);
+
+    expect(dto.delivery.zones[0].label).toBe('Within the MKAD');
+    expect(dto.delivery.zones[0].price).toBe(50000);
+    expect(dto.delivery.zones[0].freeThreshold).toBe(1000000);
+    expect(dto.delivery.zones[0].id).toBe('mkad');
+  });
+
+  it('без оверлея и на базовой локали подписи зон остаются базовыми', () => {
+    const eff = makeEffective();
+    eff.delivery = {
+      freeDeliveryThreshold: 0,
+      zones: [{ id: 'mkad', label: 'В пределах МКАД', price: 50000 }],
+    };
+    const noLoc = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`);
+    expect(noLoc.delivery.zones[0].label).toBe('В пределах МКАД');
+
+    eff.contentI18n = { en: { delivery: { zones: [{ label: 'Within the MKAD' }] } } };
+    const ru = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`, {
+      locale: 'ru',
+      defaultLocale: 'ru',
+    });
+    expect(ru.delivery.zones[0].label).toBe('В пределах МКАД');
+  });
 });

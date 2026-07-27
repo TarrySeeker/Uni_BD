@@ -10,6 +10,8 @@ import { fromMinor } from '@/lib/orders/money';
 
 import { updateCatalogOrdersAction } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
+import { SettingsTranslationTabs } from './SettingsTranslationTabs';
+import { buildDeliveryTrFieldDefs } from './content-i18n-form-state';
 
 /**
  * Форма каталог/доставка/заказы (docs/11 §5.4.5).
@@ -35,13 +37,20 @@ export function CatalogOrdersForm({
   catalog,
   delivery,
   orders,
+  i18n,
+  translations,
 }: {
   catalog: EffectiveSettings['catalog'];
   delivery: EffectiveSettings['delivery'];
   orders: EffectiveSettings['orders'];
+  i18n: EffectiveSettings['i18n'];
+  translations: EffectiveSettings['contentI18n'];
 }) {
   const t = useTranslations();
   const router = useRouter();
+  // Дескрипторы переводимых подписей зон разворачиваются по фактическому списку
+  // зон магазина; цена и порог бесплатной доставки не переводятся.
+  const trFields = buildDeliveryTrFieldDefs(delivery as unknown as Record<string, unknown>);
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -103,6 +112,13 @@ export function CatalogOrdersForm({
   const fe = (f: string) => fieldError(error, f);
 
   return (
+    <SettingsTranslationTabs
+      section="delivery"
+      fields={trFields}
+      locales={i18n.locales}
+      defaultLocale={i18n.defaultLocale}
+      translations={translations}
+    >
     <div>
       {error ? (
         <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -214,5 +230,6 @@ export function CatalogOrdersForm({
         </button>
       </div>
     </div>
+    </SettingsTranslationTabs>
   );
 }

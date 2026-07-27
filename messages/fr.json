@@ -1163,7 +1163,8 @@
       "corpCertTileTitle": "Clients pro / certificats — tuile {n}",
       "navHeaderItem": "Menu d'en-tête — élément {n}",
       "navFooterColumnTitle": "Pied de page — colonne {n} (titre)",
-      "navFooterColumnLink": "Pied de page — colonne {n}, lien {j}"
+      "navFooterColumnLink": "Pied de page — colonne {n}, lien {j}",
+      "deliveryZoneLabel": "Zone de livraison «{zone}» (libellé)"
     }
   },
   "promo": {

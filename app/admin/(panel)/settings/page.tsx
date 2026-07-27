@@ -129,7 +129,13 @@ export default async function SettingsPage() {
           </Section>
 
           <Section id="catalog" title={t('settings.page.sections.catalog')}>
-            <CatalogOrdersForm catalog={eff.catalog} delivery={eff.delivery} orders={eff.orders} />
+            <CatalogOrdersForm
+              catalog={eff.catalog}
+              delivery={eff.delivery}
+              orders={eff.orders}
+              i18n={eff.i18n}
+              translations={eff.contentI18n}
+            />
             <ResetRow
               keys={[
                 { key: 'catalog', label: t('settings.page.reset.catalog') },

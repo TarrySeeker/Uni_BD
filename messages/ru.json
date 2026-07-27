@@ -1163,7 +1163,8 @@
       "corpCertTileTitle": "Корпоративным / сертификаты — плитка {n}",
       "navHeaderItem": "Меню шапки — пункт {n}",
       "navFooterColumnTitle": "Футер — колонка {n} (заголовок)",
-      "navFooterColumnLink": "Футер — колонка {n}, ссылка {j}"
+      "navFooterColumnLink": "Футер — колонка {n}, ссылка {j}",
+      "deliveryZoneLabel": "Зона доставки «{zone}» (подпись)"
     }
   },
   "promo": {

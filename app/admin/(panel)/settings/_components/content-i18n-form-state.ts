@@ -24,7 +24,13 @@ export type TrLocaleState = Record<string, string>;
 export type TrState = Record<string, TrLocaleState>;
 
 /** Секции настроек, доступные для перевода (совпадает с CONTENT_I18N_SECTIONS). */
-export type ContentI18nSection = 'home' | 'navigation' | 'branding' | 'seo' | 'contacts';
+export type ContentI18nSection =
+  | 'home'
+  | 'navigation'
+  | 'branding'
+  | 'seo'
+  | 'contacts'
+  | 'delivery';
 
 // -----------------------------------------------------------------------------
 // Плоские дескрипторы (branding/seo/contacts): whitelist = SETTINGS_TR_FIELDS.
@@ -365,6 +371,34 @@ export function buildNavigationTrFieldDefs(navigation: AnyRec): TranslatableFiel
         kind: 'text',
       }),
     );
+  });
+
+  return defs;
+}
+
+/**
+ * Переводимые листы доставки → дескрипторы. Whitelist повторяет
+ * SETTINGS_TR_FIELDS.delivery: только подпись зоны. id/price/freeThreshold НЕ
+ * переводятся — это машинный ключ и деньги, локаль покупателя на них влиять не
+ * должна.
+ *
+ * Подпись поля несёт БАЗОВОЕ имя зоны параметром `zone`, а не только номер:
+ * зон обычно две-три и различаются они именно текстом («В пределах МКАД» vs
+ * «За МКАД + область»), поэтому «Зона 2» без имени не даёт владельцу понять,
+ * что он переводит. Номер оставлен как запасной ориентир для безымянной зоны.
+ */
+export function buildDeliveryTrFieldDefs(delivery: AnyRec): TranslatableFieldDef[] {
+  const defs: TranslatableFieldDef[] = [];
+  const d = (delivery ?? {}) as AnyRec;
+
+  asArray(d.zones).forEach((zone, i) => {
+    const base = (zone as AnyRec)?.label;
+    defs.push({
+      key: `zones.${i}.label`,
+      labelKey: 'settings.trFields.deliveryZoneLabel',
+      labelParams: { n: i + 1, zone: typeof base === 'string' && base.trim() ? base : String(i + 1) },
+      kind: 'text',
+    });
   });
 
   return defs;

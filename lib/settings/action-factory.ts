@@ -196,6 +196,10 @@ export const CONTENT_I18N_SECTIONS = [
   'branding',
   'seo',
   'contacts',
+  // delivery — подписи зон доставки (ТЗ_1). Их видит покупатель в селекторе
+  // чекаута, поэтому в трёхъязычном магазине они обязаны переводиться; деньги и
+  // машинный id зоны в оверлей не попадают (см. SETTINGS_TR_FIELDS.delivery).
+  'delivery',
 ] as const;
 export type ContentI18nSection = (typeof CONTENT_I18N_SECTIONS)[number];
 
