@@ -34,6 +34,25 @@
 		X-Frame-Options "SAMEORIGIN"
 		# Базовая referrer-политика
 		Referrer-Policy "strict-origin-when-cross-origin"
+		# Content-Security-Policy — барьер против XSS (живая проверка 29.07.2026
+		# показала, что заголовок не отдавался вовсе ни витриной, ни админкой).
+		#
+		# Почему политика именно такая:
+		#  • 'unsafe-inline' в script-src ОБЯЗАТЕЛЕН: Next.js передаёт состояние
+		#    гидрации инлайновыми <script>. Убрать его можно только переходом на
+		#    nonce (middleware + переписывание страниц) — это отдельная задача,
+		#    а пустой CSP хуже несовершенного.
+		#  • 'unsafe-inline' в style-src: инлайновые стили есть и у Next, и у
+		#    портированной вёрстки (background-image в атрибуте style).
+		#  • img-src/media-src включают домен админки: медиа магазина отдаётся
+		#    оттуда ({$ADMIN_DOMAIN}), витрина ссылается на него напрямую.
+		#  • frame-src https: — контент магазина может встраивать видео (сейчас
+		#    Vimeo); сузить до конкретного хоста нельзя, владелец меняет контент
+		#    из админки без правки конфига.
+		#  • object-src 'none' и base-uri 'self' — дёшево закрывают легаси-векторы.
+		#  • frame-ancestors дублирует X-Frame-Options: браузеры уважают именно
+		#    CSP-директиву, старый заголовок оставлен для древних клиентов.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://{$ADMIN_DOMAIN} https://{$SHOP_DOMAIN}; media-src 'self' https://{$ADMIN_DOMAIN}; font-src 'self' data:; connect-src 'self' https://{$ADMIN_DOMAIN}; frame-src https:; object-src 'none'; base-uri 'self'; form-action 'self' https://{$ADMIN_DOMAIN}; frame-ancestors 'self'"
 		# Убираем заголовок, раскрывающий сервер
 		-Server
 	}

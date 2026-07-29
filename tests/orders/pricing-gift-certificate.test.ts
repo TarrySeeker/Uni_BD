@@ -150,7 +150,11 @@ describe('toGiftQuoteDto / toQuoteDto — витрина (§5)', () => {
     });
     expect(dto.giftDiscountTotal).toBe('0.00');
     expect(dto.grandTotal).toBe('300.00');
-    expect(dto.gift?.reason).toBe('expired');
+    // 🔴 АУДИТ (безопасность): причина СКЛЕЕНА — 'expired' подтверждало бы, что
+    // сертификат с таким кодом СУЩЕСТВУЕТ (деньги на предъявителя, угадывание
+    // кодов). Проверяем, что reason не потерян (витрине есть что перевести), но
+    // существование кода не раскрыто. См. tests/storefront/code-privacy.test.ts.
+    expect(dto.gift?.reason).toBe('not_applicable');
   });
 
   it('toQuoteDto без сертификата: gift=null, grandTotal без изменений', () => {

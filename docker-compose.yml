@@ -373,6 +373,12 @@ services:
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
       BACKUP_DRILL_CRON: ${BACKUP_DRILL_CRON:-0 4 * * 0}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      # Каталог бэкапов — в окружении СЕРВИСА, а не только в `command`. Иначе
+      # ручной запуск `docker compose exec backup /scripts/backup.sh` шёл без
+      # переменной, PROJECT_ROOT вычислялся от `/`, и зеркало медиа уходило в
+      # `/media` ВНУТРИ контейнера — в слой, исчезающий при пересоздании.
+      # Копия выглядела сделанной, но её не было (проверено 29.07.2026).
+      BACKUP_DIR: /backups
     volumes:
       # Скрипты бэкапа/восстановления (read-only) и каталог миграций при нужде.
       - ./scripts:/scripts:ro
@@ -388,10 +394,22 @@ services:
         set -e
         export BACKUP_DIR=/backups
         # mc (MinIO Client) для зеркала медиа; pg_dump/pg_restore уже в образе.
+        # Три попытки с таймаутом: разовый сетевой сбой при старте не должен
+        # выводить медиа-бэкап из строя навсегда. Именно так и случилось
+        # 15.07.2026 — `wget: download timed out`, и 819 МБ фотографий
+        # оставались без копии 13 дней, пока бэкап рапортовал об успехе.
         if ! command -v mc >/dev/null 2>&1; then
-          wget -q -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc \
-            && chmod +x /usr/local/bin/mc \
-            || echo "[backup] предупреждение: mc не установлен — медиа будет пропущено";
+          for try in 1 2 3; do
+            if wget -q -T 30 -O /usr/local/bin/mc \
+                 https://dl.min.io/client/mc/release/linux-amd64/mc; then
+              chmod +x /usr/local/bin/mc && break;
+            fi;
+            echo "[backup] попытка $$try/3: не удалось скачать mc, повтор через 10с";
+            rm -f /usr/local/bin/mc;
+            sleep 10;
+          done;
+          command -v mc >/dev/null 2>&1 \
+            || echo "[backup] ОШИБКА: mc не установлен — backup.sh откажет при непустом S3";
         fi
         {
           echo "$$BACKUP_CRON /scripts/backup.sh >/proc/1/fd/1 2>&1";

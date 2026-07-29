@@ -514,7 +514,18 @@ export async function listProducts(
   //  - isFeatured: ручной флаг is_featured;
   //  - isNew: effective_is_new = COALESCE(override is_new, created_at >= порог) — как бейдж.
   const where = sql`
-    WHERE (${searchTerm}::text IS NULL OR p.name ILIKE ${searchTerm} OR p.sku ILIKE ${searchTerm})
+    WHERE (${searchTerm}::text IS NULL
+           OR p.name ILIKE ${searchTerm}
+           OR p.sku ILIKE ${searchTerm}
+           -- Переводы: покупатель на en/fr ищет по тому имени, которое ВИДИТ.
+           -- Языки не перечисляем — магазин может включить любой набор локалей
+           -- (мультитенантность), поэтому обходим все значения jsonb-оверлея.
+           OR EXISTS (
+                SELECT 1
+                  FROM jsonb_each(COALESCE(p.translations, '{}'::jsonb)) AS tr(lang, fields)
+                 WHERE jsonb_typeof(tr.fields) = 'object'
+                   AND (tr.fields->>'name') ILIKE ${searchTerm}
+              ))
       AND (${f.status ?? null}::text IS NULL OR p.status = ${f.status ?? null})
       AND (${f.brandId ?? null}::uuid IS NULL OR p.brand_id = ${f.brandId ?? null})
       AND (${f.designerId ?? null}::uuid IS NULL OR p.designer_id = ${f.designerId ?? null})

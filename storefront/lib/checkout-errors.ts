@@ -32,27 +32,21 @@ export const CART_ITEM_ISSUE_REASONS = [
   'out_of_stock',
 ] as const;
 
-/** Причина отказа промокода — QuoteDto.promo.reason. */
-export const PROMO_REJECT_REASONS = [
-  'not_found',
-  'inactive',
-  'not_started',
-  'expired',
-  'below_min_total',
-  'below_min_qty',
-  'usage_limit_reached',
-  'per_customer_limit_reached',
-  'invalid_kind',
-] as const;
+/**
+ * Причина отказа промокода — QuoteDto.promo.reason.
+ *
+ * 🔴 Сервер СКЛЕИВАЕТ причину (аудит-безопасность: точные not_found/expired/
+ * inactive работали оракулом существования кодов — см. lib/storefront/code-privacy.ts).
+ * Публично приходит одно значение; исторические точные коды остаются в карте
+ * переводов ниже — старый сервер/другой тенант платформы их ещё может прислать.
+ */
+export const PROMO_REJECT_REASONS = ['not_applicable'] as const;
 
-/** Причина отказа подарочного сертификата — QuoteDto.gift.reason. */
-export const GIFT_REJECT_REASONS = [
-  'not_found',
-  'expired',
-  'depleted',
-  'disabled',
-  'no_amount_due',
-] as const;
+/**
+ * Причина отказа подарочного сертификата — QuoteDto.gift.reason.
+ * Склеена так же; `no_amount_due` — про КОРЗИНУ, а не про код, и потому живёт.
+ */
+export const GIFT_REJECT_REASONS = ['not_applicable', 'no_amount_due'] as const;
 
 /** Доменная причина отказа оформления/оплаты — error.reason. */
 export const ORDER_ERROR_REASONS = [
@@ -62,6 +56,8 @@ export const ORDER_ERROR_REASONS = [
   'invalid_gift',
   'delivery_unavailable',
   'invalid_zone',
+  /** Прислан код пункта выдачи, которого нет в справочнике службы доставки. */
+  'invalid_pvz',
   'payments_disabled',
   'order_not_found',
   'order_not_payable',
@@ -101,6 +97,12 @@ export function issueLabel(t: CheckoutDict, code: string): string {
  */
 export function promoReasonLabel(t: CheckoutDict, reason: string): string {
   const map: Record<string, string> = {
+    // 🔴 Актуальный публичный ответ сервера: причина СКЛЕЕНА (оракул закрыт).
+    // Покупателю нужен понятный текст, а не диагноз кода — он его и получает.
+    not_applicable: t.promoReasonNotApplicable,
+    // Ниже — точные коды: их ещё может прислать старый сервер/другой тенант.
+    // Убирать нельзя (иначе такой ответ упадёт в общий фолбэк), но и оракула из
+    // них не возникает: актуальный сервер их наружу не выпускает.
     not_found: t.promoReasonNotFound,
     inactive: t.promoReasonInactive,
     not_started: t.promoReasonNotStarted,
@@ -125,6 +127,9 @@ export function promoReasonLabel(t: CheckoutDict, reason: string): string {
  */
 export function giftReasonLabel(t: CheckoutDict, reason: string): string {
   const map: Record<string, string> = {
+    // 🔴 Актуальный публичный ответ сервера: причина СКЛЕЕНА (оракул закрыт).
+    not_applicable: t.giftReasonNotApplicable,
+    // Точные коды — совместимость со старым сервером/другим тенантом.
     not_found: t.giftReasonNotFound,
     expired: t.giftReasonExpired,
     depleted: t.giftReasonDepleted,
@@ -162,6 +167,9 @@ export function orderErrorLabel(t: CheckoutDict, err: ErrorCodes | null): string
     invalid_gift: t.orderErrorInvalidGift,
     delivery_unavailable: t.orderErrorDeliveryUnavailable,
     invalid_zone: t.orderErrorInvalidZone,
+    // 🔴 Пункт выдачи не найден в справочнике службы: покупателю нужно выбрать
+    // ПУНКТ заново — отдельный текст, иначе он полезет менять адрес/способ.
+    invalid_pvz: t.orderErrorInvalidPvz,
     payments_disabled: t.orderErrorPaymentsDisabled,
     order_not_found: t.orderErrorOrderNotFound,
     order_not_payable: t.orderErrorOrderNotPayable,

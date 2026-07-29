@@ -94,6 +94,10 @@ export interface Dictionary {
   favorite: {
     title: string; // «Избранное»
     empty: string; // «В избранном пока пусто.»
+    /** aria-label сердечка, когда товар ещё не в избранном. */
+    add: string;
+    /** aria-label сердечка, когда товар уже в избранном. */
+    remove: string;
   };
   product: {
     inStock: string; // «В наличии»
@@ -107,6 +111,8 @@ export interface Dictionary {
     aboutDesigner: string; // «О дизайнере»
     worksCount: string; // шаблон с плейсхолдером {n}, напр. «Работ: {n}»
     designerNoWorks: string; // «У этого дизайнера пока нет опубликованных работ.»
+    /** aria-label превью в галерее; шаблон с плейсхолдером {n} — номер фото. */
+    photoNumber: string;
   };
   cart: {
     title: string; // «Корзина»
@@ -270,12 +276,20 @@ export interface Dictionary {
     promoReasonBelowMinQty: string;
     /** Домен: invalid_kind — тип скидки не применим к этой корзине. */
     promoReasonInvalidKind: string;
+    /**
+     * Домен: not_applicable — СКЛЕЕННАЯ причина отказа промокода. Сервер намеренно
+     * не раскрывает, существует код или нет (оракул перебора закрыт), поэтому
+     * текст говорит о РЕЗУЛЬТАТЕ («не подошёл»), а не о состоянии кода.
+     */
+    promoReasonNotApplicable: string;
     // --- Причины отказа сертификата (gift.reason из /cart/quote) ---
     giftReasonNotFound: string;
     giftReasonExpired: string;
     giftReasonDepleted: string;
     giftReasonDisabled: string;
     giftReasonNoAmountDue: string;
+    /** Домен: not_applicable — склеенная причина отказа сертификата (оракул закрыт). */
+    giftReasonNotApplicable: string;
     // --- Ошибки создания заказа (code из /orders) ---
     orderErrorOutOfStock: string;
     orderErrorInvalidItem: string;
@@ -284,6 +298,8 @@ export interface Dictionary {
     orderErrorDeliveryUnavailable: string;
     /** Домен: invalid_zone — прислана зона доставки, которой нет в настройках. */
     orderErrorInvalidZone: string;
+    /** Домен: invalid_pvz — выбранного пункта выдачи нет в справочнике службы. */
+    orderErrorInvalidPvz: string;
     orderErrorPaymentsDisabled: string;
     /** Домен: order_not_found — заказ не найден либо ссылка/токен не подошли. */
     orderErrorOrderNotFound: string;
@@ -533,6 +549,8 @@ const ru: Dictionary = {
   favorite: {
     title: 'Избранное',
     empty: 'В избранном пока пусто.',
+    add: 'В избранное',
+    remove: 'Убрать из избранного',
   },
   product: {
     inStock: 'В наличии',
@@ -546,6 +564,7 @@ const ru: Dictionary = {
     aboutDesigner: 'О дизайнере',
     worksCount: 'Работ: {n}',
     designerNoWorks: 'У этого дизайнера пока нет опубликованных работ.',
+    photoNumber: 'Фото {n}',
   },
   cart: {
     title: 'Корзина',
@@ -649,11 +668,15 @@ const ru: Dictionary = {
     promoReasonBelowMinQty:
       'Для этого промокода нужно больше единиц товара — добавьте ещё.',
     promoReasonInvalidKind: 'Этот промокод неприменим к вашей корзине.',
+    promoReasonNotApplicable:
+      'Промокод не подошёл к этому заказу. Проверьте написание или попробуйте другой.',
     giftReasonNotFound: 'Сертификат с таким кодом не найден.',
     giftReasonExpired: 'Срок действия сертификата истёк.',
     giftReasonDepleted: 'На сертификате не осталось средств.',
     giftReasonDisabled: 'Сертификат отключён.',
     giftReasonNoAmountDue: 'Сертификату нечего покрывать в этом заказе.',
+    giftReasonNotApplicable:
+      'Сертификат не подошёл к этому заказу. Проверьте написание кода или свяжитесь с магазином.',
     orderErrorOutOfStock:
       'Часть товаров закончилась, пока вы оформляли заказ. Обновите корзину.',
     orderErrorInvalidItem: 'Один из товаров стал недоступен. Уберите его из корзины.',
@@ -665,6 +688,8 @@ const ru: Dictionary = {
       'Онлайн-оплата временно недоступна. Свяжитесь с магазином для оформления.',
     orderErrorInvalidZone:
       'Выбранная зона доставки больше недоступна. Обновите страницу и выберите её заново.',
+    orderErrorInvalidPvz:
+      'Выбранный пункт выдачи больше недоступен. Обновите страницу и выберите пункт выдачи заново.',
     orderErrorOrderNotFound:
       'Заказ не найден. Проверьте ссылку из письма или свяжитесь с магазином.',
     orderErrorOrderNotPayable: 'Этот заказ оплатить нельзя: он уже оплачен или закрыт.',
@@ -856,6 +881,8 @@ const en: Dictionary = {
   favorite: {
     title: 'Wishlist',
     empty: 'Your wishlist is empty.',
+    add: 'Add to wishlist',
+    remove: 'Remove from wishlist',
   },
   product: {
     inStock: 'In stock',
@@ -869,6 +896,7 @@ const en: Dictionary = {
     aboutDesigner: 'About the designer',
     worksCount: 'Works: {n}',
     designerNoWorks: 'This designer has no published works yet.',
+    photoNumber: 'Photo {n}',
   },
   cart: {
     title: 'Cart',
@@ -973,11 +1001,15 @@ const en: Dictionary = {
     promoReasonBelowMinQty:
       'This promo code requires more items — please add a few more.',
     promoReasonInvalidKind: 'This promo code does not apply to your cart.',
+    promoReasonNotApplicable:
+      'This promo code does not apply to your order. Check the spelling or try another one.',
     giftReasonNotFound: 'No gift certificate found for this code.',
     giftReasonExpired: 'The gift certificate has expired.',
     giftReasonDepleted: 'The gift certificate has no funds left.',
     giftReasonDisabled: 'The gift certificate has been disabled.',
     giftReasonNoAmountDue: 'There is nothing for the gift certificate to cover in this order.',
+    giftReasonNotApplicable:
+      'This gift certificate does not apply to your order. Check the code or contact the shop.',
     orderErrorOutOfStock:
       'Some items ran out while you were placing the order. Please refresh your cart.',
     orderErrorInvalidItem: 'One of the items became unavailable. Please remove it from the cart.',
@@ -989,6 +1021,8 @@ const en: Dictionary = {
       'Online payment is temporarily unavailable. Please contact the store to place your order.',
     orderErrorInvalidZone:
       'The selected delivery area is no longer available. Refresh the page and pick it again.',
+    orderErrorInvalidPvz:
+      'The selected pickup point is no longer available. Refresh the page and choose another pickup point.',
     orderErrorOrderNotFound:
       'Order not found. Check the link from your email or contact the store.',
     orderErrorOrderNotPayable: 'This order cannot be paid: it has already been paid or closed.',
@@ -1181,6 +1215,8 @@ const fr: Dictionary = {
   favorite: {
     title: 'Favoris',
     empty: 'Votre liste de favoris est vide.',
+    add: 'Ajouter aux favoris',
+    remove: 'Retirer des favoris',
   },
   product: {
     inStock: 'En stock',
@@ -1194,6 +1230,7 @@ const fr: Dictionary = {
     aboutDesigner: 'À propos du créateur',
     worksCount: 'Œuvres : {n}',
     designerNoWorks: 'Ce créateur n’a pas encore d’œuvres publiées.',
+    photoNumber: 'Photo {n}',
   },
   cart: {
     title: 'Panier',
@@ -1300,11 +1337,15 @@ const fr: Dictionary = {
     promoReasonBelowMinQty:
       'Ce code promo exige davantage d’articles — ajoutez-en quelques-uns.',
     promoReasonInvalidKind: 'Ce code promo ne s’applique pas à votre panier.',
+    promoReasonNotApplicable:
+      'Ce code promo ne s’applique pas à cette commande. Vérifiez l’orthographe ou essayez-en un autre.',
     giftReasonNotFound: 'Carte cadeau introuvable.',
     giftReasonExpired: 'La carte cadeau a expiré.',
     giftReasonDepleted: 'La carte cadeau n’a plus de solde.',
     giftReasonDisabled: 'La carte cadeau a été désactivée.',
     giftReasonNoAmountDue: 'Il n’y a rien à couvrir par la carte cadeau dans cette commande.',
+    giftReasonNotApplicable:
+      'Cette carte cadeau ne s’applique pas à cette commande. Vérifiez le code ou contactez la boutique.',
     orderErrorOutOfStock:
       'Certains articles se sont épuisés pendant votre commande. Veuillez actualiser votre panier.',
     orderErrorInvalidItem: 'Un des articles est devenu indisponible. Retirez-le du panier.',
@@ -1316,6 +1357,8 @@ const fr: Dictionary = {
       'Le paiement en ligne est temporairement indisponible. Contactez la boutique pour passer commande.',
     orderErrorInvalidZone:
       'La zone de livraison choisie n’est plus disponible. Actualisez la page et sélectionnez-la à nouveau.',
+    orderErrorInvalidPvz:
+      'Le point de retrait choisi n’est plus disponible. Actualisez la page et sélectionnez un autre point de retrait.',
     orderErrorOrderNotFound:
       'Commande introuvable. Vérifiez le lien reçu par e-mail ou contactez la boutique.',
     orderErrorOrderNotPayable: 'Cette commande ne peut pas être réglée : elle est déjà payée ou clôturée.',

@@ -23,6 +23,7 @@
  */
 
 import type { PaymentBlock } from '@/lib/orders/status';
+import { CODE_REJECTED_REASON } from './code-privacy';
 
 // -----------------------------------------------------------------------------
 // 1) Причины отказа создания заказа / инициации оплаты — поле error.reason.
@@ -48,6 +49,12 @@ export const STOREFRONT_ERROR_REASONS = [
   'delivery_unavailable',
   /** Прислана зона доставки, которой нет в настройках магазина. */
   'invalid_zone',
+  /**
+   * Прислан код пункта выдачи, которого нет в справочнике службы доставки.
+   * Отдельная причина, а не `delivery_unavailable`: покупателю нужно ВЫБРАТЬ
+   * пункт заново (адрес/способ менять не надо), и это его единственное действие.
+   */
+  'invalid_pvz',
   /** Выбран онлайн-способ оплаты при выключенном модуле payments. */
   'payments_disabled',
   /** Заказ не найден / токен доступа не подошёл (инициация оплаты). */
@@ -140,25 +147,34 @@ export const CART_ITEM_ISSUE_REASONS = [
   'out_of_stock',
 ] as const;
 
-/** Причина отказа промокода — QuoteDto.promo.reason. */
-export const PROMO_REJECT_REASONS = [
-  'not_found',
-  'inactive',
-  'not_started',
-  'expired',
-  'below_min_total',
-  'below_min_qty',
-  'usage_limit_reached',
-  'per_customer_limit_reached',
-  'invalid_kind',
-] as const;
+/**
+ * Причина отказа промокода — QuoteDto.promo.reason.
+ *
+ * 🔴 АУДИТ (безопасность, «оракул существования кодов»). Раньше здесь жил ВЕСЬ
+ * доменный алфавит (not_found/inactive/expired/…), и ответ /cart/quote прямо
+ * говорил, существует код или нет: `not_found` против `expired`/`inactive` —
+ * готовый перебор словаря промокодов. Публичный алфавит СУЖЕН до одной
+ * склеенной причины; точный доменный алфавит НЕ тронут (lib/orders/promo.ts) и
+ * по-прежнему доступен логам/админке. Склейка — lib/storefront/code-privacy.ts.
+ *
+ * Это НЕ «удаление члена контракта» в смысле §22: витрина обязана переводить
+ * любой неизвестный ключ в общий текст (giftReasonLabel/promoReasonLabel уже так
+ * устроены), поэтому старый клиент, получив `not_applicable`, покажет корректное
+ * «код не подошёл», а не сырой код.
+ */
+export const PROMO_REJECT_REASONS = [CODE_REJECTED_REASON] as const;
 
-/** Причина отказа подарочного сертификата — QuoteDto.gift.reason. */
+/**
+ * Причина отказа подарочного сертификата — QuoteDto.gift.reason.
+ *
+ * 🔴 Тот же аудит, и здесь ставка выше: сертификат — инструмент НА ПРЕДЪЯВИТЕЛЯ.
+ * Различие `not_found` / `expired` / `depleted` подтверждало существование кода и
+ * помогало угадывать живые сертификаты. Наружу остаются ровно две вещи: «код не
+ * подошёл» (склейка) и «покрывать нечего» — последнее про КОРЗИНУ, а не про код,
+ * и потому оракулом не является (см. code-privacy.ts).
+ */
 export const GIFT_REJECT_REASONS = [
-  'not_found',
-  'expired',
-  'depleted',
-  'disabled',
+  CODE_REJECTED_REASON,
   /** Валиден, но покрывать нечего (сумма к оплате уже 0). */
   'no_amount_due',
 ] as const;

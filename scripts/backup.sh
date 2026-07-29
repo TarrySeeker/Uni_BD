@@ -153,25 +153,55 @@ cleanup_mc() {
   fi
 }
 
+S3_CONFIGURED=0
+if [ -n "${S3_ENDPOINT_VAL}" ] && [ -n "${S3_BUCKET_VAL}" ] && \
+   [ -n "${S3_ACCESS_KEY_VAL}" ] && [ -n "${S3_SECRET_KEY_VAL}" ]; then
+  S3_CONFIGURED=1
+fi
+
 if ! command -v mc >/dev/null 2>&1; then
-  warn "MinIO Client (mc) не найден — пропускаю медиа (это нормально для dev без медиа)."
-elif [ -z "${S3_ENDPOINT_VAL}" ] || [ -z "${S3_BUCKET_VAL}" ] || \
-     [ -z "${S3_ACCESS_KEY_VAL}" ] || [ -z "${S3_SECRET_KEY_VAL}" ]; then
+  # Заданный S3 = медиа есть, и его надо бэкапить. Отсутствие mc в этом случае —
+  # не «особенность dev», а тихий отказ бэкапа: дамп БД содержит лишь КЛЮЧИ
+  # файлов, сами изображения в него не попадают. Живой случай 15–29.07.2026:
+  # закачка mc сорвалась по таймауту, и 15 прогонов подряд рапортовали
+  # «Бэкап готов», пока 819 МБ фотографий оставались без единой копии.
+  if [ "${S3_CONFIGURED}" -eq 1 ]; then
+    fail "MinIO Client (mc) не найден, а S3 настроен — медиа НЕ сохранено."
+    fail "Дамп БД содержит только ключи файлов: потеря бакета = потеря всех фото."
+    fail "Установите mc в контейнер backup и повторите бэкап."
+    exit 1
+  fi
+  warn "MinIO Client (mc) не найден, S3 не настроен — медиа нет, пропускаю."
+elif [ "${S3_CONFIGURED}" -eq 0 ]; then
   warn "S3_ENDPOINT/S3_BUCKET/ключи заданы не полностью — пропускаю медиа."
 else
   trap cleanup_mc EXIT
   if ! mc alias set "${MC_ALIAS}" "${S3_ENDPOINT_VAL}" \
          "${S3_ACCESS_KEY_VAL}" "${S3_SECRET_KEY_VAL}" >/dev/null 2>&1; then
-    warn "Не удалось подключиться к S3 (${S3_ENDPOINT_VAL}) — пропускаю медиа."
+    fail "Не удалось подключиться к S3 (${S3_ENDPOINT_VAL}) — медиа НЕ сохранено."
+    cleanup_mc
+    exit 1
   elif ! mc ls "${MC_ALIAS}/${S3_BUCKET_VAL}" >/dev/null 2>&1; then
-    warn "Бакет ${S3_BUCKET_VAL} недоступен/пуст — пропускаю медиа (нет файлов для бэкапа)."
+    # Пустой бакет от недоступного не отличить по коду `mc ls`, поэтому
+    # различаем явно: пустой — законный повод пропустить, недоступный — отказ.
+    if mc stat "${MC_ALIAS}/${S3_BUCKET_VAL}" >/dev/null 2>&1; then
+      warn "Бакет ${S3_BUCKET_VAL} пуст — медиа нечего сохранять."
+    else
+      fail "Бакет ${S3_BUCKET_VAL} недоступен — медиа НЕ сохранено."
+      cleanup_mc
+      exit 1
+    fi
   else
     # --overwrite/--remove держат зеркало в актуальном состоянии;
     # медиа аддитивно — это безопасно (см. порядок §6.2).
     if mc mirror --overwrite "${MC_ALIAS}/${S3_BUCKET_VAL}" "${MEDIA_DIR}/"; then
       ok "Медиа зазеркалировано в ${MEDIA_DIR}/"
     else
-      warn "mc mirror завершился с ошибкой — медиа НЕ обновлено (БД-дамп уже готов)."
+      # Готовый дамп БД не делает бэкап состоявшимся: без фотографий магазин
+      # не восстановить. Падаем, чтобы cron-прогон отметился как неуспешный.
+      fail "mc mirror завершился с ошибкой — медиа НЕ обновлено, бэкап неполный."
+      cleanup_mc
+      exit 1
     fi
   fi
   cleanup_mc

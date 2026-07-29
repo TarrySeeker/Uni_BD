@@ -139,7 +139,7 @@ export default async function ProductPage({
       <Breadcrumbs items={crumbs} locale={locale} homeLabel={dict.common.home} />
 
       <div className="work__head">
-        <ProductGallery media={product.media} alt={product.name} />
+        <ProductGallery media={product.media} alt={product.name} locale={locale} />
 
         <div className="work__info">
           <div className="work-head">

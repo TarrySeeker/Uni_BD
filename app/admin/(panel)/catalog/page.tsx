@@ -8,6 +8,7 @@ import {
   parseProductListFilter,
 } from '@/lib/catalog/list-filters';
 import { listDesigners } from '@/lib/designers';
+import { getLocaleConfig } from '@/lib/i18n';
 
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
@@ -62,11 +63,16 @@ export default async function CatalogPage({
   const filter = parseProductListFilter(sp, PAGE_SIZE);
   const currency = getEnv().SHOP_CURRENCY;
 
+  // Локаль магазина — до списка дизайнеров: без неё коллатор берёт системную
+  // локаль контейнера (en-US), и кириллические имена в фильтре встанут иначе,
+  // чем в разделе «Дизайнеры». Один и тот же список — один и тот же алфавит.
+  const { defaultLocale } = await getLocaleConfig();
+
   const [{ rows, total }, designers, categoryTree] = await Promise.all([
     listProducts(filter),
     // По умолчанию listDesigners отдаёт ручной порядок (ORDER BY sort) — он нужен витрине,
     // где порядок задаёт владелец. В служебном фильтре искать по нему неудобно: нужен алфавит.
-    listDesigners({ sort: 'name_asc' }),
+    listDesigners({ sort: 'name_asc', locale: defaultLocale }),
     getCategoryTree(),
   ]);
 

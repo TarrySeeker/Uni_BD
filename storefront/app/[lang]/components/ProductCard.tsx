@@ -45,6 +45,7 @@ export default function ProductCard({ product, locale = DEFAULT_LOCALE }: Props)
           )}
         </div>
         <FavoriteButton
+          locale={locale}
           item={{
             slug: product.slug,
             name: product.name,

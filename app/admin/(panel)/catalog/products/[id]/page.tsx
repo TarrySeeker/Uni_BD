@@ -46,12 +46,17 @@ export default async function ProductDetailPage({
   }
 
   const { id } = await params;
+  // Локаль магазина — до списка дизайнеров: иначе коллатор возьмёт системную
+  // локаль контейнера (en-US) и кириллические имена разойдутся с разделом
+  // «Дизайнеры», где сортировка идёт в локали магазина.
+  const { defaultLocale } = await getLocaleConfig();
+
   const [product, brands, designers, categoryTree, attributes, attributeValues, localeConfig, blocks, settings] =
     await Promise.all([
       getProductById(id),
       listBrands(),
       // Алфавит: в форме товара дизайнера ищут глазами по списку (запрос заказчика).
-      listDesigners({ sort: 'name_asc' }),
+      listDesigners({ sort: 'name_asc', locale: defaultLocale }),
       getCategoryTree(),
       listAttributes(),
       listAttributeValuesByAttribute(),

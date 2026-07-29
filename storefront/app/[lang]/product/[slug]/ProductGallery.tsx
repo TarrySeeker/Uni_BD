@@ -9,14 +9,20 @@
 
 import { useState } from 'react';
 import type { MediaDto } from '@/lib/types';
+import { fillTemplate, getDictionary } from '@/lib/dictionaries';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
 export default function ProductGallery({
   media,
   alt,
+  locale = DEFAULT_LOCALE,
 }: {
   media: MediaDto[];
   alt: string;
+  /** Локаль — для подписи превью скринридеру («Фото 2» / «Photo 2»). */
+  locale?: Locale;
 }) {
+  const d = getDictionary(locale);
   const images = media.filter((m) => m.url && m.type === 'image');
   const [active, setActive] = useState(0);
 
@@ -49,7 +55,7 @@ export default function ProductGallery({
               type="button"
               className={`sf-gallery-thumb${i === idx ? ' is-active' : ''}`}
               onClick={() => setActive(i)}
-              aria-label={`Фото ${i + 1}`}
+              aria-label={fillTemplate(d.product.photoNumber, { n: i + 1 })}
             >
               {im.url && <img src={im.url} alt="" />}
             </button>

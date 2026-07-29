@@ -89,7 +89,6 @@ describe('каталог админки — подписи статусов ес
     for (const s of ORDER_STATUSES) {
       const key = orderStatusLabelKey(s)!;
       for (const locale of ['ru', 'en', 'fr'] as const) {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         expect(at(CATALOGS[locale], key)).toBeTruthy();
       }
     }

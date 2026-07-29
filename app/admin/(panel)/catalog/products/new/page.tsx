@@ -28,10 +28,15 @@ export default async function NewProductPage() {
     return <Forbidden permission={guard.permission} />;
   }
 
+  // Локаль магазина нужна ДО списка дизайнеров: без неё коллатор берёт системную
+  // локаль контейнера (en-US), и кириллические имена встают не туда, где их ждёт
+  // раздел «Дизайнеры» — два экрана показали бы разный алфавит.
+  const { defaultLocale } = await getLocaleConfig();
+
   const [brands, designers, categoryTree, attributes, settings, localeConfig] = await Promise.all([
     listBrands(),
     // Алфавит: в форме товара дизайнера ищут глазами по списку (запрос заказчика).
-    listDesigners({ sort: 'name_asc' }),
+    listDesigners({ sort: 'name_asc', locale: defaultLocale }),
     getCategoryTree(),
     listAttributes(),
     getEffectiveSettings(),

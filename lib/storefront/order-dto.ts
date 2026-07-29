@@ -21,6 +21,7 @@ import type { QuoteResult } from '@/lib/orders/pricing';
 import { toMinor, fromMinor } from '@/lib/orders/money';
 import type { GiftQuoteInfo } from '@/lib/orders/repository';
 import { toGiftQuoteDto, type GiftQuoteDto } from '@/lib/storefront/gift-dto';
+import { publicPromoReason } from '@/lib/storefront/code-privacy';
 import {
   orderStatusLabel,
   paymentStatusLabel,
@@ -483,7 +484,11 @@ export interface QuoteDto {
     applied: boolean;
     code: string | null;
     discount: string;
-    /** Машиночитаемая причина отказа промокода (если не применён). */
+    /**
+     * Машиночитаемая причина отказа промокода (если не применён). СКЛЕЕНА:
+     * «нет такого кода» и «код есть, но не годится» неразличимы — иначе ответ
+     * работал бы оракулом перебора промокодов. См. ./code-privacy.ts.
+     */
     reason: string | null;
   };
   /** Подарочный сертификат (если код передан): applied/appliedAmount/остаток. null — не передан. */
@@ -546,7 +551,11 @@ export function toQuoteDto(input: {
       applied: quote.promo.applied,
       code: quote.promo.code,
       discount: quote.promo.discount,
-      reason: input.promoReason ?? null,
+      // 🔴 АУДИТ (безопасность): точная причина НЕ уезжает наружу — разница
+      // not_found против expired/inactive подтверждала СУЩЕСТВОВАНИЕ промокода и
+      // давала перебор словаря. Домен точную причину сохраняет (логи/админка),
+      // публично — одно склеенное значение. См. ./code-privacy.ts.
+      reason: publicPromoReason(input.promoReason),
     },
     gift: toGiftQuoteDto(gift),
     delivery: {

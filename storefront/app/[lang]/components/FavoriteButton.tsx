@@ -10,10 +10,24 @@
 
 import type { FavoriteItem } from '@/lib/favorites';
 import { useFavorites } from '@/lib/favorites';
+import { getDictionary } from '@/lib/dictionaries';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
-export default function FavoriteButton({ item }: { item: FavoriteItem }) {
+export default function FavoriteButton({
+  item,
+  locale = DEFAULT_LOCALE,
+}: {
+  item: FavoriteItem;
+  /**
+   * Локаль нужна из-за подписи для скринридера: без неё англо- и франкоязычный
+   * покупатель слышал у каждой карточки русское «В избранное» (находка 29.07).
+   * Значение по умолчанию оставляет вызовы без локали рабочими.
+   */
+  locale?: Locale;
+}) {
   const { has, toggle } = useFavorites();
   const active = has(item.slug);
+  const d = getDictionary(locale);
 
   return (
     <div
@@ -21,7 +35,7 @@ export default function FavoriteButton({ item }: { item: FavoriteItem }) {
       data-id={item.slug}
       role="button"
       aria-pressed={active}
-      aria-label={active ? 'Убрать из избранного' : 'В избранное'}
+      aria-label={active ? d.favorite.remove : d.favorite.add}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();

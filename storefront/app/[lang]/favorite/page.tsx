@@ -76,7 +76,7 @@ export default function FavoritePage() {
                   )}
                   {formatDisplayPrice(item.price, selected)}
                 </div>
-                <FavoriteButton item={item} />
+                <FavoriteButton item={item} locale={locale} />
               </a>
             </div>
           ))}

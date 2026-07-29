@@ -55,6 +55,9 @@ import {
   type DeliveryCostLine,
   type DeliveryZoneConfig,
 } from './delivery-cost';
+// Проверка существования ПВЗ (аудит major): развязка orders↔cdek внутри модуля —
+// он сам делает ленивый import cdek и никогда не бросает (см. его шапку).
+import { verifyPvzCode, classifyPvzVerification } from './pvz-verification';
 import type { DeliveryType, Order, OrderItem, PaymentMethod, PromoCode } from './types';
 import type { CartQuoteInput, CreateOrderInput } from './schemas';
 import { getSetting } from '@/lib/settings/repository';
@@ -1097,6 +1100,8 @@ export type CreateOrderResult =
         | 'invalid_gift'
         | 'delivery_unavailable'
         | 'invalid_zone'
+        /** Прислан код пункта выдачи, которого нет в справочнике службы доставки. */
+        | 'invalid_pvz'
         | 'payments_disabled'
         | 'total_mismatch';
       message: string;
@@ -1180,6 +1185,27 @@ export async function createOrder(
     }
     throw e;
   }
+  // 🔴 АУДИТ (major): ПВЗ проверяется на СУЩЕСТВОВАНИЕ так же строго, как зона.
+  // Раньше pvzCode проходил лишь формальную валидацию схемы («непустая строка
+  // ≤64») и напрямую уезжал в orders.delivery_pvz_code → в СДЭК как
+  // delivery_point: на боевых ключах заказ оплачивался, а накладную по нему не
+  // создать никогда (СДЭК отвергает неизвестный пункт) — заказ повисал.
+  // Политика на недоступность СДЭК (fail-open) собрана в classifyPvzVerification,
+  // обоснование — в шапке lib/orders/pvz-verification.ts. Проверка идёт ДО
+  // резерва остатков: незачем занимать товар под заведомо неотгружаемый заказ.
+  const pvzCheck = await verifyPvzCode({
+    deliveryType: input.delivery?.type,
+    pvzCode: input.delivery?.pvzCode,
+  });
+  if (classifyPvzVerification(pvzCheck) === 'reject') {
+    return {
+      ok: false,
+      code: 'invalid_pvz',
+      message:
+        'Выбранный пункт выдачи не найден. Обновите страницу и выберите пункт выдачи заново.',
+    };
+  }
+
   // Самовывоз бесплатен всегда — зона к нему не применяется (см. computeDeliveryCost).
   const appliedZone = input.delivery?.type === 'pickup' ? undefined : deliveryZone;
   const freeThreshold = Number(

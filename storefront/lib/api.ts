@@ -210,6 +210,48 @@ export async function getPages(locale?: string): Promise<PageListItemDto[]> {
 }
 
 /**
+ * Список активных дизайнеров (эндпоинт отдаёт только is_active). Нужен карте сайта:
+ * страницы `/designers/{slug}` существуют, но листинга дизайнеров на витрине нет,
+ * поэтому иначе робот нашёл бы их только по ссылкам из карточек товаров.
+ * Пагинации у эндпоинта нет — дизайнеров единицы, приходят одним ответом.
+ */
+export async function getDesigners(locale?: string): Promise<FullDesignerDto[]> {
+  const body = await apiGet<{ data: FullDesignerDto[] }>(
+    withLocale('/designers', locale),
+  );
+  return body?.data ?? [];
+}
+
+/**
+ * ВСЕ slug активных товаров — постранично, для карты сайта.
+ *
+ * Эндпоинт `/products` жёстко ограничивает `limit` сотней (Math.min(100, …) в
+ * app/api/storefront/v1/products/route.ts), поэтому одним запросом каталог из ~850
+ * позиций не забрать: без пагинации карта молча содержала бы первые 100 товаров.
+ * Архивные сюда не попадают — API сам фильтрует `status: 'active'` (архивные дали
+ * бы в карте 404, а их в этом магазине 748).
+ *
+ * `max` — общий потолок (карта всё равно обрежет по SITEMAP_PRODUCT_CAP); он же
+ * страхует от бесконечного цикла, если сервер начнёт отдавать неверную пагинацию.
+ * Локаль НЕ передаём: slug у товара один на все языки, а лишний параметр только
+ * помешал бы кешированию ответа.
+ */
+export async function getAllProductSlugs(max = 15000): Promise<{ slug: string }[]> {
+  const PAGE = 100; // потолок limit на стороне API
+  const slugs: { slug: string }[] = [];
+  for (let offset = 0; offset < max; offset += PAGE) {
+    const res = await getProducts({ limit: PAGE, offset });
+    for (const p of res.data) {
+      if (p?.slug) slugs.push({ slug: p.slug });
+    }
+    // Последняя страница: сервер отдал меньше запрошенного либо total исчерпан.
+    if (res.data.length < PAGE) break;
+    if (res.pagination?.total && offset + PAGE >= res.pagination.total) break;
+  }
+  return slugs;
+}
+
+/**
  * Товары для «избранной» сетки главной: сперва featured, при пустом результате —
  * общий список (fallback), чтобы витрина всегда показывала реальные товары.
  */

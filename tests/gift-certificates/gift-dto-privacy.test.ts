@@ -74,7 +74,11 @@ describe('storefront gift DTO — guard по исходнику', () => {
     expect(SRC).not.toMatch(/\.\.\.gift\b/);
     expect(SRC).not.toMatch(/return\s*\{\s*\.\.\./);
     for (const key of PUBLIC_KEYS) {
-      expect(SRC).toContain(`${key}: gift.${key}`);
+      // Поле берётся из домена ЯВНО и поимённо. Допускается обёртка-редактор
+      // (`reason: publicGiftReason(gift.reason)` — склейка причины, аудит
+      // «оракул существования кодов»): это по-прежнему поимённый перенос
+      // конкретного поля, а не спред домена, ради которого guard и написан.
+      expect(SRC, key).toMatch(new RegExp(`${key}:\\s*(\\w+\\()?gift\\.${key}`));
     }
   });
 });

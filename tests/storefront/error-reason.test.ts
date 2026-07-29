@@ -53,6 +53,9 @@ describe('публичный алфавит доменных причин отк
     expect(transportForReason('invalid_gift')).toBe('unprocessable');
     expect(transportForReason('delivery_unavailable')).toBe('unprocessable');
     expect(transportForReason('invalid_zone')).toBe('unprocessable');
+    // Неизвестный ПВЗ — плохие данные тела, не конфликт состояния: покупателю
+    // надо выбрать пункт заново, повтор того же запроса не поможет.
+    expect(transportForReason('invalid_pvz')).toBe('unprocessable');
     expect(transportForReason('payments_disabled')).toBe('unprocessable');
     expect(transportForReason('invalid_item')).toBe('unprocessable');
     // Сумма разошлась — КОНФЛИКТ состояния: тело валидно, изменились цены/промокод/
@@ -71,6 +74,9 @@ describe('публичный алфавит доменных причин отк
       invalid_gift: 'invalid_gift',
       delivery_unavailable: 'delivery_unavailable',
       invalid_zone: 'invalid_zone',
+      // Аудит major: прислан код ПВЗ, которого нет в справочнике службы —
+      // раньше такой заказ создавался и был неотгружаем (накладную не создать).
+      invalid_pvz: 'invalid_pvz',
       payments_disabled: 'payments_disabled',
       // Аудит №2/№9: показанный покупателю итог разошёлся с фактическим.
       total_mismatch: 'total_mismatch',
@@ -90,7 +96,16 @@ describe('публичный алфавит доменных причин отк
     expect([...CART_ITEM_ISSUE_REASONS].sort()).toEqual(Object.keys(cover).sort());
   });
 
-  it('алфавит причин промокода совпадает с доменным union PromoRejectReason', () => {
+  /**
+   * 🔴 АУДИТ (безопасность, «оракул существования кодов»). ПУБЛИЧНЫЙ алфавит
+   * причин отказа кода НАМЕРЕННО НЕ РАВЕН доменному: точные причины (not_found
+   * против expired/inactive) прямо говорили, существует код или нет, и делали
+   * /cart/quote оракулом для перебора промокодов и угадывания сертификатов
+   * (bearer-инструмент). Домен точные причины СОХРАНЯЕТ (логи/админка) — это
+   * проверяется ниже; наружу выпускается одно склеенное значение.
+   */
+  it('публичный алфавит промокода СКЛЕЕН и не раскрывает существование кода', () => {
+    // Домен по-прежнему полон — тип-уровневая сверка (Record требует все ключи).
     const cover: Record<PromoRejectReason, true> = {
       not_found: true,
       inactive: true,
@@ -102,13 +117,22 @@ describe('публичный алфавит доменных причин отк
       per_customer_limit_reached: true,
       invalid_kind: true,
     };
-    expect([...PROMO_REJECT_REASONS].sort()).toEqual(Object.keys(cover).sort());
+    expect(Object.keys(cover).length).toBeGreaterThan(1);
+    // А публичный — ровно одно значение, и ни одна доменная причина в нём не
+    // светится (иначе по её наличию/отсутствию снова читалось бы существование).
+    expect([...PROMO_REJECT_REASONS]).toEqual(['not_applicable']);
+    for (const domainReason of Object.keys(cover)) {
+      expect(PROMO_REJECT_REASONS as readonly string[], domainReason).not.toContain(domainReason);
+    }
   });
 
-  it('алфавит причин сертификата покрывает всё, что отдаёт /cart/quote', () => {
-    expect([...GIFT_REJECT_REASONS].sort()).toEqual(
-      ['depleted', 'disabled', 'expired', 'no_amount_due', 'not_found'].sort(),
-    );
+  it('публичный алфавит сертификата: склейка + причина про КОРЗИНУ', () => {
+    // no_amount_due остаётся: он про состояние заказа («покрывать нечего»), а не
+    // про существование кода — оракулом не является и нужен для UX.
+    expect([...GIFT_REJECT_REASONS].sort()).toEqual(['no_amount_due', 'not_applicable'].sort());
+    for (const leaky of ['not_found', 'expired', 'depleted', 'disabled']) {
+      expect(GIFT_REJECT_REASONS as readonly string[], leaky).not.toContain(leaky);
+    }
   });
 });
 

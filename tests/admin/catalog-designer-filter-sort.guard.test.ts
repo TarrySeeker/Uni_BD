@@ -48,6 +48,26 @@ describe('GUARD: фильтр дизайнеров в каталоге — ал�
     expect(src).not.toMatch(/listDesigners\(\s*\)/);
   });
 
+  /**
+   * ЖИВАЯ НАХОДКА 2026-07-29: сортировка запрашивалась БЕЗ локали, а раздел
+   * «Дизайнеры» — с ней (`locale: defaultLocale`). Пустая локаль даёт
+   * `new Intl.Collator(undefined)` → системная локаль контейнера, а она `en-US`
+   * при базовом языке магазина `ru`. Порядок расходится:
+   *   ru: ангел | Егоров | Ёлка | Яна | ART
+   *   en: ART | ангел | Егоров | Ёлка | Яна
+   * Сейчас не проявляется — все 17 дизайнеров с латинскими именами. Выстрелит
+   * на первом кириллическом: фильтр и раздел покажут РАЗНЫЙ алфавит.
+   */
+  it.each([
+    ['app/admin/(panel)/catalog/page.tsx', 'фильтр каталога'],
+    ['app/admin/(panel)/catalog/products/[id]/page.tsx', 'редактирование товара'],
+    ['app/admin/(panel)/catalog/products/new/page.tsx', 'создание товара'],
+  ])('%s (%s) — сортирует в локали магазина, а не в системной', (path) => {
+    const src = readFileSync(join(process.cwd(), path), 'utf8');
+    const call = src.slice(src.indexOf('listDesigners('));
+    expect(call.slice(0, 200)).toMatch(/locale:/);
+  });
+
   it('движок сортировки действительно упорядочивает по алфавиту', () => {
     // Реальные имена дизайнеров магазина: латиница, разный регистр, диакритика.
     const list = [

@@ -8,6 +8,7 @@
  */
 
 import type { GiftQuoteInfo } from '@/lib/orders/repository';
+import { publicGiftReason } from './code-privacy';
 
 /** Блок подарочного сертификата в ответе /cart/quote (скрывает faceValue/spentTotal). */
 export interface GiftQuoteDto {
@@ -19,7 +20,12 @@ export interface GiftQuoteDto {
   appliedAmount: string;
   /** Остаток сертификата ПОСЛЕ применения (для «останется N ₽»). */
   balanceRemainingAfter: string;
-  /** Машиночитаемая причина, если не применён (not_found/expired/depleted/…); null — применён. */
+  /**
+   * Машиночитаемая причина, если не применён; null — применён.
+   * СКЛЕЕНА (публичный алфавит GIFT_REJECT_REASONS): «нет такого кода» и «код
+   * есть, но истёк/исчерпан/отключён» неразличимы — иначе ответ работал бы
+   * оракулом существования сертификатов. См. ./code-privacy.ts.
+   */
   reason: string | null;
 }
 
@@ -31,6 +37,11 @@ export function toGiftQuoteDto(gift: GiftQuoteInfo | null): GiftQuoteDto | null 
     code: gift.code,
     appliedAmount: gift.appliedAmount,
     balanceRemainingAfter: gift.balanceRemainingAfter,
-    reason: gift.reason,
+    // 🔴 АУДИТ (безопасность): точная причина НЕ уезжает наружу. Различие
+    // not_found / expired / depleted / disabled подтверждало СУЩЕСТВОВАНИЕ кода
+    // и превращало /cart/quote в оракул для угадывания сертификатов (деньги на
+    // предъявителя). Здесь — единственная граница, где домен становится
+    // публичным DTO, поэтому склейка стоит именно тут. См. ./code-privacy.ts.
+    reason: publicGiftReason(gift.reason),
   };
 }

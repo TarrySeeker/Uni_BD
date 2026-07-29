@@ -306,7 +306,7 @@ describe('order-dto — toQuoteDto', () => {
     expect(dto.issues).toEqual([]);
   });
 
-  it('переносит причину отказа промокода и проблемные позиции', () => {
+  it('переносит причину отказа промокода (СКЛЕЕННУЮ) и проблемные позиции', () => {
     const dto = toQuoteDto({
       quote: makeQuoteResult(),
       currency: 'RUB',
@@ -314,7 +314,12 @@ describe('order-dto — toQuoteDto', () => {
       promoReason: 'expired',
       issues: [{ index: 0, code: 'out_of_stock' }],
     });
-    expect(dto.promo.reason).toBe('expired');
+    // 🔴 АУДИТ (безопасность): наружу уезжает СКЛЕЕННАЯ причина, а не 'expired'.
+    // Точная причина подтверждала СУЩЕСТВОВАНИЕ промокода (not_found против
+    // expired) и давала перебор словаря. Подробности и неразличимость —
+    // tests/storefront/code-privacy.test.ts. Факт переноса (reason не теряется,
+    // витрине есть что перевести) проверяется здесь по-прежнему.
+    expect(dto.promo.reason).toBe('not_applicable');
     expect(dto.fulfillable).toBe(false);
     expect(dto.issues).toEqual([{ index: 0, code: 'out_of_stock' }]);
   });

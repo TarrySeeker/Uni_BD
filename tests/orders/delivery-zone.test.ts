@@ -165,8 +165,11 @@ describe('guard: repository.ts — запись зоны в заказ (anti-tam
     expect(insert).not.toMatch(/input\.delivery\??\.zoneLabel/);
     expect(insert).not.toMatch(/input\.delivery\??\.zonePrice/);
     // Записываемая зона выведена из НАСТРОЕК магазина (строгий резолв по eff.delivery.zones).
+    // Окно между резолвом и appliedZone расширено: между ними теперь стоит ещё
+    // одна строгая проверка доставки — существование ПВЗ (аудит major, тот же
+    // класс «заказ, который невозможно отгрузить»). Инвариант прежний.
     expect(repo).toMatch(
-      /deliveryZone = resolveDeliveryZoneStrict\(\{[\s\S]{0,200}zones: eff\.delivery\.zones[\s\S]{0,600}const appliedZone =[\s\S]{0,160}deliveryZone;/,
+      /deliveryZone = resolveDeliveryZoneStrict\(\{[\s\S]{0,200}zones: eff\.delivery\.zones[\s\S]{0,2000}const appliedZone =[\s\S]{0,160}deliveryZone;/,
     );
   });
 
