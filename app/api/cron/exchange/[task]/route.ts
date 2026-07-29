@@ -26,19 +26,28 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { getCdekConfig } from '@/lib/cdek/config';
 import { getEffectiveSettings } from '@/lib/config/settings';
-import { runUpdateExchangeRatesProd } from '@/lib/exchange/service';
+import {
+  runUpdateExchangeRatesProd,
+  runRoundDisplayPricesProd,
+} from '@/lib/exchange/service';
 import { isCbrBaseSupported, type UpdateRatesStats } from '@/lib/exchange/cron';
+import type { RoundPricesStats } from '@/lib/exchange/round-display-prices-worker';
 import { extractCronSecret, cronSecretMatches } from '@/lib/cron/secret';
 
 export const dynamic = 'force-dynamic';
 
-const TASKS = ['update-rates'] as const;
+// `round-display-prices` ставится в расписании ПОСЛЕ `update-rates`: пересчёт
+// ярлыков по вчерашнему курсу — это ровно та рассинхронизация, ради устранения
+// которой владелец и выбрал автоматический пересчёт.
+const TASKS = ['update-rates', 'round-display-prices'] as const;
 type CronTask = (typeof TASKS)[number];
 
-async function dispatch(task: CronTask): Promise<UpdateRatesStats> {
+async function dispatch(task: CronTask): Promise<UpdateRatesStats | RoundPricesStats> {
   switch (task) {
     case 'update-rates':
       return runUpdateExchangeRatesProd();
+    case 'round-display-prices':
+      return runRoundDisplayPricesProd();
   }
 }
 
