@@ -270,20 +270,35 @@ export function buildHomeTrFieldDefs(home: AnyRec): TranslatableFieldDef[] {
   // looks
   const looks = block('looks');
   defs.push({ key: 'looks.title', labelKey: 'settings.trFields.looksTitle', kind: 'text' });
-  asArray(looks.categories).forEach((_, i) => {
+  asArray(looks.categories).forEach((c, i) => {
     defs.push({
       key: `looks.categories.${i}.title`,
       labelKey: 'settings.trFields.looksCategoryTitle',
       labelParams: { n: i + 1 },
       kind: 'text',
     });
-    defs.push({
-      key: `looks.categories.${i}.text`,
-      labelKey: 'settings.trFields.looksCategoryText',
-      labelParams: { n: i + 1 },
-      kind: 'textarea',
-    });
+    // Текст категории — наследие v1 (статичная сетка). Показываем поле перевода
+    // ТОЛЬКО если текст реально заведён: у вкладок v2 его нет, и пустая строка
+    // перевода в панели сбивала бы владельца с толку.
+    const legacyText = (c as AnyRec | null | undefined)?.text;
+    if (typeof legacyText === 'string' && legacyText.trim().length > 0) {
+      defs.push({
+        key: `looks.categories.${i}.text`,
+        labelKey: 'settings.trFields.looksCategoryText',
+        labelParams: { n: i + 1 },
+        kind: 'textarea',
+      });
+    }
   });
+  // Имена авторов карточек — контент витрины, переводимый владельцем.
+  asArray(looks.items).forEach((_, i) =>
+    defs.push({
+      key: `looks.items.${i}.authorName`,
+      labelKey: 'settings.trFields.looksItemAuthorName',
+      labelParams: { n: i + 1 },
+      kind: 'text',
+    }),
+  );
 
   // tiles
   asArray(block('tiles').items).forEach((_, i) =>

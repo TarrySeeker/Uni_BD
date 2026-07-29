@@ -30,7 +30,7 @@ export async function GET(
 ): Promise<Response> {
   return runStorefront(
     req,
-    async ({ cors }) => {
+    async ({ cors, locale }) => {
       const { number } = await ctx.params;
       const url = new URL(req.url);
       const token = url.searchParams.get('token');
@@ -52,8 +52,12 @@ export async function GET(
         allowEmail: false,
       });
 
+      // Подписи статусов — на языке ПОКУПАТЕЛЯ (runStorefront уже вычислил его из
+      // ?locale=/Accept-Language). Раньше локаль здесь молча терялась, и покупатель
+      // на /en и /fr видел русские «Отгружен»/«Оплачена» (аудит major №5, №30).
       const dto = toOrderPublicDto(found.order, found.items, {
         includeSensitiveDelivery: tokenProven,
+        locale,
       });
       return jsonData(dto, {}, cors);
     },

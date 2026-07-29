@@ -6,6 +6,7 @@ import { PageHeader } from '../_components/PageHeader';
 import { guardCustomers, customerStatusLabelKey, customerStatusBadgeClass } from './_components/guard';
 import { listCustomers, countCustomers } from '@/lib/customer-auth/repository';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 import { listTruncationNotice } from '@/lib/admin/list-truncation';
 
 /**
@@ -28,6 +29,8 @@ export default async function CustomersPage({
   }
 
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
 
   // Подпись статуса — ключом каталога; незнакомый код показываем как есть.
   const statusLabel = (status: string): string => {
@@ -112,10 +115,10 @@ export default async function CustomersPage({
                   <td className="px-4 py-2 text-gray-700">{c.ordersCount}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-700">{c.totalSpent}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">
-                    {c.lastLoginAt ? formatDateTime(c.lastLoginAt) : '—'}
+                    {c.lastLoginAt ? formatDateTime(c.lastLoginAt, timeZone) : '—'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">
-                    {formatDateTime(c.createdAt)}
+                    {formatDateTime(c.createdAt, timeZone)}
                   </td>
                 </tr>
               ))}

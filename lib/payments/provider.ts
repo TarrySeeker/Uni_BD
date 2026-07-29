@@ -31,6 +31,15 @@ export function isPaymentProvider(v: unknown): v is PaymentProvider {
 }
 
 /**
+ * true, если у провайдера ЕСТЬ онлайн-инициация оплаты (витрина может увести
+ * покупателя на платёжную форму). `manual` и любое неизвестное значение — false:
+ * диспетчер инициации по этому предикату отказывает, а НЕ угадывает чужой шлюз.
+ */
+export function isOnlinePaymentProvider(v: unknown): v is OnlinePaymentProvider {
+  return typeof v === 'string' && (ONLINE_PAYMENT_PROVIDERS as readonly string[]).includes(v);
+}
+
+/**
  * Активный платёжный провайдер витрины (выбор эквайера по конфигу магазина,
  * docs/24 §2). Читается из env PAYMENTS_PROVIDER (дефолт 'tbank'). Принимает
  * опциональный source для тестируемости без мутации process.env.

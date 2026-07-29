@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 
 import { getEffectiveSettings } from '@/lib/config/settings';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 import { getSetting } from '@/lib/settings/repository';
 import { getEnabledModules } from '@/lib/config/modules';
 import { parseSettingValue, type ModuleOverrides } from '@/lib/settings/schemas';
@@ -39,6 +40,10 @@ export default async function SettingsPage() {
   }
 
   const eff = await getEffectiveSettings();
+  // Часовой пояс магазина (аудит major №26) резолвится отдельно от EffectiveSettings:
+  // приоритет «настройка branding.timeZone → env SHOP_TIMEZONE → дефолт платформы»
+  // живёт в lib/admin/timezone.ts, чтобы им пользовались все экраны админки.
+  const timeZone = await getShopTimeZone();
   // Сырой module_overrides для формы (что именно переопределено vs наследуется env).
   const rawOverrides = await getSetting('module_overrides');
   const overrides: ModuleOverrides =
@@ -89,7 +94,7 @@ export default async function SettingsPage() {
         {/* Контент разделов. */}
         <div className="min-w-0">
           <Section id="branding" title={t('settings.page.sections.branding')}>
-            <BrandingForm branding={eff.branding} i18n={eff.i18n} translations={eff.contentI18n} />
+            <BrandingForm branding={eff.branding} timeZone={timeZone} i18n={eff.i18n} translations={eff.contentI18n} />
             <ResetRow keys={[{ key: 'branding', label: t('settings.page.reset.branding') }]} />
           </Section>
 

@@ -16,6 +16,8 @@ import type { TransactionSql } from 'postgres';
 import { sql } from '@/lib/db/client';
 import { getEnv } from '@/lib/config/env';
 import { getEffectiveSettings, isModuleEffectivelyEnabled } from '@/lib/config/settings';
+import { resolveOrderCurrency } from '@/lib/orders/currency';
+import { resolveDisplaySnapshot } from '@/lib/orders/display-currency';
 import { getProductById } from '@/lib/catalog/repository';
 import { effectiveCompareAt } from '@/lib/catalog/pricing';
 import type { Product, ProductDetail, ProductVariant } from '@/lib/catalog/types';
@@ -142,6 +144,12 @@ export function mapOrder(row: Record<string, unknown>): Order {
     deliveryTotal: String(row.delivery_total),
     grandTotal: String(row.grand_total),
     currency: String(row.currency),
+    // Снимок валюты отображения (0059): у заказов до миграции колонок нет вовсе,
+    // а у оформленных в базовой валюте они NULL → strOrNull даёт null в обоих
+    // случаях (справочные поля, на суммы и оплату не влияют).
+    displayCurrency: strOrNull(row.display_currency),
+    displayRate: strOrNull(row.display_rate),
+    displayTotal: strOrNull(row.display_total),
     paymentMethod: row.payment_method as Order['paymentMethod'],
     paymentStatus: row.payment_status as Order['paymentStatus'],
     paidAt: row.paid_at ? asDate(row.paid_at) : null,
@@ -514,6 +522,15 @@ async function giftCategoryIdsCached(): Promise<Set<string>> {
 /**
  * Резолвит одну позицию витрины в ценовую строку ИЗ КАТАЛОГА (цена не из
  * запроса). variantId приоритетен; иначе берётся товар без варианта.
+ *
+ * 🔴 ЯЗЫК СНИМКА (аудит minor №10). `name` берётся из БАЗОВЫХ полей каталога и
+ * НАМЕРЕННО не локализуется под язык покупателя. Снимок заказа — юридически
+ * значимый документ, и он же питает необратимые процессы, которые о локали
+ * сессии не знают: фискальный чек 54-ФЗ (lib/payments, receipt), накладную
+ * СДЭК и автовыпуск сертификатов (распознаёт позицию по подстроке в имени).
+ * Локализация записи дала бы чек ОФД на языке покупателя и молча сломала бы
+ * автовыпуск. Локализуется ОТОБРАЖЕНИЕ каталога до оформления, а не запись.
+ * Инвариант закреплён tests/orders/item-snapshot-language.test.ts.
  */
 export async function resolveCartLine(input: {
   productId?: string;
@@ -788,11 +805,15 @@ export async function quoteCart(
   input: CartQuoteInput & { customerEmail?: string; now?: Date },
 ): Promise<QuoteCartResult> {
   const env = getEnv();
-  const currency = env.SHOP_CURRENCY;
   // Порог бесплатной доставки — из эффективных настроек (env ⊕ БД), docs/11 §5.4.4.
   // EffectiveSettings хранит порог в КОПЕЙКАХ; calculateQuote ожидает РУБЛИ —
   // конвертируем на границе legacy-расчёта через fromMinor (money-инвариант §7).
   const eff = await getEffectiveSettings();
+  // 🔴 АУДИТ №32 (деньги). Валюта котировки бралась ПРЯМО из env.SHOP_CURRENCY, а
+  // показ цен — из эффективных настроек, где БД приоритетна. Смена базовой валюты
+  // в админке меняла экран, но не заказ. Теперь обе точки идут через ОДИН резолвер
+  // поверх тех же эффективных настроек — расходиться больше нечему.
+  const currency = resolveOrderCurrency(eff, env);
   // Порог бесплатной доставки: зона (ТЗ_1) может задать СВОЙ порог — тогда он
   // перекрывает общий порог магазина для заказов в эту зону; иначе — общий порог.
   // Неизвестный id зоны (zonePricing.unknown) → порог 0 (бесплатной доставки не
@@ -1076,9 +1097,37 @@ export type CreateOrderResult =
         | 'invalid_gift'
         | 'delivery_unavailable'
         | 'invalid_zone'
-        | 'payments_disabled';
+        | 'payments_disabled'
+        | 'total_mismatch';
       message: string;
     };
+
+/**
+ * Сверка ожидаемого (показанного покупателю) итога с фактическим — по КОПЕЙКАМ.
+ *
+ * Сравнение строк недопустимо: '1000' и '1000.00' — одна и та же сумма, а
+ * '9600.00' и '9600' различаются как строки. toMinor приводит обе к целым копейкам.
+ *
+ * `expected === undefined` → сверки нет (старый клиент, аддитивность контракта).
+ */
+function totalsMatch(expected: string | undefined, actual: string): boolean {
+  if (expected === undefined) return true;
+  return toMinor(expected) === toMinor(actual);
+}
+
+/**
+ * Единый отказ по расхождению суммы. `message` — ДИАГНОСТИКА (лог/поддержка):
+ * покупателю витрина показывает свою локализованную строку по `error.reason`.
+ */
+function totalMismatchResult(expected: string, actual: string): CreateOrderResult {
+  return {
+    ok: false,
+    code: 'total_mismatch',
+    message:
+      `Сумма заказа изменилась: покупателю показано ${expected}, ` +
+      `фактический итог ${actual}. Заказ не создан — требуется пересчёт.`,
+  };
+}
 
 /**
  * Создаёт заказ атомарно (ADR-010, §4.2):
@@ -1136,14 +1185,32 @@ export async function createOrder(
   const freeThreshold = Number(
     fromMinor(deliveryZone?.freeThreshold ?? eff.delivery.freeDeliveryThreshold),
   );
+  // 🔴 АУДИТ №32 (деньги). Валюта СНИМКА заказа — тот же единый резолвер, что и у
+  // котировки/показа (эффективные настройки, env лишь фолбэк). Прежде в INSERT
+  // подставлялся env.SHOP_CURRENCY напрямую, минуя настройки: покупатель видел
+  // цену в валюте из админки, а платил в валюте из env при том же числе. Суммы
+  // НЕ конвертируются намеренно (см. lib/orders/currency.ts §2): курса смены
+  // базовой валюты платформа не знает, а тихий пересчёт переоценил бы каталог.
+  const orderCurrency = resolveOrderCurrency(eff, env);
 
   // Идемпотентность: если такой ключ уже есть — вернуть существующий заказ.
+  //
+  // 🔴 НАХОДКА №2 (аудит 2026-07-26): переиспользование обязано СВЕРИТЬ суммы.
+  // Прежде reused-заказ отдавался безусловно, и после сбоя шлюза покупатель,
+  // применивший промокод (12000 → 9600), получал обратно СТАРЫЙ заказ №A на 12000
+  // и уходил платить сумму, которой на экране не было. Сама идемпотентность НЕ
+  // ослаблена: при совпадении сумм заказ по-прежнему переиспользуется, дубля не
+  // возникает; при расхождении — доменный отказ вместо тихой выдачи.
   if (input.idempotencyKey) {
     const existing = await sql<Record<string, unknown>[]>`
       SELECT * FROM orders WHERE idempotency_key = ${input.idempotencyKey} LIMIT 1
     `;
     if (existing[0]) {
-      return { ok: true, order: mapOrder(existing[0]), reused: true };
+      const order = mapOrder(existing[0]);
+      if (!totalsMatch(input.expectedGrandTotal, order.grandTotal)) {
+        return totalMismatchResult(input.expectedGrandTotal!, order.grandTotal);
+      }
+      return { ok: true, order, reused: true };
     }
   }
 
@@ -1267,6 +1334,36 @@ export async function createOrder(
   const giftCertId = giftApplies ? giftCert!.id : null;
   const giftDiscountTotal = giftApplies ? giftDiscount : fromMinor(0);
 
+  // 🔴 НАХОДКА №9 (аудит 2026-07-26): СВЕРКА ожидаемого итога с фактическим — ДО
+  // транзакции, до резерва остатков и до списания сертификата.
+  //
+  // Сервер только что пересчитал всё заново (цены каталога, промокод по актуальным
+  // счётчикам, доставку и — главное — покрытие сертификатом из СВЕЖЕГО остатка).
+  // Если покупателю показали «сертификат покрывает весь заказ», а баланс потратил
+  // параллельный заказ, giftDiscount выйдет меньше и finalGrandTotal перестанет быть
+  // нулём. Прежде такой заказ создавался МОЛЧА, и покупателя вели на шлюз платить
+  // сумму, которой он не видел. Теперь — доменный отказ, заказ не создаётся вовсе
+  // (остатки не зарезервированы, сертификат не списан, номер не потрачен).
+  if (!totalsMatch(input.expectedGrandTotal, finalGrandTotal)) {
+    return totalMismatchResult(input.expectedGrandTotal!, finalGrandTotal);
+  }
+
+  // 🔴 СНИМОК ВАЛЮТЫ ОТОБРАЖЕНИЯ (0059). «Покупатель видел 540,78 € по курсу
+  // 88,76» — справочный факт для разбора претензий: эквайринг рублёвый, а курс ЦБ
+  // меняется ежедневно, и через неделю восстановить экран покупателя нечем.
+  //
+  // От клиента приходит ТОЛЬКО КОД валюты (input.displayCurrency). Курс берётся из
+  // ТЕХ ЖЕ эффективных настроек `eff`, что и валюта заказа, а сумма считается от
+  // УЖЕ ПОСЧИТАННОГО СЕРВЕРОМ finalGrandTotal — то есть после промокода, доставки
+  // и сертификата (ADR-010: клиентское число к деньгам не допускается).
+  // Базовая валюта / неизвестный код / невалидный курс → null во всех трёх
+  // колонках: одновалютный магазин платформы не заметит ничего.
+  const displaySnapshot = resolveDisplaySnapshot({
+    requestedCurrency: input.displayCurrency,
+    grandTotal: finalGrandTotal,
+    settings: eff,
+  });
+
   try {
     const order = await sql.begin(async (tx) => {
       // Повторная проверка идемпотентности внутри транзакции (гонка двух запросов).
@@ -1360,7 +1457,8 @@ export async function createOrder(
       const [orderRow] = await tx<Record<string, unknown>[]>`
         INSERT INTO orders (
           number, status, items_total, discount_total, delivery_total, grand_total,
-          currency, payment_method, payment_status, payment_provider, paid_at,
+          currency, display_currency, display_rate, display_total,
+          payment_method, payment_status, payment_provider, paid_at,
           delivery_type, is_postamat, delivery_city,
           delivery_address, delivery_pvz_code, delivery_zone_id, delivery_zone_label,
           delivery_cost, promo_code_id, promo_code,
@@ -1369,7 +1467,11 @@ export async function createOrder(
           source, ip
         ) VALUES (
           ${number}, 'new', ${quote.itemsTotal}, ${quote.discount}, ${quote.deliveryCost},
-          ${finalGrandTotal}, ${env.SHOP_CURRENCY}, ${input.paymentMethod}, ${paymentStatus},
+          ${finalGrandTotal}, ${orderCurrency},
+          ${displaySnapshot?.displayCurrency ?? null},
+          ${displaySnapshot?.displayRate ?? null},
+          ${displaySnapshot?.displayTotal ?? null},
+          ${input.paymentMethod}, ${paymentStatus},
           ${paymentProvider}, ${paidAt},
           ${input.delivery.type}, ${input.delivery.isPostamat ?? false}, ${input.delivery.city ?? null},
           ${input.delivery.address ?? null}, ${input.delivery.pvzCode ?? null},
@@ -1467,7 +1569,15 @@ export async function createOrder(
       await autoIssueGiftsAfterCommit(String(order.row.id));
     }
 
-    return { ok: true, order: mapOrder(order.row), reused: order.reused };
+    const mapped = mapOrder(order.row);
+    // Сверка суммы на ПУТИ ПЕРЕИСПОЛЬЗОВАНИЯ внутри транзакции (гонка двух
+    // запросов с одним ключом): заказ создал конкурент, и его суммы могут не
+    // совпасть с показанными. Тот же инвариант, что и в предтранзакционной
+    // проверке ключа, — покупателя не уводят платить незнакомую сумму.
+    if (order.reused && !totalsMatch(input.expectedGrandTotal, mapped.grandTotal)) {
+      return totalMismatchResult(input.expectedGrandTotal!, mapped.grandTotal);
+    }
+    return { ok: true, order: mapped, reused: order.reused };
   } catch (err) {
     if (err instanceof OutOfStockError) {
       return { ok: false, code: 'out_of_stock', message: `Недостаточно остатка: ${err.sku}.` };
@@ -1506,7 +1616,13 @@ export async function createOrder(
         SELECT * FROM orders WHERE idempotency_key = ${input.idempotencyKey} LIMIT 1
       `;
       if (existing[0]) {
-        return { ok: true, order: mapOrder(existing[0]), reused: true };
+        const raced = mapOrder(existing[0]);
+        // Третий (и последний) путь переиспользования — тот же инвариант сверки:
+        // заказ конкурента мог родиться с другими суммами.
+        if (!totalsMatch(input.expectedGrandTotal, raced.grandTotal)) {
+          return totalMismatchResult(input.expectedGrandTotal!, raced.grandTotal);
+        }
+        return { ok: true, order: raced, reused: true };
       }
     }
     throw err;

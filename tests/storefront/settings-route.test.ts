@@ -19,7 +19,7 @@ function fakeEffective(): EffectiveSettings {
     modules: { overrides: {} },
     access: { singleUserMode: false },
     home: HOME_DEFAULTS,
-    navigation: { header: [], footer: [] },
+    navigation: { header: [], footer: [], footerMeta: { subscribeTitle: '', subscribeNote: '', copyright: '', designedByLabel: '', designedByHref: '' } },
     contentI18n: {},
     i18n: { defaultLocale: 'ru', locales: ['ru', 'en', 'fr'] },
     branding: {
@@ -49,6 +49,9 @@ async function loadRoute() {
   vi.resetModules();
   vi.doMock('@/lib/config/settings', () => ({
     getEffectiveSettings: vi.fn(async () => fakeEffective()),
+    // Аудит №20: роут спрашивает авторитетный гейт модулей, чтобы посчитать
+    // публичные delivery.methods. В этом файле набор не важен — отдаём полный.
+    getEffectiveModuleSet: vi.fn(async () => new Set(['catalog', 'orders', 'cdek'])),
   }));
   // resolveStorefrontLocale → getLocaleConfig() читает shop_settings.i18n через
   // репозиторий: отдаём детерминированную конфигурацию вместо обращения к БД.

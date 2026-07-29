@@ -86,6 +86,23 @@ export interface CmsPage {
   noindex: boolean;
   sitemapPriority: number | null;
   sitemapChangefreq: SitemapChangefreq | null;
+  /**
+   * Показывать страницу в боковом меню разделов витрины (миграция 0060,
+   * cms_pages.show_in_nav). Источник ПУНКТОВ боковика доп-страниц — сами
+   * страницы, а не список в коде: у каждого магазина свой набор (мультитенант).
+   * Дефолт false — существующие страницы в меню не появляются сами собой.
+   *
+   * Опционально по той же причине, что ogTitle/ogDescription (C18): обратная
+   * совместимость с уже существующими фикстурами и вызовами. mapCmsPage всегда
+   * проставляет конкретное значение (boolean), читатели трактуют пусто как false.
+   */
+  showInNav?: boolean;
+  /**
+   * Позиция в боковом меню (cms_pages.nav_order). NULL = «порядок не задан»:
+   * такие пункты уходят В КОНЕЦ и сортируются между собой по заголовку.
+   * 0 — валидная первая позиция, НЕ синоним NULL.
+   */
+  navOrder?: number | null;
   /** Сырой jsonb-оверлей переводов (ADR-i18n): whitelist = title/seo/og. Резолв в DTO. */
   translations?: TranslationsMap;
   // audit:

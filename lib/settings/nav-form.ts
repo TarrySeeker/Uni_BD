@@ -25,9 +25,25 @@ export interface NavFooterColumnInput {
   links: NavLinkInput[];
 }
 
+/**
+ * НЕ-ссылочное содержимое подвала (заголовок рассылки, приписка о согласии,
+ * копирайт, кредит студии). Собирается из отдельных однострочных полей формы.
+ * Пустые поля НЕ попадают в результат: `footerMetaSchema` требует непустые
+ * строки, а «пусто» означает «владелец не задал» → витрина берёт свой дефолт.
+ */
+export interface NavFooterMetaInput {
+  subscribeTitle?: string;
+  subscribeNote?: string;
+  copyright?: string;
+  designedByLabel?: string;
+  designedByHref?: string;
+}
+
 export interface NavigationFormState {
   header: NavLinkInput[];
   footer: NavFooterColumnInput[];
+  /** Отсутствует, если владелец не заполнил ни одного поля подвала. */
+  footerMeta?: NavFooterMetaInput;
 }
 
 /** Строка «Метка | href» → пара (обе части обязательны), иначе null. */
@@ -40,15 +56,42 @@ function parsePairLine(line: string): NavLinkInput | null {
 }
 
 /**
+ * Собирает footerMeta из однострочных полей формы. Пустые/пробельные значения
+ * отбрасываются; ни одного заполненного → undefined (ключ в настройки не пойдёт,
+ * витрина остаётся на словарных дефолтах — мультитенантный «не задано»).
+ */
+export function parseFooterMetaFormState(
+  raw: NavFooterMetaInput,
+): NavFooterMetaInput | undefined {
+  const out: NavFooterMetaInput = {};
+  const keys = [
+    'subscribeTitle',
+    'subscribeNote',
+    'copyright',
+    'designedByLabel',
+    'designedByHref',
+  ] as const;
+  for (const key of keys) {
+    const value = (raw[key] ?? '').trim();
+    if (value) out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
  * Парсит поля формы навигации.
  *
  * @param headerText  Пункты шапки — по одному на строку в формате «Метка | href».
  * @param footerText  Колонки футера — блоки, разделённые пустой строкой; в блоке
  *                    первая строка = заголовок колонки, далее «Метка | href».
+ * @param footerMeta  Тексты подвала (заголовок рассылки/приписка/копирайт/кредит).
+ *                    Аддитивный необязательный аргумент: прежние вызовы с двумя
+ *                    аргументами дают ровно прежний результат (без ключа footerMeta).
  */
 export function parseNavigationFormState(
   headerText: string,
   footerText: string,
+  footerMeta?: NavFooterMetaInput,
 ): NavigationFormState {
   const header = headerText
     .split('\n')
@@ -73,5 +116,7 @@ export function parseNavigationFormState(
     })
     .filter((x): x is NavFooterColumnInput => x !== null);
 
-  return { header, footer };
+  const meta = footerMeta ? parseFooterMetaFormState(footerMeta) : undefined;
+
+  return meta ? { header, footer, footerMeta: meta } : { header, footer };
 }

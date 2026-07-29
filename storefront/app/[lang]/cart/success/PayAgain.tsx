@@ -21,7 +21,7 @@
  */
 
 import { useState } from 'react';
-import { ApiError, initPaykeeperPayment } from '@/lib/api';
+import { ApiError, initPayment } from '@/lib/api';
 
 /** Строки блока (plain-объект из словаря; функций в пропсах быть не должно). */
 export interface PayAgainStrings {
@@ -52,7 +52,7 @@ export default function PayAgain({
       const returnUrl = `${window.location.origin}${window.location.pathname}?number=${encodeURIComponent(
         number,
       )}&token=${encodeURIComponent(token)}`;
-      const payment = await initPaykeeperPayment({
+      const payment = await initPayment({
         orderNumber: number,
         accessToken: token,
         returnUrl,

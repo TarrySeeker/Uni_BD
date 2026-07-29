@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { describe, it, expect } from 'vitest';
@@ -157,17 +157,70 @@ describe('ответ покупателю — доменная причина, �
 });
 
 describe('GUARD: гард стоит на СЕРВЕРЕ, во всех точках инициации оплаты', () => {
-  const routes = [
-    'app/api/storefront/v1/payments/tbank/init/route.ts',
-    'app/api/storefront/v1/payments/paykeeper/init/route.ts',
-    'app/api/storefront/v1/payments/alfabank/init/route.ts',
-  ];
+  /**
+   * НАМЕРЕНИЕ (не менять): гард от двойной оплаты стоит на СЕРВЕРЕ в КАЖДОЙ точке
+   * инициации, и потерять его нельзя.
+   *
+   * СТРУКТУРА ИЗМЕНИЛАСЬ (аудит major №1): раньше периметр был скопирован в каждый
+   * provider-роут, и тест грепал три файла. Теперь копия ОДНА — общий обработчик
+   * `lib/payments/init-route.ts`, через который ходят и legacy-роуты эквайеров, и
+   * нейтральный `/payments/init`. Поэтому проверяем ДВА звена цепи:
+   *   1) гард РЕАЛЬНО есть в общем модуле;
+   *   2) КАЖДЫЙ init-роут проходит через этот модуль, а не в обход него.
+   *
+   * 🔴 Список роутов НЕ захардкожен: он вычитывается из файловой системы, поэтому
+   * четвёртый init-роут, добавленный МИМО общего обработчика (со своей копией
+   * логики или вовсе без гарда), уронит этот тест сам собой.
+   */
+  const SHARED_HANDLER = 'lib/payments/init-route.ts';
 
-  it.each(routes)('%s — отказ с доменной причиной по paymentBlockFor', (path) => {
-    const src = read(path);
+  it('🔴 общий обработчик init отказывает по paymentBlockFor с доменной причиной', () => {
+    const src = read(SHARED_HANDLER);
     expect(src).toContain('paymentBlockFor(');
     expect(src).toContain('reasonForPaymentBlock(');
     expect(src).toContain('jsonDomainError(');
+  });
+
+  /** Все init-роуты витрины, найденные на диске (а не по памяти автора теста). */
+  const discoveredInitRoutes = (() => {
+    const base = 'app/api/storefront/v1/payments';
+    const dir = resolve(ROOT, base);
+    const found: string[] = [];
+    // `/payments/init/route.ts` + `/payments/<провайдер>/init/route.ts`.
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const direct = `${base}/${entry.name}/route.ts`;
+      if (entry.name === 'init' && existsSync(resolve(ROOT, direct))) {
+        found.push(direct);
+        continue;
+      }
+      const nested = `${base}/${entry.name}/init/route.ts`;
+      if (existsSync(resolve(ROOT, nested))) found.push(nested);
+    }
+    return found.sort();
+  })();
+
+  it('init-роуты вообще найдены (иначе гвард молча ничего не проверяет)', () => {
+    // Сегодня их 4: нейтральный + три legacy-эквайера. Меньше трёх — значит
+    // обнаружение сломалось, и следующая проверка стала бы пустой.
+    expect(discoveredInitRoutes.length).toBeGreaterThanOrEqual(3);
+    expect(discoveredInitRoutes).toContain(
+      'app/api/storefront/v1/payments/init/route.ts',
+    );
+  });
+
+  it.each(discoveredInitRoutes)('%s — инициация идёт ЧЕРЕЗ общий гард', (path) => {
+    const src = read(path);
+    // Роут обязан делегировать общему обработчику: там и paymentBlockFor, и
+    // единый 404 анти-перебора, и anti-tamper, и доверенный returnUrl.
+    expect(
+      src,
+      'init-роут в обход общего обработчика — гард от двойной оплаты можно потерять',
+    ).toContain('handlePaymentInit(');
+    expect(src).toMatch(/from '@\/lib\/payments\/init-route'/);
+    // И не имеет СВОЕЙ копии решения об оплачиваемости (двух источников правды
+    // быть не должно: разойдутся — деньги).
+    expect(src, 'своя копия гарда рядом с общей').not.toContain('paymentBlockFor(');
   });
 
   const services = [

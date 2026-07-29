@@ -11,6 +11,7 @@ import {
   type AuditFilter,
 } from '@/lib/admin/audit-filters';
 import { diffAuditData } from '@/lib/admin/audit-diff';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
@@ -56,9 +57,16 @@ interface AuditRow {
   user_agent: string | null;
 }
 
-/** Форматирует время записи в локали ru (московское время — привычнее владельцу). */
-function formatTime(value: Date): string {
-  return new Date(value).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+/**
+ * Форматирует время записи в поясе МАГАЗИНА (аудит major №26).
+ *
+ * Раньше здесь стояла жёсткая 'Europe/Moscow', а список заказов и карточка
+ * форматировали время без пояса вовсе (⇒ пояс контейнера, обычно UTC): одно и то
+ * же событие оператор видел с разным временем на соседних экранах. Пояс теперь
+ * приходит из настройки магазина (см. getShopTimeZone) — единый на всю админку.
+ */
+function formatTime(value: Date, timeZone: string): string {
+  return new Date(value).toLocaleString('ru-RU', { timeZone });
 }
 
 /** Короткий вид uuid для подписи (полный — в title-tooltip). */
@@ -119,7 +127,13 @@ export async function loadAuditRows(
 
 /**
  * Подтягивает понятные имена сущностей по id: email для пользователей, title для
- * ролей. Возвращает Map<entity_id, name>. Только для валидных uuid (cast-safe).
+ * ролей, НОМЕР для заказов. Возвращает Map<entity_id, name>. Только для валидных
+ * uuid (cast-safe).
+ *
+ * Заказы добавлены по находке аудита major №25: строка «заказ такой-то изменён»
+ * показывала обрезанный uuid, а поиск в списке заказов ищет только по номеру/
+ * email/телефону — по uuid дойти до заказа было нельзя ВООБЩЕ. Резолв дешёвый:
+ * один запрос по ANY(uuid[]) на страницу журнала, как для users/roles.
  */
 async function resolveEntityNames(rows: AuditRow[]): Promise<Map<string, string>> {
   const collect = (type: string): string[] => [
@@ -131,8 +145,9 @@ async function resolveEntityNames(rows: AuditRow[]): Promise<Map<string, string>
   ];
   const userIds = collect('user');
   const roleIds = collect('role');
+  const orderIds = collect('order');
 
-  const [userRows, roleRows] = await Promise.all([
+  const [userRows, roleRows, orderRows] = await Promise.all([
     userIds.length
       ? sql<{ id: string; email: string }[]>`
           SELECT id::text AS id, email FROM users WHERE id = ANY(${userIds}::uuid[])
@@ -143,12 +158,45 @@ async function resolveEntityNames(rows: AuditRow[]): Promise<Map<string, string>
           SELECT id::text AS id, title FROM roles WHERE id = ANY(${roleIds}::uuid[])
         `
       : Promise.resolve([] as { id: string; title: string }[]),
+    orderIds.length
+      ? sql<{ id: string; number: string }[]>`
+          SELECT id::text AS id, number FROM orders WHERE id = ANY(${orderIds}::uuid[])
+        `
+      : Promise.resolve([] as { id: string; number: string }[]),
   ]);
 
   const map = new Map<string, string>();
   for (const u of userRows) map.set(u.id, u.email);
   for (const r of roleRows) map.set(r.id, r.title);
+  for (const o of orderRows) map.set(o.id, o.number);
   return map;
+}
+
+/**
+ * Ссылка на карточку сущности из строки журнала (аудит major №25) — или null,
+ * если перехода нет.
+ *
+ * 🔴 RBAC НЕ ОСЛАБЛЯЕТСЯ. Право 'audit.read' само по себе НЕ даёт доступа к
+ * заказам или пользователям, поэтому ссылка рисуется только тем, у кого есть
+ * право на соответствующий раздел. Это лишь UI-фильтр: целевые страницы всё
+ * равно проверяют право на сервере (guardOrders / requireUser + can), так что
+ * подобранный вручную URL ничего не откроет — просто не заманиваем оператора
+ * в гарантированный 403.
+ */
+function entityHref(
+  entityType: string | null,
+  entityId: string | null,
+  perms: { orders: boolean; users: boolean },
+): string | null {
+  if (!entityId || !UUID_RE.test(entityId)) return null;
+  switch (entityType) {
+    case 'order':
+      return perms.orders ? `/admin/orders/${entityId}` : null;
+    case 'user':
+      return perms.users ? `/admin/users/${entityId}` : null;
+    default:
+      return null;
+  }
 }
 
 /** Сохраняет текущие фильтры, меняя только page (для ссылок пагинации). */
@@ -183,6 +231,10 @@ export default async function AuditPage({
 
   const { rows, total, currentPage, totalPages } = await loadAuditRows(filter, PAGE_SIZE);
   const names = await resolveEntityNames(rows);
+  // Пояс магазина — один на всю админку (major №26); Москва не хардкодится.
+  const timeZone = await getShopTimeZone();
+  // Права на переход из журнала в сущность (major №25) — см. entityHref.
+  const perms = { orders: can(user, 'orders.read'), users: can(user, 'users.read') };
 
   return (
     <div>
@@ -217,6 +269,7 @@ export default async function AuditPage({
             ) : (
               rows.map((row) => {
                 const name = row.entity_id ? names.get(row.entity_id) : undefined;
+                const href = entityHref(row.entity_type, row.entity_id, perms);
                 const diff =
                   row.before_data || row.after_data
                     ? diffAuditData(row.before_data, row.after_data)
@@ -224,7 +277,7 @@ export default async function AuditPage({
                 return (
                   <tr key={row.id}>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-700">
-                      {formatTime(row.created_at)}
+                      {formatTime(row.created_at, timeZone)}
                     </td>
                     <td className="px-4 py-2 text-gray-700" title={row.user_agent ?? undefined}>
                       <span>{row.actor_email ?? '—'}</span>
@@ -240,12 +293,27 @@ export default async function AuditPage({
                         <span>
                           <span className="text-gray-500">
                             {auditEntityTypeLabel(row.entity_type, t)}
-                          </span>
-                          {name ? (
-                            <span className="ml-1 text-gray-900">{name}</span>
+                          </span>{' '}
+                          {/*
+                            Переход в сущность (major №25). Раньше здесь был только
+                            обрезанный uuid, а найти по нему заказ в списке нельзя
+                            (поиск идёт по номеру/email/телефону) — журнал был
+                            тупиком. Ссылка рисуется, лишь когда у оператора есть
+                            право на целевой раздел (см. entityHref).
+                          */}
+                          {href ? (
+                            <Link
+                              href={href}
+                              title={row.entity_id ?? undefined}
+                              className="font-medium text-blue-700 hover:underline"
+                            >
+                              {name ?? shortId(row.entity_id as string)}
+                            </Link>
+                          ) : name ? (
+                            <span className="text-gray-900">{name}</span>
                           ) : row.entity_id ? (
                             <code
-                              className="ml-1 rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-400"
+                              className="rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-400"
                               title={row.entity_id}
                             >
                               {shortId(row.entity_id)}

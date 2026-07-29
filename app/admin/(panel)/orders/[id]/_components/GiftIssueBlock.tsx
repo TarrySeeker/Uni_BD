@@ -56,6 +56,7 @@ export function GiftIssueBlock({
   issued,
   canWrite,
   warnings = [],
+  orderEligible = true,
 }: {
   orderId: string;
   items: readonly GiftIssueItemView[];
@@ -63,6 +64,12 @@ export function GiftIssueBlock({
   canWrite: boolean;
   /** Готовые строки giftRefundWarnings (считает сервер, kind='revoked'). */
   warnings?: readonly string[];
+  /**
+   * Заказ проходит калитку выпуска (оплачен, не отменён/возвращён) — считает
+   * сервер тем же правилом, что применит действие (находка аудита №27).
+   * false — форма требует явного подтверждения обхода и письменного основания.
+   */
+  orderEligible?: boolean;
 }) {
   const router = useRouter();
   const t = useTranslations();
@@ -72,6 +79,9 @@ export function GiftIssueBlock({
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [recipientName, setRecipientName] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
+  // Осознанное ручное исключение из калитки (находка №27): галка + основание.
+  const [overrideGate, setOverrideGate] = useState(false);
+  const [justification, setJustification] = useState('');
 
   const issuedItemIds = new Set(issued.map((c) => c.orderItemId).filter(Boolean));
 
@@ -83,6 +93,10 @@ export function GiftIssueBlock({
       orderId,
       orderItemId: itemId,
       recipient: { name: recipientName, email: recipientEmail },
+      // Сервер всё равно перепроверяет калитку и требует основание — здесь
+      // только передача осознанного выбора оператора.
+      overrideGate: !orderEligible && overrideGate,
+      comment: !orderEligible && overrideGate ? justification : '',
     });
     setPendingItemId(null);
     if (result.ok) {
@@ -95,6 +109,8 @@ export function GiftIssueBlock({
       setOpenItemId(null);
       setRecipientName('');
       setRecipientEmail('');
+      setOverrideGate(false);
+      setJustification('');
       router.refresh();
     } else {
       setError(result);
@@ -210,10 +226,56 @@ export function GiftIssueBlock({
                           />
                         </div>
                       </div>
+                      {/*
+                        Находка №27: заказ не проходит калитку (не оплачен /
+                        отменён / возвращён). Выпуск не запрещён совсем — оплата
+                        могла пройти мимо эквайринга, — но требует явного
+                        подтверждения и письменного основания, которое уходит
+                        в аудит вместе с обойдённой причиной.
+                      */}
+                      {!orderEligible ? (
+                        <div className="mt-3 rounded border border-amber-300 bg-amber-50 p-2">
+                          <p className="text-xs text-amber-900">
+                            {t('orders.detailGiftIssueBlock.gateBlocked')}
+                          </p>
+                          <label className="mt-2 flex items-start gap-2 text-xs text-amber-900">
+                            <input
+                              type="checkbox"
+                              checked={overrideGate}
+                              onChange={(e) => setOverrideGate(e.target.checked)}
+                              className="mt-0.5"
+                            />
+                            <span>{t('orders.detailGiftIssueBlock.gateOverrideLabel')}</span>
+                          </label>
+                          {overrideGate ? (
+                            <div className="mt-2">
+                              <label
+                                htmlFor={`gate-why-${it.id}`}
+                                className="block text-xs text-amber-900"
+                              >
+                                {t('orders.detailGiftIssueBlock.gateReasonLabel')}
+                              </label>
+                              <input
+                                id={`gate-why-${it.id}`}
+                                value={justification}
+                                onChange={(e) => setJustification(e.target.value)}
+                                placeholder={t('orders.detailGiftIssueBlock.gateReasonPlaceholder')}
+                                className="mt-1 w-full rounded border border-amber-300 px-2 py-1 text-sm"
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
                       <button
                         type="button"
                         onClick={() => issue(it.id)}
-                        disabled={pendingItemId === it.id}
+                        disabled={
+                          pendingItemId === it.id ||
+                          // Обход без основания сервер всё равно отобьёт —
+                          // не даём оператору упереться в отказ вслепую.
+                          (!orderEligible && (!overrideGate || justification.trim() === ''))
+                        }
                         className="mt-3 rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
                       >
                         {pendingItemId === it.id ? t('orders.detailGiftIssueBlock.issuing') : t('orders.detailGiftIssueBlock.issueConfirm')}

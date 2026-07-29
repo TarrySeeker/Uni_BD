@@ -16,6 +16,7 @@ import {
 
 import { issueGiftCertificateAction, updateGiftCertificateAction } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
+import { GiftStatusStamp } from './GiftStatusStamp';
 
 type Fail = Extract<ActionResult<unknown>, { ok: false }>;
 
@@ -167,7 +168,10 @@ export function GiftCertificateForm({
           </div>
           <div>
             <dt className="text-gray-500">{t('giftCertificates.giftCertificateForm.summary.status')}</dt>
-            <dd className="font-medium text-gray-900">{cert!.status}</dd>
+            {/* Минор №4: локализованная марка вместо служебного значения ('depleted'). */}
+            <dd className="font-medium text-gray-900">
+              <GiftStatusStamp status={cert!.status} />
+            </dd>
           </div>
         </dl>
       ) : null}

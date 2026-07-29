@@ -8,6 +8,7 @@ import { ExportToolbar } from './_components/ExportToolbar';
 import { listLeads, countLeads } from '@/lib/leads/repository';
 import { leadSourceLabel } from '@/lib/leads/schemas';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 import { listTruncationNotice } from '@/lib/admin/list-truncation';
 import { getStorage } from '@/lib/storage';
 import { getTranslations } from 'next-intl/server';
@@ -36,6 +37,8 @@ const TH =
 
 export default async function LeadsPage() {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const guard = await guardLeads();
   if (!guard.ok) {
     return <Forbidden permission={guard.permission} />;
@@ -108,7 +111,7 @@ export default async function LeadsPage() {
             <tbody>
               {leads.map((l) => (
                 <tr key={l.id} className="border-t border-gray-100 align-top">
-                  <td className="whitespace-nowrap px-4 py-2 text-gray-600">{formatDateTime(l.created_at)}</td>
+                  <td className="whitespace-nowrap px-4 py-2 text-gray-600">{formatDateTime(l.created_at, timeZone)}</td>
                   <td className="px-4 py-2">{l.name}</td>
                   <td className="px-4 py-2">{l.contact}</td>
                   <td className="px-4 py-2 text-gray-600">{leadSourceLabel(l.source)}</td>

@@ -3,7 +3,8 @@
  *
  * УТЕЧКА ЗАПРЕЩЕНА: наружу НЕ уходят password_hash, id сессии, внутренний uuid
  * покупателя, сырые токены. `me` отдаёт профиль без секретов; список заказов —
- * сводка с русскими подписями статусов (единый источник lib/orders/labels).
+ * сводка с подписями статусов НА ЯЗЫКЕ ПОКУПАТЕЛЯ (единый источник
+ * lib/orders/labels). Без локали — базовый ru (обратная совместимость).
  */
 
 import {
@@ -53,15 +54,22 @@ export interface CustomerOrderDto {
   createdAt: string;
 }
 
-export function toCustomerOrderDto(o: CustomerOrderSummary): CustomerOrderDto {
+/**
+ * Сводка заказа → DTO ЛК. `locale` — язык ПОКУПАТЕЛЯ (из `?locale=`, вычислен
+ * runStorefront); не задан → базовый ru, как было до локализации.
+ */
+export function toCustomerOrderDto(
+  o: CustomerOrderSummary,
+  locale?: string | null,
+): CustomerOrderDto {
   return {
     number: o.number,
     status: o.status,
-    statusLabel: orderStatusLabel(o.status),
+    statusLabel: orderStatusLabel(o.status, locale),
     paymentStatus: o.paymentStatus,
-    paymentStatusLabel: paymentStatusLabel(o.paymentStatus),
+    paymentStatusLabel: paymentStatusLabel(o.paymentStatus, locale),
     deliveryStatus: o.deliveryStatus,
-    deliveryStatusLabel: deliveryStatusLabel(o.deliveryStatus),
+    deliveryStatusLabel: deliveryStatusLabel(o.deliveryStatus, locale),
     grandTotal: o.grandTotal,
     currency: o.currency,
     createdAt: o.createdAt.toISOString(),

@@ -51,13 +51,21 @@ import {
   type GiftIssueSourceRow,
 } from './repository';
 import {
-  buildGiftCodeForOrderItem,
   giftFaceValueFromItem,
+  giftValidDaysFor,
+  giftValidUntil,
   normalizeGiftParty,
+  randomGiftCode,
   type GiftPartyInput,
 } from './origin';
+import { reviveStatusAfterTopUp } from './lifecycle';
+import { getSetting } from '@/lib/settings/repository';
+import { resolveGiftSettings, type ResolvedGiftSettings } from '@/lib/settings/schemas';
 import { sql } from '@/lib/db/client';
 import type { GiftCertificate, GiftCertificateStatus, GiftParty } from './types';
+
+/** Ключ настроек магазина с политикой сертификатов (тот же, что у автовыпуска). */
+const GIFT_SETTINGS_KEY = 'gift';
 
 /** Путь раздела сертификатов для инвалидации после мутации. */
 const GIFT_LIST_PATH = '/admin/gift-certificates';
@@ -87,6 +95,17 @@ export interface GiftActionDeps {
   updateGiftFields: (input: UpdateFieldsInput) => Promise<GiftCertificate>;
   /** Заказ + позиция-снимок для выпуска «по заказу» (ТЗ п.7). */
   getOrderItemForGiftIssue: (orderId: string, orderItemId: string) => Promise<GiftIssueSourceRow | null>;
+  /**
+   * Политика сертификатов магазина (ТА ЖЕ, что у автовыпуска). Ручной путь обязан
+   * знать её: до находки №27 он игнорировал и калитки заказа, и срок действия.
+   */
+  getGiftSettings: () => Promise<ResolvedGiftSettings>;
+  /**
+   * Генератор кода на предъявителя. 🔴 ТОЛЬКО криптостойкий (находка №13):
+   * детерминированный код из номера заказа даёт ~24 бита и перебирается через
+   * публичный /cart/quote, который отвечает applied/not_found.
+   */
+  randomCode: () => string;
 }
 
 /** Поля обновления, уже разрешённые (translations посчитан). */
@@ -109,6 +128,14 @@ export interface UpdateFieldsInput {
   /** Снимок «на чьё имя». */
   recipient?: GiftParty;
   recipientProvided: boolean;
+  /**
+   * Статус, в который надо вернуть ИСЧЕРПАННЫЙ сертификат после пополнения
+   * (находка №10). null — статус не трогаем. Считается чистым правилом
+   * reviveStatusAfterTopUp, а применяется в UPDATE атомарно вместе с номиналом:
+   * отдельным запросом между ними существовало бы окно «остаток есть, а код
+   * мёртв».
+   */
+  reviveStatus: GiftCertificateStatus | null;
 }
 
 /** Прод-зависимости (реальная БД + дефолтный пайплайн). */
@@ -122,18 +149,32 @@ export function productionGiftDeps(): GiftActionDeps {
     updateGiftStatus,
     updateGiftFields: updateGiftFieldsDb,
     getOrderItemForGiftIssue,
+    getGiftSettings: async () => resolveGiftSettings((await getSetting(GIFT_SETTINGS_KEY))?.value),
+    randomCode: randomGiftCode,
   };
 }
 
 /**
  * UPDATE полей сертификата (partial). Только переданные ключи трогаются
  * (CASE WHEN provided). translations пишется одним UPDATE вместе с базой (ru).
+ *
+ * Находка №10: статус оживает В ТОМ ЖЕ UPDATE, что и номинал. Условие
+ * `status = 'depleted'` повторено в SQL намеренно — между чтением строки в
+ * action и этим запросом сертификат могли отключить или погасить возвратом
+ * заказа; guard в WHERE-части CASE не даёт пополнению снять чужое решение.
  */
 async function updateGiftFieldsDb(input: UpdateFieldsInput): Promise<GiftCertificate> {
   const rows = await sql<Record<string, unknown>[]>`
     UPDATE gift_certificates SET
       name           = COALESCE(${input.name ?? null}, name),
       initial_amount = COALESCE(${input.initialAmount ?? null}, initial_amount),
+      status         = CASE
+                         WHEN ${input.reviveStatus ?? null}::text IS NOT NULL
+                              AND status = 'depleted'
+                              AND COALESCE(${input.initialAmount ?? null}, initial_amount) > spent_total
+                           THEN ${input.reviveStatus ?? null}
+                         ELSE status
+                       END,
       valid_until    = CASE WHEN ${input.validUntilProvided}
                             THEN ${input.validUntil ?? null} ELSE valid_until END,
       description     = CASE WHEN ${input.descriptionProvided}
@@ -162,6 +203,62 @@ async function updateGiftFieldsDb(input: UpdateFieldsInput): Promise<GiftCertifi
   `;
   return mapGiftCertificate(rows[0]!);
 }
+
+// -----------------------------------------------------------------------------
+// Калитки ручного выпуска (находка аудита №27).
+// -----------------------------------------------------------------------------
+
+/**
+ * Причина, по которой ручной выпуск по заказу запрещён. Набор НАМЕРЕННО совпадает
+ * с автопутём (AutoIssueSkipReason): «выпускать ли код по этому заказу» — один
+ * доменный вопрос, и два разных ответа на него уже дали дефект №27 (ручная кнопка
+ * выпускала деньги на предъявителя по неоплаченному заказу, пока автопуть
+ * добросовестно отказывался).
+ */
+export type ManualIssueGateReason = 'order_not_paid' | 'order_not_eligible' | 'paid_with_gift';
+
+/** Заголовок заказа в объёме, достаточном для калитки. */
+export interface ManualIssueOrderGate {
+  paymentStatus: string;
+  status: string;
+  /** Сертификат, которым оплачен САМ заказ (не путать с issued_order_id). */
+  giftCertificateId?: string | null;
+}
+
+/** Тексты отказов (доменные, доходят до оператора как сообщение действия). */
+const GATE_MESSAGES: Record<ManualIssueGateReason, string> = {
+  order_not_paid:
+    'Заказ не оплачен: выпустить сертификат с деньгами по неоплаченному заказу нельзя. ' +
+    'Если оплата прошла мимо эквайринга, отметьте обход и укажите причину в комментарии.',
+  order_not_eligible:
+    'Заказ отменён или возвращён: выпускать по нему сертификат нельзя. ' +
+    'Если это осознанная компенсация, отметьте обход и укажите причину в комментарии.',
+  paid_with_gift:
+    'Заказ оплачен другим сертификатом, а настройки магазина запрещают выпуск по таким заказам.',
+};
+
+/**
+ * Калитка ручного выпуска. Возвращает причину отказа либо null.
+ *
+ * Порядок и смысл проверок повторяют orderGateReason автопути; дополнительно
+ * учитывается политика allowIssueOnGiftPaidOrder (в автопути она проверяется
+ * отдельным шагом сразу после калитки — здесь собрано в одном месте, потому что
+ * ручной путь единственной точкой решения удобнее и тестируется целиком).
+ */
+export function manualIssueGateReason(
+  order: ManualIssueOrderGate,
+  settings: Pick<ResolvedGiftSettings, 'allowIssueOnGiftPaidOrder'>,
+): ManualIssueGateReason | null {
+  if (order.paymentStatus !== 'paid') return 'order_not_paid';
+  if (order.status === 'cancelled' || order.status === 'refunded') return 'order_not_eligible';
+  if (order.giftCertificateId && settings.allowIssueOnGiftPaidOrder !== true) {
+    return 'paid_with_gift';
+  }
+  return null;
+}
+
+/** Реэкспорт чистого правила оживления (находка №10) — точка входа для UI/тестов. */
+export { reviveStatusAfterTopUp };
 
 /** Собирает набор gift-actions поверх инъецированных зависимостей. */
 export function createGiftActions(deps: GiftActionDeps) {
@@ -268,8 +365,29 @@ export function createGiftActions(deps: GiftActionDeps) {
         localeConfig,
       );
 
+      /**
+       * Находка №10: пополнение ИСЧЕРПАННОГО сертификата обязано вернуть его в
+       * работу. Раньше номинал рос, остаток становился положительным, а status
+       * оставался 'depleted' — assertRedeemable отбивал код по статусу ДО
+       * расчёта остатка, и «оживить» его было нечем (кнопка «Активировать»
+       * рисуется только для 'disabled'). Правило чистое и общее с SQL-путём
+       * возврата средств: 'depleted' не переживает появление остатка.
+       */
+      const reviveStatus =
+        data.initialAmount !== undefined
+          ? (() => {
+              const next = reviveStatusAfterTopUp({
+                status: before.status,
+                initialAmount: data.initialAmount,
+                spentTotal: before.spentTotal,
+              });
+              return next === before.status ? null : next;
+            })()
+          : null;
+
       const after = await deps.updateGiftFields({
         id: data.id,
+        reviveStatus,
         name: data.name,
         initialAmount: data.initialAmount,
         validUntil: data.validUntil,
@@ -294,8 +412,18 @@ export function createGiftActions(deps: GiftActionDeps) {
           action: 'gift.update',
           entityType: 'gift_certificate',
           entityId: after.id,
-          before: { initialAmount: before.initialAmount, validUntil: before.validUntil?.toISOString() ?? null },
-          after: { initialAmount: after.initialAmount, validUntil: after.validUntil?.toISOString() ?? null },
+          // Статус в диффе: пополнение может ОЖИВИТЬ исчерпанный код (находка
+          // №10) — владелец обязан видеть это движение денег на предъявителя.
+          before: {
+            initialAmount: before.initialAmount,
+            validUntil: before.validUntil?.toISOString() ?? null,
+            status: before.status,
+          },
+          after: {
+            initialAmount: after.initialAmount,
+            validUntil: after.validUntil?.toISOString() ?? null,
+            status: after.status,
+          },
         },
       };
     },
@@ -345,6 +473,19 @@ export function createGiftActions(deps: GiftActionDeps) {
    * чекаут не даёт customers-строки; customer_id пишем ссылкой, если он есть).
    * Получатель — из формы («на чьё имя»).
    *
+   * КАЛИТКИ (находка аудита №27). Раньше единственной проверкой был «номинал > 0»:
+   * код с деньгами выпускался по НЕОПЛАЧЕННОМУ, отменённому или возвращённому
+   * заказу, а срок действия всегда был бессрочным. Теперь путь проходит ТЕ ЖЕ
+   * калитки, что автовыпуск (manualIssueGateReason ≡ orderGateReason + политика
+   * «оплачен сертификатом»), и берёт срок из политики магазина.
+   *
+   * ГРАНИЦА ручного исключения. Полный запрет был бы неверен: оператор обязан
+   * уметь выпустить код по заказу, оплаченному мимо эквайринга (наличные в
+   * салоне, банковский перевод, компенсация). Поэтому обход возможен, но он
+   * ЯВНЫЙ и следовой: требует флага overrideGate, письменного обоснования в
+   * comment и попадает в аудит вместе с причиной, которую обошли. Умолчание —
+   * безопасное: без флага отказ.
+   *
    * Идемпотентность: повторный выпуск по той же позиции упирается в частичный
    * UNIQUE (issued_order_item_id) миграции 0054 → duplicate_issue. Это же
    * ограничение защитит автовыпуск волны 4 при повторных вебхуках оплаты.
@@ -369,9 +510,45 @@ export function createGiftActions(deps: GiftActionDeps) {
         );
       }
 
-      const code =
-        data.code ??
-        buildGiftCodeForOrderItem({ orderNumber: src.orderNumber, orderItemId: src.item.id });
+      const settings = await deps.getGiftSettings();
+
+      // Калитка заказа — общая с автопутём (находка №27).
+      const gate = manualIssueGateReason(src, settings);
+      if (gate) {
+        if (data.overrideGate !== true) {
+          throw new GiftCertificateError('order_not_eligible', GATE_MESSAGES[gate]);
+        }
+        // Обход разрешён только «под протокол»: без письменного основания
+        // владелец не отличит компенсацию от ошибки оператора.
+        if ((data.comment ?? '').trim() === '') {
+          throw new GiftCertificateError(
+            'validation',
+            'Выпуск в обход проверки требует причины: заполните комментарий (основание).',
+          );
+        }
+      }
+      const overridden = gate !== null;
+
+      /**
+       * 🔴 Находка №13. Код на предъявителя — только CSPRNG (randomGiftCode,
+       * ~80 бит). Прежний детерминированный код строился из ПОСЛЕДОВАТЕЛЬНОГО
+       * номера заказа + 6 hex ≈ 24 бита, а публичный POST /cart/quote отвечает
+       * applied/not_found — то есть работает оракулом перебора. Явный код от
+       * оператора уважаем (перенос бумажного бланка), но по умолчанию не
+       * выводим код ни из чего предсказуемого.
+       */
+      const code = data.code ?? deps.randomCode();
+
+      /**
+       * Срок действия: явный выбор оператора > снимок позиции > политика
+       * магазина. Отсчёт от ОПЛАТЫ (как в автопути) — заказ, пролежавший месяц,
+       * иначе породил бы почти истёкший код. Для выпуска в обход калитки
+       * (оплаты может не быть вовсе) базой служит момент выпуска.
+       */
+      const validUntil =
+        data.validUntil !== undefined && data.validUntil !== null
+          ? data.validUntil
+          : giftValidUntil(src.paidAt ?? new Date(), giftValidDaysFor(src.item, settings));
 
       let cert: GiftCertificate;
       try {
@@ -379,7 +556,7 @@ export function createGiftActions(deps: GiftActionDeps) {
           code,
           name: data.name ?? src.item.nameSnapshot,
           initialAmount: faceValue,
-          validUntil: data.validUntil ?? null,
+          validUntil,
           description: null,
           terms: null,
           comment: data.comment ?? '',
@@ -415,9 +592,15 @@ export function createGiftActions(deps: GiftActionDeps) {
           after: {
             code: cert.code,
             initialAmount: cert.initialAmount,
+            validUntil: cert.validUntil?.toISOString() ?? null,
             issueSource: 'order',
             issuedOrderId: src.orderId,
             issuedOrderItemId: src.item.id,
+            // Обход калитки (находка №27) обязан быть видим владельцу: иначе
+            // выпуск по неоплаченному заказу неотличим от обычного.
+            ...(overridden
+              ? { gateOverridden: true, gateReason: gate, gateJustification: data.comment ?? '' }
+              : {}),
           },
         },
       };

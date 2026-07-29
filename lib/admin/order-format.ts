@@ -20,6 +20,11 @@ import type {
   PromoKind,
   StatusHistoryKind,
 } from '@/lib/orders/types';
+// 🔴 Именно client-safe leaf, а НЕ '@/lib/admin/timezone': этот модуль тянут
+// клиентские компоненты (OrderFilters, PromoForm), а timezone.ts читает настройку
+// из БД и тащит за собой драйвер postgres — прод-сборка упала бы на 'fs'/'net'.
+// Сторож — tests/build/client-server-boundary.guard.test.ts.
+import { DEFAULT_SHOP_TIME_ZONE, parseTimeZone } from '@/lib/admin/timezone-token';
 
 // -----------------------------------------------------------------------------
 // Лейблы (русский). Record по литералам → исчерпывающая проверка компилятором.
@@ -129,12 +134,28 @@ export function deliveryStatusBadgeClass(status: string): string {
 // Прочие форматтеры представления.
 // -----------------------------------------------------------------------------
 
-/** Дата+время по-русски для лент истории/списка (ru-RU, без секунд). */
-export function formatDateTime(value: Date | string | null | undefined): string {
+/**
+ * Дата+время для лент истории/списков (ru-RU, без секунд).
+ *
+ * 🔴 ЧАСОВОЙ ПОЯС ОБЯЗАТЕЛЕН (аудит major №26). Раньше пояс не указывался вовсе,
+ * и время рендерилось в поясе КОНТЕЙНЕРА (обычно UTC), тогда как журнал аудита
+ * жёстко ставил Москву: оператор видел одно и то же событие с разным временем на
+ * соседних экранах. Теперь пояс — явный аргумент; страницы берут его из настройки
+ * магазина (getShopTimeZone, lib/admin/timezone.ts), а не из окружения процесса.
+ *
+ * Аргумент опционален ради аддитивности: вызов без него даёт дефолт платформы —
+ * детерминированный результат, не зависящий от TZ хоста. Битый идентификатор
+ * пояса тоже откатывается на дефолт: опечатка в настройке не роняет таблицу.
+ */
+export function formatDateTime(
+  value: Date | string | null | undefined,
+  timeZone: string = DEFAULT_SHOP_TIME_ZONE,
+): string {
   if (value === null || value === undefined) return '—';
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleString('ru-RU', {
+    timeZone: parseTimeZone(timeZone) ?? DEFAULT_SHOP_TIME_ZONE,
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

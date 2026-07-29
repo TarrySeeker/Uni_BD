@@ -16,7 +16,7 @@ import {
   findCategory,
   categoryHref,
 } from '@/lib/tree';
-import { localizedHref, toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
+import { localizedHref, toLocale, alternatesFor, enabledLocalesFrom, absoluteUrlBase } from '@/lib/i18n';
 import { metaTitle } from '@/lib/seo';
 import { getDictionary } from '@/lib/dictionaries';
 import Breadcrumbs, { type Crumb } from '../../components/Breadcrumbs';
@@ -40,23 +40,48 @@ export async function generateMetadata({
   ]);
   if (!product) return { title: getDictionary(locale).notFound.productMetaTitle };
   const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
+  // Аудит №34: hreflang обязан быть АБСОЛЮТНЫМ URL (относительные поисковики
+  // игнорируют). База — публичный адрес магазина из его же настроек, без хардкода.
+  const urlBase = absoluteUrlBase(settings);
   return {
     // meta.title от Storefront API — уже с применённым titleTemplate (buildSeoMeta),
     // поэтому absolute: иначе шаблон layout наложится вторым слоем.
     title: metaTitle(product.meta.title, product.name, settings),
     description: product.meta.description ?? undefined,
-    alternates: alternatesFor(`/product/${slug}`, locale, enabledLocales),
+    alternates: alternatesFor(`/product/${slug}`, locale, enabledLocales, urlBase),
     robots: product.meta.noindex ? { index: false, follow: false } : undefined,
   };
 }
 
-/** Строковые/числовые атрибуты товара для блока work-head__about (машинные — пропускаем). */
+/**
+ * Строковые/числовые атрибуты товара для блока work-head__about (машинные — пропускаем).
+ *
+ * 🔴 Аудит minor №11: и КЛЮЧ, и ЗНАЧЕНИЕ приходят уже локализованными — Storefront API
+ * переводит денормализованный attributes_cache по справочнику attributes/attribute_values
+ * (см. lib/storefront/attributes-i18n). Раньше DTO отдавал сырой кеш, и на en/fr витрине
+ * здесь печатались машинный код характеристики и русское значение.
+ *
+ * Мультизначные характеристики (массив значений одного кода) склеиваем в одну строку —
+ * раньше они молча ОТБРАСЫВАЛИСЬ фильтром, и покупатель не видел, например, всех
+ * материалов состава.
+ */
 function renderableAttributes(
   attributes: Record<string, unknown>,
 ): [string, string][] {
-  return Object.entries(attributes)
-    .filter(([, v]) => typeof v === 'string' || typeof v === 'number')
-    .map(([k, v]) => [k, String(v)] as [string, string]);
+  const out: [string, string][] = [];
+  for (const [k, v] of Object.entries(attributes)) {
+    if (typeof v === 'string' || typeof v === 'number') {
+      out.push([k, String(v)]);
+      continue;
+    }
+    if (Array.isArray(v)) {
+      const parts = v
+        .filter((x): x is string | number => typeof x === 'string' || typeof x === 'number')
+        .map((x) => String(x));
+      if (parts.length > 0) out.push([k, parts.join(', ')]);
+    }
+  }
+  return out;
 }
 
 export default async function ProductPage({

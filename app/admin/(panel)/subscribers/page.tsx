@@ -7,6 +7,7 @@ import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
 import { listSubscribers, countSubscribers } from '@/lib/newsletter/repository';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 import { listTruncationNotice } from '@/lib/admin/list-truncation';
 import { ExportToolbar } from './_components/ExportToolbar';
 import { SubscriberRowActions } from './_components/SubscriberRowActions';
@@ -23,6 +24,8 @@ const LIST_LIMIT = 500;
 
 export default async function SubscribersPage() {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const user = await requireUser();
   if (!can(user, 'orders.read')) {
     return <Forbidden permission="orders.read" />;
@@ -81,7 +84,7 @@ export default async function SubscribersPage() {
             <tbody>
               {subscribers.map((s) => (
                 <tr key={s.id} className="border-t border-gray-100">
-                  <td className="whitespace-nowrap px-4 py-2 text-gray-600">{formatDateTime(s.created_at)}</td>
+                  <td className="whitespace-nowrap px-4 py-2 text-gray-600">{formatDateTime(s.created_at, timeZone)}</td>
                   <td className="px-4 py-2">{s.email}</td>
                   <td className="px-4 py-2">
                     <SubscriberStatusBadge status={s.status} />

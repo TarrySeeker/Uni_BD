@@ -162,7 +162,10 @@
       "bogoPayRequired": "For kind=bogo, «pay for M» (bogoPayQty) is required.",
       "scopeTargetsRequired": "The selected apply scope requires at least one target.",
       "scopeTargetTypeMismatch": "The target type does not match the selected apply scope.",
-      "freeDeliveryCartOnly": "Free delivery (kind='free_delivery') is only available for apply_scope='cart'."
+      "freeDeliveryCartOnly": "Free delivery (kind='free_delivery') is only available for apply_scope='cart'.",
+      "conflictOrderStatus": "The order status changed in parallel: the transition from «{from}» is no longer valid. The screen has been refreshed — check the current status.",
+      "conflictPaymentStatus": "The payment status changed in parallel: the transition from «{from}» is no longer valid. The screen has been refreshed — check the current status.",
+      "conflictDeliveryStatus": "The delivery status changed in parallel: the transition from «{from}» is no longer valid. The screen has been refreshed — check the current status."
     },
     "settings": {
       "imageRefInvalid": "Enter an image URL (https://…) or a path starting with «/» (e.g. /media/…)",
@@ -812,7 +815,16 @@
         "catTextLabel": "Text",
         "uploadPhoto": "Upload look photo",
         "addCategory": "+ Add category",
-        "hint": "Each category — photo, title and text. Incomplete categories are not saved."
+        "hint": "Each category — photo, title and text. Incomplete categories are not saved.",
+        "cardN": "Card {n}",
+        "cardCategoryLabel": "Category (tab)",
+        "authorNameLabel": "Author name",
+        "authorNamePlaceholder": "Anna",
+        "cardPhotoLabel": "Look photo (portrait)",
+        "avatarLabel": "Author avatar",
+        "uploadAvatar": "Upload avatar",
+        "addCard": "+ Add card",
+        "cardsHint": "A card is a tab, a look photo, an author name and (optionally) an avatar. Incomplete cards are not saved."
       },
       "tiles": {
         "legend": "«Category tiles» block",
@@ -879,7 +891,9 @@
       "accentColor": "Accent color (HEX)",
       "supportEmail": "Support email",
       "supportPhone": "Support phone",
-      "saveButton": "Save branding"
+      "saveButton": "Save branding",
+      "timeZone": "Shop time zone",
+      "timeZoneHelp": "IANA identifier, for example Europe/Moscow or Europe/Paris. All times in the admin panel are shown in it, and date-range filters use its calendar days. Leave empty to use the server environment value."
     },
     "navigationForm": {
       "saved": "Navigation saved.",
@@ -892,6 +906,15 @@
       "footerColumnsLabel": "Columns are separated by a blank line. The first line of a column is its title, then «Label | Link»",
       "footerPlaceholder": "Store\nCatalog | /catalog\nDelivery | /#delivery\n\nContact\nEmail | mailto:info@example.com",
       "footerHint": "Each block up to a blank line is a separate footer column.",
+      "footerTextsLegend": "Footer texts",
+      "footerTextsHint": "Newsletter heading, consent note, copyright and designer credit. Leave a field empty and the storefront shows its default text in the shopper's language.",
+      "subscribeTitleLabel": "Newsletter form heading",
+      "subscribeNoteLabel": "Note under the newsletter form (personal data consent)",
+      "copyrightLabel": "Copyright (left side of the bottom line)",
+      "copyrightHint": "For example: “2026 © My shop”. The year is taken literally — it is not filled in automatically. Leave empty to show the shop name from branding.",
+      "designedByLabel": "Designer credit (right side of the bottom line)",
+      "designedByHrefLabel": "Credit link",
+      "designedByHrefHint": "A path starting with “/” or a full https:// address. Leave empty to show the credit as plain text.",
       "saveButton": "Save navigation",
       "resetButton": "Reset navigation"
     },
@@ -1041,8 +1064,9 @@
     },
     "languagesForm": {
       "saveSuccess": "Language set saved.",
-      "storefrontNoticeTitle": "Important note about the storefront.",
-      "storefrontNoticeBody": "The site currently uses its own list of languages and does not yet read this set: a language disabled here will not disappear from the storefront — its pages will simply be shown in the default language ({defaultLabel}). In the admin panel the set takes effect immediately: it determines the translation tabs in the catalog and content forms.",
+      "storefrontNoticeTitle": "How this set affects the site.",
+      "storefrontNoticeBody": "The set takes effect in two places at once. On the site: enabled languages appear in the language switcher, while a disabled language is removed from the site — its addresses redirect to the default language ({defaultLabel}). In the admin panel: the set determines the translation tabs in the catalog and content forms.",
+      "storefrontSupportHint": "Any shop may add a language to the set, but the site can only display it once the interface has been translated into that language. A language without a translation will not appear on the site: its pages redirect to the default language, even though the translation tabs in the admin panel start working right away. If you need the new language on the site itself, ask the developers to add the interface translation.",
       "defaultLocaleLabel": "Default language",
       "defaultLocaleHelp": "Cannot be changed. All primary content (names, descriptions, page texts) is stored in the database in this language, with translations layered on top. Changing the default language would require migrating all data and would change the site's page URLs, so it is done separately, by hand.",
       "defaultRowNote": "default language — always enabled",
@@ -1155,6 +1179,7 @@
       "looksTitle": "Looks — title",
       "looksCategoryTitle": "Looks — category {n} (title)",
       "looksCategoryText": "Looks — category {n} (text)",
+      "looksItemAuthorName": "Looks — card {n} author",
       "tilesItemTitle": "Category tiles — tile {n}",
       "designersTitle": "Designers — title",
       "designersItemName": "Designers — name {n}",
@@ -1291,6 +1316,10 @@
       "statusArchived": "Archived",
       "sitemapPriority": "Sitemap priority (0–1)",
       "sitemapChangefreq": "Sitemap changefreq",
+      "showInNav": "Show in the storefront side menu",
+      "showInNavHint": "Checked pages form the vertical menu on the left of content pages (e.g. About · Delivery · Payment · Terms). The menu label is this page’s title.",
+      "navOrder": "Menu position",
+      "navOrderPlaceholder": "not set — placed last",
       "canonicalPlaceholder": "Auto: /pages/{slug}",
       "slugFallback": "page-slug",
       "uploadImage": "Upload image",
@@ -1553,7 +1582,8 @@
       "confirmManualRefund": "Confirm that the money has already been returned to the customer OUTSIDE the system (bank transfer/cash desk)? The order will be marked refunded and your confirmation will be written to the audit log.",
       "manualRefundTitle": "The gateway will not refund automatically",
       "manualRefundHint": "For this order the payment gateway does not perform refunds (for example, an offline payment or an acquirer without automatic refunds). Return the money to the customer yourself — by transfer or from the cash desk — and only then confirm. The confirmation is recorded in the audit log.",
-      "manualRefundButton": "Money returned outside the system — confirm"
+      "manualRefundButton": "Money returned outside the system — confirm",
+      "conflictHint": "Someone else has already changed this order. The buttons below now reflect the current state — there is no need to repeat the same action."
     },
     "page": {
       "moduleDisabled": "orders (module disabled)",
@@ -1589,7 +1619,39 @@
       "recipientNameLabel": "Recipient name",
       "recipientEmailLabel": "Recipient e-mail",
       "issuing": "Issuing…",
-      "issueConfirm": "Issue"
+      "issueConfirm": "Issue",
+      "gateBlocked": "This order fails the check: it is unpaid, cancelled or refunded. Issuing a certificate carrying money against such an order is blocked by default.",
+      "gateOverrideLabel": "Issue anyway, overriding the check (I confirm there is a valid reason)",
+      "gateReasonLabel": "Reason (recorded in the audit log)",
+      "gateReasonPlaceholder": "e.g. paid in cash at the store, receipt #12"
+    },
+    "statusLabels": {
+      "order": {
+        "new": "New",
+        "awaiting_payment": "Awaiting payment",
+        "paid": "Paid",
+        "packed": "Packed",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "refunded": "Refunded"
+      },
+      "payment": {
+        "pending": "Pending",
+        "authorized": "Authorised",
+        "paid": "Paid",
+        "failed": "Failed",
+        "refunded": "Refunded"
+      },
+      "delivery": {
+        "pending": "Pending",
+        "registered": "Registered",
+        "in_transit": "In transit",
+        "delivered": "Delivered",
+        "returned": "Returned",
+        "cancelled": "Cancelled"
+      }
     },
     "orderFilters": {
       "ariaLabel": "Order filters",
@@ -1686,7 +1748,11 @@
       "giftBadge": "Gift",
       "summary": {
         "items": "Items",
-        "grandTotal": "Total"
+        "giftDiscount": "Gift certificate",
+        "giftCode": "Certificate code",
+        "grandTotal": "Total",
+        "displaySeen": "Customer saw",
+        "displayRate": "at rate {rate}"
       },
       "labelDiscount": "Discount",
       "deliveryHeading": "Delivery",

@@ -9,6 +9,7 @@ import {
 } from '@/lib/reviews/repository';
 import { REVIEW_STATUSES, type ReviewStatus } from '@/lib/reviews/types';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
@@ -71,6 +72,8 @@ export default async function ReviewsListPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const guard = await guardReviews('reviews.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
@@ -161,7 +164,7 @@ export default async function ReviewsListPage({
               rows.map((r) => (
                 <tr key={r.id} className="border-t border-gray-100 align-top">
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">
-                    {formatDateTime(r.createdAt)}
+                    {formatDateTime(r.createdAt, timeZone)}
                   </td>
                   <td className="px-4 py-2 text-gray-700">
                     {r.productName ?? '—'}

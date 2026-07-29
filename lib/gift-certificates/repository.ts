@@ -254,6 +254,16 @@ export interface GiftIssueSourceRow {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  /**
+   * Статусы и момент оплаты заказа — КАЛИТКА ручного выпуска (находка аудита
+   * №27) и база отсчёта срока действия кода. До их появления ручной путь не мог
+   * отличить оплаченный заказ от отменённого и выпускал деньги по любому.
+   */
+  paymentStatus: PaymentStatus;
+  status: OrderStatus;
+  paidAt: Date | null;
+  /** Сертификат, которым оплачен САМ заказ (0041); не путать с issued_order_id. */
+  giftCertificateId: string | null;
   item: CertificateSourceItem;
 }
 
@@ -270,6 +280,7 @@ export async function getOrderItemForGiftIssue(
     SELECT o.id            AS order_id,
            o.number        AS order_number,
            o.currency      AS currency,
+           o.status, o.payment_status, o.paid_at, o.gift_certificate_id,
            o.customer_id, o.customer_name, o.customer_email, o.customer_phone,
            i.id            AS item_id,
            i.name_snapshot, i.sku_snapshot, i.attributes_snapshot,
@@ -289,6 +300,10 @@ export async function getOrderItemForGiftIssue(
     customerName: String(row.customer_name ?? ''),
     customerEmail: String(row.customer_email ?? ''),
     customerPhone: String(row.customer_phone ?? ''),
+    paymentStatus: String(row.payment_status) as PaymentStatus,
+    status: String(row.status) as OrderStatus,
+    paidAt: toNullableDate(row.paid_at),
+    giftCertificateId: row.gift_certificate_id != null ? String(row.gift_certificate_id) : null,
     item: {
       id: String(row.item_id),
       nameSnapshot: String(row.name_snapshot ?? ''),
@@ -645,6 +660,41 @@ export async function revokeIssuedGiftsTx(
     spentTotal: String(r.spent_total),
   }));
   return { revokedCount: revoked.length, revoked };
+}
+
+/**
+ * Помечает истёкшие сертификаты статусом 'expired' (минор аудита №3).
+ *
+ * Дефект информационный: деньги защищены явными проверками срока в
+ * redeemGiftTx и assertRedeemable, но админка показывала истёкший код «Активен»,
+ * хотя бейдж и локализованная подпись 'expired' уже существовали, а выставить
+ * этот статус было НЕЧЕМ (крон знал одну задачу, а экшен допускал лишь
+ * active↔disabled).
+ *
+ * Правило совпадает с чистым expiredGiftStatus (lib/gift-certificates/lifecycle):
+ * трогаем ТОЛЬКО 'active' и 'depleted'. 'disabled' не трогаем — истечение срока
+ * не должно снимать блокировку оператора; уже 'expired' не трогаем — идемпотентность.
+ * Отсечка `now()` считается БД: в кластере часы приложения и БД могут разъехаться,
+ * а деньги сравниваются по времени БД (redeemGiftTx).
+ *
+ * Возвращает число помеченных строк. Кодов не возвращает и не логирует.
+ */
+export async function markExpiredGiftCertificates(limit = 500): Promise<number> {
+  const rows = await sql<{ id: string }[]>`
+    UPDATE gift_certificates
+       SET status = 'expired', updated_at = now()
+     WHERE id IN (
+       SELECT id FROM gift_certificates
+        WHERE status IN ('active','depleted')
+          AND valid_until IS NOT NULL
+          AND valid_until <= now()
+        ORDER BY valid_until
+        LIMIT ${Math.max(1, Math.min(5000, Math.trunc(limit)))}
+        FOR UPDATE SKIP LOCKED
+     )
+    RETURNING id
+  `;
+  return rows.length;
 }
 
 /** Заказ-кандидат на догоняющий автовыпуск (для крона). */

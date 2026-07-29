@@ -110,10 +110,15 @@ export type SetGiftStatusInput = z.infer<typeof SetGiftStatusSchema>;
  *
  * Номинала во входе НЕТ намеренно: он берётся из ценового СНИМКА позиции
  * (order_items.line_total) на сервере — админ не может выпустить код дороже,
- * чем покупатель заплатил. Код опционален: без него строится детерминированный
- * по заказу+позиции (buildGiftCodeForOrderItem), что делает повтор безопасным.
+ * чем покупатель заплатил. Код опционален: без него сервер генерирует
+ * КРИПТОСЛУЧАЙНЫЙ (randomGiftCode, ~80 бит) — детерминированный по номеру
+ * заказа перебирался через публичный /cart/quote (находка аудита №13).
  * Покупатель тоже берётся с сервера (денормализованные поля заказа); во входе
  * только получатель — «на чьё имя».
+ *
+ * overrideGate — ЯВНОЕ ручное исключение из калиток заказа (находка №27):
+ * оператор подтверждает выпуск по неоплаченному/отменённому заказу. Требует
+ * непустого comment (основание) и попадает в аудит. Умолчание — false.
  */
 export const IssueGiftFromOrderSchema = z.object({
   orderId: z.string().uuid(),
@@ -123,6 +128,7 @@ export const IssueGiftFromOrderSchema = z.object({
   recipient: giftPartySchema.optional(),
   validUntil: validUntilSchema,
   comment: z.string().trim().max(2000).optional().default(''),
+  overrideGate: z.boolean().optional().default(false),
 });
 export type IssueGiftFromOrderInput = z.infer<typeof IssueGiftFromOrderSchema>;
 

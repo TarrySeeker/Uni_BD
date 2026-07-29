@@ -9,21 +9,25 @@
 
 import { useParams } from 'next/navigation';
 import { useCart } from '@/lib/cart';
-import { formatPrice, formatDisplayPrice } from '@/lib/format';
+import { formatDisplayPrice } from '@/lib/format';
 import { useCurrency } from '@/lib/currency';
 import { localizedHref, toLocale } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 
 export default function CartPage() {
   const { items, subtotal, mounted, setItemQty, remove } = useCart();
-  const { selected } = useCurrency();
+  const { selected, currencies } = useCurrency();
+  // Базовая валюта магазина — первая в списке (см. availableCurrencies). Она несёт
+  // формат чисел и знаки после запятой ИЗ НАСТРОЕК (№9).
+  const base = currencies[0] ?? selected;
   const locale = toLocale(useParams().lang);
   const dict = getDictionary(locale);
   const href = (path: string) => localizedHref(path, locale);
   // Позиции показываем в ВЫБРАННОЙ валюте (мультивалюта). Цены в корзине — рубли.
   const showPrice = (rub: number) => formatDisplayPrice(rub, selected);
-  // ИТОГ к оплате — ВСЕГДА в рублях (эквайринг рублёвый). formatPrice → «N ₽».
-  const payTotal = formatPrice(subtotal);
+  // ИТОГ к оплате — ВСЕГДА в БАЗОВОЙ валюте магазина (в ней и эквайринг), но
+  // формат чисел/знаков — из настроек магазина (№9), а не зашитый русский.
+  const payTotal = formatDisplayPrice(subtotal, base);
   // Если выбрана НЕ базовая валюта — показываем итог в ней справочно.
   const isBase = selected.rate === 1;
 

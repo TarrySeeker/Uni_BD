@@ -55,6 +55,9 @@ describe('публичный алфавит доменных причин отк
     expect(transportForReason('invalid_zone')).toBe('unprocessable');
     expect(transportForReason('payments_disabled')).toBe('unprocessable');
     expect(transportForReason('invalid_item')).toBe('unprocessable');
+    // Сумма разошлась — КОНФЛИКТ состояния: тело валидно, изменились цены/промокод/
+    // остаток сертификата. Повтор того же запроса не поможет, нужен пересчёт.
+    expect(transportForReason('total_mismatch')).toBe('conflict');
   });
 
   it('КАЖДЫЙ код отказа createOrder входит в алфавит (тип-уровневая сверка)', () => {
@@ -69,6 +72,8 @@ describe('публичный алфавит доменных причин отк
       delivery_unavailable: 'delivery_unavailable',
       invalid_zone: 'invalid_zone',
       payments_disabled: 'payments_disabled',
+      // Аудит №2/№9: показанный покупателю итог разошёлся с фактическим.
+      total_mismatch: 'total_mismatch',
     };
     for (const reason of Object.values(cover)) {
       expect(STOREFRONT_ERROR_REASONS).toContain(reason);

@@ -36,8 +36,9 @@ export function toKopecks(numericRubles: string | number): number {
  * Собирает Receipt из заказа + позиций. Email/Phone — из заказа (одно из двух
  * обязательно). Taxation — из config (TBANK_TAXATION); Tax позиции — defaultTax
  * (TBANK_DEFAULT_TAX). Доставка (deliveryTotal>0) добавляется позицией «Доставка»
- * (PaymentObject:'service'). Возвращает null, если нет ни email, ни телефона
- * (чек невозможен) или taxation не задан.
+ * (PaymentObject:'service'). Скидка промокода И списание подарочного сертификата
+ * распределяются по позициям товаров (см. ниже). Возвращает null, если нет ни
+ * email, ни телефона (чек невозможен) или taxation не задан.
  */
 export function buildReceipt(
   order: Order,
@@ -57,12 +58,28 @@ export function buildReceipt(
   const lineAmounts = items.map((it) => toKopecks(it.unitPrice) * it.quantity);
   const itemsTotalKop = lineAmounts.reduce((a, b) => a + b, 0);
 
-  // Скидка уровня заказа (промокод) — распределяем ТОЛЬКО по товарам, не по
-  // доставке (доставка — отдельная услуга, в чеке полной стоимостью). 54-ФЗ:
-  // цена позиции должна учитывать скидку, иначе Σ Amount > Init.Amount и Т-Банк
-  // отклонит Init. Распределяем пропорционально доле позиции с корректным
-  // распределением остатка округления (largest remainder), чтобы Σ совпала точно.
-  const discountKop = toKopecks(order.discountTotal);
+  // Скидки уровня заказа — распределяем ТОЛЬКО по товарам, не по доставке
+  // (доставка — отдельная услуга, в чеке полной стоимостью). 54-ФЗ: цена позиции
+  // должна учитывать скидку, иначе Σ Amount > Init.Amount и Т-Банк отклонит Init.
+  // Распределяем пропорционально доле позиции с корректным распределением остатка
+  // округления (largest remainder), чтобы Σ совпала точно.
+  //
+  // Уменьшают Σ позиций ДВЕ величины (обе применяются к товарам, не к доставке):
+  //  1) promo — order.discountTotal;
+  //  2) подарочный сертификат — order.giftDiscountTotal (аудит major #14).
+  // Ключевое: orders.grand_total (= Init.Amount) записывается УЖЕ за вычетом
+  // сертификата (repository.createOrder → finalGrandTotal), поэтому чек, знающий
+  // только про discountTotal, ДЕТЕРМИНИРОВАННО ронял инвариант ниже на любом
+  // заказе с сертификатом — Init падал на уже созданном заказе с уже списанным
+  // балансом. Сертификат по домену покрывает только нетто-товары
+  // (pricing.applyGiftCertificate: amountDue = itemsTotal − promoDiscount), т.е.
+  // ровно ту же базу, что и promo, — поэтому обе величины складываем и
+  // распределяем ОДНИМ проходом того же алгоритма (консистентность с promo
+  // важнее отдельной «позиции сертификата»: цена позиции в чеке остаётся ценой
+  // фактического расчёта, инвариант Amount = Price × Quantity сохраняется).
+  const promoDiscountKop = toKopecks(order.discountTotal);
+  const giftDiscountKop = toKopecks(order.giftDiscountTotal);
+  const discountKop = promoDiscountKop + giftDiscountKop;
   const discounted = distributeDiscount(lineAmounts, discountKop, itemsTotalKop);
 
   const receiptItems: TbankReceiptItem[] = items.map((it, i) => {

@@ -6,6 +6,7 @@ import { getReviewById } from '@/lib/reviews/repository';
 import { can } from '@/lib/auth/rbac';
 import { getLocaleConfig } from '@/lib/i18n';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 
 import { Forbidden } from '../../_components/Forbidden';
 import { guardReviews } from '../_components/guard';
@@ -29,6 +30,8 @@ export default async function ReviewDetail({
   params: Promise<{ id: string }>;
 }) {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const guard = await guardReviews('reviews.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
@@ -72,7 +75,7 @@ export default async function ReviewDetail({
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-gray-500">{t('reviews.detailPage.dateLabel')}</dt>
-            <dd className="text-gray-800">{formatDateTime(review.createdAt)}</dd>
+            <dd className="text-gray-800">{formatDateTime(review.createdAt, timeZone)}</dd>
           </div>
           <div>
             <dt className="text-gray-500">

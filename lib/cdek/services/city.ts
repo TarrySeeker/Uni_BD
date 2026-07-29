@@ -65,4 +65,45 @@ export class CityService {
       .map(mapCity)
       .filter((c): c is CdekCity => c !== null);
   }
+
+  /**
+   * Резолв «название города → числовой код СДЭК» (аудит-находка #15).
+   *
+   * ЗАЧЕМ. У заказа хранится только ИМЯ города (orders.delivery_city, текст) —
+   * числового кода нет ни в схеме заказа, ни где-либо ещё (cityCode приходит на
+   * чекаут для расчёта, но не сохраняется). Накладной же нужен `to_location.code`,
+   * иначе адресация опирается на один адрес без города. Отдельная колонка/миграция
+   * не нужна: код восстанавливается из имени тем же источником, что и автокомплит
+   * витрины — searchCities (mock → фикстуры, real → GET /v2/location/cities).
+   *
+   * ТОЧНОЕ СОВПАДЕНИЕ ИМЕНИ — обязательное условие. searchCities ищет по
+   * подстроке, и первый элемент ответа легко может оказаться другим населённым
+   * пунктом («Новосибирская Слобода» перед «Новосибирском»). Отправить посылку не
+   * в тот город ХУЖЕ, чем не проставить код вовсе, поэтому при отсутствии точного
+   * совпадения возвращаем null.
+   *
+   * НЕ БРОСАЕТ. Резолв — УЛУЧШЕНИЕ адресации, а не предусловие: сбой сети/СДЭК
+   * даёт null, и накладная уезжает с city+address (то же, что оператор написал бы
+   * руками). Иначе временная недоступность справочника блокировала бы отгрузку.
+   */
+  async resolveCityCode(name: string | null | undefined): Promise<number | null> {
+    const q = (name ?? '').trim();
+    if (q.length < 2) return null;
+
+    let candidates: CdekCity[];
+    try {
+      candidates = await this.searchCities(q, 20);
+    } catch {
+      return null; // справочник недоступен → накладная не блокируется
+    }
+
+    const needle = normalizeCityName(q);
+    const exact = candidates.find((c) => normalizeCityName(c.name) === needle);
+    return exact ? exact.code : null;
+  }
+}
+
+/** Нормализация имени города для сравнения: регистр, пробелы, ё→е. */
+function normalizeCityName(s: string): string {
+  return s.trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
 }

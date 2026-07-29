@@ -5,6 +5,7 @@ import { can } from '@/lib/auth/rbac';
 import { getLocaleConfig } from '@/lib/i18n';
 import { getGiftCertificateById, getRedemptions } from '@/lib/gift-certificates';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 
 import { Forbidden } from '../../_components/Forbidden';
 import { PageHeader } from '../../_components/PageHeader';
@@ -35,6 +36,8 @@ export default async function EditGiftCertificatePage({
   params: Promise<{ id: string }>;
 }) {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const guard = await guardGift('gift.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
@@ -119,7 +122,7 @@ export default async function EditGiftCertificatePage({
               <tbody>
                 {redemptions.map((r) => (
                   <tr key={r.id} className="border-t border-gray-100">
-                    <td className="whitespace-nowrap px-4 py-2 text-gray-600">{formatDateTime(r.createdAt)}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-gray-600">{formatDateTime(r.createdAt, timeZone)}</td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-700">
                       <Link href={`/admin/orders/${r.orderId}`} className="text-blue-700 hover:underline">
                         {r.orderId.slice(0, 8)}…
@@ -128,7 +131,7 @@ export default async function EditGiftCertificatePage({
                     <td className="whitespace-nowrap px-4 py-2 text-gray-900">{r.amount}</td>
                     <td className="px-4 py-2 text-gray-600">
                       {r.reversedAt
-                        ? t('giftCertificates.detailPage.redemptions.reversed', { date: formatDateTime(r.reversedAt) })
+                        ? t('giftCertificates.detailPage.redemptions.reversed', { date: formatDateTime(r.reversedAt, timeZone) })
                         : t('giftCertificates.detailPage.redemptions.redeemed')}
                     </td>
                   </tr>

@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { can } from '@/lib/auth/rbac';
 import { listGiftCertificates, countGiftCertificates } from '@/lib/gift-certificates';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 import { listTruncationNotice } from '@/lib/admin/list-truncation';
 
 import { Forbidden } from '../_components/Forbidden';
@@ -31,6 +32,8 @@ function partyLabel(party: { name: string | null; email: string | null; phone: s
 
 export default async function GiftCertificatesPage() {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const guard = await guardGift('gift.read');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
@@ -106,7 +109,7 @@ export default async function GiftCertificatesPage() {
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">{c.spentTotal}</td>
                   <td className="whitespace-nowrap px-4 py-2 font-medium text-gray-900">{c.remaining}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">
-                    {c.validUntil ? formatDateTime(c.validUntil) : t('giftCertificates.page.unlimited')}
+                    {c.validUntil ? formatDateTime(c.validUntil, timeZone) : t('giftCertificates.page.unlimited')}
                   </td>
                   <td className="px-4 py-2">
                     <GiftStatusBadge status={c.status} />

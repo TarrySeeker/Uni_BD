@@ -9,6 +9,7 @@ import {
   deliveryTypeLabel,
   formatDateTime,
 } from '@/lib/admin/order-format';
+import { getShopTimeZone, utcDayRangeForShopDay } from '@/lib/admin/timezone';
 import { mapOrder, getPromoByCode } from '@/lib/orders/repository';
 import type { Order } from '@/lib/orders/types';
 import {
@@ -121,12 +122,23 @@ function pageHref(
 /**
  * Загрузка отфильтрованного списка заказов (view-слой). Параметризованный sql
  * (анти-SQLi); промокод резолвится в id через repository.getPromoByCode.
+ *
+ * 🔴 СУТКИ СЧИТАЮТСЯ В ПОЯСЕ МАГАЗИНА (аудит major №26). Раньше границы периода
+ * клеились строкой как UTC-сутки ('T00:00:00.000Z' / 'T23:59:59.999Z'), поэтому
+ * «заказы за сегодня» ТЕРЯЛИ ночные заказы: в МСК (UTC+3) заказ, сделанный в
+ * 01:00, лежит в предыдущих UTC-сутках. Теперь границы считает
+ * utcDayRangeForShopDay, а верхняя граница ЭКСКЛЮЗИВНА (начало следующих суток) —
+ * так не теряются события последней доли секунды.
+ *
+ * 🔴 СТРАНИЦА КЛАМПИТСЯ ДО ВЫБОРКИ (аудит minor №8). Раньше offset считался из
+ * сырого filter.page ДО того, как известен total: на ?page=99 таблица приходила
+ * пустой и подписывалась «Заказов пока нет», хотя заказы есть. Теперь порядок
+ * такой же, как в журнале аудита: сначала count → totalPages → clamp → offset.
  */
 async function loadOrders(
   filter: OrdersFilter,
-): Promise<{ rows: Order[]; total: number }> {
-  const limit = PAGE_SIZE;
-  const offset = (filter.page - 1) * PAGE_SIZE;
+  timeZone: string,
+): Promise<{ rows: Order[]; total: number; currentPage: number; totalPages: number }> {
   const q = filter.q ? `%${filter.q}%` : null;
 
   let promoCodeId: string | null = null;
@@ -134,14 +146,16 @@ async function loadOrders(
     const promo = await getPromoByCode(filter.promoCode);
     if (!promo) {
       // Нет такого промокода → заведомо пустой результат.
-      return { rows: [], total: 0 };
+      return { rows: [], total: 0, currentPage: 1, totalPages: 1 };
     }
     promoCodeId = promo.id;
   }
 
-  // Верхняя граница периода — конец дня (включительно).
-  const dateTo = filter.dateTo ? `${filter.dateTo}T23:59:59.999Z` : null;
-  const dateFrom = filter.dateFrom ? `${filter.dateFrom}T00:00:00.000Z` : null;
+  const { fromUtc: dateFrom, toUtc: dateTo } = utcDayRangeForShopDay(
+    filter.dateFrom,
+    filter.dateTo,
+    timeZone,
+  );
 
   const where = sql`
     WHERE (${filter.status ?? null}::text IS NULL OR status = ${filter.status ?? null})
@@ -150,19 +164,24 @@ async function loadOrders(
       AND (${promoCodeId}::uuid IS NULL OR promo_code_id = ${promoCodeId})
       AND (${q}::text IS NULL OR number ILIKE ${q} OR customer_email ILIKE ${q} OR customer_phone ILIKE ${q})
       AND (${dateFrom}::timestamptz IS NULL OR created_at >= ${dateFrom})
-      AND (${dateTo}::timestamptz IS NULL OR created_at <= ${dateTo})
+      AND (${dateTo}::timestamptz IS NULL OR created_at < ${dateTo})
   `;
 
-  const [totalRows, rows] = await Promise.all([
-    sql<{ n: string }[]>`SELECT count(*)::text AS n FROM orders ${where}`,
-    sql<Record<string, unknown>[]>`
-      SELECT * FROM orders ${where}
-      ORDER BY created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `,
-  ]);
+  const totalRows = await sql<{ n: string }[]>`
+    SELECT count(*)::text AS n FROM orders ${where}
+  `;
+  const total = Number(totalRows[0]?.n ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(filter.page, totalPages);
+  const offset = (currentPage - 1) * PAGE_SIZE;
 
-  return { rows: rows.map(mapOrder), total: Number(totalRows[0]?.n ?? 0) };
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT * FROM orders ${where}
+    ORDER BY created_at DESC
+    LIMIT ${PAGE_SIZE} OFFSET ${offset}
+  `;
+
+  return { rows: rows.map(mapOrder), total, currentPage, totalPages };
 }
 
 export default async function OrdersPage({
@@ -186,10 +205,11 @@ export default async function OrdersPage({
   // страница /orders/new и экшен createManualOrder защищены отдельно на сервере).
   const canWrite = can(guard.user, 'orders.write');
 
-  const { rows, total } = await loadOrders(filter);
+  // Пояс магазина — один на всю админку (major №26): и подписи времени в таблице,
+  // и границы суток в фильтре «за период» считаются в нём, а не в поясе контейнера.
+  const timeZone = await getShopTimeZone();
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const currentPage = Math.min(filter.page, totalPages);
+  const { rows, total, currentPage, totalPages } = await loadOrders(filter, timeZone);
 
   return (
     <div>
@@ -267,7 +287,9 @@ export default async function OrdersPage({
                       {row.number}
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-gray-600">{formatDateTime(row.createdAt)}</td>
+                  <td className="px-4 py-2 text-gray-600">
+                    {formatDateTime(row.createdAt, timeZone)}
+                  </td>
                   <td className="px-4 py-2 text-gray-700">
                     <div>{row.customerName}</div>
                     <div className="text-xs text-gray-400">{row.customerEmail}</div>

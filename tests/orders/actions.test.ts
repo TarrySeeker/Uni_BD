@@ -782,7 +782,10 @@ describe('guarded UPDATE статуса (TOCTOU)', () => {
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation'); // OrderError('conflict') → PublicActionError
-    expect(res.message).toContain('изменился параллельно');
+    // Аудит minor №7: сообщение — КЛЮЧ каталога (в юните translate-заглушка
+    // отдаёт вход как есть), а не сырой русский литерал; код отказа машиночитаем.
+    expect(res.code).toBe('conflict');
+    expect(res.message).toBe('errors.orders.conflictOrderStatus');
     expect(wroteHistory()).toBe(false);
     expect(releaseReservationMock).not.toHaveBeenCalled();
     expect(commitReservationMock).not.toHaveBeenCalled();
@@ -807,7 +810,8 @@ describe('guarded UPDATE статуса (TOCTOU)', () => {
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
-    expect(res.message).toContain('изменился параллельно');
+    expect(res.code).toBe('conflict');
+    expect(res.message).toBe('errors.orders.conflictPaymentStatus');
     expect(wroteHistory()).toBe(false);
   });
 
@@ -829,7 +833,8 @@ describe('guarded UPDATE статуса (TOCTOU)', () => {
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
     expect(res.error).toBe('validation');
-    expect(res.message).toContain('изменился параллельно');
+    expect(res.code).toBe('conflict');
+    expect(res.message).toBe('errors.orders.conflictDeliveryStatus');
     expect(wroteHistory()).toBe(false);
   });
 });
@@ -1570,7 +1575,9 @@ describe('единый денежный путь возврата (№7/№38)',
     const res = await refundOrder({ id: UUID });
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toContain('параллельно');
+    expect(res.code).toBe('conflict');
+    // Здесь срывается переход статуса ЗАКАЗА (paid → refunded), а не оплаты.
+    expect(res.message).toBe('errors.orders.conflictOrderStatus');
   });
 
   it('конкурентность фолбэк-ветки: guarded UPDATE оплаты вернул 0 строк → conflict', async () => {
@@ -1581,7 +1588,8 @@ describe('единый денежный путь возврата (№7/№38)',
     const res = await refundOrder({ id: UUID });
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('ожидался отказ');
-    expect(res.message).toContain('параллельно');
+    expect(res.code).toBe('conflict');
+    expect(res.message).toBe('errors.orders.conflictPaymentStatus');
   });
 
   it('оплаченный заказ в статусе «new» ВОЗВРАЩАЕТСЯ (нет тупика: кнопки статуса заказа нет)', async () => {

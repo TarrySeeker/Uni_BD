@@ -17,7 +17,7 @@ import type { ReactNode } from 'react';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCategories, getSettings } from '@/lib/api';
-import { rootCategories, topLevelCategories } from '@/lib/tree';
+import { rootCategories, topLevelCategories, menuSections } from '@/lib/tree';
 import { rootTitle, siteDescription } from '@/lib/seo';
 import { CurrencyProvider } from '@/lib/currency';
 import {
@@ -26,6 +26,7 @@ import {
   toLocale,
   enabledLocalesFrom,
   switchLocalePath,
+  absoluteUrlBase,
 } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import SiteHeader from './SiteHeader';
@@ -49,7 +50,17 @@ export async function generateMetadata({
   const locale = toLocale((await params).lang);
   const settings = await getSettings(locale);
 
+  // 🔴 АУДИТ №34. metadataBase не задавался НИГДЕ (единственное упоминание было в
+  // комментарии lib/i18n.ts), поэтому любой относительный URL в метаданных Next
+  // разрешал относительно http://localhost:3000 — с предупреждением в логах и
+  // мусорным адресом в разметке. База — публичный адрес магазина из его же
+  // настроек (тот же источник, что у sitemap/robots и return-url платежей), без
+  // хардкода домена. Настройка не заполнена → base остаётся undefined и поведение
+  // прежнее (относительные пути), а не выдуманный чужой домен.
+  const base = absoluteUrlBase(settings);
+
   return {
+    ...(base ? { metadataBase: new URL(base) } : {}),
     title: rootTitle(settings),
     description: siteDescription(settings),
     icons: {
@@ -101,8 +112,13 @@ export default async function RootLayout({
     redirect(switchLocalePath(pathname, DEFAULT_LOCALE));
   }
 
-  // Меню шапки — оба корня со всей вложенностью; футер — группы каталога.
+  // Полное дерево (с техническим корнем `catalog`) — источник ВЛОЖЕННЫХ адресов
+  // /catalog/родитель/ребёнок как на проде; его же получает подвал.
   const menuRoots = rootCategories(categories);
+  // ПУНКТЫ меню — разделы, а не технический корень: menuSections разворачивает
+  // `catalog` в его детей, иначе весь каталог прячется за одним «Каталог +»
+  // вместо списка разделов эталона (docs/41 §2).
+  const menuItems = menuSections(categories);
   const footerCats = topLevelCategories(categories);
 
   return (
@@ -115,7 +131,8 @@ export default async function RootLayout({
         {/* CurrencyProvider — выбор валюты отображения (₽/€) на весь клиент витрины. */}
         <CurrencyProvider settings={settings}>
           <SiteHeader
-            categories={menuRoots}
+            categories={menuItems}
+            tree={menuRoots}
             settings={settings}
             locale={locale}
             enabledLocales={enabledLocales}

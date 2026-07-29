@@ -47,6 +47,29 @@ export const CATEGORY_TR_FIELDS = [
 export const VARIANT_TR_FIELDS = ['name'] as const;
 
 /**
+ * Характеристика (attributes, §2.4) — только человекочитаемое `name`.
+ *
+ * `code` НЕ переводим принципиально: это стабильный ключ импорта ('color','size'),
+ * по которому строится денормализованный attributes_cache и сходятся фильтры —
+ * его перевод разорвал бы связь кеша со справочником. Метаданные формы
+ * (type/unit/is_variant/…) — машинные, тоже не текст.
+ *
+ * Колонка translations у attributes создана миграцией 0034.
+ */
+export const ATTRIBUTE_TR_FIELDS = ['name'] as const;
+
+/**
+ * Значение характеристики (attribute_values) — только `value` ('Шёлк' → 'Silk').
+ *
+ * `slug` НЕ переводим: это ЧПУ-код значения для фасетных фильтров — машинный
+ * идентификатор в URL, перевод сломал бы уже выданные ссылки.
+ *
+ * Тот же whitelist обслуживает подписи цвето-свотчей карточки (products.colors),
+ * потому что их имена приходят из этого же словаря значений.
+ */
+export const ATTRIBUTE_VALUE_TR_FIELDS = ['value'] as const;
+
+/**
  * Структурная секция карточки товара (product_blocks, §9). Плоские переводимые
  * поля — title/blockquot/body; табы переводятся СТРУКТУРНО (translations[locale].tabs,
  * localizeStructured), поэтому в плоский whitelist НЕ входят. Непереводимо:

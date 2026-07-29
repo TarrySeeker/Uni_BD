@@ -7,11 +7,11 @@
 
 import { localizedHref, DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
 
-export interface Crumb {
-  label: string;
-  /** Бесхитростный путь (`/catalog`, `/catalog/twilly`) — локаль навесит компонент. */
-  href?: string;
-}
+// Форма крошки живёт в чистом lib/breadcrumbs (там же — сборка JSON-LD
+// BreadcrumbList): один тип на визуальный компонент и на микроразметку, чтобы
+// они не разъехались. Реэкспорт — чтобы страницы импортировали Crumb привычно.
+export type { Crumb } from '@/lib/breadcrumbs';
+import type { Crumb } from '@/lib/breadcrumbs';
 
 export default function Breadcrumbs({
   items,

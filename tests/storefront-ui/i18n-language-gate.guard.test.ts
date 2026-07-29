@@ -13,19 +13,29 @@ import { describe, expect, it } from 'vitest';
 const STOREFRONT = resolve(__dirname, '../../storefront');
 const src = (rel: string) => readFileSync(resolve(STOREFRONT, rel), 'utf8');
 
-describe('middleware — распознаёт префикс локали regex-ом, БД не читает', () => {
+describe('middleware — распознаёт префикс локали по whitelist витрины, БД не читает', () => {
   const source = () => src('middleware.ts');
 
-  it('валидность языка НЕ решает по хардкод-массиву — используется regex ISO-кода', () => {
+  /**
+   * 🔴 АУДИТ №33/№12 переписал это ожидание. Раньше здесь сторожилось, что
+   * middleware решает REGEX-ом «похоже на локаль» — и именно этот regex и был
+   * первопричиной обоих дефектов: он пропускал ЛЮБОЙ двухбуквенный сегмент, из-за
+   * чего `/de/catalog` давал голую англоязычную 404 Next без шапки/футера, а
+   * CMS-страница со slug `/qa` становилась недостижимой. Теперь решение принимает
+   * чистая `routeDecision` по whitelist LOCALES витрины — это КОМПИЛЯТИВНАЯ
+   * константа приложения (набор его словарей), а не конфиг из БД, поэтому
+   * инвариант «middleware не читает БД» сохранён (см. тест ниже).
+   */
+  it('решение маршрутизации делегировано чистой routeDecision (regex-догадки убраны)', () => {
     const s = source();
-    // Двухбуквенный код с опциональным регионом (ru, en, pt-br) — сегмент-локаль.
-    expect(s).toMatch(/\[a-z\]\{2\}/);
+    expect(s).toContain('routeDecision');
+    expect(s).not.toMatch(/\[a-z\]\{2\}/);
   });
 
-  it('похожий на локаль префикс пропускается, прочее rewrite в дефолтную локаль', () => {
+  it('локале-подобный, но НЕподдерживаемый префикс не пропускается — rewrite в дефолт', () => {
     const s = source();
     expect(s).toContain('NextResponse.rewrite');
-    expect(s).toContain('DEFAULT_LOCALE');
+    expect(s).toContain('NextResponse.next');
   });
 
   it('middleware НЕ читает конфиг/БД (edge): без обращений к настройкам/getSettings', () => {

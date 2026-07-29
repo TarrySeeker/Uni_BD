@@ -9,7 +9,7 @@ import type { ActionResult } from '@/lib/server/action';
 import type { EffectiveSettings } from '@/lib/config/settings';
 import type { TranslationsMap } from '@/lib/i18n';
 
-import { parseNavigationFormState } from '@/lib/settings/nav-form';
+import { parseNavigationFormState, type NavFooterMetaInput } from '@/lib/settings/nav-form';
 import { updateNavigationContentAction } from './form-actions';
 import { errorMessage } from './action-result';
 import { ResetSettingButton } from './ResetSettingButton';
@@ -62,13 +62,25 @@ export function NavigationForm({
 
   const [headerText, setHeaderText] = useState(headerToText(navigation.header));
   const [footerText, setFooterText] = useState(footerToText(navigation.footer));
+  // Тексты подвала (эталон .footer-top__subscriptions + .footer-foot). Пустые
+  // поля в настройки НЕ уходят — витрина берёт свой дефолт по локали.
+  const [meta, setMeta] = useState<NavFooterMetaInput>({
+    subscribeTitle: navigation.footerMeta?.subscribeTitle ?? '',
+    subscribeNote: navigation.footerMeta?.subscribeNote ?? '',
+    copyright: navigation.footerMeta?.copyright ?? '',
+    designedByLabel: navigation.footerMeta?.designedByLabel ?? '',
+    designedByHref: navigation.footerMeta?.designedByHref ?? '',
+  });
+
+  const setMetaField = (key: keyof NavFooterMetaInput) => (value: string) =>
+    setMeta((prev) => ({ ...prev, [key]: value }));
 
   async function save() {
     setPending(true);
     setError(null);
     setSuccess(null);
     const result = await updateNavigationContentAction({
-      navigation: parseNavigationFormState(headerText, footerText),
+      navigation: parseNavigationFormState(headerText, footerText, meta),
     });
     setPending(false);
     if (result.ok) {
@@ -135,6 +147,82 @@ export function NavigationForm({
             rows={8} className={inputCls}
             placeholder={t('settings.navigationForm.footerPlaceholder')} />
           <p className={hintCls}>{t('settings.navigationForm.footerHint')}</p>
+        </div>
+      </fieldset>
+
+      {/* Тексты подвала: форма подписки + нижняя строка. Всё опционально —
+          пустое поле означает «использовать текст по умолчанию». */}
+      <fieldset className="mb-6 rounded border border-gray-200 p-4">
+        <legend className="px-1 text-sm font-semibold text-gray-800">
+          {t('settings.navigationForm.footerTextsLegend')}
+        </legend>
+        <p className={`mb-4 ${hintCls}`}>{t('settings.navigationForm.footerTextsHint')}</p>
+
+        <div className="mb-4">
+          <label htmlFor="nav-subscribe-title" className={labelCls}>
+            {t('settings.navigationForm.subscribeTitleLabel')}
+          </label>
+          <input
+            id="nav-subscribe-title"
+            type="text"
+            value={meta.subscribeTitle ?? ''}
+            onChange={(e) => setMetaField('subscribeTitle')(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="nav-subscribe-note" className={labelCls}>
+            {t('settings.navigationForm.subscribeNoteLabel')}
+          </label>
+          <textarea
+            id="nav-subscribe-note"
+            rows={2}
+            value={meta.subscribeNote ?? ''}
+            onChange={(e) => setMetaField('subscribeNote')(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="nav-copyright" className={labelCls}>
+            {t('settings.navigationForm.copyrightLabel')}
+          </label>
+          <input
+            id="nav-copyright"
+            type="text"
+            value={meta.copyright ?? ''}
+            onChange={(e) => setMetaField('copyright')(e.target.value)}
+            className={inputCls}
+          />
+          <p className={hintCls}>{t('settings.navigationForm.copyrightHint')}</p>
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="nav-designed-by" className={labelCls}>
+            {t('settings.navigationForm.designedByLabel')}
+          </label>
+          <input
+            id="nav-designed-by"
+            type="text"
+            value={meta.designedByLabel ?? ''}
+            onChange={(e) => setMetaField('designedByLabel')(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="nav-designed-by-href" className={labelCls}>
+            {t('settings.navigationForm.designedByHrefLabel')}
+          </label>
+          <input
+            id="nav-designed-by-href"
+            type="text"
+            value={meta.designedByHref ?? ''}
+            onChange={(e) => setMetaField('designedByHref')(e.target.value)}
+            className={inputCls}
+          />
+          <p className={hintCls}>{t('settings.navigationForm.designedByHrefHint')}</p>
         </div>
       </fieldset>
 

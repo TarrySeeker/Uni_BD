@@ -116,6 +116,18 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     return { name: 'Покупатель', email, phone: '+70000000000' };
   }
 
+  /**
+   * 🔴 Аудит major №3: курьерские фикстуры ниже несут ГОРОД и АДРЕС.
+   *
+   * Раньше они создавали заказ как `delivery: { type: 'courier' }` — без города и
+   * без адреса. Через API такой заказ невозможен (CreateOrderSchema требует и то,
+   * и другое), а расчёт доставки при включённом модуле СДЭК теперь честно
+   * отвечает «посчитать нечем» вместо прежнего «бесплатно» (см.
+   * canResolveDeliveryCost в lib/orders/delivery-cost). Эти тесты проверяют
+   * промокоды/резерв/идемпотентность, доставка в них — лишь обязательный
+   * реквизит заказа, поэтому фикстуры приведены к РЕАЛЬНОМУ виду.
+   */
+
   beforeAll(async () => {
     repo = await import('@/lib/orders/repository');
     const db = await import('@/lib/db/client');
@@ -230,7 +242,10 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId, qty: 3 }],
       customer: customer(),
-      delivery: { type: 'courier' },
+      // Самовывоз: тест про СУММУ СКИДКИ, и доставка не должна её зашумлять.
+      // (Раньше здесь стоял курьер без города — доставка молча считалась 0.00,
+      // и ожидаемый grandTotal неявно опирался на этот баг, аудит №3.)
+      delivery: { type: 'pickup' },
       paymentMethod: 'cod',
       promoCode: 'BOGOORDER',
     });
@@ -281,7 +296,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
         { productId: outCat, qty: 5 },
       ],
       customer: customer('scopemin@example.com'),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
       promoCode: 'SCOPEMIN3',
     });
@@ -317,7 +332,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId, qty: 3 }],
       customer: customer('scopemin@example.com'),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
       promoCode: 'CARTMIN3',
     });
@@ -363,7 +378,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId, qty: 2 }],
       customer: customer(),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
     });
     expect(r.ok).toBe(true);
@@ -399,7 +414,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const args = {
       items: [{ productId, qty: 1 }],
       customer: customer(),
-      delivery: { type: 'courier' as const },
+      delivery: { type: 'courier' as const, city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod' as const,
       idempotencyKey: key,
     };
@@ -424,7 +439,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const args = {
       items: [{ productId, qty: 1 }],
       customer: customer(),
-      delivery: { type: 'courier' as const },
+      delivery: { type: 'courier' as const, city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod' as const,
       idempotencyKey: key,
     };
@@ -456,7 +471,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId, qty: 3 }],
       customer: customer(),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
     });
     expect(r.ok).toBe(false);
@@ -555,7 +570,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items,
       customer: customer(),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
     });
     expect(r.ok).toBe(false);
@@ -580,7 +595,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
       repo.createOrder({
         items: [{ productId, qty: 1 }],
         customer: customer('race@example.com'),
-        delivery: { type: 'courier' },
+        delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
         paymentMethod: 'cod',
       });
     const [a, b] = await Promise.all([mk(), mk()]);
@@ -601,7 +616,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
       repo.createOrder({
         items: [{ productId, qty: 1 }],
         customer: customer('limit@example.com'),
-        delivery: { type: 'courier' },
+        delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
         paymentMethod: 'cod',
         promoCode: 'ONCE',
       });
@@ -625,7 +640,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
       repo.createOrder({
         items: [{ productId, qty: 1 }],
         customer: customer('percust@example.com'),
-        delivery: { type: 'courier' },
+        delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
         paymentMethod: 'cod',
         promoCode: 'PERCUST1',
       });
@@ -649,7 +664,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
       repo.createOrder({
         items: [{ productId, qty: 1 }],
         customer: customer('percustrace@example.com'),
-        delivery: { type: 'courier' },
+        delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
         paymentMethod: 'cod',
         promoCode: 'PERCUSTRACE',
       });
@@ -675,7 +690,9 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId: buyProduct, qty: 1 }],
       customer: customer('gift@example.com'),
-      delivery: { type: 'courier' },
+      // Самовывоз: тест про строку-подарок и итог БЕЗ доставки (аудит №3 — раньше
+      // курьер без города давал 0.00, и ожидание 900.00 держалось на этом баге).
+      delivery: { type: 'pickup' },
       paymentMethod: 'cod',
       promoCode: 'GIFTPROMO',
     });
@@ -723,7 +740,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId: buyProduct, qty: 1 }],
       customer: customer('giftnostock@example.com'),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
       promoCode: 'GIFTONLY0',
     });
@@ -759,7 +776,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId: buyProduct, qty: 1 }],
       customer: customer('gift@example.com'),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
       promoCode: 'GIFTNOSTOCK',
     });
@@ -808,7 +825,7 @@ describe.skipIf(!INTEGRATION_DB_URL)('orders/repository (интеграция, �
     const r = await repo.createOrder({
       items: [{ productId, qty: 1 }],
       customer: customer(),
-      delivery: { type: 'courier' },
+      delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
     });
     expect(r.ok).toBe(true);

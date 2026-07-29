@@ -52,6 +52,10 @@ function stuck(n: number): StuckOrderCandidate[] {
     customerPhone: null,
     customerEmail: null,
     error: 'cdek error',
+    // Аудит #17: у зависшего заказа теперь различимы «попыток не было» и
+    // «retry исчерпан». Здесь — классический исчерпанный retry.
+    retryCount: 3,
+    attempted: true,
   }));
 }
 

@@ -74,6 +74,12 @@ function makeSource(over: Partial<GiftIssueSourceRow> = {}): GiftIssueSourceRow 
     customerName: 'Пётр Гость',
     customerEmail: 'guest@shop.io',
     customerPhone: '+79990000000',
+    // Калитка ручного выпуска (находка аудита №27): по умолчанию заказ оплачен
+    // и жив, иначе выпуск теперь отбивается — см. manual-issue-gate.test.ts.
+    paymentStatus: 'paid',
+    status: 'paid',
+    paidAt: new Date('2026-01-01T00:00:00.000Z'),
+    giftCertificateId: null,
     item: {
       id: ITEM_ID,
       nameSnapshot: 'Подарочный сертификат 5000',
@@ -100,6 +106,15 @@ function build(user: AuthUser | null, over: Partial<GiftActionDeps> = {}) {
     actionDeps: a.actionDeps,
     isOrdersEnabled: vi.fn(async () => true),
     getLocaleConfig: vi.fn(async () => DEFAULT_LOCALE_CONFIG),
+    // Политика магазина и генератор кода — новые зависимости ручного выпуска
+    // (находки №27 и №13); в юнитах инъецируются детерминированно.
+    getGiftSettings: vi.fn(async () => ({
+      autoIssue: true,
+      validDays: 0,
+      categorySlugs: [] as string[],
+      allowIssueOnGiftPaidOrder: true,
+    })),
+    randomCode: vi.fn(() => 'TEST-RAND-CODE-0001'),
     ...repo,
     ...over,
   };
@@ -287,11 +302,18 @@ describe('gift actions — issueGiftFromOrder (ТЗ п.7)', () => {
     expect(row.issuedOrderItemId).toBe(ITEM_ID);
   });
 
-  it('без кода строит детерминированный код по заказу+позиции', async () => {
+  /**
+   * Находка аудита №13: раньше код без ввода строился ДЕТЕРМИНИРОВАННО из номера
+   * заказа (~24 бита) и перебирался через публичный /cart/quote. Теперь ручной
+   * путь, как и автовыпуск, берёт криптослучайный код. Подробности — в
+   * tests/gift-certificates/manual-issue-gate.test.ts.
+   */
+  it('без кода берёт КРИПТОСЛУЧАЙНЫЙ код, а не выводит его из номера заказа', async () => {
     const { actions, repo } = build(makeUser(['gift.write']));
     await actions.issueGiftFromOrder({ orderId: ORDER_ID, orderItemId: ITEM_ID });
     const row = repo.insertGiftCertificate.mock.calls[0]![0];
-    expect(row.code).toContain('CR-2026-000042');
+    expect(row.code).toBe('TEST-RAND-CODE-0001');
+    expect(row.code).not.toContain('CR-2026-000042');
   });
 
   it('позиция другого заказа/не найдена → not_found', async () => {

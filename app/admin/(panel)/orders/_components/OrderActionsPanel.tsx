@@ -10,10 +10,10 @@ import {
 } from '@/lib/orders/status';
 import type { OrderStatus, DeliveryStatus } from '@/lib/orders/types';
 import {
-  orderStatusLabel,
-  paymentStatusLabel,
-  deliveryStatusLabel,
-} from '@/lib/admin/order-format';
+  orderStatusLabelKey,
+  paymentStatusLabelKey,
+  deliveryStatusLabelKey,
+} from '@/lib/orders/labels';
 import type { ActionResult } from '@/lib/server/action';
 
 import {
@@ -59,6 +59,15 @@ export function OrderActionsPanel({
   const router = useRouter();
   const t = useTranslations();
 
+  /**
+   * Подпись статуса на кнопке — по КЛЮЧУ каталога, на языке ОПЕРАТОРА (аудит
+   * major №35). Раньше кнопки смены статуса были жёстко русскими: оператор с
+   * интерфейсом на en/fr не понимал, что именно он нажимает на ДЕНЕЖНЫХ
+   * действиях (отмена, возврат). Незнакомый код → сам код (фолбэк).
+   */
+  const statusText = (key: string | null, code: string): string =>
+    key ? t(key) : code;
+
   const [error, setError] = useState<Fail | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -78,6 +87,13 @@ export function OrderActionsPanel({
    * разрешает пометить заказ возвращённым. Ставится по машиночитаемому коду ответа.
    */
   const [manualRefundNeeded, setManualRefundNeeded] = useState(false);
+  /**
+   * Статус заказа сменил кто-то другой, пока оператор смотрел на этот экран
+   * (аудит minor №7). Панель уже перечитала страницу — здесь только объясняем,
+   * что кнопки под сообщением об ошибке УЖЕ обновились и повторять действие
+   * вслепую не нужно. Ставится строго по машиночитаемому коду ответа.
+   */
+  const [conflict, setConflict] = useState(false);
 
   const orderNext = nextStatuses('order', status);
   const paymentNext = nextStatuses('payment', paymentStatus);
@@ -109,6 +125,7 @@ export function OrderActionsPanel({
       setComment('');
       setForceTarget(null);
       setManualRefundNeeded(false);
+      setConflict(false);
       router.refresh();
     } else {
       setError(result);
@@ -118,6 +135,15 @@ export function OrderActionsPanel({
       setForceTarget(result.code === 'commit_failed' && target ? target : null);
       // Возврат требует ручного перевода: показываем отдельное подтверждение.
       setManualRefundNeeded(result.code === 'manual_refund_required');
+      // 🔴 ТУПИК ОПЕРАТОРА (аудит minor №7). Раньше router.refresh() стоял ТОЛЬКО
+      // в ветке успеха. После «статус изменился параллельно» на экране оставались
+      // кнопки уже НЕАКТУАЛЬНОГО статуса, и каждое нажатие повторяло ту же ошибку:
+      // выхода не было, кроме ручного F5. Перечитываем страницу при ЛЮБОМ отказе —
+      // сервер один раз отдаёт актуальное состояние, кнопки перерисовываются под
+      // него, а текст ошибки остаётся на экране (refresh не сбрасывает состояние
+      // клиентского компонента), так что оператор понимает, что произошло.
+      setConflict(result.code === 'conflict');
+      router.refresh();
     }
   }
 
@@ -205,6 +231,16 @@ export function OrderActionsPanel({
           className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
         >
           {errorMessage(error, t)}
+          {/*
+            Конкурентная смена статуса (minor №7): объясняем, что кнопки ниже уже
+            перерисованы под актуальное состояние — повторять то же действие
+            бессмысленно, надо посмотреть на новый список переходов.
+          */}
+          {conflict ? (
+            <p className="mt-1 text-xs text-red-600">
+              {t('orders.orderActionsPanel.conflictHint')}
+            </p>
+          ) : null}
         </div>
       ) : null}
       {success ? (
@@ -274,7 +310,7 @@ export function OrderActionsPanel({
                       : 'bg-gray-900 text-white hover:bg-gray-700'
                   }`}
                 >
-                  {orderStatusLabel(to)}
+                  {statusText(orderStatusLabelKey(to), to)}
                 </button>
               );
             })
@@ -359,7 +395,7 @@ export function OrderActionsPanel({
                 }
                 className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
-                {paymentStatusLabel(to)}
+                {statusText(paymentStatusLabelKey(to), to)}
               </button>
             ))
           )}
@@ -387,7 +423,7 @@ export function OrderActionsPanel({
                 }
                 className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
-                {deliveryStatusLabel(to)}
+                {statusText(deliveryStatusLabelKey(to), to)}
               </button>
             ))
           )}

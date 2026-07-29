@@ -20,6 +20,7 @@ import type {
   CategoryDto,
   FullDesignerDto,
   PageDto,
+  PageListItemDto,
   ProductDetailDto,
   ProductListItemDto,
   ProductsResponse,
@@ -29,7 +30,7 @@ import type {
   QuoteDto,
   OrderCreatedDto,
   OrderPublicDto,
-  PaykeeperInitDto,
+  PaymentInitDto,
   CdekCityDto,
   CdekPvzDto,
   StorefrontApiError,
@@ -195,6 +196,20 @@ export async function getPage(
 }
 
 /**
+ * Список опубликованных CMS-страниц (slug/title/SEO + признак бокового меню).
+ *
+ * Источник пунктов вертикального меню разделов на доп-страницах: витрина не
+ * знает состава страниц магазина и знать не должна (мультитенантность) — она
+ * фильтрует по флагу showInNav, который владелец ставит в админке. Сбой сети /
+ * выключенный модуль cms → пустой массив: боковик не рисуется, сама страница
+ * (её данные приходят отдельным запросом getPage) остаётся рабочей.
+ */
+export async function getPages(locale?: string): Promise<PageListItemDto[]> {
+  const body = await apiGet<{ data: PageListItemDto[] }>(withLocale('/pages', locale));
+  return body?.data ?? [];
+}
+
+/**
  * Товары для «избранной» сетки главной: сперва featured, при пустом результате —
  * общий список (fallback), чтобы витрина всегда показывала реальные товары.
  */
@@ -353,30 +368,91 @@ export async function createOrder(
 }
 
 /**
- * Инициация онлайн-оплаты PayKeeper. Сумма считается сервером из заказа
- * (anti-tamper). Доступ подтверждается токеном заказа (из createOrder).
- * Возвращает paymentUrl (invoice_url) — редирект туда.
+ * Подписка на рассылку из подвала витрины.
+ *
+ * 🔴 ПЕРЕИСПОЛЬЗУЕТ существующий публичный эндпоинт платформы
+ * `POST /api/storefront/v1/newsletter` (app/api/storefront/v1/newsletter/route.ts,
+ * G-12): тот же конвейер runStorefront (ключ/Origin → rate-limit → CORS), та же
+ * валидация NewsletterInputSchema, та же идемпотентная запись в
+ * `newsletter_subscribers`. Второго приёмника подписок НЕ создаём — иначе часть
+ * адресов оседала бы мимо раздела «Подписчики» в админке.
+ *
+ * Адрес НЕ логируем ни здесь, ни на сервере (route пишет в лог только текст
+ * ошибки БД) — персональные данные в логи не попадают.
  */
-export async function initPaykeeperPayment(args: {
+export async function subscribeNewsletter(email: string): Promise<{ ok: boolean }> {
+  return apiPost<{ ok: boolean }>('/newsletter', { email });
+}
+
+/**
+ * Инициация онлайн-оплаты у АКТИВНОГО эквайера магазина. Сумма считается сервером
+ * из заказа (anti-tamper). Доступ подтверждается токеном заказа (из createOrder).
+ * Возвращает paymentUrl — редирект туда.
+ *
+ * 🔴 ВИТРИНА НЕ ЗНАЕТ ПРО ЭКВАЙЕРОВ. Путь нейтральный (`/payments/init`), эквайер
+ * выбирает сервер по конфигу магазина. Раньше здесь был жёстко зашит путь
+ * конкретного эквайера: при активном другом эквайере (дефолт —
+ * `PAYMENTS_PROVIDER=tbank`) покупателя уводило на его mock-страницу, где
+ * «оплата» проходила БЕЗ денег (аудит major №1).
+ */
+export async function initPayment(args: {
   orderNumber: string;
   accessToken: string;
   returnUrl?: string;
-}): Promise<PaykeeperInitDto> {
-  return apiPost<PaykeeperInitDto>('/payments/paykeeper/init', {
+}): Promise<PaymentInitDto> {
+  return apiPost<PaymentInitDto>('/payments/init', {
     orderNumber: args.orderNumber,
     accessToken: args.accessToken,
     ...(args.returnUrl ? { returnUrl: args.returnUrl } : {}),
   });
 }
 
-/** Поиск городов СДЭК для автокомплита (q ≥ 2 символов). Пустой список на сбой. */
-export async function cdekCities(q: string, limit = 10): Promise<CdekCityDto[]> {
-  if (q.trim().length < 2) return [];
+/**
+ * Результат справочного запроса к СДЭК (города / ПВЗ).
+ *
+ * 🔴 Аудит major №19. Раньше обе функции были `catch { return []; }`, и сбой
+ * транспорта/сервиса был НЕОТЛИЧИМ от честно пустого результата: витрина по
+ * `length === 0` писала «в этом городе нет пунктов выдачи» (то есть врала про
+ * СДЭК), а у автокомплита городов не показывала вообще ничего — покупатель не
+ * понимал, что происходит. Теперь ошибку возвращаем ЯВНО:
+ *   - `failed: false` — сервис ответил (список может быть честно пуст);
+ *   - `failed: true`  — ответа по существу не было; писать «ничего не найдено» НЕЛЬЗЯ.
+ * `reason` уточняет причину для подписи: `unavailable` — способ доставки сейчас
+ * недоступен (модуль выключен / 404), `error` — временный сбой (сеть, 5xx).
+ */
+export interface CdekLookupResult<T> {
+  items: T[];
+  failed: boolean;
+  reason?: 'unavailable' | 'error';
+}
+
+/** Разбор ошибки справочного запроса: недоступность способа vs временный сбой. */
+function cdekLookupFailure<T>(err: unknown): CdekLookupResult<T> {
+  // 404 (в т.ч. module_disabled) = у магазина этот способ доставки не работает;
+  // всё остальное (сеть, 5xx, 4xx) — временный сбой, имеет смысл повторить.
+  const unavailable = err instanceof ApiError && err.status === 404;
+  // Диагностика — в консоль, покупателю показываем только строку словаря.
+  console.warn('[storefront-api] cdek lookup failed:', err);
+  return { items: [], failed: true, reason: unavailable ? 'unavailable' : 'error' };
+}
+
+/**
+ * Поиск городов СДЭК для автокомплита (q ≥ 2 символов). Слишком короткий запрос —
+ * НЕ сбой: `failed: false` с пустым списком (покупатель просто ещё не дописал).
+ */
+export async function cdekCities(
+  q: string,
+  limit = 10,
+): Promise<CdekLookupResult<CdekCityDto>> {
+  if (q.trim().length < 2) return { items: [], failed: false };
   const params = new URLSearchParams({ q: q.trim(), limit: String(limit) });
   try {
-    return await apiGetOrThrow<CdekCityDto[]>(`/delivery/cdek/cities?${params.toString()}`);
-  } catch {
-    return [];
+    const items = await apiGetOrThrow<CdekCityDto[]>(
+      `/delivery/cdek/cities?${params.toString()}`,
+    );
+    return { items: items ?? [], failed: false };
+  } catch (err) {
+    return cdekLookupFailure<CdekCityDto>(err);
   }
 }
 
@@ -384,13 +460,14 @@ export async function cdekCities(q: string, limit = 10): Promise<CdekCityDto[]> 
 export async function cdekPvz(
   cityCode: number,
   type?: 'PVZ' | 'POSTAMAT',
-): Promise<CdekPvzDto[]> {
+): Promise<CdekLookupResult<CdekPvzDto>> {
   const params = new URLSearchParams({ city_code: String(cityCode) });
   if (type) params.set('type', type);
   try {
-    return await apiGetOrThrow<CdekPvzDto[]>(`/delivery/cdek/pvz?${params.toString()}`);
-  } catch {
-    return [];
+    const items = await apiGetOrThrow<CdekPvzDto[]>(`/delivery/cdek/pvz?${params.toString()}`);
+    return { items: items ?? [], failed: false };
+  } catch (err) {
+    return cdekLookupFailure<CdekPvzDto>(err);
   }
 }
 

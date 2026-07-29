@@ -5,6 +5,7 @@ import { sql } from '@/lib/db/client';
 import { isCdekMock, getCdekConfig } from '@/lib/cdek/config';
 import { deliveryModeLabel, destinationLabel } from '@/lib/cdek/format';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
@@ -110,6 +111,8 @@ export default async function CdekPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const guard = await guardCdek('cdek.manage');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
@@ -235,11 +238,11 @@ export default async function CdekPage({
                     {row.status_name ?? row.status_code ?? '—'}
                     {row.status_at ? (
                       <div className="text-xs text-gray-400">
-                        {formatDateTime(row.status_at)}
+                        {formatDateTime(row.status_at, timeZone)}
                       </div>
                     ) : null}
                   </td>
-                  <td className="px-4 py-2 text-gray-500">{formatDateTime(row.updated_at)}</td>
+                  <td className="px-4 py-2 text-gray-500">{formatDateTime(row.updated_at, timeZone)}</td>
                   <td className="px-4 py-2">
                     {row.print_url ? (
                       row.is_mock ? (

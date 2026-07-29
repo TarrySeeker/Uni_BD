@@ -34,22 +34,45 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined';
 }
 
-/** Базовая валюта витрины (₽) из настроек магазина. rate=1 (сама с собой). */
+/**
+ * Базовая валюта витрины из настроек магазина. rate=1 (сама с собой).
+ *
+ * 🔴 Аудит minor №9. Раньше здесь стояла КОНСТАНТА `fractionDigits: 0`, а локаль
+ * формата не читалась вовсе — настройки магазина «Знаков после запятой» и «Формат
+ * чисел» витрина игнорировала полностью (магазин с центами показывал целые рубли).
+ * Теперь оба поля берутся из `settings.currency`; отсутствие поля → исторический
+ * дефолт (0 знаков, локаль по умолчанию форматтера), т.е. без регресса.
+ */
 function baseCurrency(settings: PublicSettingsDto | null): DisplayCurrency {
   const code = settings?.currency?.code ?? 'RUB';
   const symbol = settings?.currency?.symbol ?? (code === 'RUB' ? '₽' : code);
-  // Базовая — рубли: показываем целыми (0 знаков), как исторический рублёвый формат.
-  return { code, symbol, rate: 1, fractionDigits: 0 };
+  const digits = settings?.currency?.fractionDigits;
+  const locale = settings?.currency?.locale ?? null;
+  return {
+    code,
+    symbol,
+    rate: 1,
+    // Схема настроек ограничивает 0..4; мусор/отсутствие → 0 (прежний показ).
+    fractionDigits:
+      typeof digits === 'number' && Number.isInteger(digits) && digits >= 0 && digits <= 4
+        ? digits
+        : 0,
+    locale,
+  };
 }
 
 /** Все валюты для переключателя: базовая + доп.валюты отображения из настроек. */
 export function availableCurrencies(settings: PublicSettingsDto | null): DisplayCurrency[] {
   const base = baseCurrency(settings);
+  // Локаль ФОРМАТА — свойство магазина, а не конкретной валюты: доп.валюты
+  // группируют разряды так же, как базовая (меняются лишь знаки после запятой).
+  const locale = settings?.currency?.locale ?? null;
   const display = (settings?.currency?.displayCurrencies ?? []).map((d) => ({
     code: d.code,
     symbol: d.symbol,
     rate: d.rate,
     fractionDigits: d.fractionDigits,
+    locale,
   }));
   // Базовая всегда первая; дубли по коду отбрасываем (базовая приоритетна).
   const seen = new Set([base.code]);
@@ -150,7 +173,14 @@ export function CurrencyProvider({
 export function useCurrency(): CurrencyContextValue {
   const ctx = useContext(CurrencyContext);
   if (ctx) return ctx;
-  const fallback: DisplayCurrency = { code: 'RUB', symbol: '₽', rate: 1, fractionDigits: 0 };
+  // Вне провайдера настроек нет — форматируем дефолтом форматтера (locale=null).
+  const fallback: DisplayCurrency = {
+    code: 'RUB',
+    symbol: '₽',
+    rate: 1,
+    fractionDigits: 0,
+    locale: null,
+  };
   return {
     currencies: [fallback],
     selected: fallback,

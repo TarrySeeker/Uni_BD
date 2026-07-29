@@ -19,7 +19,7 @@ import {
   resolveCategoryRoute,
   categoryRouteLocation,
 } from '@/lib/tree';
-import { toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
+import { toLocale, alternatesFor, enabledLocalesFrom, absoluteUrlBase } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import { ownTitle } from '@/lib/seo';
 import CatalogView from '../CatalogView';
@@ -57,12 +57,15 @@ export async function generateMetadata({
   if (route.status === 'not-found') return { title: dict.catalog.title };
   const cat = findCategory(roots, route.slug);
   const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
+  // Аудит №34: hreflang обязан быть АБСОЛЮТНЫМ URL (относительные поисковики
+  // игнорируют). База — публичный адрес магазина из его же настроек, без хардкода.
+  const urlBase = absoluteUrlBase(settings);
   // canonical — ВСЕГДА канонический путь категории, а не сырой путь запроса.
   return {
     // Имя категории строкой (шаблон из настроек применит Next), но пустым <title>
     // не бывает: безымянная категория уступает место заголовку раздела.
     title: ownTitle(cat?.name, dict.catalog.title),
-    alternates: alternatesFor(route.canonicalPath, locale, enabledLocales),
+    alternates: alternatesFor(route.canonicalPath, locale, enabledLocales, urlBase),
   };
 }
 

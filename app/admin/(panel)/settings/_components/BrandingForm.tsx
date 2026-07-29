@@ -86,10 +86,17 @@ export function SettingsImageUpload({
 
 export function BrandingForm({
   branding,
+  timeZone,
   i18n,
   translations,
 }: {
   branding: EffectiveSettings['branding'];
+  /**
+   * Эффективный часовой пояс магазина (аудит major №26): настройка → env →
+   * дефолт платформы. Приходит отдельным пропом, а не полем branding, потому что
+   * резолвер живёт в lib/admin/timezone.ts и знает про env-приоритет.
+   */
+  timeZone: string;
   i18n: { defaultLocale: string; locales: string[] };
   translations?: TranslationsMap;
 }) {
@@ -107,6 +114,10 @@ export function BrandingForm({
   const [mode, setMode] = useState(branding.theme.mode);
   const [supportEmail, setSupportEmail] = useState(branding.supportEmail ?? '');
   const [supportPhone, setSupportPhone] = useState(branding.supportPhone ?? '');
+  // Пояс, в котором оператору показывается ВСЁ время в админке (аудит major №26):
+  // журнал аудита, список заказов, карточка; в нём же считаются сутки для фильтра
+  // «за период». Мультитенантность: значение магазина, а не хардкод Москвы.
+  const [tz, setTz] = useState(timeZone);
 
   async function save() {
     setPending(true);
@@ -123,6 +134,7 @@ export function BrandingForm({
         theme,
         supportEmail: supportEmail.trim() || undefined,
         supportPhone: supportPhone.trim() || undefined,
+        timeZone: tz.trim() || undefined,
       },
     });
     setPending(false);
@@ -208,6 +220,16 @@ export function BrandingForm({
           <label htmlFor="s-sphone" className="block text-sm font-medium text-gray-700">{t('settings.brandingForm.supportPhone')}</label>
           <input id="s-sphone" value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)}
             className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label htmlFor="s-tz" className="block text-sm font-medium text-gray-700">
+            {t('settings.brandingForm.timeZone')}
+          </label>
+          <input id="s-tz" value={tz} onChange={(e) => setTz(e.target.value)}
+            placeholder="Europe/Moscow"
+            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
+          {fe('timeZone') ? <p className="mt-1 text-xs text-red-600">{fe('timeZone')}</p> : null}
+          <p className="mt-1 text-xs text-gray-500">{t('settings.brandingForm.timeZoneHelp')}</p>
         </div>
       </div>
 

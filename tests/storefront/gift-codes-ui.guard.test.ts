@@ -70,8 +70,15 @@ describe('витрина: блок кода сертификата на стра
     expect(src).not.toContain('setInterval(');
   });
 
-  it('три состояния: none — блок не рендерится вовсе', () => {
-    expect(src).toMatch(/state === 'none'\) return null/);
+  /**
+   * Находка аудита №12: ранний выход теперь учитывает СБОЙ запроса. Раньше
+   * условие было просто `!payload || state === 'none'`, и первый же 429
+   * (ведро 40/мин) молча прятал блок у покупателя, уплатившего за сертификат.
+   * Пустота допустима ТОЛЬКО когда сбоя нет. Детали — в
+   * tests/storefront/gift-codes-error-state.guard.test.ts.
+   */
+  it('три состояния: none — блок не рендерится вовсе (но только без сбоя)', () => {
+    expect(src).toMatch(/!failure && \(!payload \|\| payload\.state === 'none'\)\) return null/);
     expect(src).toContain("payload.state === 'ready'");
   });
 

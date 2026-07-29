@@ -28,6 +28,32 @@ export interface PublicSocialDto {
   url: string;
 }
 
+/**
+ * Публичный способ доставки — ВОЗМОЖНОСТЬ витрины, а не имя модуля платформы.
+ *
+ * 🔴 Аудит major №20. Витрина обязана знать, что она вправе предложить покупателю:
+ * при выключенном модуле `cdek` радио «Курьер СДЭК»/«Пункт выдачи СДЭК» вели в
+ * тупик (роуты /delivery/cdek/* под module-gate отдают 404). Но раскрывать наружу
+ * ВНУТРЕННЕЕ устройство (`module_overrides`, набор ADMIK_MODULES) нельзя — это
+ * осознанно скрытая конфигурация. Поэтому контракт — список ВОЗМОЖНОСТЕЙ:
+ *   - `zone`         — курьер по зоне из настроек магазина (зоны заданы);
+ *   - `cdek_courier` — курьерская доставка СДЭК;
+ *   - `cdek_pvz`     — выдача в пункте СДЭК.
+ * Набор мультитенантен: каждый магазин получает ровно свои способы, и обе
+ * конфигурации (модуль включён/выключен) одинаково валидны.
+ */
+export type PublicDeliveryMethod = 'zone' | 'cdek_courier' | 'cdek_pvz';
+
+/**
+ * Возможности магазина, влияющие на публичный DTO. Не «состояние модулей»:
+ * роут переводит авторитетный гейт модулей в набор способов доставки, наружу
+ * уходит только результат.
+ */
+export interface PublicSettingsCapabilities {
+  /** Доступна ли доставка СДЭК (модуль включён и роуты /delivery/cdek/* живые). */
+  cdekEnabled: boolean;
+}
+
 /** Публичная зона доставки (ТЗ_1). Деньги — в КОПЕЙКАХ; freeThreshold null, если не задан. */
 export interface PublicDeliveryZoneDto {
   id: string;
@@ -79,13 +105,25 @@ export interface PublicHomeDto {
     linkHref: string;
   };
   /**
-   * ТЗ_2 — «Образы» (lookbook): показ + опц. заголовок + категории. Каждая
-   * категория несёт imageUrl (НЕ imageKey) — сырой S3-ключ наружу не раскрываем.
+   * ТЗ_2 → v2 — «Образы» (lookbook): показ + заголовок + ВКЛАДКИ (categories) +
+   * КАРТОЧКИ карусели (items). Изображения отдаются как *Url (НЕ ключи) — сырой
+   * S3-ключ наружу не раскрываем.
+   *
+   * У категории `text`/`imageUrl` — наследие v1 (статичная сетка): остаются в
+   * контракте, чтобы клиент, ещё не знающий про items, не сломался. Пустой
+   * легаси-ключ даёт `imageUrl: ''` (резолв пустого ключа не делаем).
+   * `authorAvatarUrl` nullable: аватар автора необязателен.
    */
   looks: {
     enabled: boolean;
     title: string;
-    categories: { title: string; text: string; imageUrl: string }[];
+    categories: { id: string; title: string; text: string; imageUrl: string }[];
+    items: {
+      categoryId: string;
+      imageUrl: string;
+      authorName: string;
+      authorAvatarUrl: string | null;
+    }[];
   };
   /**
    * M4 — «Плитки категорий»: показ + плитки. Каждая плитка несёт imageUrl (НЕ
@@ -180,6 +218,14 @@ export interface PublicSettingsDto {
     kpp: string | null;
     ogrn: string | null;
     legalAddress: string | null;
+    /**
+     * Публичный адрес для заявок дизайнеров/партнёров (`email_designers`). Витрина
+     * показывает его вторым контактом в низу выезжающего меню (эталон docs/41 §2
+     * «Для дизайнеров»). Это ПУБЛИЧНАЯ приёмная почта — тот же класс данных, что
+     * contacts.email, а не приватные реквизиты вроде bankDetails. Магазин без
+     * дизайнерского направления поля не заполняет → null → блока в меню нет.
+     */
+    emailDesigners: string | null;
   };
   delivery: {
     /** Порог бесплатной доставки — в КОПЕЙКАХ (0 = выключено). */
@@ -189,6 +235,13 @@ export interface PublicSettingsDto {
      * freeThreshold — порог бесплатной доставки для зоны (null, если не задан).
      */
     zones: PublicDeliveryZoneDto[];
+    /**
+     * 🔴 Аудит №20 — ДОСТУПНЫЕ способы доставки (возможности, не модули). Витрина
+     * рендерит выбор доставки СТРОГО по этому списку: чего здесь нет — того
+     * покупателю не предлагаем. Пустой список = у магазина не настроен ни один
+     * способ (валидная конфигурация; витрина обязана это объяснить, а не молчать).
+     */
+    methods: PublicDeliveryMethod[];
   };
   seo: {
     siteName: string | null;
@@ -203,6 +256,17 @@ export interface PublicSettingsDto {
   navigation: {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
+    /**
+     * НЕ-ссылочное содержимое подвала. Пустая строка = владелец не задал →
+     * витрина берёт словарный дефолт своей локали (мультитенантно).
+     */
+    footerMeta: {
+      subscribeTitle: string;
+      subscribeNote: string;
+      copyright: string;
+      designedByLabel: string;
+      designedByHref: string;
+    };
   };
   /**
    * Набор языков магазина (ключ i18n ∩ whitelist платформы). Контракт для витрины:
@@ -254,14 +318,31 @@ function localizeStruct<T>(base: T, patch: unknown, loc: LocalizeCtx): T {
 }
 
 /**
+ * Способы доставки, которые магазин РЕАЛЬНО может выполнить. Порядок
+ * детерминирован (зона → курьер СДЭК → ПВЗ СДЭК), чтобы витрина рендерила
+ * стабильный список.
+ */
+function buildDeliveryMethods(hasZones: boolean, cdekEnabled: boolean): PublicDeliveryMethod[] {
+  const methods: PublicDeliveryMethod[] = [];
+  if (hasZones) methods.push('zone');
+  if (cdekEnabled) methods.push('cdek_courier', 'cdek_pvz');
+  return methods;
+}
+
+/**
  * Преобразует эффективные настройки в публичный DTO витрины.
  * Вырезает приватные поля (bankDetails, og_image_key, robots_extra,
  * noindex_site, module_overrides) и audit-trail. Деньги остаются в копейках.
+ *
+ * `caps` — возможности магазина (см. PublicSettingsCapabilities). Не передан →
+ * СДЭК считается доступным: обратная совместимость с прежним поведением DTO
+ * (важно для вызовов без рантайм-гейта, напр. в тестах старой формы).
  */
 export function toPublicSettingsDto(
   eff: EffectiveSettings,
   publicUrl: PublicUrlResolver = (k) => k,
   loc?: LocalizeCtx,
+  caps?: PublicSettingsCapabilities,
 ): PublicSettingsDto {
   // Оверлей переводов активен только для НЕ дефолтного языка. Иначе (loc не задан
   // или запрошен язык-канон) — patch=undefined → все localize* возвращают базу без
@@ -328,7 +409,9 @@ export function toPublicSettingsDto(
       kpp: eff.legalEntity.kpp ?? null,
       ogrn: eff.legalEntity.ogrn ?? null,
       legalAddress: eff.legalEntity.legalAddress ?? null,
+      emailDesigners: eff.legalEntity.emailDesigners ?? null,
       // bankDetails намеренно НЕ включён — приватные реквизиты.
+      // offerDocKey тоже НЕ включён — это сырой S3-ключ (инвариант «ключи не наружу»).
     },
     delivery: {
       freeDeliveryThreshold: eff.delivery.freeDeliveryThreshold,
@@ -342,6 +425,9 @@ export function toPublicSettingsDto(
         price: z.price,
         freeThreshold: z.freeThreshold ?? null,
       })),
+      // Возможности, а не модули: зональный курьер доступен, когда у магазина
+      // заданы зоны; способы СДЭК — когда доставка СДЭК доступна (caps).
+      methods: buildDeliveryMethods(eff.delivery.zones.length > 0, caps?.cdekEnabled ?? true),
     },
     seo: {
       siteName: seo.site_name ?? null,
@@ -378,9 +464,18 @@ export function toPublicSettingsDto(
         enabled: home.looks.enabled,
         title: home.looks.title,
         categories: home.looks.categories.map((c) => ({
+          id: c.id,
           title: c.title,
           text: c.text,
-          imageUrl: publicUrl(c.imageKey),
+          // Легаси-фото категории может отсутствовать (v2-вкладка) — пустой ключ
+          // НЕ резолвим, иначе наружу уехал бы битый URL вида `https://cdn/`.
+          imageUrl: c.imageKey ? publicUrl(c.imageKey) : '',
+        })),
+        items: home.looks.items.map((i) => ({
+          categoryId: i.categoryId,
+          imageUrl: publicUrl(i.imageKey),
+          authorName: i.authorName,
+          authorAvatarUrl: i.authorAvatarKey ? publicUrl(i.authorAvatarKey) : null,
         })),
       },
       tiles: {
@@ -432,6 +527,16 @@ export function toPublicSettingsDto(
         title: c.title,
         links: c.links.map((l) => ({ label: l.label, href: l.href })),
       })),
+      // Подвал: тексты и кредит. localizeStruct выше уже наложил перевод по
+      // whitelist SETTINGS_TR_FIELDS.navigation.footerMeta (href не переводится).
+      // `?? ''` — устойчивость к EffectiveSettings, собранным в старых тестах.
+      footerMeta: {
+        subscribeTitle: navigation.footerMeta?.subscribeTitle ?? '',
+        subscribeNote: navigation.footerMeta?.subscribeNote ?? '',
+        copyright: navigation.footerMeta?.copyright ?? '',
+        designedByLabel: navigation.footerMeta?.designedByLabel ?? '',
+        designedByHref: navigation.footerMeta?.designedByHref ?? '',
+      },
     },
     i18n: {
       defaultLocale: eff.i18n.defaultLocale,

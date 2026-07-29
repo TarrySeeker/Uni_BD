@@ -38,6 +38,7 @@ import type {
   CdekPackage,
 } from '../types';
 import { aggregatePackage, type CartLineDims } from './calculator';
+import { CityService } from './city';
 
 // -----------------------------------------------------------------------------
 // normalizePhone — ЧИСТАЯ (порт OrderService::normalizePhone). Тестируется без сети.
@@ -118,7 +119,7 @@ export interface CdekOrderPayload {
   shipment_point?: string;
   from_location?: { code: number };
   delivery_point?: string;
-  to_location?: { code?: number; postal_code?: string; address?: string };
+  to_location?: { code?: number; city?: string; postal_code?: string; address?: string };
   recipient: {
     name: string;
     phones: Array<{ number: string }>;
@@ -164,6 +165,15 @@ export interface BuildPayloadOptions {
     email: string | null;
     inn: string | null;
   };
+  /**
+   * УЖЕ РЕЗОЛВНУТЫЙ код города получателя для to_location.code (аудит #15).
+   *
+   * buildPayload остаётся ЧИСТОЙ и синхронной, поэтому сама в справочник СДЭК не
+   * ходит: резолв «имя города → код» делает вызывающий (CityService.resolveCityCode)
+   * и передаёт результат сюда. undefined/null — код неизвестен: тогда адресация
+   * идёт по city+address, накладная НЕ блокируется.
+   */
+  toCityCode?: number | null;
 }
 
 /**
@@ -246,9 +256,21 @@ export function buildPayload(
       );
     }
   } else {
-    // door: адрес получателя (код города у заказа — это название, не числовой код
-    // СДЭК; адрес — основное поле для курьерской доставки).
+    // door: назначение курьерской доставки (аудит-находка #15).
+    //
+    // РАНЬШЕ здесь был ТОЛЬКО address — город заказа (order.deliveryCity) в
+    // накладную не попадал вовсе, а code/postal_code оставались пустыми. Для СДЭК
+    // это «город неизвестен»: заявка либо отбивается валидацией, либо адресуется
+    // по одному адресу, который в разных городах может совпасть (ул. Ленина, 1).
+    //
+    // ТЕПЕРЬ: имя города кладём ВСЕГДА (оно у заказа заведомо есть), числовой код —
+    // если вызывающий сумел его резолвнуть (CityService.resolveCityCode). Код
+    // необязателен: без него СДЭК адресует по city+address, и отгрузка не встаёт
+    // из-за недоступности справочника городов.
+    const city = order.deliveryCity?.trim();
     payload.to_location = {
+      ...(typeof opts.toCityCode === 'number' ? { code: opts.toCityCode } : {}),
+      ...(city ? { city } : {}),
       ...(order.deliveryAddress ? { address: order.deliveryAddress } : {}),
     };
   }
@@ -430,6 +452,14 @@ export class OrderService {
     const mode = deliveryModeFor(order);
     const pkg = aggregatePackage(linesFromItems(items), cfg.defaultDimensions);
 
+    // Код города получателя (аудит #15). Резолвим ТОЛЬКО для курьера: в режиме
+    // ПВЗ адресация идёт по delivery_point, город не нужен. Резолв мягкий —
+    // null не блокирует накладную (см. CityService.resolveCityCode).
+    let toCityCode: number | null = null;
+    if (mode === 'door') {
+      toCityCode = await new CityService(this.manager).resolveCityCode(order.deliveryCity);
+    }
+
     try {
       let cdekUuid: string;
       let cdekNumber: string | null;
@@ -448,6 +478,7 @@ export class OrderService {
           defaultTariffCode: cfg.defaultTariffCode,
           doorTariffCode: cfg.doorTariffCode,
           sender: cfg.sender,
+          toCityCode,
         });
         const created = await this.create(payload);
         cdekUuid = created.uuid;
@@ -460,6 +491,10 @@ export class OrderService {
         cdekNumber,
         tariffCode: order.deliveryType === 'pickup' ? null : tariffForMode(cfg, mode),
         pvzCode: order.deliveryPvzCode,
+        // Снимок резолвнутого кода города (колонка cdek_shipments.city_code
+        // существует с 0017 — миграция не нужна). Оператор видит, КАКОЙ город
+        // ушёл в СДЭК, а повторное создание не резолвит заново вслепую.
+        cityCode: toCityCode,
         deliveryMode: mode,
         weightG: pkg.weight,
         lengthCm: pkg.length ?? null,

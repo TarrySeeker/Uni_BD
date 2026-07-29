@@ -214,6 +214,12 @@ services:
   #       сбой), эта задача выпустит его сама и отправит покупателю; уже
   #       выпущенные коды повторно НЕ создаются. Смотрит только оплаченные
   #       заказы за последние 30 дней;
+  #     • gift/expire-outdated — раз в сутки ночью: помечает подарочные
+  #       сертификаты с истёкшим сроком как «Истёк». Задача ОТОБРАЖЕНИЯ, а не
+  #       денег: потратить просроченный код нельзя в любом случае (срок
+  #       проверяется в момент списания), но без этой задачи такой сертификат
+  #       показывался в админке «Активен», и оператор не понимал, почему
+  #       покупателю отказывают. Отключённые вручную коды задача не трогает;
   #     • orders/expire-unpaid — 3 раза в час: отменяет заказы витрины с онлайн-
   #       оплатой, не оплаченные за ORDERS_UNPAID_TTL_MINUTES (по умолчанию сутки).
   #       Это ВОЗВРАТ ЗАСТРЯВШЕГО: покупателю — списанный при оформлении баланс
@@ -249,6 +255,7 @@ services:
   #   5,20,35,50 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/payments/reconcile-pending-paykeeper?key=СЕКРЕТ"
   #   10,25,40,55 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/payments/reconcile-pending-alfabank?key=СЕКРЕТ"
   #   */10 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/gift/issue-pending?key=СЕКРЕТ"
+  #   40   3 * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/gift/expire-outdated?key=СЕКРЕТ"
   #   7,27,47 * * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/orders/expire-unpaid?key=СЕКРЕТ"
   #   30  5 * * * curl -fsS -X POST "https://ВАШ_ДОМЕН/api/cron/exchange/update-rates?key=СЕКРЕТ"
   # ---------------------------------------------------------------------------
@@ -294,6 +301,11 @@ services:
           echo "5,20,35,50 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/payments/reconcile-pending-paykeeper\" >/proc/1/fd/1 2>&1";
           echo "10,25,40,55 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/payments/reconcile-pending-alfabank\" >/proc/1/fd/1 2>&1";
           echo "*/10 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/gift/issue-pending\" >/proc/1/fd/1 2>&1";
+          # Пометка истёкших кодов (минор аудита №3): статус 'expired' не
+          # выставлялся НИКОГДА, и админка показывала истёкший сертификат
+          # «Активен». Задача чисто отображательная (деньги защищены проверкой
+          # срока в redeemGiftTx), поэтому раз в сутки ночью, а не каждые 10 минут.
+          echo "40   3 * * * $$HIT \"$$CDEK_CRON_URL/api/cron/gift/expire-outdated\" >/proc/1/fd/1 2>&1";
           echo "7,27,47 * * * * $$HIT \"$$CDEK_CRON_URL/api/cron/orders/expire-unpaid\" >/proc/1/fd/1 2>&1";
           echo "30   5 * * * $$HIT \"$$CDEK_CRON_URL/api/cron/exchange/update-rates\"      >/proc/1/fd/1 2>&1";
         } > /etc/crontabs/root

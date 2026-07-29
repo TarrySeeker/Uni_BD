@@ -136,30 +136,53 @@
   margin-bottom: 30px;
 }
 
-/* ---- Полное дерево в выезжающем меню: вложенные аккордеоны (3 уровня) ------
- * app.css задаёт аккордеон только на 1 уровень (menu-block > menu-block-links).
- * Здесь добавляем вложенный уровень: держим внутренние подсписки свёрнутыми, пока
- * не открыт их собственный menu-block, и снимаем ограничение высоты, чтобы 3 уровня
- * не обрезались. Селекторы с child-комбинатором перекрывают descendant-правила
- * app.css (та же/выше специфичность + позднее в каскаде). */
-.page-menu-top-main .menu-block-links .menu-block {
-  padding-left: 12px;
+/* ---- Меню: элементы управления — настоящие <button> ------------------------
+ * Доступность (клавиатура + скринридер) требует кнопок вместо кликабельных div:
+ * раскрытие раздела, бургер, крестик и переключатель валюты. Браузер красит
+ * <button> по-своему (серый фон, рамка, своя типографика, центрирование), а
+ * app.css рассчитан на div — поэтому здесь сбрасываем это к исходному виду.
+ * Разметка и классы эталона (docs/41 §2) не меняются, меняется только тег. */
+.page-menu-top .menu-block-head,
+.page-head-settings__dd-item,
+.mm-cur__item,
+.burger {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.page-menu-top-main .menu-block-links .menu-block .menu-block-head {
-  margin: 8px 0 6px;
+/* Заголовок раздела занимает всю ширину: «+»/«—» прижаты вправо (justify-content
+ * из app.css работает только на полноширинном флекс-контейнере). */
+.page-menu-top button.menu-block-head {
+  width: 100%;
 }
-.page-menu-top-main .menu-block-links .menu-block .menu-block-head a {
-  font-size: 14px;
+/* Подпись раздела теперь <span>, а не <a>: наследуем типографику ссылки эталона. */
+.page-menu-top .menu-block-head > span:first-child {
+  font-size: 18px;
+  line-height: 120%;
+  color: #000;
 }
-/* Вложенные подсписки по умолчанию закрыты, даже когда открыт родитель. */
-.page-menu-top .menu-block .menu-block .menu-block-links {
-  max-height: 0;
+/* У бургера padding задан в app.css — возвращаем его после сброса. */
+.burger {
+  padding: 5px 0;
 }
-/* Разворачиваем только собственный подсписок открытого блока; большой запас
- * высоты, чтобы 3 уровня не обрезались. */
-.page-menu-top .menu-block.open > .menu-block-links,
-.page-menu-top .menu-block .menu-block.open > .menu-block-links {
-  max-height: 2000px;
+/* Видимый фокус: без него клавиатурная навигация «слепая». */
+.page-menu-top .menu-block-head:focus-visible,
+.page-head-settings__dd-item:focus-visible,
+.mm-cur__item:focus-visible,
+.burger:focus-visible,
+.page-menu a:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+/* Переключатель валюты в низу меню стоит в одну строку с языками. */
+.mm-cur {
+  display: flex;
 }
 
 .sf-empty {
@@ -199,6 +222,142 @@
   font-size: 14px;
   line-height: 150%;
   color: #636363;
+}
+
+/* ---- Образы v2: вкладки-категории + карусель карточек --------------------- */
+/* Карусель нативная: горизонтальный скролл-контейнер + scroll-snap. Никаких
+   JS-библиотек — свайп на мобильном и колесо/тачпад на десктопе работают сами,
+   кнопка «вперёд» лишь вызывает scrollBy. */
+.sf-looks {
+  margin-top: 48px;
+}
+.sf-looks__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.sf-looks__title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 120%;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.sf-looks__next {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  color: #111;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sf-looks__next:hover {
+  background: #f2f2f2;
+}
+/* Вкладки: на мобильном прокручиваются горизонтально, полосу скролла прячем. */
+.sf-looks__tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.sf-looks__tabs::-webkit-scrollbar {
+  display: none;
+}
+.sf-looks__tab {
+  flex: 0 0 auto;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #f2f2f2;
+  color: #111;
+  font-size: 14px;
+  line-height: 120%;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sf-looks__tab:hover {
+  background: #e6e6e6;
+}
+.sf-looks__tab.is-active {
+  background: #111;
+  color: #fff;
+}
+.sf-looks__track {
+  display: flex;
+  gap: 16px;
+  margin-top: 24px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.sf-looks__track::-webkit-scrollbar {
+  display: none;
+}
+.sf-look-card2 {
+  flex: 0 0 auto;
+  width: 260px;
+  scroll-snap-align: start;
+}
+.sf-look-card2__author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.sf-look-card2__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: #f0f0f0;
+  flex: 0 0 auto;
+  display: block;
+}
+.sf-look-card2__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sf-look-card2__name {
+  font-size: 14px;
+  line-height: 130%;
+  color: #111;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sf-look-card2__cat {
+  font-size: 12px;
+  line-height: 130%;
+  color: #909090;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Вертикальное фото образа ~3:4. */
+.sf-look-card2__photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background-color: #f5f5f5;
+}
+@media (max-width: 767px) {
+  .sf-look-card2 {
+    width: 70vw;
+  }
+  .sf-looks__title {
+    font-size: 20px;
+  }
 }
 
 /* ---- Галерея товара: превью (slick заменён кликабельными миниатюрами) ------ */
@@ -516,6 +675,10 @@
 }
 .sf-checkout__notice--warn { background: #fff8e6; border-color: #e0c068; color: #7a5b00; }
 .sf-checkout__notice--error { background: #fdecea; border-color: #e0a19a; color: #a5281b; }
+/* Валюта списания: НЕ предупреждение и не ошибка — нейтральное пояснение
+   («оплата в валюте магазина, к списанию столько-то»). Тревожная жёлто-красная
+   палитра здесь читалась бы как «что-то пошло не так» перед самой оплатой. */
+.sf-checkout__notice--currency { background: #f4f6f8; border-color: #d3d9de; color: #444; }
 
 .sf-checkout__submit {
   display: block;
@@ -561,4 +724,60 @@
   .sf-cms ul,
   .sf-cms ol { font-size: 16px; }
   .sf-checkout__grid { gap: 24px; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Боковое меню разделов дополнительных CMS-страниц (`.about__nav`).
+ *
+ * Базовые правила (`.about` flex, ширины колонок 24/78 %, размеры и hover
+ * пунктов, скрытие колонки на планшете) уже приходят из собранного дизайна
+ * `/dist/app.css` — здесь ТОЛЬКО то, чего у эталона не было:
+ *
+ *  1) подсветка ТЕКУЩЕЙ страницы. У эталона все «разделы» были якорями одной
+ *     страницы, поэтому подсвечивать было нечего; у нас это отдельные страницы;
+ *  2) липкость боковика. На эталоне её делал JS-хук `js-about-us-sticky`;
+ *     `position: sticky` даёт то же поведение без единой строки скрипта;
+ *  3) поведение на узких экранах. Эталон боковик просто ПРЯТАЛ
+ *     (`.about__left-col{display:none}`) — на телефоне переход между разделами
+ *     становился невозможен. Возвращаем меню, но ПОД контент: колонки
+ *     раскладываются в колонку, контент идёт первым и на всю ширину.
+ * ------------------------------------------------------------------------- */
+
+.about__nav {
+  position: sticky;
+  /* Отступ сверху, чтобы липкий боковик не прилипал вплотную к краю окна. */
+  top: 24px;
+}
+
+/* Текущая страница: подчёркнута постоянно (а не только по hover) и не кликается
+   визуально как «увести куда-то ещё». `currentColor` — чтобы работало и в тёмной
+   теме брендинга, где цвет текста задаётся переменной магазина. */
+.about__nav-link--current {
+  border-bottom: 1px solid currentColor;
+  cursor: default;
+}
+
+@media (max-width: 991.98px) {
+  /* Возвращаем колонку, спрятанную эталоном, и ставим её ПОСЛЕ контента. */
+  .about {
+    display: flex;
+    flex-direction: column;
+  }
+  .about__left-col {
+    display: block;
+    order: 2;
+    width: 100%;
+    padding-right: 0;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid #c1c1c1;
+  }
+  .about__right-col {
+    order: 1;
+    width: 100%;
+  }
+  /* Липкость на узком экране не нужна — меню и так внизу потока. */
+  .about__nav {
+    position: static;
+  }
 }

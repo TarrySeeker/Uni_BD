@@ -23,7 +23,13 @@
 
 import { sql } from '@/lib/db/client';
 import type { TransactionSql } from 'postgres';
-import { getCdekConfig, type CdekConfig } from './config';
+import {
+  getCdekConfig,
+  resolveWindowHours,
+  CDEK_CREATE_WINDOW_HOURS_DEFAULT,
+  CDEK_STUCK_WINDOW_HOURS_DEFAULT,
+  type CdekConfig,
+} from './config';
 import { OrderService } from './services/order';
 import { TrackingService } from './services/tracking';
 
@@ -53,6 +59,18 @@ export interface StuckOrderCandidate {
   customerPhone: string | null;
   customerEmail: string | null;
   error: string | null;
+  /**
+   * Сколько попыток создания накладной уже было (0 — ни одной). Аудит #17:
+   * раньше отчёт видел ТОЛЬКО заказы с исчерпанным retry, а заказ без единой
+   * попытки был невидим для обеих страховок сразу.
+   */
+  retryCount: number;
+  /**
+   * false — по заказу НЕ БЫЛО НИ ОДНОЙ попытки (записи cdek_shipments нет).
+   * Это более тревожный класс, чем «пробовали и не вышло»: крон его вообще не
+   * трогал (например, оплата пришла вне окна). Оператор должен видеть разницу.
+   */
+  attempted: boolean;
 }
 
 // =============================================================================
@@ -120,30 +138,62 @@ export interface NotifyStuckStats {
 // =============================================================================
 
 /**
- * Оплаченные заказы без отправления СДЭК (порт actionCreatePending SQL):
- *   payment_status='paid' (или статус продвинут), cdek_uuid IS NULL, не pickup,
- *   создан за последние 24ч, ещё нет отправления с исчерпанным retry_count.
- * LEFT JOIN cdek_shipments — отбрасываем заказы, по которым уже есть запись с
- * retry_count >= MAX (kill, как в carre). LIMIT 100, ORDER BY created_at.
+ * Окно создания накладной (часы) — из настройки, с безопасным дефолтом.
+ * Реэкспорт из config, чтобы у cron-слоя был один вход для окон.
  */
-export async function findPendingOrders(
-  limit: number = CREATE_PENDING_LIMIT,
-): Promise<PendingOrderCandidate[]> {
-  const rows = await sql<Array<{ id: string; number: string }>>`
+export { resolveWindowHours, CDEK_CREATE_WINDOW_HOURS_DEFAULT, CDEK_STUCK_WINDOW_HOURS_DEFAULT };
+
+/** Нормализация окна создания (нестрого-положительное → дефолт). */
+export function resolveCreateWindowHours(raw: number | undefined | null): number {
+  return resolveWindowHours(raw, CDEK_CREATE_WINDOW_HOURS_DEFAULT);
+}
+
+/**
+ * SQL выборки кандидатов на создание накладной. Вынесен в ЧИСТЫЙ билдер, чтобы
+ * форму запроса (якорь окна, границы) можно было проверить тестом без живой БД —
+ * именно в форме запроса и жил баг #17.
+ *
+ * ЯКОРЬ ОКНА — МОМЕНТ ОПЛАТЫ: coalesce(paid_at, created_at). Раньше окно
+ * отсчитывалось от created_at, поэтому заказ, оплаченный позже (перевод, сутки
+ * простоя крона), выпадал из выборки НАВСЕГДА — накладная не создавалась молча.
+ * Жизненный цикл накладной запускает оплата, от неё и считаем. paid_at может
+ * быть пуст (статус продвинут оператором вручную) → фоллбэк на created_at.
+ *
+ * ОКНО ОСТАЁТСЯ КОНЕЧНЫМ (см. CDEK_CREATE_WINDOW_HOURS_DEFAULT): магазин,
+ * переехавший с историей, не должен разом отправить легаси-заказы в СДЭК.
+ * Границы: интервал + LIMIT + отсечение исчерпанных retry — как было.
+ */
+export function buildPendingOrdersQuery(windowHours: number): string {
+  const hours = resolveCreateWindowHours(windowHours);
+  return `
     SELECT o.id, o.number
       FROM orders o
       LEFT JOIN cdek_shipments s ON s.order_id = o.id
      WHERE o.cdek_uuid IS NULL
        AND o.delivery_type <> 'pickup'
-       AND o.created_at > now() - interval '24 hours'
+       AND coalesce(o.paid_at, o.created_at) > now() - interval '${hours} hours'
        AND (
          o.payment_status = 'paid'
          OR o.status IN ('paid', 'packed', 'shipped', 'delivered', 'completed')
        )
        AND (s.id IS NULL OR (s.cdek_uuid IS NULL AND s.retry_count < ${CDEK_MAX_RETRIES}))
-     ORDER BY o.created_at
-     LIMIT ${limit}
-  `;
+     ORDER BY coalesce(o.paid_at, o.created_at)
+     LIMIT `;
+}
+
+/**
+ * Оплаченные заказы без отправления СДЭК (порт actionCreatePending SQL):
+ *   payment_status='paid' (или статус продвинут), cdek_uuid IS NULL, не pickup,
+ *   оплачен в пределах окна (см. buildPendingOrdersQuery), ещё нет отправления с
+ *   исчерпанным retry_count. LIMIT 100.
+ */
+export async function findPendingOrders(
+  limit: number = CREATE_PENDING_LIMIT,
+  windowHours: number = getCdekConfig().createWindowHours,
+): Promise<PendingOrderCandidate[]> {
+  const rows = await sql.unsafe<Array<{ id: string; number: string }>>(
+    buildPendingOrdersQuery(windowHours) + String(Math.trunc(limit)),
+  );
   return rows.map((r) => ({ id: String(r.id), number: String(r.number) }));
 }
 
@@ -168,11 +218,53 @@ export async function findActiveShipments(
 }
 
 /**
- * Зависшие заказы (порт actionNotifyStuck SQL): оплачены, без cdek_uuid,
- * retry_count >= MAX, за последние 7 дней. Для одного админ-уведомления.
+ * SQL отчёта о «зависших» заказах — чистый билдер (форма проверяется тестом).
+ *
+ * ФИКС #17. Раньше здесь был ЖЁСТКИЙ `JOIN cdek_shipments` + `retry_count >= MAX`,
+ * то есть отчёт видел только заказы, по которым попытки БЫЛИ и исчерпались.
+ * Заказ, до которого крон не дошёл ни разу (оплата пришла вне окна, простой
+ * крона), не попадал ни в создание, ни в отчёт — исчезал молча. Это и было
+ * «обе страховки молчат».
+ *
+ * Теперь LEFT JOIN и два класса в одной выборке:
+ *   • s.id IS NULL           — попыток НЕ БЫЛО вовсе (attempted=false);
+ *   • s.retry_count >= MAX   — попытки исчерпаны (attempted=true).
+ * Заказы с попытками «в процессе» (retry < MAX) не тревожат: их подхватит
+ * следующий тик create-pending.
+ *
+ * Окно — параметр (не зашитые 7 дней) и покрывает окно создания (см. config
+ * stuckWindowHours): иначе заказ снова выпал бы из обеих страховок.
  */
-export async function findStuckOrders(): Promise<StuckOrderCandidate[]> {
-  const rows = await sql<
+export function buildStuckOrdersQuery(windowHours: number): string {
+  const hours = resolveWindowHours(windowHours, CDEK_STUCK_WINDOW_HOURS_DEFAULT);
+  return `
+    SELECT o.id, o.number, o.customer_name, o.customer_phone, o.customer_email,
+           LEFT(s.error, 255) AS error,
+           coalesce(s.retry_count, 0) AS retry_count,
+           (s.id IS NOT NULL) AS attempted
+      FROM orders o
+      LEFT JOIN cdek_shipments s ON s.order_id = o.id
+     WHERE o.cdek_uuid IS NULL
+       AND o.delivery_type <> 'pickup'
+       AND s.cdek_uuid IS NULL
+       AND (s.id IS NULL OR s.retry_count >= ${CDEK_MAX_RETRIES})
+       AND coalesce(o.paid_at, o.created_at) > now() - interval '${hours} hours'
+       AND (
+         o.payment_status = 'paid'
+         OR o.status IN ('paid', 'packed', 'shipped', 'delivered', 'completed')
+       )
+     ORDER BY coalesce(o.paid_at, o.created_at)
+  `;
+}
+
+/**
+ * Зависшие заказы: оплачены, без cdek_uuid, и либо retry исчерпан, либо попыток
+ * не было вовсе. Для одного админ-уведомления.
+ */
+export async function findStuckOrders(
+  windowHours: number = getCdekConfig().stuckWindowHours,
+): Promise<StuckOrderCandidate[]> {
+  const rows = await sql.unsafe<
     Array<{
       id: string;
       number: string;
@@ -180,22 +272,10 @@ export async function findStuckOrders(): Promise<StuckOrderCandidate[]> {
       customer_phone: string | null;
       customer_email: string | null;
       error: string | null;
+      retry_count: number | string | null;
+      attempted: boolean | null;
     }>
-  >`
-    SELECT o.id, o.number, o.customer_name, o.customer_phone, o.customer_email,
-           LEFT(s.error, 255) AS error
-      FROM orders o
-      JOIN cdek_shipments s ON s.order_id = o.id
-     WHERE o.cdek_uuid IS NULL
-       AND s.cdek_uuid IS NULL
-       AND s.retry_count >= ${CDEK_MAX_RETRIES}
-       AND o.created_at > now() - interval '7 days'
-       AND (
-         o.payment_status = 'paid'
-         OR o.status IN ('paid', 'packed', 'shipped', 'delivered', 'completed')
-       )
-     ORDER BY o.created_at
-  `;
+  >(buildStuckOrdersQuery(windowHours));
   return rows.map((r) => ({
     id: String(r.id),
     number: String(r.number),
@@ -203,6 +283,8 @@ export async function findStuckOrders(): Promise<StuckOrderCandidate[]> {
     customerPhone: r.customer_phone ?? null,
     customerEmail: r.customer_email ?? null,
     error: r.error ?? null,
+    retryCount: Number(r.retry_count ?? 0),
+    attempted: r.attempted === true,
   }));
 }
 
@@ -237,9 +319,11 @@ export interface NotifyStuckDeps {
 
 function defaultCreatePendingDeps(): CreatePendingDeps {
   const orderService = new OrderService();
+  const config = getCdekConfig();
   return {
-    config: getCdekConfig(),
-    findCandidates: findPendingOrders,
+    config,
+    // Окно берётся из настройки магазина (мультитенантно), не зашито в SQL.
+    findCandidates: (limit) => findPendingOrders(limit, config.createWindowHours),
     createShipment: async (orderId) => {
       const sh = await orderService.createShipment(orderId);
       return { cdekUuid: sh.cdekUuid };
@@ -265,17 +349,37 @@ function defaultRefreshActiveDeps(): RefreshActiveDeps {
  * зависит от почтового модуля Admik (его пока нет) — оставляем лог-заглушку.
  * Заменяется в deps, когда появится mailer.
  */
-async function defaultNotifyStuck(orders: readonly StuckOrderCandidate[]): Promise<void> {
-  console.warn(
-    `[cdek/notify-stuck] ${orders.length} заказ(ов) без накладной (retry >= ${CDEK_MAX_RETRIES}): ` +
-      orders.map((o) => `#${o.number}`).join(', '),
-  );
+export async function defaultNotifyStuck(
+  orders: readonly StuckOrderCandidate[],
+): Promise<void> {
+  // Две группы (аудит #17) логируются РАЗДЕЛЬНО: «попыток не было» — это не
+  // «СДЭК отбил заявку», а «крон до заказа не дошёл» (оплата вне окна, простой
+  // шедулера). Слитый в одну строку список скрывал бы разницу от оператора.
+  const never = orders.filter((o) => !o.attempted);
+  const exhausted = orders.filter((o) => o.attempted);
+
+  if (never.length > 0) {
+    console.warn(
+      `[cdek/notify-stuck] ${never.length} оплаченный(ых) заказ(ов) БЕЗ ЕДИНОЙ ПОПЫТКИ ` +
+        `создания накладной (крон их не подхватил — проверьте окно ` +
+        `CDEK_CREATE_WINDOW_HOURS и работу шедулера): ` +
+        never.map((o) => `#${o.number}`).join(', '),
+    );
+  }
+  if (exhausted.length > 0) {
+    console.warn(
+      `[cdek/notify-stuck] ${exhausted.length} заказ(ов) без накладной, попытки исчерпаны ` +
+        `(retry >= ${CDEK_MAX_RETRIES}): ` +
+        exhausted.map((o) => `#${o.number}`).join(', '),
+    );
+  }
 }
 
 function defaultNotifyStuckDeps(): NotifyStuckDeps {
+  const cfg = getCdekConfig();
   return {
-    config: getCdekConfig(),
-    findCandidates: findStuckOrders,
+    config: cfg,
+    findCandidates: () => findStuckOrders(cfg.stuckWindowHours),
     notify: defaultNotifyStuck,
   };
 }

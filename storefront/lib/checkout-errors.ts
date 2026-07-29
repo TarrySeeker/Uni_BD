@@ -67,6 +67,8 @@ export const ORDER_ERROR_REASONS = [
   'order_not_payable',
   'payment_init_failed',
   'payment_in_progress',
+  /** Итог, показанный покупателю, разошёлся с фактическим итогом заказа. */
+  'total_mismatch',
 ] as const;
 
 // -----------------------------------------------------------------------------
@@ -167,6 +169,9 @@ export function orderErrorLabel(t: CheckoutDict, err: ErrorCodes | null): string
     // 🔴 Холд: деньги удержаны, подтверждение в пути. Отдельный текст — иначе
     // покупатель читает «оплатить нельзя» и идёт платить ещё раз с другой карты.
     payment_in_progress: t.orderErrorPaymentInProgress,
+    // 🔴 Сумма изменилась между расчётом и оформлением: покупателю нужно вернуться
+    // к корзине и увидеть актуальный итог, а не «попробовать ещё раз» вслепую.
+    total_mismatch: t.orderErrorTotalMismatch,
   };
   if (err.reason && byReason[err.reason]) {
     return byReason[err.reason]!;

@@ -25,8 +25,14 @@ import { PublicActionError } from '@/lib/server/action';
  */
 export class OrderError extends PublicActionError {
   readonly code: string;
-  constructor(code: string, message: string) {
-    super(message);
+  /**
+   * `params` — необязательные ICU-параметры, если `message` является КЛЮЧОМ
+   * каталога (пайплайн зовёт t(message, params)). Нужны сообщениям, в которые
+   * подставляется подпись статуса: см. conflictParams в lib/orders/actions.ts.
+   * Аргумент опционален — существующие вызовы с одним лишь текстом не меняются.
+   */
+  constructor(code: string, message: string, params?: Record<string, string | number>) {
+    super(message, params);
     this.code = code;
     this.name = 'OrderError';
     Object.setPrototypeOf(this, OrderError.prototype);
@@ -34,14 +40,19 @@ export class OrderError extends PublicActionError {
 }
 
 /**
- * Сбой РЕАЛЬНО НУЖНОГО расчёта стоимости доставки (сеть/ошибка СДЭК).
+ * РЕАЛЬНО НУЖНЫЙ расчёт стоимости доставки не состоялся. Две причины:
+ *   • расчёт УПАЛ (сеть/ошибка СДЭК);
+ *   • считать НЕЧЕМ — нет назначения (город/индекс/ПВЗ), аудит major №3.
  *
- * Anti-undercharge: при создании заказа нулевая доставка из-за сбоя расчёта
- * НЕДОПУСТИМА — клиент недоплатил бы за доставку (магазин теряет деньги). Раньше
- * computeDeliveryCost молча деградировал такой сбой к stub 0.00; теперь он
- * БРОСАЕТ эту ошибку, блокируя создание заказа с понятным сообщением. По-design
- * нулевая доставка (самовывоз / cdek выключен / нет назначения / порог бесплатной
- * доставки) сюда НЕ попадает — она обрабатывается до расчёта (needsCdekProvider).
+ * Anti-undercharge: при создании заказа нулевая доставка из-за несостоявшегося
+ * расчёта НЕДОПУСТИМА — клиент недоплатил бы за доставку (магазин теряет деньги).
+ * Раньше computeDeliveryCost молча деградировал оба случая к stub 0.00; теперь он
+ * БРОСАЕТ эту ошибку, блокируя создание заказа с понятным сообщением. Для №3 это
+ * ещё и защита от повисшего заказа: без города накладную СДЭК не создать никогда.
+ *
+ * By-design нулевая доставка (самовывоз / cdek выключен / зона с ценой 0 / порог
+ * бесплатной доставки) сюда НЕ попадает — она разводится ДО расчёта
+ * (canResolveDeliveryCost + needsCdekProvider) и остаётся resolved:true.
  *
  * Наследует PublicActionError → message доходит до UI как доменная ошибка
  * (`error:'validation'`), а не «внутренняя ошибка». code='delivery_calc_failed'.

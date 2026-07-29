@@ -162,7 +162,10 @@
       "bogoPayRequired": "Pour kind=bogo, « payez pour M » (bogoPayQty) est requis.",
       "scopeTargetsRequired": "La portée d'application sélectionnée requiert au moins une cible.",
       "scopeTargetTypeMismatch": "Le type de cible ne correspond pas à la portée d'application sélectionnée.",
-      "freeDeliveryCartOnly": "La livraison gratuite (kind='free_delivery') n'est possible que pour apply_scope='cart'."
+      "freeDeliveryCartOnly": "La livraison gratuite (kind='free_delivery') n'est possible que pour apply_scope='cart'.",
+      "conflictOrderStatus": "Le statut de la commande a changé en parallèle : la transition depuis « {from} » n'est plus valable. L'écran a été actualisé — vérifiez le statut actuel.",
+      "conflictPaymentStatus": "Le statut du paiement a changé en parallèle : la transition depuis « {from} » n'est plus valable. L'écran a été actualisé — vérifiez le statut actuel.",
+      "conflictDeliveryStatus": "Le statut de la livraison a changé en parallèle : la transition depuis « {from} » n'est plus valable. L'écran a été actualisé — vérifiez le statut actuel."
     },
     "settings": {
       "imageRefInvalid": "Indiquez l’URL de l’image (https://…) ou un chemin commençant par «/» (par exemple /media/…)",
@@ -812,7 +815,16 @@
         "catTextLabel": "Texte",
         "uploadPhoto": "Téléverser la photo du look",
         "addCategory": "+ Ajouter une catégorie",
-        "hint": "Chaque catégorie — photo, titre et texte. Les catégories incomplètes ne sont pas enregistrées."
+        "hint": "Chaque catégorie — photo, titre et texte. Les catégories incomplètes ne sont pas enregistrées.",
+        "cardN": "Carte {n}",
+        "cardCategoryLabel": "Catégorie (onglet)",
+        "authorNameLabel": "Nom de l'auteur",
+        "authorNamePlaceholder": "Anna",
+        "cardPhotoLabel": "Photo du look (portrait)",
+        "avatarLabel": "Avatar de l'auteur",
+        "uploadAvatar": "Téléverser l'avatar",
+        "addCard": "+ Ajouter une carte",
+        "cardsHint": "Une carte, c'est un onglet, une photo du look, un nom d'auteur et (facultatif) un avatar. Les cartes incomplètes ne sont pas enregistrées."
       },
       "tiles": {
         "legend": "Bloc « Tuiles de catégories »",
@@ -879,7 +891,9 @@
       "accentColor": "Couleur d'accent (HEX)",
       "supportEmail": "E-mail d'assistance",
       "supportPhone": "Téléphone d'assistance",
-      "saveButton": "Enregistrer l'image de marque"
+      "saveButton": "Enregistrer l'image de marque",
+      "timeZone": "Fuseau horaire de la boutique",
+      "timeZoneHelp": "Identifiant IANA, par exemple Europe/Moscow ou Europe/Paris. Toutes les heures de l'administration y sont affichées et les filtres par période y calculent les journées. Laissez vide pour utiliser la valeur de l'environnement du serveur."
     },
     "navigationForm": {
       "saved": "Navigation enregistrée.",
@@ -892,6 +906,15 @@
       "footerColumnsLabel": "Les colonnes sont séparées par une ligne vide. La première ligne d'une colonne est son titre, puis « Libellé | Lien »",
       "footerPlaceholder": "Boutique\nCatalogue | /catalog\nLivraison | /#delivery\n\nContact\nE-mail | mailto:info@example.com",
       "footerHint": "Chaque bloc jusqu'à une ligne vide constitue une colonne de pied de page distincte.",
+      "footerTextsLegend": "Textes du pied de page",
+      "footerTextsHint": "Titre du formulaire d’abonnement, mention de consentement, copyright et crédit du studio. Un champ vide affiche le texte par défaut dans la langue du client.",
+      "subscribeTitleLabel": "Titre du formulaire d’abonnement",
+      "subscribeNoteLabel": "Mention sous le formulaire d’abonnement (consentement aux données personnelles)",
+      "copyrightLabel": "Copyright (partie gauche de la ligne du bas)",
+      "copyrightHint": "Par exemple : « 2026 © Ma boutique ». L’année est reprise telle quelle, elle n’est pas ajoutée automatiquement. Vide : le nom de la boutique issu de la marque est affiché.",
+      "designedByLabel": "Crédit du concepteur (partie droite de la ligne du bas)",
+      "designedByHrefLabel": "Lien du crédit",
+      "designedByHrefHint": "Un chemin commençant par « / » ou une adresse https:// complète. Vide : le crédit s’affiche en texte simple.",
       "saveButton": "Enregistrer la navigation",
       "resetButton": "Réinitialiser la navigation"
     },
@@ -1041,8 +1064,9 @@
     },
     "languagesForm": {
       "saveSuccess": "Ensemble de langues enregistré.",
-      "storefrontNoticeTitle": "Note importante sur la vitrine.",
-      "storefrontNoticeBody": "Le site utilise actuellement sa propre liste de langues et ne lit pas encore cet ensemble : une langue désactivée ici ne disparaîtra pas de la vitrine — ses pages seront simplement affichées dans la langue par défaut ({defaultLabel}). Dans l'interface d'administration, l'ensemble prend effet immédiatement : il détermine les onglets de traduction dans les formulaires du catalogue et du contenu.",
+      "storefrontNoticeTitle": "Effet de cet ensemble sur le site.",
+      "storefrontNoticeBody": "L'ensemble agit à deux endroits à la fois. Sur le site : les langues activées apparaissent dans le sélecteur de langue, tandis qu'une langue désactivée est retirée du site — ses adresses sont redirigées vers la langue par défaut ({defaultLabel}). Dans l'administration : l'ensemble détermine les onglets de traduction dans les formulaires du catalogue et du contenu.",
+      "storefrontSupportHint": "Toute boutique peut ajouter une langue à l'ensemble, mais le site ne pourra l'afficher qu'une fois l'interface traduite dans cette langue. Une langue sans traduction n'apparaîtra pas sur le site : ses pages sont redirigées vers la langue par défaut, même si les onglets de traduction de l'administration fonctionnent immédiatement. Si la nouvelle langue est nécessaire sur le site lui-même, demandez aux développeurs d'ajouter la traduction de l'interface.",
       "defaultLocaleLabel": "Langue par défaut",
       "defaultLocaleHelp": "Non modifiable. Tout le contenu principal (noms, descriptions, textes des pages) est stocké dans la base de données dans cette langue, les traductions venant s'y superposer. Changer la langue par défaut nécessiterait la migration de toutes les données et modifierait les URL des pages du site ; cela se fait donc séparément, manuellement.",
       "defaultRowNote": "langue par défaut — toujours activée",
@@ -1155,6 +1179,7 @@
       "looksTitle": "Looks — titre",
       "looksCategoryTitle": "Looks — catégorie {n} (titre)",
       "looksCategoryText": "Looks — catégorie {n} (texte)",
+      "looksItemAuthorName": "Looks — auteur de la carte {n}",
       "tilesItemTitle": "Tuiles de catégories — tuile {n}",
       "designersTitle": "Designers — titre",
       "designersItemName": "Designers — nom {n}",
@@ -1291,6 +1316,10 @@
       "statusArchived": "Archivée",
       "sitemapPriority": "Priorité sitemap (0–1)",
       "sitemapChangefreq": "Fréquence de changement sitemap",
+      "showInNav": "Afficher dans le menu latéral de la boutique",
+      "showInNavHint": "Les pages cochées composent le menu vertical à gauche des pages de contenu (ex. : À propos · Livraison · Paiement · Conditions). Le libellé du lien est le titre de cette page.",
+      "navOrder": "Position dans le menu",
+      "navOrderPlaceholder": "non définie — placée en dernier",
       "canonicalPlaceholder": "Auto : /pages/{slug}",
       "slugFallback": "slug-page",
       "uploadImage": "Téléverser une image",
@@ -1553,7 +1582,8 @@
       "confirmManualRefund": "Confirmer que l’argent a déjà été rendu au client EN DEHORS du système (virement/caisse) ? La commande sera marquée comme remboursée et votre confirmation sera inscrite dans le journal d’audit.",
       "manualRefundTitle": "La passerelle ne remboursera pas automatiquement",
       "manualRefundHint": "Pour cette commande, la passerelle de paiement n’effectue pas de remboursement (par exemple paiement hors ligne ou acquéreur sans remboursement automatique). Rendez l’argent au client vous-même — par virement ou en caisse — et confirmez seulement ensuite. La confirmation est inscrite dans le journal d’audit.",
-      "manualRefundButton": "Argent rendu hors du système — confirmer"
+      "manualRefundButton": "Argent rendu hors du système — confirmer",
+      "conflictHint": "Quelqu'un d'autre a déjà modifié cette commande. Les boutons ci-dessous reflètent désormais l'état actuel — inutile de répéter la même action."
     },
     "page": {
       "moduleDisabled": "commandes (module désactivé)",
@@ -1589,7 +1619,39 @@
       "recipientNameLabel": "Nom du destinataire",
       "recipientEmailLabel": "E-mail du destinataire",
       "issuing": "Émission…",
-      "issueConfirm": "Émettre"
+      "issueConfirm": "Émettre",
+      "gateBlocked": "Cette commande ne passe pas le contrôle : elle est impayée, annulée ou remboursée. L'émission d'un certificat porteur d'argent sur une telle commande est bloquée par défaut.",
+      "gateOverrideLabel": "Émettre malgré tout, en contournant le contrôle (je confirme qu'un motif existe)",
+      "gateReasonLabel": "Motif (enregistré dans le journal d'audit)",
+      "gateReasonPlaceholder": "p. ex. payé en espèces en boutique, reçu n°12"
+    },
+    "statusLabels": {
+      "order": {
+        "new": "Nouvelle",
+        "awaiting_payment": "En attente de paiement",
+        "paid": "Payée",
+        "packed": "Préparée",
+        "shipped": "Expédiée",
+        "delivered": "Livrée",
+        "completed": "Terminée",
+        "cancelled": "Annulée",
+        "refunded": "Remboursée"
+      },
+      "payment": {
+        "pending": "En attente",
+        "authorized": "Autorisé",
+        "paid": "Payé",
+        "failed": "Échoué",
+        "refunded": "Remboursé"
+      },
+      "delivery": {
+        "pending": "En attente",
+        "registered": "Enregistrée",
+        "in_transit": "En cours de livraison",
+        "delivered": "Livrée",
+        "returned": "Retournée",
+        "cancelled": "Annulée"
+      }
     },
     "orderFilters": {
       "ariaLabel": "Filtres des commandes",
@@ -1686,7 +1748,11 @@
       "giftBadge": "Cadeau",
       "summary": {
         "items": "Articles",
-        "grandTotal": "Total"
+        "giftDiscount": "Carte cadeau",
+        "giftCode": "Code de la carte",
+        "grandTotal": "Total",
+        "displaySeen": "Le client voyait",
+        "displayRate": "au taux de {rate}"
       },
       "labelDiscount": "Remise",
       "deliveryHeading": "Livraison",

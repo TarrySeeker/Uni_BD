@@ -48,6 +48,43 @@ export interface CdekConfig {
 
   cronSecret: string | null;
   createEnabled: boolean;
+
+  /**
+   * Окно (часы) поиска заказов на авто-создание накладной, от МОМЕНТА ОПЛАТЫ
+   * (аудит #17). Всегда положительное: невалидный env → дефолт.
+   */
+  createWindowHours: number;
+  /** Окно (часы) отчёта о «зависших» заказах без накладной (покрывает окно создания). */
+  stuckWindowHours: number;
+}
+
+/**
+ * Дефолтное окно создания накладной — 30 суток (аудит-находка #17).
+ *
+ * ПОЧЕМУ НЕ 24 ЧАСА. Прежнее жёсткое «created_at > now() - 24 hours» означало:
+ * заказ, оплаченный на вторые сутки (банковский перевод, подтверждение вручную,
+ * сутки простоя крона), не попадал в выборку УЖЕ НИКОГДА — накладная не
+ * создавалась молча.
+ *
+ * ПОЧЕМУ НЕ «ВСЯ ИСТОРИЯ». Окно обязано остаться конечным: магазин, переехавший
+ * с историей заказов (на стенде 288 легаси-записей), при бесконечной выборке
+ * разом отправил бы старые оплаченные заказы в СДЭК. Тот же класс аварии, что у
+ * уборщика неоплаченных заказов (ORDERS_UNPAID_TTL_MINUTES=0 по умолчанию).
+ * 30 суток с запасом покрывают любую отложенную оплату и отсекают легаси.
+ */
+export const CDEK_CREATE_WINDOW_HOURS_DEFAULT = 720;
+
+/** Дефолтное окно отчёта о «зависших» — равно окну создания (не уже него). */
+export const CDEK_STUCK_WINDOW_HOURS_DEFAULT = CDEK_CREATE_WINDOW_HOURS_DEFAULT;
+
+/**
+ * Нормализует окно (часы) из настройки: только конечное положительное целое;
+ * иначе — дефолт. Ноль/отрицательное НЕ означает «без ограничения» (это была бы
+ * выборка по всей истории — см. риск легаси выше).
+ */
+export function resolveWindowHours(raw: number | undefined | null, fallback: number): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return fallback;
+  return Math.trunc(raw);
 }
 
 /**
@@ -145,6 +182,17 @@ export function getCdekConfig(source?: Record<string, string | undefined>): Cdek
 
     cronSecret: nonEmpty(env.CDEK_CRON_SECRET),
     createEnabled: env.CDEK_CREATE_ENABLED,
+
+    createWindowHours: resolveWindowHours(
+      env.CDEK_CREATE_WINDOW_HOURS,
+      CDEK_CREATE_WINDOW_HOURS_DEFAULT,
+    ),
+    // Окно «зависших» не должно быть уже окна создания: иначе заказ, выпавший из
+    // создания, не попадёт и в отчёт — то есть исчезнет молча (ровно баг #17).
+    stuckWindowHours: Math.max(
+      resolveWindowHours(env.CDEK_STUCK_WINDOW_HOURS, CDEK_STUCK_WINDOW_HOURS_DEFAULT),
+      resolveWindowHours(env.CDEK_CREATE_WINDOW_HOURS, CDEK_CREATE_WINDOW_HOURS_DEFAULT),
+    ),
   };
 }
 

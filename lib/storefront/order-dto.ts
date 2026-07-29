@@ -171,8 +171,15 @@ export interface OrderPublicDto {
   status: Order['status'];
   paymentStatus: Order['paymentStatus'];
   deliveryStatus: Order['deliveryStatus'];
-  /** Готовые РУССКИЕ подписи статусов (G-15) — единый источник lib/orders/labels;
-   *  витрина показывает их вместо своей карты (устранено расхождение admin↔витрина). */
+  /**
+   * Готовые подписи статусов НА ЯЗЫКЕ ПОКУПАТЕЛЯ (G-15) — единый источник
+   * lib/orders/labels; витрина показывает их вместо своей карты (устранено
+   * расхождение admin↔витрина).
+   *
+   * 🔴 Здесь ТЕКСТ, а не ключ: поле потребляет живая витрина и печатает как есть.
+   * Язык — из `?locale=` запроса (язык покупателя), см. OrderPublicDtoOptions.
+   * Без локали — базовый ru, как было до локализации (обратная совместимость).
+   */
   statusLabel: string;
   paymentStatusLabel: string;
   deliveryStatusLabel: string;
@@ -292,6 +299,12 @@ export interface OrderPublicDtoOptions {
    * сильный доступ, а не получить персональные данные по умолчанию.
    */
   includeSensitiveDelivery?: boolean;
+  /**
+   * Язык ПОКУПАТЕЛЯ для подписей статусов (*Label). Вычислен runStorefront из
+   * `?locale=`/Accept-Language. Не задан → базовая локаль магазина (ru) — прежнее
+   * поведение. К языку оператора админки отношения не имеет.
+   */
+  locale?: string | null;
 }
 
 /**
@@ -308,14 +321,17 @@ export function toOrderPublicDto(
   options: OrderPublicDtoOptions = {},
 ): OrderPublicDto {
   const sensitive = options.includeSensitiveDelivery === true;
+  const locale = options.locale ?? null;
   return {
     number: order.number,
     status: order.status,
     paymentStatus: order.paymentStatus,
     deliveryStatus: order.deliveryStatus,
-    statusLabel: orderStatusLabel(order.status),
-    paymentStatusLabel: paymentStatusLabel(order.paymentStatus),
-    deliveryStatusLabel: deliveryStatusLabel(order.deliveryStatus),
+    // Подписи — на языке ПОКУПАТЕЛЯ; машинные коды выше не тронуты (витрина
+    // резолвит по ним собственный словарь, см. storefront/lib/order-view).
+    statusLabel: orderStatusLabel(order.status, locale),
+    paymentStatusLabel: paymentStatusLabel(order.paymentStatus, locale),
+    deliveryStatusLabel: deliveryStatusLabel(order.deliveryStatus, locale),
 
     itemsTotal: order.itemsTotal,
     discountTotal: order.discountTotal,

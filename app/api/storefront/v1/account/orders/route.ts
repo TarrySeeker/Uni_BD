@@ -31,7 +31,7 @@ function parseIntOr(v: string | null, def: number): number {
 export async function GET(req: Request): Promise<Response> {
   return runStorefront(
     req,
-    async ({ cors }) => {
+    async ({ cors, locale }) => {
       const customer = await getMe(extractCustomerSessionToken(req));
       if (!customer) {
         return jsonError('unauthorized', 'Требуется вход.', cors);
@@ -43,7 +43,9 @@ export async function GET(req: Request): Promise<Response> {
       const offset = (page - 1) * pageSize;
 
       const orders = await getOrderHistory(customer.id, { limit: pageSize, offset });
-      const items = orders.map(toCustomerOrderDto);
+      // Подписи статусов — на языке ПОКУПАТЕЛЯ (minor №6): локаль уже вычислена
+      // runStorefront, раньше она здесь терялась и ЛК был русским для en/fr.
+      const items = orders.map((o) => toCustomerOrderDto(o, locale));
 
       return jsonData(
         { items },

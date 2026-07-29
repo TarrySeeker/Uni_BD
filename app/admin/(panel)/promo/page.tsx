@@ -12,6 +12,7 @@ import {
   formatMinQty,
   formatScopeWithTargets,
 } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 import { mapPromoCode } from '@/lib/orders/repository';
 import type { PromoCode } from '@/lib/orders/types';
 
@@ -85,15 +86,22 @@ function limitText(total: number | null, perCustomer: number | null): string {
 }
 
 /** Текст срока действия. */
-function periodText(starts: Date | null, ends: Date | null, unlimitedLabel: string): string {
+function periodText(
+  starts: Date | null,
+  ends: Date | null,
+  unlimitedLabel: string,
+  timeZone: string,
+): string {
   if (!starts && !ends) return unlimitedLabel;
-  const from = starts ? formatDateTime(starts) : '…';
-  const to = ends ? formatDateTime(ends) : '…';
+  const from = starts ? formatDateTime(starts, timeZone) : '…';
+  const to = ends ? formatDateTime(ends, timeZone) : '…';
   return `${from} — ${to}`;
 }
 
 export default async function PromoPage() {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const guard = await guardOrders('orders.write');
   if (!guard.ok) {
     if (guard.reason === 'module_disabled') {
@@ -194,7 +202,7 @@ export default async function PromoPage() {
                   </td>
                   <td className="px-4 py-2 text-gray-700">{p.usedCount}</td>
                   <td className="px-4 py-2 text-xs text-gray-500">
-                    {periodText(p.startsAt, p.endsAt, t('promo.page.unlimited'))}
+                    {periodText(p.startsAt, p.endsAt, t('promo.page.unlimited'), timeZone)}
                   </td>
                   <td className="px-4 py-2">
                     {p.isActive ? (

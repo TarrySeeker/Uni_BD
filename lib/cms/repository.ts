@@ -80,6 +80,13 @@ export function mapCmsPage(row: any): CmsPage {
         ? null
         : Number(row.sitemap_priority),
     sitemapChangefreq: (row.sitemap_changefreq ?? null) as SitemapChangefreq | null,
+    // Боковое меню разделов (0060). Колонки могли ещё не приехать на инстанс,
+    // где миграцию не накатили — читаем защитно: нет колонки → «не в меню».
+    showInNav: Boolean(row.show_in_nav),
+    navOrder:
+      row.nav_order === null || row.nav_order === undefined
+        ? null
+        : Number(row.nav_order),
     translations: asTranslations(row.translations),
     createdBy: row.created_by ?? null,
     updatedBy: row.updated_by ?? null,
@@ -173,7 +180,7 @@ export async function getCmsPageById(
     SELECT id, slug, title, status, published_at,
            seo_title, seo_description, og_title, og_description,
            og_image_url, canonical_url, noindex,
-           sitemap_priority, sitemap_changefreq, translations,
+           sitemap_priority, sitemap_changefreq, show_in_nav, nav_order, translations,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages WHERE id = ${id} LIMIT 1
   `;
@@ -203,7 +210,7 @@ export async function listPublishedCmsPages(): Promise<CmsPage[]> {
     SELECT id, slug, title, status, published_at,
            seo_title, seo_description, og_title, og_description,
            og_image_url, canonical_url, noindex,
-           sitemap_priority, sitemap_changefreq, translations,
+           sitemap_priority, sitemap_changefreq, show_in_nav, nav_order, translations,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages
     WHERE status = 'published'
@@ -223,7 +230,7 @@ export async function getPublishedCmsPageBySlug(
     SELECT id, slug, title, status, published_at,
            seo_title, seo_description, og_title, og_description,
            og_image_url, canonical_url, noindex,
-           sitemap_priority, sitemap_changefreq, translations,
+           sitemap_priority, sitemap_changefreq, show_in_nav, nav_order, translations,
            created_by, updated_by, created_at, updated_at
     FROM cms_pages
     WHERE slug = ${slug} AND status = 'published'

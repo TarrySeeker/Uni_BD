@@ -57,8 +57,9 @@ describe('CMS-страница: явный canonical оставлен нетро
     // Тернарник: meta.canonical ? { canonical: ... } : alternatesFor(..., enabledLocales)
     expect(s).toMatch(/meta\.canonical\s*\?/);
     expect(s).toMatch(/\{\s*canonical:\s*meta\.canonical\s*\}/);
-    // enabled-набор прокинут именно в ELSE-ветке alternatesFor.
-    expect(s).toMatch(/alternatesFor\(`\/\$\{slug\}`,\s*locale,\s*enabledLocales\)/);
+    // enabled-набор прокинут именно в ELSE-ветке alternatesFor (4-й аргумент —
+    // абсолютная база URL, добавлена аудитом №34; см. hreflang-absolute-url.test.ts).
+    expect(s).toMatch(/alternatesFor\(`\/\$\{slug\}`,\s*locale,\s*enabledLocales,\s*urlBase\)/);
   });
 });
 

@@ -79,10 +79,14 @@ describe('settings/schemas — homeSchema.looks', () => {
     ).toBe(false);
   });
 
-  it('категория требует все три поля (нет imageKey → отказ)', () => {
+  // v2 («Образы» = вкладки + карусель): вкладке достаточно title — text/imageKey
+  // ослаблены до опциональных. Обязательность СНЯТА намеренно, старые данные с
+  // тремя полями по-прежнему валидны (см. tests/settings/home-looks-tabs.test.ts).
+  it('категория без text/imageKey валидна (вкладка = только заголовок)', () => {
     expect(
       homeSchema.safeParse({ looks: { categories: [{ title: 'A', text: 'B' }] } }).success,
-    ).toBe(false);
+    ).toBe(true);
+    expect(homeSchema.safeParse({ looks: { categories: [{ title: 'A' }] } }).success).toBe(true);
   });
 
   it('пустой/опущенный список категорий валиден', () => {
@@ -127,8 +131,13 @@ describe('config/settings — home.looks merge', () => {
     ]);
     expect(eff.home.looks.enabled).toBe(false);
     expect(eff.home.looks.title).toBe('Наши образы');
+    // v2: merge добивает категории машинным id (автоген по позиции) и мигрирует
+    // легаси-фото в карточку карусели — контент старых магазинов не теряется.
     expect(eff.home.looks.categories).toEqual([
-      { title: 'Лето', text: 'Летние образы', imageKey: 'looks/summer.webp' },
+      { id: 'cat-0', title: 'Лето', text: 'Летние образы', imageKey: 'looks/summer.webp' },
+    ]);
+    expect(eff.home.looks.items).toEqual([
+      { categoryId: 'cat-0', imageKey: 'looks/summer.webp', authorName: '', authorAvatarKey: '' },
     ]);
   });
 
@@ -164,16 +173,21 @@ describe('storefront/settings-dto — home.looks', () => {
     expect(dto.home.looks.enabled).toBe(true);
     expect(dto.home.looks.title).toBe('Образы');
     expect(dto.home.looks.categories).toEqual([
-      { title: 'Классика', text: 'Текст 1', imageUrl: 'https://cdn.test/looks/1.webp' },
-      { title: 'Кэжуал', text: 'Текст 2', imageUrl: 'https://cdn.test/looks/2.webp' },
+      { id: 'cat-0', title: 'Классика', text: 'Текст 1', imageUrl: 'https://cdn.test/looks/1.webp' },
+      { id: 'cat-1', title: 'Кэжуал', text: 'Текст 2', imageUrl: 'https://cdn.test/looks/2.webp' },
     ]);
     const json = JSON.stringify(dto.home.looks);
     expect(json).not.toContain('imageKey');
     expect(json).not.toContain('"looks/1.webp"');
   });
 
-  it('дефолт (нет оверрайда) → looks выключен, категории пусты', () => {
+  it('дефолт (нет оверрайда) → looks выключен, категории и карточки пусты', () => {
     const dto = toPublicSettingsDto(mergeSettings(envWith(), []));
-    expect(dto.home.looks).toEqual({ enabled: false, title: HOME_DEFAULTS.looks.title, categories: [] });
+    expect(dto.home.looks).toEqual({
+      enabled: false,
+      title: HOME_DEFAULTS.looks.title,
+      categories: [],
+      items: [],
+    });
   });
 });

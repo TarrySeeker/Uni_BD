@@ -59,6 +59,11 @@ vi.mock('@/lib/catalog/repository', () => ({
 vi.mock('@/lib/storefront/queries', () => ({
   getActiveProductIdBySlug: vi.fn(async () => 'p1'),
   getProductCategorySlugs: vi.fn(async () => []),
+  // Аудит №11: карточка тянет словарь переводов характеристик/значений. Здесь он
+  // ПУСТ — этот тест про локализацию полей самого товара, а атрибуты покрыты
+  // отдельно (tests/storefront/attributes-i18n-dto.test.ts). Пустой словарь = DTO
+  // отдаёт кеш характеристик как раньше, поэтому ожидания теста не меняются.
+  getAttributeDictionary: vi.fn(async () => ({ names: new Map(), values: new Map() })),
 }));
 
 // Карточка товара теперь тянет структурные секции (§9) — мокаем пустым списком,

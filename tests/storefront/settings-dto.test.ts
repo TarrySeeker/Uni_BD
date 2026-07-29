@@ -14,7 +14,7 @@ function makeEffective(): EffectiveSettings {
   return {
     modules: { overrides: {} },
     home: HOME_DEFAULTS,
-    navigation: { header: [], footer: [] },
+    navigation: { header: [], footer: [], footerMeta: { subscribeTitle: '', subscribeNote: '', copyright: '', designedByLabel: '', designedByHref: '' } },
     access: { singleUserMode: false },
     contentI18n: {},
     i18n: { defaultLocale: 'ru', locales: ['ru', 'en', 'fr'] },

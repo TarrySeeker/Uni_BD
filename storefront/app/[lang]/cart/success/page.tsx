@@ -20,7 +20,7 @@
  */
 
 import type { Metadata } from 'next';
-import { getOrder } from '@/lib/api';
+import { getOrder, getSettings } from '@/lib/api';
 import { localizedHref, toLocale } from '@/lib/i18n';
 import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 import {
@@ -66,7 +66,17 @@ export default async function SuccessPage({
   const locale = toLocale(lang);
   const dict = getDictionary(locale);
 
-  const order = number && token ? await getOrder(number, token, locale) : null;
+  // 🔴 №9: формат чисел/знаки после запятой и символ валюты — из настроек магазина
+  // (мультитенантность). Настройки могут быть недоступны (старый/упавший API) —
+  // тогда блок сертификата форматирует дефолтом, как раньше.
+  const [order, settings] = await Promise.all([
+    number && token ? getOrder(number, token, locale) : Promise.resolve(null),
+    getSettings(locale),
+  ]);
+  const numberFormat = {
+    locale: settings?.currency?.locale ?? null,
+    fractionDigits: settings?.currency?.fractionDigits ?? null,
+  };
 
   // Исход считается по СТАТУСУ ЗАКАЗА (источник истины), подсказка шлюза лишь
   // уточняет ещё не подтверждённое состояние. Без прочитанного заказа исхода нет.
@@ -163,7 +173,7 @@ export default async function SuccessPage({
               и пункт выдачи/адрес. Общая карточка с постоянной страницей заказа —
               покупатель видит одно и то же в обоих местах.
             */}
-            <OrderCard order={order} t={dict.order} />
+            <OrderCard order={order} t={dict.order} numberFormat={numberFormat} />
 
             {/*
               🔴 Ссылка «вернуться к заказу» (находка №5). Писем о смене статуса
@@ -198,6 +208,8 @@ export default async function SuccessPage({
             token={token}
             strings={dict.success}
             locale={locale}
+            numberFormat={numberFormat}
+            currencySymbol={settings?.currency?.symbol ?? null}
           />
         ) : null}
 

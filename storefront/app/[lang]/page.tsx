@@ -10,7 +10,7 @@
  *   6. Витрина дизайнеров    .mainpage--designers     ← settings.home.designers  (M4)
  *   7. Промо-слайдер         .mainpage--slider        ← settings.home.slider     (M5)
  *   8. Корп./сертификаты     .dop-links--vertical     ← settings.home.corpCert   (M5)
- *   9. Lookbook              .lookbook                ← settings.home.looks
+ *   9. «Образы»              .sf-looks (вкладки+карусель) ← settings.home.looks
  *
  * ⚠️ Ранее `.dop-links--vertical` был захардкоженным плейсхолдером и удалялся; в
  * M5 он восстановлен как УПРАВЛЯЕМЫЙ из настроек блок (settings.home.corpCert) —
@@ -18,11 +18,20 @@
  */
 
 import type { Metadata } from 'next';
-import { getNewProducts, getSettings } from '@/lib/api';
-import { localizedHref, toLocale, DEFAULT_LOCALE, localePrefix } from '@/lib/i18n';
+import { getNewProducts, getPages, getSettings } from '@/lib/api';
+import { buildPageNav } from '@/lib/cms-nav';
+import {
+  localizedHref,
+  toLocale,
+  DEFAULT_LOCALE,
+  alternatesFor,
+  enabledLocalesFrom,
+  absoluteUrlBase,
+} from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import ProductCard from './components/ProductCard';
 import { PromoSlider } from './components/PromoSlider';
+import { LooksCarousel } from './components/LooksCarousel';
 
 // Всегда рендерим по запросу: при `next build` (docker) API app:3000 ещё не
 // поднят — статическая генерация не должна ходить в сеть.
@@ -52,7 +61,16 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const locale = toLocale((await params).lang);
-  return { alternates: { canonical: localePrefix(locale) || '/' } };
+  // 🔴 АУДИТ №34. Прежде здесь стоял ТОЛЬКО canonical (относительным путём), то есть
+  // на ГЛАВНОЙ — самой важной для языкового таргетинга странице мультиязычного
+  // магазина — hreflang не было вовсе. Теперь главная эмитит тот же набор
+  // альтернатив, что и остальные SEO-страницы: по ВКЛЮЧЁННЫМ языкам магазина и
+  // АБСОЛЮТНЫМИ URL (база — публичный адрес из настроек, домен не хардкодится).
+  const settings = await getSettings(locale);
+  const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
+  return {
+    alternates: alternatesFor('/', locale, enabledLocales, absoluteUrlBase(settings)),
+  };
 }
 
 export default async function HomePage({
@@ -62,9 +80,10 @@ export default async function HomePage({
 }) {
   const locale = toLocale((await params).lang);
   const dict = getDictionary(locale);
-  const [settings, products] = await Promise.all([
+  const [settings, products, pages] = await Promise.all([
     getSettings(locale),
     getNewProducts(12, locale),
+    getPages(locale),
   ]);
 
   const hero = settings?.home?.hero;
@@ -89,11 +108,19 @@ export default async function HomePage({
   // внешним/абсолютным); фиксированные внутренние ссылки локализуем через href().
   const href = (path: string) => localizedHref(path, locale);
   const heroHref = hero?.ctaHref ?? href('/catalog');
-  // Lookbook (ТЗ_2 «Образы»): первый образ — крупный ряд (как на проде), остальные —
-  // в сетке второго ряда. БЕЗ жёсткого лимита в 3 — сколько задано в админке, столько
-  // и показываем (владелец добавляет образы без правки кода).
-  const looksCategories = looks?.categories ?? [];
-  const [looksFirst, ...looksRest] = looksCategories;
+  // Ссылка «Наша история» блока «О нас» ведёт на КОНТЕНТНУЮ страницу магазина, и
+  // её адрес — тоже данные: берём ПЕРВЫЙ пункт бокового меню разделов (та самая
+  // страница, которую владелец поставил первой в админке). Раньше здесь был
+  // зашитый '/about' — у магазина без такого slug ссылка вела в 404, а у магазина
+  // с другим составом страниц — не туда. Нет ни одного отмеченного пункта →
+  // ссылку не показываем вовсе (лучше её отсутствие, чем битый адрес).
+  const aboutHref = buildPageNav(pages, '')[0]?.href ?? null;
+  // «Образы» v2: вкладки-категории + карусель карточек «автор + фото». Списки —
+  // через `?? []` (секция может приехать без массива при version skew: падение
+  // здесь = 500 главной). Категории отдаём как {id,title} — text/imageUrl это
+  // наследие v1, вкладке они не нужны.
+  const looksCategories = (looks?.categories ?? []).map((c) => ({ id: c.id, title: c.title }));
+  const looksItems = looks?.items ?? [];
 
   return (
     <div className="mainpage">
@@ -123,7 +150,17 @@ export default async function HomePage({
         </div>
       )}
 
-      {/* 3. О нас (.mainpage--about_us) */}
+      {/* 3. О нас (.mainpage--about_us) — макет владельца: СЛЕВА крупная фраза
+          магазина в две строки, СПРАВА широкая колонка текста и ссылка «Наша
+          история» с подчёркиванием. Колонки 50/50 и подчёркивание ссылки уже
+          заданы `/dist/app.css` (.mainpage--about_us*), на мобильном там же
+          flex-direction:column — колонки складываются одна под другую.
+
+          ⚠️ РАСХОЖДЕНИЕ С ЭТАЛОНОМ, подтверждённое владельцем: на боевом
+          carrerusse.com слева стоял «О нас», а фраза «Carré Russe — искусство…»
+          была <h3> в правой колонке (docs/41 §4). Делаем как на скриншоте —
+          фраза слева и крупно. Сама фраза — ДАННЫЕ (home.about.title из настроек
+          магазина), а не литерал: у следующего магазина она своя. */}
       {about?.title && (
         <div className="mainpage--about_us">
           <div className="mainpage--about_us-name">
@@ -135,7 +172,9 @@ export default async function HomePage({
                 {p}
               </div>
             ))}
-            <a href={href('/about')}>{dict.home.ourStory}</a>
+            {/* Адрес — из данных (первый раздел бокового меню, см. aboutHref).
+                Магазин без контентных страниц ссылку просто не показывает. */}
+            {aboutHref && <a href={href(aboutHref)}>{dict.home.ourStory}</a>}
           </div>
         </div>
       )}
@@ -221,43 +260,16 @@ export default async function HomePage({
         </div>
       )}
 
-      {/* 9. Lookbook (.lookbook) — settings.home.looks */}
-      {looks?.enabled && looksCategories.length > 0 && (
-        <div className="lookbook">
-          <h2 className="lookbook__title">{looks.title}</h2>
-          <div className="lookbook__rows">
-            {looksFirst && (
-              <div className="lookbook__row lookbook__row--first">
-                <div className="lookbook__anons">
-                  <p>{looksFirst.text}</p>
-                </div>
-                <div className="lookbook__item lookbook__item--first">
-                  {looksFirst.imageUrl && (
-                    <img src={looksFirst.imageUrl} alt="" className="lazy" />
-                  )}
-                  <p>{looksFirst.title}</p>
-                </div>
-              </div>
-            )}
-            {looksRest.length > 0 && (
-              <div className="lookbook__row lookbook__row--second">
-                {looksRest.map((lb, i) => (
-                  <div
-                    key={`${lb.title}-${i}`}
-                    className={`lookbook__item lookbook__item--${
-                      i === 0 ? 'second' : 'third'
-                    }`}
-                  >
-                    {lb.imageUrl && (
-                      <img src={lb.imageUrl} alt="" className="lazy" />
-                    )}
-                    <p>{lb.title}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* 9. «Образы» — settings.home.looks: вкладки-категории + карусель карточек.
+          Клиентский компонент (вкладки/листание), но карточки в разметке сразу —
+          SSR-дружественно для SEO (фото и имена есть в HTML до гидратации). */}
+      {looks?.enabled && looksCategories.length > 0 && looksItems.length > 0 && (
+        <LooksCarousel
+          title={looks.title}
+          categories={looksCategories}
+          items={looksItems}
+          labels={{ next: dict.home.looksNext, tabs: dict.home.looksTabsAria }}
+        />
       )}
     </div>
   );

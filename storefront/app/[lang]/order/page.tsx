@@ -15,7 +15,7 @@
  */
 
 import type { Metadata } from 'next';
-import { getOrder } from '@/lib/api';
+import { getOrder, getSettings } from '@/lib/api';
 import { localizedHref, toLocale } from '@/lib/i18n';
 import { getDictionary, fillTemplate } from '@/lib/dictionaries';
 import { readOrderLink } from '@/lib/order-view';
@@ -51,7 +51,16 @@ export default async function OrderPage({
   const t = dict.order;
 
   const link = readOrderLink(query);
+  // 🔴 Инвариант (сторожится order-tracking.guard): без валидной пары номер+токен
+  // заказ НЕ запрашивается вовсе.
   const order = link ? await getOrder(link.number, link.token, locale) : null;
+  // 🔴 №9: формат чисел — из настроек магазина (мультитенантность), а не ru-RU.
+  // Настройки недоступны → formatPrice отдаёт исторический вид, без регресса.
+  const settings = await getSettings(locale);
+  const numberFormat = {
+    locale: settings?.currency?.locale ?? null,
+    fractionDigits: settings?.currency?.fractionDigits ?? null,
+  };
 
   // Исход оплаты (находка №1): постоянная ссылка на заказ — это и есть та самая
   // «страница оплатить заказ по номеру», которой не существовало. Подсказки шлюза
@@ -116,7 +125,7 @@ export default async function OrderPage({
               />
             ) : null}
 
-            <OrderCard order={order} t={t} />
+            <OrderCard order={order} t={t} numberFormat={numberFormat} />
           </>
         )}
 

@@ -206,10 +206,36 @@ export async function translateMessage(
   try {
     const { getTranslations } = await import('next-intl/server');
     const t = await getTranslations();
-    return t.has(key) ? t(key, params) : key;
+    return t.has(key) ? t(key, resolveParamKeys(t, params)) : key;
   } catch {
     return key;
   }
+}
+
+/**
+ * Разворачивает ЗНАЧЕНИЯ ICU-параметров, которые сами являются ключами каталога.
+ *
+ * ЗАЧЕМ (аудит minor №7). Сообщение о конкурентной смене статуса подставляло СЫРОЙ
+ * код: «переход из "awaiting_payment" более неактуален» — служебная строка вместо
+ * человеческой подписи, да ещё и на языке автора кода. Подписи статусов живут в
+ * lib/orders/labels (единый источник, G-15) и отдаются потребителям КЛЮЧОМ
+ * каталога (orderStatusLabelKey и т.п.), потому что доменный слой не знает языка
+ * оператора. ICU вложенных подстановок не умеет, поэтому разворачиваем ключи
+ * здесь, ровно перед форматированием — и карты подписей нигде не дублируются.
+ *
+ * Строка-параметр, которой в каталоге НЕТ, остаётся как есть (обычные значения
+ * вроде email или номера заказа не меняются). Числа не трогаем.
+ */
+function resolveParamKeys(
+  t: { has: (key: string) => boolean; (key: string): string },
+  params?: Record<string, string | number>,
+): Record<string, string | number> | undefined {
+  if (!params) return undefined;
+  const out: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(params)) {
+    out[name] = typeof value === 'string' && t.has(value) ? t(value) : value;
+  }
+  return out;
 }
 
 /**

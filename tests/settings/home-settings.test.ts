@@ -228,7 +228,11 @@ describe('settings/actions — updateHomeAction', () => {
 describe('navigation (G-10/G-11)', () => {
   it('пустая БД → navigation пустой', () => {
     const eff = mergeSettings(envWith(), []);
-    expect(eff.navigation).toEqual({ header: [], footer: [] });
+    expect(eff.navigation.header).toEqual([]);
+    expect(eff.navigation.footer).toEqual([]);
+    // Тексты подвала — аддитивный ключ footerMeta: «не задано» = пустые строки
+    // (витрина берёт словарный дефолт локали). Детали — tests/settings/navigation-footer-meta.
+    expect(Object.values(eff.navigation.footerMeta).every((v) => v === '')).toBe(true);
   });
 
   it('оверрайд → header/footer из БД + проброс в DTO', () => {

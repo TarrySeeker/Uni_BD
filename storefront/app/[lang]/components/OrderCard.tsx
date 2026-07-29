@@ -17,7 +17,7 @@
  * ни одного зашитого под конкретный магазин слова, всё из словаря и DTO).
  */
 
-import { formatPrice } from '@/lib/format';
+import { formatPrice, type NumberFormatOpts } from '@/lib/format';
 import type { OrderDict } from '@/lib/order-view';
 import {
   deliveryStatusText,
@@ -38,9 +38,16 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function OrderCard({
   order,
   t,
+  numberFormat,
 }: {
   order: OrderPublicDto;
   t: OrderDict;
+  /**
+   * 🔴 №9 — формат чисел МАГАЗИНА (currency.locale/fractionDigits из настроек).
+   * Опционально: без него formatPrice отдаёт исторический вид, поэтому старые
+   * вызовы карточки не меняют поведение.
+   */
+  numberFormat?: NumberFormatOpts;
 }) {
   const place = deliveryPlaceText(order.delivery);
   const track = order.delivery.track?.trim() ?? '';
@@ -61,7 +68,7 @@ export default function OrderCard({
 
         <div className="sf-summary-row sf-summary-row--total">
           <span>{t.statusTotal}</span>
-          <span>{formatPrice(order.grandTotal, order.currency)}</span>
+          <span>{formatPrice(order.grandTotal, order.currency, null, numberFormat)}</span>
         </div>
       </div>
 
@@ -77,7 +84,7 @@ export default function OrderCard({
               <span className="sf-summary-line__qty"> × {it.qty}</span>
             </div>
             <div className="sf-summary-line__price">
-              {formatPrice(it.lineTotal, order.currency)}
+              {formatPrice(it.lineTotal, order.currency, null, numberFormat)}
             </div>
           </div>
         ))}

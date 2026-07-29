@@ -102,6 +102,15 @@ export function PageForm({
   const [sitemapChangefreq, setSitemapChangefreq] = useState(
     page?.sitemapChangefreq ?? '',
   );
+  // Боковое меню разделов витрины (0059). Именно эти два поля делают состав
+  // боковика доп-страниц ДАННЫМИ магазина, а не списком в коде витрины:
+  // мультитенантность — у следующего магазина другой набор страниц или боковик
+  // не нужен вовсе. Порядок держим строкой: пустое поле = «не задан» (NULL),
+  // и его надо уметь отличить от нуля (валидная первая позиция).
+  const [showInNav, setShowInNav] = useState(page?.showInNav ?? false);
+  const [navOrder, setNavOrder] = useState(
+    page?.navOrder != null ? String(page.navOrder) : '',
+  );
 
   // SeoFieldset: для страницы маппим ogImageKey ↔ ogImageUrl; ogTitle/ogDescription
   // хранятся в og_title/og_description (C18) — инициализируем из страницы и шлём в payload.
@@ -147,6 +156,10 @@ export function PageForm({
       slug: slug.trim() || undefined,
       status: status === 'published' ? undefined : status,
       ...pageSeoPayload(),
+      showInNav,
+      // Пустое поле → `null` (ЯВНЫЙ сброс позиции в БД), а не `undefined`
+      // («не трогай»): иначе владелец не смог бы убрать однажды заданный порядок.
+      navOrder: navOrder.trim() ? Number(navOrder) : null,
     };
   }
 
@@ -378,6 +391,43 @@ export function PageForm({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Боковое меню разделов витрины (0059). Отмеченные страницы образуют
+            вертикальное меню слева на дополнительных страницах магазина; порядок
+            задаёт число (пусто — пункт уходит в конец, к таким же). */}
+        <div className="lg:col-span-2 rounded border border-gray-200 p-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={showInNav}
+              onChange={(e) => setShowInNav(e.target.checked)}
+              disabled={!canWrite}
+              className="h-4 w-4"
+            />
+            {t('cms.pageForm.showInNav')}
+          </label>
+          <p className="mt-1 text-xs text-gray-500">{t('cms.pageForm.showInNavHint')}</p>
+          {showInNav ? (
+            <div className="mt-3 max-w-xs">
+              <label htmlFor="p-nav-order" className={labelCls}>
+                {t('cms.pageForm.navOrder')}
+              </label>
+              <input
+                id="p-nav-order"
+                type="number"
+                step="1"
+                value={navOrder}
+                onChange={(e) => setNavOrder(e.target.value)}
+                className={inputCls}
+                disabled={!canWrite}
+                placeholder={t('cms.pageForm.navOrderPlaceholder')}
+              />
+              {fe('navOrder') ? (
+                <p className="mt-1 text-xs text-red-600">{fe('navOrder')}</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="lg:col-span-2">

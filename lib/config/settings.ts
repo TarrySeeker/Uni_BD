@@ -166,6 +166,19 @@ export interface EffectiveSettings {
   navigation: {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
+    /**
+     * НЕ-ссылочное содержимое подвала (заголовок рассылки, приписка о согласии,
+     * копирайт, кредит студии). Все поля — строки; ПУСТАЯ строка = «владелец не
+     * задал» → витрина берёт словарный дефолт своей локали. Никогда не undefined,
+     * чтобы читателю (DTO/витрина) не требовался лишний optional chaining.
+     */
+    footerMeta: {
+      subscribeTitle: string;
+      subscribeNote: string;
+      copyright: string;
+      designedByLabel: string;
+      designedByHref: string;
+    };
   };
   /**
    * Флаги доступа уровня магазина (B9). singleUserMode — «однопользовательский
@@ -225,6 +238,70 @@ export function cleanLogoUrl(url: string | null | undefined): string | null {
 }
 
 /**
+ * «Образы» v1 → v2: нормализация блока с АВТО-МИГРАЦИЕЙ старых данных.
+ *
+ * 🔴 Зачем. До v2 блок был статичной сеткой: `categories:[{title,text,imageKey}]`,
+ * без карточек. Такие данные уже лежат в БД живых магазинов. v2 рисует вкладки
+ * (categories) + карусель карточек (items). Если бы витрина просто перешла на
+ * `items`, у магазина с легаси-данными блок стал бы ПУСТЫМ — контент живого сайта
+ * визуально пропал бы, хотя из БД никуда не делся.
+ *
+ * Правила нормализации:
+ *  1. Каждая категория получает `id`: заданный владельцем либо автогенерированный
+ *     по ПОЗИЦИИ (`cat-<i>`). Позиция, а не хеш от заголовка: заголовок переводим
+ *     (content_i18n) и редактируем, а связь карточка↔вкладка обязана переживать
+ *     правку текста. Дубликаты id разводятся суффиксом — id уникален всегда.
+ *  2. Порядок категорий СОХРАНЯЕТСЯ: content_i18n накладывает переводы на массивы
+ *     ПО ИНДЕКСУ, перестановка порушила бы переводы живого сайта.
+ *  3. Если карточек нет (`items` пуст/отсутствует), а у категорий есть легаси-фото
+ *     — из каждой такой категории делается ОДНА карточка (фото категории, пустой
+ *     автор: имя выдумывать нельзя, владелец заполнит в админке).
+ *  4. Карточки-сироты (categoryId не совпал ни с одной вкладкой) отбрасываются —
+ *     иначе они не показались бы ни на одной вкладке и «висели» бы мёртвым грузом.
+ */
+function normalizeLooks(db: NonNullable<HomeSettings['looks']>): HomeContent['looks'] {
+  const rawCategories = db.categories ?? [];
+  const seenIds = new Set<string>();
+  const categories = rawCategories.map((c, i) => {
+    let id = (c.id ?? '').trim() || `cat-${i}`;
+    while (seenIds.has(id)) id = `${id}-${i}`;
+    seenIds.add(id);
+    return { id, title: c.title, text: c.text ?? '', imageKey: c.imageKey ?? '' };
+  });
+
+  const rawItems = db.items ?? [];
+  const items =
+    rawItems.length > 0
+      ? // v2: карточки заданы явно — берём только те, чья вкладка существует.
+        rawItems
+          .filter((it) => seenIds.has(it.categoryId))
+          .map((it) => ({
+            categoryId: it.categoryId,
+            imageKey: it.imageKey,
+            authorName: it.authorName,
+            authorAvatarKey: it.authorAvatarKey ?? '',
+          }))
+      : // v1 → v2: фото категорий становятся карточками (контент не теряется).
+        categories
+          .filter((c) => c.imageKey.length > 0)
+          .map((c) => ({
+            categoryId: c.id,
+            imageKey: c.imageKey,
+            authorName: '',
+            authorAvatarKey: '',
+          }));
+
+  return {
+    // enabled по умолчанию false (блок opt-in): отсутствие флага в оверрайде
+    // не включает «Образы» молча. title добивается дефолтом.
+    enabled: db.enabled ?? HOME_DEFAULTS.looks.enabled,
+    title: db.title ?? HOME_DEFAULTS.looks.title,
+    categories,
+    items,
+  };
+}
+
+/**
  * Сливает контент главной: для каждого блока — если в БД задан оверрайд блока,
  * берётся он (отсутствующие внутри поля добиваются дефолтом, чтобы HomeContent
  * был полностью заполнен и виджеты витрины не падали на null-блоке); иначе —
@@ -279,21 +356,8 @@ function mergeHome(db: HomeSettings): HomeContent {
           linkHref: db.philosophy.linkHref ?? HOME_DEFAULTS.philosophy.linkHref,
         }
       : HOME_DEFAULTS.philosophy,
-    looks: db.looks
-      ? {
-          // enabled по умолчанию false (блок opt-in): отсутствие флага в оверрайде
-          // не включает «Образы» молча. title/categories добиваются дефолтом.
-          enabled: db.looks.enabled ?? HOME_DEFAULTS.looks.enabled,
-          title: db.looks.title ?? HOME_DEFAULTS.looks.title,
-          categories: db.looks.categories
-            ? db.looks.categories.map((c) => ({
-                title: c.title,
-                text: c.text,
-                imageKey: c.imageKey,
-              }))
-            : HOME_DEFAULTS.looks.categories,
-        }
-      : HOME_DEFAULTS.looks,
+    // «Образы»: нормализация + авто-миграция v1→v2 (см. normalizeLooks).
+    looks: db.looks ? normalizeLooks(db.looks) : HOME_DEFAULTS.looks,
     tiles: db.tiles
       ? {
           // opt-in: отсутствие флага не включает плитки молча; items добиваются дефолтом.
@@ -501,6 +565,15 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
     navigation: {
       header: navigation.header ?? [],
       footer: (navigation.footer ?? []).map((c) => ({ title: c.title, links: c.links ?? [] })),
+      // Аддитивно: ключ `navigation` из БД без footerMeta (все существующие
+      // магазины) даёт пустые строки → витрина рендерит словарные дефолты.
+      footerMeta: {
+        subscribeTitle: navigation.footerMeta?.subscribeTitle ?? '',
+        subscribeNote: navigation.footerMeta?.subscribeNote ?? '',
+        copyright: navigation.footerMeta?.copyright ?? '',
+        designedByLabel: navigation.footerMeta?.designedByLabel ?? '',
+        designedByHref: navigation.footerMeta?.designedByHref ?? '',
+      },
     },
     access: {
       // Дефолт OFF: отсутствие/пустой объект access → однопользовательский режим

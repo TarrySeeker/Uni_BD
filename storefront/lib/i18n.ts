@@ -135,27 +135,133 @@ export function switchLocalePath(currentPathname: string, target: Locale): strin
 }
 
 /**
+ * База АБСОЛЮТНЫХ URL витрины — публичный адрес магазина из его же настроек
+ * (`seo.siteUrl`, админка → Настройки → SEO). Тот же источник, что у sitemap/robots
+ * и у return-url платежей, поэтому домен нигде не хардкодится (мультитенантность:
+ * платформа обслуживает разные магазины на разных доменах).
+ *
+ * 🔴 АУДИТ №34. Прежде hreflang эмитился ОТНОСИТЕЛЬНЫМИ путями, а `metadataBase`
+ * витрина не задавала нигде — Next подставлял `http://localhost:3000`, и связку
+ * альтернатив поисковики игнорировали. Абсолютную базу берём отсюда.
+ *
+ * Устойчивость к version skew и «протухшим» данным БД (тот же класс защиты, что в
+ * lib/seo.ts): нет настроек / нет секции / не строка / пусто → null (остаёмся на
+ * относительных путях — прежнее поведение, не хуже). Схема НЕ http(s) отвергается
+ * (anti-XSS/anti-open-redirect: значение приезжает в атрибут href альтернатив).
+ * Хвостовые слэши срезаются, иначе склейка даст `https://shop//en/catalog`.
+ */
+export function absoluteUrlBase(
+  settings: { seo?: { siteUrl?: string | null } } | null | undefined,
+): string | null {
+  const raw: unknown = settings?.seo?.siteUrl;
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!/^https?:\/\/[^/]/i.test(trimmed)) return null;
+  const base = trimmed.replace(/\/+$/, '');
+  return base === '' ? null : base;
+}
+
+/**
  * hreflang-альтернативы для generateMetadata: для каждой ВКЛЮЧЁННОЙ локали — URL
  * того же (голого) пути с её префиксом; canonical — текущая локаль. `path` —
  * бесхитростный путь без локали (`/`, `/catalog`, `/product/x`).
- *   alternatesFor('/catalog', 'en') → {
- *     canonical:'/en/catalog',
- *     languages:{ ru:'/catalog', en:'/en/catalog', fr:'/fr/catalog' }
+ *   alternatesFor('/catalog', 'en', LOCALES, 'https://shop.example') → {
+ *     canonical:'https://shop.example/en/catalog',
+ *     languages:{ ru:'https://shop.example/catalog', … }
  *   }
  * `locales` — enabled-набор (по умолчанию весь whitelist LOCALES); выключенный в
  * админке язык, переданный сюда усечённым набором, НЕ попадёт в hreflang. canonical
  * считается напрямую по `current` (корректен, даже если current вне набора — напр.
- * запрос выключенного языка до редиректа layout). Значения — относительные пути;
- * Next.js разрешит их относительно metadataBase.
+ * запрос выключенного языка до редиректа layout).
+ *
+ * `base` (аудит №34) — абсолютная база из настроек магазина (absoluteUrlBase). С
+ * ней значения становятся АБСОЛЮТНЫМИ URL, как того требует спецификация hreflang;
+ * без неё (настройка не заполнена) отдаём прежние относительные пути — деградация
+ * до старого поведения, а не поломка.
  */
 export function alternatesFor(
   path: string,
   current: Locale,
   locales: readonly Locale[] = LOCALES,
+  base: string | null = null,
 ): { canonical: string; languages: Record<string, string> } {
+  const abs = (href: string): string => (base ? `${base}${href}` : href);
   const languages: Record<string, string> = {};
   for (const l of locales) {
-    languages[l] = localizedHref(path, l) || '/';
+    languages[l] = abs(localizedHref(path, l) || '/');
   }
-  return { canonical: localizedHref(path, current) || '/', languages };
+  return { canonical: abs(localizedHref(path, current) || '/'), languages };
+}
+
+// =============================================================================
+// Маршрутизация локале-подобных префиксов (аудит №33 major + №12 minor).
+// =============================================================================
+
+/**
+ * Решение маршрутизации по входящему pathname — чистая функция, чтобы edge-
+ * middleware оставался тонким, а поведение проверялось юнитами без Next.
+ *
+ * 🔴 АУДИТ №33. Прежде middleware распознавал префикс локали РЕГУЛЯРКОЙ
+ * `/^[a-z]{2}(-[a-z]{2})?$/`, то есть ЛЮБОЙ похожий на локаль сегмент
+ * (`/de/catalog`) пропускался как есть. Сегмент `[lang]` получал `de`, `toLocale`
+ * фолбэчил его в `ru`, а `stripLocale` (ему нужен ИМЕННО `isLocale`) считал
+ * `/de/catalog` голым ru-путём — переключатель языка строил несуществующий
+ * `/en/de/catalog`. Корневого `app/not-found.tsx` не было, поэтому покупатель видел
+ * ГОЛУЮ англоязычную 404 Next без шапки, футера и ссылок. Тот же голый 404
+ * отдавался на `/ru/<путь>`: regex исключал только сам `ru`, и путь уезжал в
+ * rewrite `/ru/ru/...`.
+ *
+ * 🔴 АУДИТ №12. Та же первопричина: CMS-страница со slug из двух букв (`/qa`)
+ * матчилась той же регуляркой и уходила в маршрут `[lang]` (главная на языке «qa»)
+ * вместо `[lang]/[slug]` — страница становилась недостижимой.
+ *
+ * ПОЧЕМУ WHITELIST ЗДЕСЬ ЛЕГИТИМЕН. Прежний комментарий утверждал, что набор
+ * языков нельзя знать на edge, так как он живёт в БД. Это смешение двух разных
+ * наборов: в БД живёт набор ВКЛЮЧЁННЫХ владельцем языков (его по-прежнему читает
+ * только layout), а `LOCALES` — набор языков, которые витрина физически УМЕЕТ
+ * (её словари и переводы, компилятивная константа этого же приложения). Второй
+ * известен на этапе сборки, БД для него не нужна, и включение языка вне `LOCALES`
+ * всё равно требует правки кода витрины (словарь). Поэтому edge вправе его знать:
+ * задержки/точки отказа/утечки конфига не появляется.
+ *
+ * Исходы:
+ *   - `pass`     — реальный не-дефолтный префикс (`/en`, `/fr/...`): пропустить;
+ *   - `redirect` — явный префикс дефолта (`/ru/...`): 308 на канонический голый
+ *                  путь (дефолт живёт на корне; `/ru/*` — SEO-дубль, которого нет);
+ *   - `rewrite`  — всё остальное (`/`, `/catalog`, `/qa`, `/de/catalog`): внутрь
+ *                  сегмента дефолтной локали. `/qa` тем самым доходит до
+ *                  `[lang]/[slug]` (CMS-страница жива), а `/de/catalog` даёт
+ *                  ЛОКАЛИЗОВАННУЮ 404 внутри layout — с шапкой, футером и ссылками.
+ */
+export type RouteDecision =
+  | { kind: 'pass' }
+  | { kind: 'rewrite'; pathname: string }
+  | { kind: 'redirect'; pathname: string; permanent: true };
+
+export function routeDecision(pathname: string): RouteDecision {
+  const segments = pathname.split('/').filter(Boolean);
+  const first = segments[0];
+
+  // Реальная не-дефолтная локаль витрины — проходит как есть (сегмент [lang] уже
+  // заполнен). Включённость языка проверит layout: она из БД, edge её не знает.
+  if (isLocale(first) && first !== DEFAULT_LOCALE) {
+    return { kind: 'pass' };
+  }
+
+  // Явный префикс дефолтной локали — канонизируем редиректом на голый путь.
+  // ПОСТОЯННЫЙ 308 (не 307): `/ru/*` не является адресом витрины ни при какой
+  // настройке — дефолт живёт на корне по устройству схемы URL, а не по значению
+  // из БД. 308 (а не 301) сохраняет метод и тело запроса.
+  if (first === DEFAULT_LOCALE) {
+    const rest = segments.slice(1).join('/');
+    return { kind: 'redirect', pathname: rest ? `/${rest}` : '/', permanent: true };
+  }
+
+  // Всё остальное — внутрь сегмента дефолтной локали. Неизвестный локале-подобный
+  // префикс сюда и попадает: `[lang]` получает валидный `ru`, поэтому дальше
+  // отработают layout и локализованный not-found, а не голая 404 Next.
+  return {
+    kind: 'rewrite',
+    pathname: pathname === '/' ? `/${DEFAULT_LOCALE}` : `/${DEFAULT_LOCALE}${pathname}`,
+  };
 }

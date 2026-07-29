@@ -45,6 +45,14 @@ export {
   type AutoIssueSkipReason,
 } from './auto-issue';
 
+export {
+  GIFT_EXPIRE_TASK,
+  expiredGiftStatus,
+  reviveStatusAfterTopUp,
+  type ExpireInput,
+  type ReviveInput,
+} from './lifecycle';
+
 export { GIFT_TR_FIELDS } from './fields';
 
 export {
@@ -108,6 +116,7 @@ export {
   lockOrderForGiftIssueTx,
   revokeIssuedGiftsTx,
   findOrdersPendingGiftIssue,
+  markExpiredGiftCertificates,
   type RedeemResult,
   type ReleaseResult,
   type IssueGiftCertificateRow,
@@ -126,5 +135,8 @@ export {
   updateGiftCertificate,
   setGiftStatus,
   issueGiftFromOrder,
+  manualIssueGateReason,
   type GiftActionDeps,
+  type ManualIssueGateReason,
+  type ManualIssueOrderGate,
 } from './actions';

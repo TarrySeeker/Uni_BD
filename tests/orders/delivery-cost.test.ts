@@ -92,16 +92,24 @@ describe('orders/delivery-cost — адаптер расчёта доставк�
     expect(a.periodMin).toBeGreaterThan(0);
   });
 
-  it('cdek включён, но без назначения → 0.00 stub (нечего считать)', async () => {
+  // 🔴 ИЗМЕНЕНО аудитом major №3. Раньше здесь ожидалось `0.00 / source:'stub'`
+  // (и, что хуже, resolved:TRUE) — то есть «посчитать нечем» выдавалось за
+  // «посчитали, бесплатно». Именно это снимало анти-андерчардж-защиту: заказ
+  // создавался с бесплатной доставкой и без города, а накладную СДЭК по нему
+  // было не создать никогда. Теперь нерассчитанность видна явно.
+  it('cdek включён, но без назначения → НЕ бесплатно, а нерассчитанность (№3)', async () => {
     process.env.ADMIK_MODULES = 'orders,cdek';
     const { computeDeliveryCost } = await load();
-    const res = await computeDeliveryCost({
-      deliveryType: 'courier',
-      lines: [{ qty: 1 }],
-      destination: {},
-    });
-    expect(res.cost).toBe('0.00');
-    expect(res.source).toBe('stub');
+    const res = await computeDeliveryCost(
+      { deliveryType: 'courier', lines: [{ qty: 1 }], destination: {} },
+      { softFail: true },
+    );
+    expect(res.resolved).toBe(false);
+    expect(res.source).toBe('unavailable');
+    // Без softFail (путь создания заказа) — вовсе бросает.
+    await expect(
+      computeDeliveryCost({ deliveryType: 'courier', lines: [{ qty: 1 }], destination: {} }),
+    ).rejects.toMatchObject({ code: 'delivery_calc_failed' });
   });
 
   // BUG #3 (correctness): курьерская доставка из orders несёт назначение ТОЛЬКО

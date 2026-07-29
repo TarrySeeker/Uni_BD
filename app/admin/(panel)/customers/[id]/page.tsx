@@ -6,8 +6,9 @@ import { Forbidden } from '../../_components/Forbidden';
 import { PageHeader } from '../../_components/PageHeader';
 import { guardCustomers, customerStatusLabelKey, customerStatusBadgeClass } from '../_components/guard';
 import { getCustomerById, listCustomerOrders } from '@/lib/customer-auth/repository';
-import { orderStatusLabel, paymentStatusLabel } from '@/lib/orders/labels';
+import { orderStatusLabelKey, paymentStatusLabelKey } from '@/lib/orders/labels';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 
 /**
  * Карточка покупателя (docs/24 §6): профиль (read-only) + список заказов. Правки
@@ -27,12 +28,18 @@ export default async function CustomerDetailPage({
   }
 
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
 
   // Подпись статуса — ключом каталога; незнакомый код показываем как есть.
   const statusLabel = (status: string): string => {
     const key = customerStatusLabelKey(status);
     return key ? t(key) : status;
   };
+
+  // Статусы заказа/оплаты в списке заказов покупателя — тем же приёмом, на языке
+  // ОПЕРАТОРА (аудит major №28): раньше печатались жёстко русские подписи.
+  const byKey = (key: string | null, code: string): string => (key ? t(key) : code);
 
   const { id } = await params;
   const customer = await getCustomerById(id);
@@ -71,13 +78,13 @@ export default async function CustomerDetailPage({
             </span>
           </dd>
           <dt className="text-gray-500">{t('customers.detailPage.emailVerified')}</dt>
-          <dd>{customer.emailVerifiedAt ? formatDateTime(customer.emailVerifiedAt) : '—'}</dd>
+          <dd>{customer.emailVerifiedAt ? formatDateTime(customer.emailVerifiedAt, timeZone) : '—'}</dd>
           <dt className="text-gray-500">{t('customers.detailPage.language')}</dt>
           <dd>{customer.preferredLocale || '—'}</dd>
           <dt className="text-gray-500">{t('customers.detailPage.lastLogin')}</dt>
-          <dd>{customer.lastLoginAt ? formatDateTime(customer.lastLoginAt) : '—'}</dd>
+          <dd>{customer.lastLoginAt ? formatDateTime(customer.lastLoginAt, timeZone) : '—'}</dd>
           <dt className="text-gray-500">{t('customers.detailPage.registered')}</dt>
-          <dd>{formatDateTime(customer.createdAt)}</dd>
+          <dd>{formatDateTime(customer.createdAt, timeZone)}</dd>
           <dt className="text-gray-500">{t('customers.detailPage.ordersAndTotal')}</dt>
           <dd>
             {customer.ordersCount} / {customer.totalSpent}
@@ -110,10 +117,14 @@ export default async function CustomerDetailPage({
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-600">
-                      {formatDateTime(o.createdAt)}
+                      {formatDateTime(o.createdAt, timeZone)}
                     </td>
-                    <td className="px-4 py-2">{orderStatusLabel(o.status)}</td>
-                    <td className="px-4 py-2">{paymentStatusLabel(o.paymentStatus)}</td>
+                    <td className="px-4 py-2">
+                      {byKey(orderStatusLabelKey(o.status), o.status)}
+                    </td>
+                    <td className="px-4 py-2">
+                      {byKey(paymentStatusLabelKey(o.paymentStatus), o.paymentStatus)}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-700">
                       {o.grandTotal} {o.currency}
                     </td>

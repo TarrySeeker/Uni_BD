@@ -165,8 +165,15 @@ export function productionAutoIssueDeps(): AutoIssueDeps {
 // Конвейер.
 // -----------------------------------------------------------------------------
 
-/** Заказ пригоден к автовыпуску (оплачен и не отменён/возвращён). */
-function orderGateReason(order: AutoIssueOrderSnapshot): AutoIssueSkipReason | null {
+/**
+ * Заказ пригоден к автовыпуску (оплачен и не отменён/возвращён).
+ *
+ * ЭКСПОРТИРУЕТСЯ намеренно: ручной выпуск (actions.manualIssueGateReason) обязан
+ * отвечать на тот же вопрос теми же причинами — расхождение уже дало дефект №27,
+ * когда кнопка админки выпускала деньги на предъявителя по неоплаченному заказу,
+ * а автопуть от того же заказа отказывался. Сравнение поведения закреплено тестом.
+ */
+export function orderGateReason(order: AutoIssueOrderSnapshot): AutoIssueSkipReason | null {
   if (order.paymentStatus !== 'paid') return 'order_not_paid';
   if (order.status === 'cancelled' || order.status === 'refunded') return 'order_not_eligible';
   return null;

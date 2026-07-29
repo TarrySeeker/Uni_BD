@@ -124,6 +124,7 @@ export const createCmsPage = defineAction({
           (slug, title, status, seo_title, seo_description,
            og_title, og_description, og_image_url,
            canonical_url, noindex, sitemap_priority, sitemap_changefreq,
+           show_in_nav, nav_order,
            created_by, updated_by)
         VALUES (
           ${slug}, ${data.title}, ${data.status ?? 'draft'},
@@ -132,6 +133,7 @@ export const createCmsPage = defineAction({
           ${data.ogImageUrl ?? null}, ${data.canonicalUrl ?? null},
           ${data.noindex ?? false}, ${data.sitemapPriority ?? null},
           ${data.sitemapChangefreq ?? null},
+          ${data.showInNav ?? false}, ${data.navOrder ?? null},
           ${ctx.user.id}, ${ctx.user.id}
         )
         RETURNING id
@@ -202,6 +204,12 @@ export const updateCmsPage = defineAction({
                                     THEN ${data.sitemapPriority ?? null} ELSE sitemap_priority END,
           sitemap_changefreq = CASE WHEN ${data.sitemapChangefreq !== undefined}
                                     THEN ${data.sitemapChangefreq ?? null} ELSE sitemap_changefreq END,
+          -- Боковое меню разделов (0060). COALESCE НЕ годится для nav_order:
+          -- владелец должен уметь СБРОСИТЬ позицию в NULL («порядок не задан»),
+          -- поэтому — тот же CASE-на-undefined, что у SEO-полей.
+          show_in_nav        = COALESCE(${data.showInNav ?? null}, show_in_nav),
+          nav_order          = CASE WHEN ${data.navOrder !== undefined}
+                                    THEN ${data.navOrder ?? null} ELSE nav_order END,
           translations       = CASE WHEN ${tr.provided}
                                     THEN ${sql.json(tr.value as Record<string, never>)}
                                     ELSE translations END,

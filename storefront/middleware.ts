@@ -7,25 +7,24 @@
  * Реализация: все страницы физически лежат под `app/[lang]/`. Здесь мы
  * ПЕРЕПИСЫВАЕМ (rewrite, не redirect — URL в адресной строке не меняется) голые
  * пути ru во внутренний `/ru/<path>`, чтобы сегмент [lang] всегда был заполнен.
- * Пути, уже начинающиеся с `/en` или `/fr`, проходят без изменений. Голый `/en`
- * (без хвостового слэша) и `/fr` тоже валидны — matcher их пропускает как есть.
+ * Пути, начинающиеся с РЕАЛЬНОЙ не-дефолтной локали (`/en`, `/fr`), проходят как
+ * есть. Явный `/ru/...` канонизируется постоянным редиректом на голый путь.
+ *
+ * 🔴 АУДИТ №33 + №12. Само решение вынесено в чистую `routeDecision` (lib/i18n) —
+ * там же и подробный разбор дефекта: прежний regex «похоже на локаль» пропускал
+ * ЛЮБОЙ двухбуквенный сегмент, из-за чего `/de/catalog` давал голую 404 Next без
+ * шапки/футера, `/ru/...` — её же, а CMS-страница со slug `/qa` становилась
+ * недостижимой (уезжала в маршрут `[lang]` вместо `[lang]/[slug]`).
+ *
+ * БД здесь по-прежнему НЕ читается: `routeDecision` опирается только на whitelist
+ * языков, которые витрина физически умеет (компилятивная константа LOCALES), а
+ * набор ВКЛЮЧЁННЫХ владельцем языков (он живёт в БД) проверяет layout.
  *
  * Статику/ассеты/служебные пути НЕ трогаем (matcher их исключает).
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { DEFAULT_LOCALE } from '@/lib/i18n';
-
-/**
- * Сегмент, ПОХОЖИЙ на префикс локали: двухбуквенный ISO-код с опциональным
- * регионом (ru, en, pt-br). 🔴 middleware работает на edge и БД НЕ ЧИТАЕТ — какой
- * язык реально включён/валиден, решает layout (там доступны настройки магазина).
- * Здесь лишь распознаём форму префикса: похоже на локаль → пропускаем сегмент как
- * есть, остальное — rewrite в дефолтную локаль. Так набор языков не зашит в edge
- * (нет задержки/точки отказа/риска утечки конфига), а включение нового языка не
- * требует правки middleware.
- */
-const LOCALE_SEGMENT = /^[a-z]{2}(-[a-z]{2})?$/;
+import { routeDecision } from '@/lib/i18n';
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -36,20 +35,22 @@ export function middleware(req: NextRequest) {
   const headers = new Headers(req.headers);
   headers.set('x-pathname', pathname);
 
-  const first = pathname.split('/').filter(Boolean)[0];
+  const decision = routeDecision(pathname);
 
-  // Похожий на локаль префикс (кроме дефолтной ru, живущей на корне) — пропускаем
-  // как есть: сегмент [lang] заполнит роутинг, а валидность/включённость проверит
-  // layout (неизвестный/выключенный язык он уведёт редиректом на дефолт).
-  if (first && first !== DEFAULT_LOCALE && LOCALE_SEGMENT.test(first)) {
+  if (decision.kind === 'pass') {
     return NextResponse.next({ request: { headers } });
   }
 
-  // Голый путь = дефолтная локаль. Переписываем во внутренний /<default>/<path>,
-  // сохраняя query-строку. URL в браузере остаётся голым (rewrite, не redirect).
+  if (decision.kind === 'redirect') {
+    const url = req.nextUrl.clone();
+    url.pathname = decision.pathname;
+    // 308 — постоянный редирект С СОХРАНЕНИЕМ метода и тела (в отличие от 301).
+    return NextResponse.redirect(url, 308);
+  }
+
+  // rewrite: URL в браузере остаётся голым, query-строка сохраняется (clone).
   const url = req.nextUrl.clone();
-  url.pathname =
-    pathname === '/' ? `/${DEFAULT_LOCALE}` : `/${DEFAULT_LOCALE}${pathname}`;
+  url.pathname = decision.pathname;
   return NextResponse.rewrite(url, { request: { headers } });
 }
 

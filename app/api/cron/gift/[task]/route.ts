@@ -25,17 +25,43 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getCdekConfig } from '@/lib/cdek/config';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { extractCronSecret, cronSecretMatches } from '@/lib/cron/secret';
-import { runIssuePending, type IssuePendingStats } from '@/lib/gift-certificates/cron';
+import {
+  runIssuePending,
+  runExpireOutdated,
+  type IssuePendingStats,
+} from '@/lib/gift-certificates/cron';
+import { GIFT_EXPIRE_TASK } from '@/lib/gift-certificates/lifecycle';
 
 export const dynamic = 'force-dynamic';
 
-const TASKS = ['issue-pending'] as const;
+/**
+ * Задачи роута:
+ *   issue-pending   — догоняющий автовыпуск по оплаченным заказам (ТЗ п.11);
+ *   expire-outdated — пометка истёкших кодов статусом 'expired' (минор аудита №3:
+ *                     статус не выставлялся НИКОГДА, и админка показывала
+ *                     истёкший сертификат «Активен»).
+ *
+ * 🔴 ИМЕНА ЗДЕСЬ — ЛИТЕРАЛЫ, а не ссылки на константы. Так требует guard паритета
+ * расписания (tests/build/cron-crontab-parity.guard): он читает `const TASKS` из
+ * ИСХОДНИКА и не исполняет модуль, поэтому вычисляемое имя стало бы для него
+ * невидимым — задача молча осталась бы без строки в crontab. Совпадение литерала
+ * с доменной константой закреплено проверкой ниже.
+ */
+const TASKS = ['issue-pending', 'expire-outdated'] as const;
 type CronTask = (typeof TASKS)[number];
+
+/**
+ * Страховка от расхождения литерала выше и доменного имени задачи: если
+ * GIFT_EXPIRE_TASK переименуют, тип перестанет сходиться на этапе компиляции.
+ */
+const _EXPIRE_TASK_MATCHES: (typeof TASKS)[1] = GIFT_EXPIRE_TASK;
 
 async function dispatch(task: CronTask): Promise<IssuePendingStats> {
   switch (task) {
     case 'issue-pending':
       return runIssuePending();
+    case 'expire-outdated':
+      return runExpireOutdated();
   }
 }
 

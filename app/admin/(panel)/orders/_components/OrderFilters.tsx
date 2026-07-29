@@ -9,17 +9,18 @@ import {
   PAYMENT_STATUSES,
   DELIVERY_TYPES,
 } from '@/lib/orders/types';
-import {
-  orderStatusLabel,
-  paymentStatusLabel,
-  deliveryTypeLabel,
-} from '@/lib/admin/order-format';
+import { deliveryTypeLabel } from '@/lib/admin/order-format';
+import { orderStatusLabelKey, paymentStatusLabelKey } from '@/lib/orders/labels';
 
 /**
  * Панель фильтров списка заказов (docs/07 §5). Состояние живёт в URL (shareable):
  * поиск (номер/email/телефон), статус заказа, статус оплаты, тип доставки, период
  * дат, промокод. Сабмит формирует querystring и навигирует — серверная страница
  * перечитывает заказы. Сброс на первую страницу при изменении фильтров.
+ *
+ * 🔴 Подписи статусов в выпадающих списках — по КЛЮЧУ каталога через next-intl
+ * (аудит major №35): раньше печатались русские строки, и оператор с интерфейсом
+ * на en/fr не мог прочитать собственные фильтры.
  */
 export function OrderFilters() {
   const router = useRouter();
@@ -90,11 +91,14 @@ export function OrderFilters() {
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
             <option value="">{t('orders.orderFilters.any')}</option>
-            {ORDER_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {orderStatusLabel(s)}
-              </option>
-            ))}
+            {ORDER_STATUSES.map((s) => {
+              const key = orderStatusLabelKey(s);
+              return (
+                <option key={s} value={s}>
+                  {key ? t(key) : s}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -109,11 +113,14 @@ export function OrderFilters() {
             className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
           >
             <option value="">{t('orders.orderFilters.any')}</option>
-            {PAYMENT_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {paymentStatusLabel(s)}
-              </option>
-            ))}
+            {PAYMENT_STATUSES.map((s) => {
+              const key = paymentStatusLabelKey(s);
+              return (
+                <option key={s} value={s}>
+                  {key ? t(key) : s}
+                </option>
+              );
+            })}
           </select>
         </div>
 

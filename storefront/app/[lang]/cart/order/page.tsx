@@ -1,8 +1,8 @@
 /**
  * Страница оформления заказа carre (/cart/order, /en/cart/order, …). Повторяет
  * боевой флоу carrerusse.com: заполнение контактов/доставки → серверный расчёт
- * (/cart/quote) → создание заказа (/orders) → инициация онлайн-оплаты PayKeeper
- * (/payments/paykeeper/init) → редирект на invoice_url → страница успеха.
+ * (/cart/quote) → создание заказа (/orders) → инициация онлайн-оплаты у АКТИВНОГО
+ * эквайера (/payments/init) → редирект на платёжную форму → страница успеха.
  *
  * Серверная обёртка: тянет публичные настройки (зоны доставки, валюта) и отдаёт
  * их клиентской форме. Сам чекаут — client-компонент. Anti-tamper: цену считает
@@ -42,6 +42,17 @@ export default async function OrderPage({
   const currencyCode = settings?.currency?.code ?? 'RUB';
   const currencySymbol = settings?.currency?.symbol ?? null;
   const zones = settings?.delivery?.zones ?? [];
+  // 🔴 Аудит №20 — ДОСТУПНЫЕ способы доставки (возможности магазина из публичного
+  // DTO). Форма не предлагает то, чего магазин выполнить не может: при выключенном
+  // модуле СДЭК его радио не рендерятся вовсе. `undefined` (старый ответ API без
+  // поля либо недоступные настройки) → прежнее поведение, без регресса.
+  const deliveryMethods = settings?.delivery?.methods;
+  // 🔴 Аудит №9 — формат чисел магазина («Формат чисел» + «Знаков после запятой»
+  // из настроек). Отсутствие настроек → исторический показ, без регресса.
+  const numberFormat = {
+    locale: settings?.currency?.locale ?? null,
+    fractionDigits: settings?.currency?.fractionDigits ?? null,
+  };
 
   return (
     <>
@@ -52,7 +63,9 @@ export default async function OrderPage({
         currencyCode={currencyCode}
         currencySymbol={currencySymbol}
         zones={zones}
+        deliveryMethods={deliveryMethods}
         locale={locale}
+        numberFormat={numberFormat}
       />
     </>
   );

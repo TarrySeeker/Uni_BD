@@ -72,7 +72,7 @@ describe('cron route /api/cron/gift/[task]', () => {
   it('без ключа → 401, воркер не запускается', async () => {
     process.env.CDEK_CRON_SECRET = SECRET;
     const run = vi.fn(async () => stats());
-    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run }));
+    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run, runExpireOutdated: vi.fn(async () => stats()) }));
     const res = await callPost('issue-pending', URL_OK);
     expect(res.status).toBe(401);
     expect(run).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe('cron route /api/cron/gift/[task]', () => {
   it('верный ключ в query → 200 со статистикой прогона', async () => {
     process.env.CDEK_CRON_SECRET = SECRET;
     const run = vi.fn(async () => stats({ scanned: 2, issued: 1, ordersIssued: 1 }));
-    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run }));
+    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run, runExpireOutdated: vi.fn(async () => stats()) }));
 
     const res = await callPost('issue-pending', `${URL_OK}?key=${SECRET}`);
     expect(res.status).toBe(200);
@@ -111,7 +111,7 @@ describe('cron route /api/cron/gift/[task]', () => {
   it('верный ключ в заголовке X-Cron-Secret (как ходит cron-контейнер) → 200', async () => {
     process.env.CDEK_CRON_SECRET = SECRET;
     const run = vi.fn(async () => stats());
-    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run }));
+    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run, runExpireOutdated: vi.fn(async () => stats()) }));
 
     const { POST } = await import('@/app/api/cron/gift/[task]/route');
     const { NextRequest } = await import('next/server');
@@ -127,7 +127,7 @@ describe('cron route /api/cron/gift/[task]', () => {
   it('GET работает так же (планировщики ходят обоими методами)', async () => {
     process.env.CDEK_CRON_SECRET = SECRET;
     const run = vi.fn(async () => stats());
-    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run }));
+    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run, runExpireOutdated: vi.fn(async () => stats()) }));
 
     const { GET } = await import('@/app/api/cron/gift/[task]/route');
     const { NextRequest } = await import('next/server');
@@ -141,7 +141,7 @@ describe('cron route /api/cron/gift/[task]', () => {
     process.env.CDEK_CRON_SECRET = SECRET;
     ordersEnabled = false;
     const run = vi.fn(async () => stats());
-    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run }));
+    vi.doMock('@/lib/gift-certificates/cron', () => ({ runIssuePending: run, runExpireOutdated: vi.fn(async () => stats()) }));
 
     const res = await callPost('issue-pending', `${URL_OK}?key=${SECRET}`);
     expect(res.status).toBe(200);
@@ -164,6 +164,46 @@ describe('cron route /api/cron/gift/[task]', () => {
     expect(body.ok).toBe(false);
     expect(body.stats?.failed).toBe(2);
     spy.mockRestore();
+  });
+
+  /**
+   * Минор аудита №3: раньше роут знал ОДНУ задачу (TASKS = ['issue-pending']),
+   * из-за чего статус 'expired' не выставлялся никогда и админка показывала
+   * истёкший сертификат «Активен».
+   */
+  it('задача expire-outdated известна роуту и вызывает свой воркер', async () => {
+    process.env.CDEK_CRON_SECRET = SECRET;
+    const expire = vi.fn(async () => stats({ scanned: 7 }));
+    const issue = vi.fn(async () => stats());
+    vi.doMock('@/lib/gift-certificates/cron', () => ({
+      runIssuePending: issue,
+      runExpireOutdated: expire,
+    }));
+
+    const res = await callPost(
+      'expire-outdated',
+      `http://localhost/api/cron/gift/expire-outdated?key=${SECRET}`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; task: string; stats: { scanned: number } };
+    expect(body.ok).toBe(true);
+    expect(body.task).toBe('expire-outdated');
+    expect(body.stats.scanned).toBe(7);
+    expect(expire).toHaveBeenCalledTimes(1);
+    // Задачи не путаются между собой.
+    expect(issue).not.toHaveBeenCalled();
+  });
+
+  it('expire-outdated тоже под секретом (без ключа → 401)', async () => {
+    process.env.CDEK_CRON_SECRET = SECRET;
+    const expire = vi.fn(async () => stats());
+    vi.doMock('@/lib/gift-certificates/cron', () => ({
+      runIssuePending: vi.fn(async () => stats()),
+      runExpireOutdated: expire,
+    }));
+    const res = await callPost('expire-outdated', 'http://localhost/api/cron/gift/expire-outdated');
+    expect(res.status).toBe(401);
+    expect(expire).not.toHaveBeenCalled();
   });
 
   it('lockSkipped (параллельный прогон) остаётся 2xx — это не сбой', async () => {

@@ -92,21 +92,60 @@ export function HomeContentForm({
   const [philText, setPhilText] = useState(home.philosophy.text ?? '');
   const [philLinkLabel, setPhilLinkLabel] = useState(home.philosophy.linkLabel ?? '');
   const [philLinkHref, setPhilLinkHref] = useState(home.philosophy.linkHref ?? '');
-  // looks (ТЗ_2) — «Образы»: показ + заголовок + репитер категорий (фото/заголовок/текст).
+  // looks v2 — «Образы»: показ + заголовок + репитер ВКЛАДОК-категорий и репитер
+  // КАРТОЧЕК (фото образа + аватар автора + имя + принадлежность вкладке).
+  // Легаси-поля категории (text/imageKey) в состоянии сохраняем и отправляем
+  // обратно нетронутыми: иначе сохранение формы затёрло бы контент, который
+  // старая витрина ещё показывает, а карточки-миграции — потеряли бы источник.
   const [looksEnabled, setLooksEnabled] = useState(home.looks.enabled);
   const [looksTitle, setLooksTitle] = useState(home.looks.title ?? '');
   const [looksCategories, setLooksCategories] = useState<
-    { title: string; text: string; imageKey: string }[]
+    { id: string; title: string; text: string; imageKey: string }[]
   >(() => (home.looks.categories ?? []).map((c) => ({ ...c })));
+  const [looksItems, setLooksItems] = useState<
+    { categoryId: string; imageKey: string; authorName: string; authorAvatarKey: string }[]
+  >(() => (home.looks.items ?? []).map((i) => ({ ...i })));
 
-  function setLookCategory(i: number, field: 'title' | 'text' | 'imageKey', value: string) {
+  function setLookCategory(i: number, field: 'id' | 'title', value: string) {
     setLooksCategories((prev) => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
   }
   function addLookCategory() {
-    setLooksCategories((prev) => [...prev, { title: '', text: '', imageKey: '' }]);
+    // id генерируем от позиции — тот же принцип, что в normalizeLooks на сервере.
+    setLooksCategories((prev) => [
+      ...prev,
+      { id: `cat-${prev.length}-${Date.now()}`, title: '', text: '', imageKey: '' },
+    ]);
   }
   function removeLookCategory(i: number) {
-    setLooksCategories((prev) => prev.filter((_, idx) => idx !== i));
+    setLooksCategories((prev) => {
+      const removed = prev[i];
+      // Вместе со вкладкой убираем её карточки — иначе они станут сиротами и
+      // сервер их всё равно отбросит, а владелец решит, что фото «пропали молча».
+      if (removed) setLooksItems((items) => items.filter((it) => it.categoryId !== removed.id));
+      return prev.filter((_, idx) => idx !== i);
+    });
+  }
+
+  function setLookItem(
+    i: number,
+    field: 'categoryId' | 'imageKey' | 'authorName' | 'authorAvatarKey',
+    value: string,
+  ) {
+    setLooksItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, [field]: value } : it)));
+  }
+  function addLookItem() {
+    setLooksItems((prev) => [
+      ...prev,
+      {
+        categoryId: looksCategories[0]?.id ?? '',
+        imageKey: '',
+        authorName: '',
+        authorAvatarKey: '',
+      },
+    ]);
+  }
+  function removeLookItem(i: number) {
+    setLooksItems((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   // tiles (M4) — «Плитки категорий»: показ + репитер плиток (заголовок/ссылка/фото).
@@ -262,11 +301,42 @@ export function HomeContentForm({
         looks: {
           enabled: looksEnabled,
           title: s(looksTitle),
-          // Только полностью заполненные категории (все три поля) — неполные строки
-          // отбрасываем, как pairsToArr для delivery/valuesStrip (иначе Zod-отказ).
+          // Вкладке достаточно непустого заголовка. Легаси-поля (text/imageKey)
+          // отправляем ТОЛЬКО если непусты: пустая строка не пройдёт Zod (nonEmpty),
+          // а сохранять их обязательно — иначе правка блока обнулила бы контент v1.
           categories: looksCategories
-            .map((c) => ({ title: c.title.trim(), text: c.text.trim(), imageKey: c.imageKey.trim() }))
-            .filter((c) => c.title && c.text && c.imageKey),
+            .map((c) => {
+              const cat: { id?: string; title: string; text?: string; imageKey?: string } = {
+                title: c.title.trim(),
+              };
+              const id = c.id.trim();
+              if (id) cat.id = id;
+              const text = c.text.trim();
+              if (text) cat.text = text;
+              const imageKey = c.imageKey.trim();
+              if (imageKey) cat.imageKey = imageKey;
+              return cat;
+            })
+            .filter((c) => c.title),
+          // Карточка едет, только если заполнены вкладка + фото + имя автора;
+          // неполные отбрасываем (как делали looks-категории v1), иначе Zod-отказ.
+          items: looksItems
+            .map((it) => {
+              const card: {
+                categoryId: string;
+                imageKey: string;
+                authorName: string;
+                authorAvatarKey?: string;
+              } = {
+                categoryId: it.categoryId.trim(),
+                imageKey: it.imageKey.trim(),
+                authorName: it.authorName.trim(),
+              };
+              const avatar = it.authorAvatarKey.trim();
+              if (avatar) card.authorAvatarKey = avatar;
+              return card;
+            })
+            .filter((it) => it.categoryId && it.imageKey && it.authorName),
         },
         tiles: {
           enabled: tilesEnabled,
@@ -539,9 +609,10 @@ export function HomeContentForm({
               placeholder={t('settings.homeContentForm.looks.titlePlaceholder')} className={inputCls} />
           </div>
 
+          {/* Репитер ВКЛАДОК-категорий: у вкладки только заголовок (id машинный). */}
           <div className="grid grid-cols-1 gap-4">
             {looksCategories.map((cat, i) => (
-              <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
+              <div key={cat.id || i} className="rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-600">{t('settings.homeContentForm.looks.categoryN', { n: i + 1 })}</span>
                   <button type="button" onClick={() => removeLookCategory(i)}
@@ -549,26 +620,11 @@ export function HomeContentForm({
                     {t('common.actions.delete')}
                   </button>
                 </div>
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label htmlFor={`home-looks-title-${i}`} className={labelCls}>{t('fields.title')}</label>
-                    <input id={`home-looks-title-${i}`} value={cat.title}
-                      onChange={(e) => setLookCategory(i, 'title', e.target.value)}
-                      placeholder={t('settings.homeContentForm.looks.catTitlePlaceholder')} className={inputCls} />
-                  </div>
-                  <div>
-                    <label htmlFor={`home-looks-text-${i}`} className={labelCls}>{t('settings.homeContentForm.looks.catTextLabel')}</label>
-                    <textarea id={`home-looks-text-${i}`} value={cat.text}
-                      onChange={(e) => setLookCategory(i, 'text', e.target.value)}
-                      rows={3} className={inputCls} />
-                  </div>
-                  <div>
-                    <label htmlFor={`home-looks-img-${i}`} className={labelCls}>{t('settings.homeContentForm.photoLabel')}</label>
-                    <input id={`home-looks-img-${i}`} value={cat.imageKey}
-                      onChange={(e) => setLookCategory(i, 'imageKey', e.target.value)}
-                      placeholder="home/looks/1.webp" className={inputCls} />
-                    <ImageUploadButton label={t('settings.homeContentForm.looks.uploadPhoto')} onUploaded={(key) => setLookCategory(i, 'imageKey', key)} />
-                  </div>
+                <div>
+                  <label htmlFor={`home-looks-title-${i}`} className={labelCls}>{t('fields.title')}</label>
+                  <input id={`home-looks-title-${i}`} value={cat.title}
+                    onChange={(e) => setLookCategory(i, 'title', e.target.value)}
+                    placeholder={t('settings.homeContentForm.looks.catTitlePlaceholder')} className={inputCls} />
                 </div>
               </div>
             ))}
@@ -580,6 +636,62 @@ export function HomeContentForm({
               {t('settings.homeContentForm.looks.addCategory')}
             </button>
             <p className={hintCls}>{t('settings.homeContentForm.looks.hint')}</p>
+          </div>
+
+          {/* Репитер КАРТОЧЕК карусели: вкладка + фото образа + автор (имя+аватар). */}
+          <div className="grid grid-cols-1 gap-4">
+            {looksItems.map((card, i) => (
+              <div key={i} className="rounded border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-600">{t('settings.homeContentForm.looks.cardN', { n: i + 1 })}</span>
+                  <button type="button" onClick={() => removeLookItem(i)}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                    {t('common.actions.delete')}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label htmlFor={`home-looks-item-cat-${i}`} className={labelCls}>{t('settings.homeContentForm.looks.cardCategoryLabel')}</label>
+                    <select id={`home-looks-item-cat-${i}`} value={card.categoryId}
+                      onChange={(e) => setLookItem(i, 'categoryId', e.target.value)}
+                      className={inputCls}>
+                      <option value="">—</option>
+                      {looksCategories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.title || c.id}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={`home-looks-item-name-${i}`} className={labelCls}>{t('settings.homeContentForm.looks.authorNameLabel')}</label>
+                    <input id={`home-looks-item-name-${i}`} value={card.authorName}
+                      onChange={(e) => setLookItem(i, 'authorName', e.target.value)}
+                      placeholder={t('settings.homeContentForm.looks.authorNamePlaceholder')} className={inputCls} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-looks-item-img-${i}`} className={labelCls}>{t('settings.homeContentForm.looks.cardPhotoLabel')}</label>
+                    <input id={`home-looks-item-img-${i}`} value={card.imageKey}
+                      onChange={(e) => setLookItem(i, 'imageKey', e.target.value)}
+                      placeholder="home/looks/card-1.webp" className={inputCls} />
+                    <ImageUploadButton label={t('settings.homeContentForm.looks.uploadPhoto')} onUploaded={(key) => setLookItem(i, 'imageKey', key)} />
+                  </div>
+                  <div>
+                    <label htmlFor={`home-looks-item-avatar-${i}`} className={labelCls}>{t('settings.homeContentForm.looks.avatarLabel')}</label>
+                    <input id={`home-looks-item-avatar-${i}`} value={card.authorAvatarKey}
+                      onChange={(e) => setLookItem(i, 'authorAvatarKey', e.target.value)}
+                      placeholder="home/looks/avatar-1.webp" className={inputCls} />
+                    <ImageUploadButton label={t('settings.homeContentForm.looks.uploadAvatar')} onUploaded={(key) => setLookItem(i, 'authorAvatarKey', key)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <button type="button" onClick={addLookItem}
+              className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+              {t('settings.homeContentForm.looks.addCard')}
+            </button>
+            <p className={hintCls}>{t('settings.homeContentForm.looks.cardsHint')}</p>
           </div>
         </div>
       </fieldset>

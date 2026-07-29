@@ -241,6 +241,24 @@ const pageSeoFields = {
   sitemapChangefreq: sitemapChangefreqSchema,
 };
 
+/**
+ * Поля бокового меню разделов витрины (миграция 0060). Оба опциональны и
+ * аддитивны: страницы, созданные до волны, валидны без них.
+ *
+ *  • showInNav — «показывать в боковом меню разделов». Именно этот флаг делает
+ *    боковик доп-страниц ДАННЫМИ, а не списком в коде витрины (мультитенант:
+ *    у следующего магазина другой набор страниц либо боковик не нужен вовсе);
+ *  • navOrder — позиция; ЦЕЛОЕ (дробная позиция — опечатка ввода), 0 и
+ *    отрицательные валидны, пусто = «не задан» → пункт уходит в конец.
+ */
+const pageNavFields = {
+  showInNav: z.boolean().optional(),
+  // nullable, а не только optional: `null` — это ЯВНЫЙ сброс позиции («порядок
+  // не задан», пункт уходит в конец), тогда как `undefined` = «поле не прислали,
+  // не трогай». Различие несёт UPDATE (CASE WHEN … !== undefined).
+  navOrder: z.number().int().nullable().optional(),
+};
+
 /** Статус страницы — триада из CHECK БД (для фильтра списка). */
 export const cmsPageStatusSchema = z.enum(
   CMS_PAGE_STATUSES as unknown as [string, ...string[]],
@@ -263,6 +281,7 @@ export const CmsPageCreateSchema = z.object({
   slug: slugSchema.optional(),
   status: cmsPageEditableStatusSchema.optional(),
   ...pageSeoFields,
+  ...pageNavFields,
 });
 
 /** Обновление страницы: id обязателен, остальные поля частичны. */
@@ -272,6 +291,7 @@ export const CmsPageUpdateSchema = z.object({
   slug: slugSchema.optional(),
   status: cmsPageEditableStatusSchema.optional(),
   ...pageSeoFields,
+  ...pageNavFields,
   // Оверлей переводов (ADR-i18n, инкремент 2b): { [locale]: { [field]: string } }.
   // Тонкая фильтрация whitelist/языков — в handler (resolveTranslationsUpdate).
   translations: translationsBlockSchema,

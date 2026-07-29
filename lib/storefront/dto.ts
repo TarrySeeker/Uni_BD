@@ -31,6 +31,11 @@ import {
 import { localizeBlockTabs } from '@/lib/product-blocks';
 import type { ProductBlock, ProductBlockType } from '@/lib/product-blocks';
 import { localizeEntity, type LocalizeCtx } from './locale';
+import {
+  localizeAttributesCache,
+  localizeColors,
+  type AttributeDictionary,
+} from './attributes-i18n';
 import type {
   Brand,
   BrandRef,
@@ -605,6 +610,16 @@ export function toProductDetailDto(
     loc?: LocalizeCtx;
     /** Структурные секции карточки (§9); резолвятся по ctx.locale в toProductBlockDto. */
     blocks?: ProductBlock[];
+    /**
+     * 🔴 Аудит minor №11 (остаток) — словарь переводов ХАРАКТЕРИСТИК и ЦВЕТОВ
+     * (attributes/attribute_values.translations, миграция 0034). attributes_cache —
+     * денормализованная проекция EAV на языке по умолчанию, переводимой колонки у
+     * неё нет; поэтому кеш локализуется здесь, по справочнику.
+     *
+     * Опционально: без словаря DTO отдаёт кеш/цвета как раньше — старые вызовы
+     * (и магазины без переводов) не меняют поведение.
+     */
+    attributeDict?: AttributeDictionary | null;
   },
 ): ProductDetailDto {
   // Локализуем переводимые поля товара (name/description/seo/og) по ctx.locale.
@@ -637,11 +652,14 @@ export function toProductDetailDto(
     // Кросс-линк на дизайнера (аватар — тем же storage.url).
     designer: toDesignerDto(p.designer, opts.seoCtx.publicUrl),
     categories: opts.categorySlugs,
-    attributes: p.attributesCache ?? {},
-    // Дисплейные свотчи carre `.wv__colors` — публичны как есть ({hex,name}); name
-    // уже на ru (из словаря b_master_colors). Копируем, чтобы наружу не утекала
-    // ссылка на доменный массив. Пустой → витрина блок не рендерит.
-    colors: (p.colors ?? []).map((c) => ({ hex: c.hex, name: c.name })),
+    // 🔴 №11: кеш характеристик локализуется по справочнику (код → переведённое имя,
+    // значение → переведённое значение). Без словаря — прежний сырой кеш.
+    attributes: localizeAttributesCache(p.attributesCache, opts.attributeDict, opts.loc),
+    // Дисплейные свотчи carre `.wv__colors` — публичны как есть ({hex,name}). Имя
+    // цвета ПЕРЕВОДИМО (тот же словарь значений: раньше здесь стояло «name уже на ru»,
+    // и на en/fr витрине title/aria-label кружка оставались русскими). hex не трогаем:
+    // это идентификатор, а не текст. Пустой массив → витрина блок не рендерит.
+    colors: localizeColors(p.colors, opts.attributeDict, opts.loc),
     variants: p.variants
       .filter((v) => v.isActive)
       .map((v) => toVariantDto(v, product, opts.loc)),

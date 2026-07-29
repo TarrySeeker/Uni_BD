@@ -129,6 +129,16 @@ export const brandingSchema = z
       .optional(),
     supportEmail: z.string().trim().email().optional(),
     supportPhone: z.string().trim().min(1).optional(),
+    /**
+     * Часовой пояс магазина (IANA, напр. 'Europe/Moscow', 'Europe/Paris') —
+     * аудит major №26. В нём оператору показывается время во ВСЕЙ админке:
+     * журнал аудита, список заказов, карточка; в нём же считаются сутки для
+     * фильтра «за период». Не задан → env SHOP_TIMEZONE → дефолт платформы
+     * (lib/admin/timezone.ts). Мультитенантность: Москва нигде не хардкодится.
+     * Валидность идентификатора проверяет parseTimeZone на чтении (Intl) —
+     * схема лишь следит, чтобы значение было непустой строкой.
+     */
+    timeZone: z.string().trim().min(1).optional(),
   })
   .strip();
 
@@ -411,10 +421,21 @@ export const homeSchema = z
       })
       .strip()
       .optional(),
-    // ТЗ_2 — «Образы» (lookbook): опц. заголовок + список категорий, каждая =
-    // фото (imageKey S3, ADR-012 — DTO резолвит в URL) + заголовок + абзац. По
-    // умолчанию (нет оверрайда) блок скрыт и пуст; магазин наполняет его в админке
-    // без правки кода. Универсальный блок — никакого хардкода под нишу магазина.
+    // ТЗ_2 — «Образы» (lookbook) v2: вкладки-категории + карусель карточек
+    // «автор + фото». Структура:
+    //   categories: вкладки-фильтры [{ id?, title, text?, imageKey? }]
+    //   items:      карточки        [{ categoryId, imageKey, authorName, authorAvatarKey? }]
+    //
+    // 🔴 ОБРАТНАЯ СОВМЕСТИМОСТЬ. До v2 категория ОБЯЗАНА была нести text+imageKey
+    // (статичная сетка образов), и такие данные уже заведены у живых магазинов.
+    // Поэтому text/imageKey здесь ОСЛАБЛЕНЫ до опциональных (v2-вкладке хватает
+    // title), но НЕ удалены: старый JSON из БД проходит валидацию без правки, а
+    // mergeSettings мигрирует его в карточки (см. lib/config/settings.ts).
+    // Ослабление обязательности — расширение множества принимаемых значений,
+    // старые данные остаются валидными (аддитивная эволюция схемы).
+    //
+    // По умолчанию (нет оверрайда) блок скрыт и пуст; магазин наполняет его в
+    // админке без правки кода. Универсальный блок — без хардкода под нишу.
     looks: z
       .object({
         enabled: z.boolean().optional(),
@@ -423,9 +444,26 @@ export const homeSchema = z
           .array(
             z
               .object({
+                // Машинный ключ вкладки (связь с карточками). Опционален: у легаси
+                // его нет — merge автогенерирует стабильный id по позиции.
+                id: z.string().trim().min(1).optional(),
                 title: nonEmpty,
-                text: nonEmpty,
+                // Легаси-поля статичной сетки: сохраняем, чтобы не терять контент.
+                text: nonEmpty.optional(),
+                imageKey: z.string().trim().min(1).optional(),
+              })
+              .strip(),
+          )
+          .optional(),
+        items: z
+          .array(
+            z
+              .object({
+                categoryId: z.string().trim().min(1),
                 imageKey: z.string().trim().min(1),
+                authorName: nonEmpty,
+                // Аватар опционален: карточка валидна и без фото автора.
+                authorAvatarKey: z.string().trim().min(1).optional(),
               })
               .strip(),
           )
@@ -543,6 +581,40 @@ export const homeSchema = z
  */
 const navLinkSchema = z.object({ label: nonEmpty, href: hrefSchema }).strip();
 
+/**
+ * footerMeta — НЕ-ссылочное содержимое подвала витрины (эталон carrerusse.com,
+ * `.footer-top__subscriptions` + `.footer-foot`). Живёт в том же ключе `navigation`,
+ * что и колонки футера: одна настройка = одна админ-форма = один аудит-эвент.
+ *
+ * Все поля опциональны и АДДИТИВНЫ: старые значения ключа `navigation` без этого
+ * объекта валидны как раньше, витрина падает на словарные дефолты (`dict.footer.*`).
+ * Мультитенантность: заголовок рассылки, подпись копирайта и кредит студии —
+ * данные магазина, а не литералы в JSX.
+ *
+ *  - subscribeTitle  — заголовок над формой подписки («Рассылка от …»);
+ *  - subscribeNote   — мелкая приписка о согласии на обработку перс. данных;
+ *  - copyright       — левая подпись `.footer-foot` («2026 © Carre Russe»);
+ *  - designedByLabel — текст кредита («Designed by — Pragmatica»);
+ *  - designedByHref  — ссылка кредита (без неё кредит рендерится текстом).
+ *
+ * 🔴 Копирайт БЕЗ подстановки года: год — часть текста владельца. Автогенерация
+ * года на сервере ломала бы кэш SSR и не совпадала бы с юрлицом магазина.
+ */
+export const footerMetaSchema = z
+  .object({
+    subscribeTitle: nonEmpty.optional(),
+    subscribeNote: nonEmpty.optional(),
+    copyright: nonEmpty.optional(),
+    designedByLabel: nonEmpty.optional(),
+    // 🔴 internalHrefSchema, а не hrefSchema: кредит рендерится как <a href> с
+    // target="_blank" на КАЖДОЙ странице магазина. Допускаем только путь от «/»
+    // или полный https:// — отсекая javascript:/data: (XSS), http:// и `//host`
+    // (mixed-content и скрытый open-redirect). Тот же гвард, что у ссылок
+    // промо-слайдера и плиток corp/cert.
+    designedByHref: internalHrefSchema.optional(),
+  })
+  .strip();
+
 export const navigationSchema = z
   .object({
     header: z.array(navLinkSchema).optional(),
@@ -556,6 +628,7 @@ export const navigationSchema = z
           .strip(),
       )
       .optional(),
+    footerMeta: footerMetaSchema.optional(),
   })
   .strip();
 
@@ -755,7 +828,11 @@ export const SETTINGS_TR_FIELDS = {
     delivery: ['items.title', 'items.text'],
     valuesStrip: ['items.title', 'items.text'],
     philosophy: ['eyebrow', 'title', 'text', 'linkLabel'],
-    looks: ['title', 'categories.title', 'categories.text'],
+    // «Образы» v2: переводимы заголовок блока, названия вкладок-категорий,
+    // легаси-текст категории и ИМЯ АВТОРА карточки (контент витрины, который
+    // владелец переводит через content_i18n). categoryId/imageKey/авата-ключ —
+    // идентификаторы, не текст.
+    looks: ['title', 'categories.title', 'categories.text', 'items.authorName'],
     tiles: ['items.title'],
     designers: ['title', 'items.name'],
     slider: ['slides.name', 'slides.caption'],
@@ -764,6 +841,10 @@ export const SETTINGS_TR_FIELDS = {
   navigation: {
     header: ['label'],
     footer: ['title', 'links.label'],
+    // Подвал: переводится ТЕКСТ (заголовок рассылки, приписка о согласии,
+    // копирайт, подпись кредита). designedByHref — адрес, не текст: в whitelist
+    // его нет намеренно, иначе перевод мог бы увести ссылку на другой сайт.
+    footerMeta: ['subscribeTitle', 'subscribeNote', 'copyright', 'designedByLabel'],
   },
   // Зоны доставки (ТЗ_1): переводима ТОЛЬКО подпись зоны — её видит покупатель в
   // селекторе чекаута. id (машинный ключ, по нему сервер находит зону и её цену),

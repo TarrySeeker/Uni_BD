@@ -142,12 +142,19 @@ export interface PublicSocialDto {
   url: string;
 }
 
+/**
+ * Способ доставки, доступный покупателю (зеркало PublicDeliveryMethod из
+ * Uni_BD/lib/storefront/settings-dto.ts). Это ВОЗМОЖНОСТЬ магазина, а не имя
+ * модуля платформы: витрина не знает и не должна знать про ADMIK_MODULES.
+ */
+export type DeliveryMethod = 'zone' | 'cdek_courier' | 'cdek_pvz';
+
 // -----------------------------------------------------------------------------
 // Оформление заказа (чекаут). Формы входа сверены ДОСЛОВНО с Zod-схемами Admik
 // (Uni_BD/lib/orders/schemas.ts: CartQuoteSchema, CreateOrderSchema,
 // deliverySelectionSchema, cartLineSchema) и публичными DTO ответов
 // (lib/storefront/order-dto.ts: QuoteDto, OrderCreatedDto, OrderPublicDto),
-// а также роутами delivery/cdek/* и payments/paykeeper/init.
+// а также роутами delivery/cdek/* и payments/init (эквайер выбирает сервер).
 // Anti-tamper (ADR-010): в телах запроса НЕТ полей цены — сумму считает сервер.
 // -----------------------------------------------------------------------------
 
@@ -219,6 +226,30 @@ export interface CreateOrderRequest {
   giftCertificateCode?: string;
   comment?: string;
   idempotencyKey?: string;
+  /**
+   * Итог, который ВИДИТ покупатель на момент нажатия «Оплатить» (= quote.grandTotal).
+   * Сервер сверяет его со своим пересчитанным итогом и при расхождении отказывает
+   * причиной `total_mismatch` вместо тихого создания заказа (аудит: находки №2/№9).
+   *
+   * 🔴 Это НЕ цена: anti-tamper не ослаблен — сумму по-прежнему считает только
+   * сервер, а поле служит исключительно ОЖИДАНИЕМ для сравнения. Опционально —
+   * старый клиент без него работает как раньше.
+   */
+  expectedGrandTotal?: string;
+  /**
+   * КОД валюты, в которой покупатель СМОТРЕЛ цены на витрине (ISO-4217). Сервер
+   * сохраняет снимок «что было на экране» (orders.display_currency/rate/total,
+   * миграция 0059), чтобы через неделю можно было разобрать претензию: курс ЦБ
+   * меняется ежедневно и нигде больше не фиксируется.
+   *
+   * 🔴 ЭТО НЕ ДЕНЬГИ. Ни курс, ни сумма в валюте показа не отправляются: сервер
+   * берёт курс из настроек магазина и считает справочный итог сам от своего
+   * grandTotal (ADR-010 anti-tamper). Подделка кода меняет лишь СПРАВОЧНУЮ
+   * подпись в карточке заказа, но не сумму к оплате.
+   *
+   * Отсутствует, когда покупатель смотрел в базовой валюте магазина.
+   */
+  displayCurrency?: string;
 }
 
 /**
@@ -290,13 +321,25 @@ export interface OrderCreatedDto {
   accessToken: string;
 }
 
-/** Ответ POST /payments/paykeeper/init. */
-export interface PaykeeperInitDto {
-  /** invoice_url PayKeeper — редирект сюда (в mock — demo-URL). */
+/**
+ * Ответ POST /payments/init — инициация оплаты у АКТИВНОМ эквайере магазина.
+ *
+ * 🔴 Витрина НЕ знает, какой эквайер настроен: сервер выбирает его сам и лишь
+ * НАЗЫВАЕТ в ответе (для логов/диагностики). Раньше здесь был PayKeeper-специфичный
+ * DTO и жёсткий путь `/payments/paykeeper/init` — из-за этого при активном другом
+ * эквайере покупателя уводило на mock-страницу PayKeeper (аудит major №1).
+ */
+export interface PaymentInitDto {
+  /** Куда редиректить покупателя: invoice_url / PaymentURL / formUrl (в mock — demo-URL). */
   paymentUrl: string;
-  invoiceId: string;
+  /** Идентификатор счёта у эквайера (нормализован сервером). */
+  paymentId: string;
+  /** Имя эквайера, реально выставившего счёт ('tbank' | 'paykeeper' | 'alfabank'). */
+  provider: string;
   status: string;
   isMock: boolean;
+  /** Алиас paymentId для PayKeeper — обратная совместимость, витриной не используется. */
+  invoiceId?: string;
 }
 
 /** Город СДЭК (GET /cdek/cities). */
@@ -446,6 +489,20 @@ export interface PageDto {
   sections: PageSection[];
 }
 
+/**
+ * Строка списка страниц (`GET /pages`) — источник бокового меню разделов
+ * доп-страниц. `showInNav`/`navOrder` опциональны намеренно: витрина может
+ * временно работать со старым Admik, где миграции 0060 ещё нет; тогда боковик
+ * просто пуст (см. buildPageNav), а страницы рендерятся на всю ширину.
+ */
+export interface PageListItemDto {
+  slug: string;
+  title: string;
+  meta: SeoMetaDto;
+  showInNav?: boolean;
+  navOrder?: number | null;
+}
+
 export interface PublicSettingsDto {
   branding: {
     shopName: string;
@@ -485,6 +542,21 @@ export interface PublicSettingsDto {
     socials: PublicSocialDto[];
   };
   /**
+   * Публичные реквизиты юрлица (БЕЗ приватных bankDetails). Витрине отсюда нужен
+   * `emailDesigners` — вторая приёмная почта в низу выезжающего меню («Для
+   * дизайнеров», эталон docs/41 §2). Секция и поле опциональны ЦЕЛИКОМ (version
+   * skew: старая админка их ещё не отдаёт, магазин без дизайнерского направления
+   * не заполняет) — отсутствие означает «блока в меню нет», а не ошибку.
+   */
+  legalEntity?: {
+    name?: string | null;
+    inn?: string | null;
+    kpp?: string | null;
+    ogrn?: string | null;
+    legalAddress?: string | null;
+    emailDesigners?: string | null;
+  };
+  /**
    * Доставка (ТЗ_1): порог бесплатной доставки + зоны (Москва в МКАД / за МКАД).
    * Деньги — в КОПЕЙКАХ. Опционально для устойчивости к старым ответам API.
    */
@@ -496,6 +568,15 @@ export interface PublicSettingsDto {
       price: number;
       freeThreshold: number | null;
     }>;
+    /**
+     * 🔴 Аудит №20 — ДОСТУПНЫЕ способы доставки (возможности магазина, не модули
+     * платформы). Чекаут предлагает покупателю строго то, что здесь перечислено:
+     * при выключенном модуле СДЭК его способов тут нет, и радио не рендерятся
+     * (иначе роуты /delivery/cdek/* отвечают 404 и покупатель — в тупике).
+     * Поле опционально: старый ответ API без него → считаем СДЭК доступным
+     * (прежнее поведение витрины, без регресса).
+     */
+    methods?: DeliveryMethod[];
   };
   seo: {
     siteName: string | null;
@@ -513,11 +594,21 @@ export interface PublicSettingsDto {
       ctaHref: string | null;
     };
     about: { title: string; paragraphs: string[]; imageUrls: string[]; values: string[] };
-    /** ТЗ_2 — «Образы» (lookbook): категории с фото (imageUrl) + заголовок/текст. */
+    /**
+     * «Образы» (lookbook) v2: вкладки-категории + карточки карусели «автор + фото».
+     * У категории `text`/`imageUrl` — наследие v1 (статичная сетка), в v2-рендере
+     * не используются, но остаются в контракте ради совместимости.
+     */
     looks: {
       enabled: boolean;
       title: string;
-      categories: { title: string; text: string; imageUrl: string }[];
+      categories: { id: string; title: string; text: string; imageUrl: string }[];
+      items: {
+        categoryId: string;
+        imageUrl: string;
+        authorName: string;
+        authorAvatarUrl: string | null;
+      }[];
     };
     /** M4 — «Плитки категорий» (.dop-links--adaptive): показ + плитки (imageUrl — публичный URL). */
     tiles: {
@@ -553,6 +644,19 @@ export interface PublicSettingsDto {
   navigation: {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
+    /**
+     * Подвал (эталон `.footer-top__subscriptions` + `.footer-foot`): заголовок
+     * рассылки, приписка о согласии, копирайт, кредит студии. Пустая строка =
+     * владелец не задал → берётся словарный дефолт локали (см. SiteFooter).
+     * Опционально ЦЕЛИКОМ — version skew: старая админка это поле ещё не отдаёт.
+     */
+    footerMeta?: {
+      subscribeTitle: string;
+      subscribeNote: string;
+      copyright: string;
+      designedByLabel: string;
+      designedByHref: string;
+    };
   };
   /**
    * Набор языков магазина (ключ i18n ∩ whitelist платформы). Контракт трека A:

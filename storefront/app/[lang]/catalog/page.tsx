@@ -6,7 +6,7 @@
 
 import type { Metadata } from 'next';
 import { getSettings } from '@/lib/api';
-import { toLocale, alternatesFor, enabledLocalesFrom } from '@/lib/i18n';
+import { toLocale, alternatesFor, enabledLocalesFrom, absoluteUrlBase } from '@/lib/i18n';
 import { getDictionary } from '@/lib/dictionaries';
 import CatalogView from './CatalogView';
 
@@ -21,9 +21,12 @@ export async function generateMetadata({
   const dict = getDictionary(locale);
   const settings = await getSettings(locale);
   const enabledLocales = enabledLocalesFrom(settings?.i18n?.locales);
+  // Аудит №34: hreflang обязан быть АБСОЛЮТНЫМ URL (относительные поисковики
+  // игнорируют). База — публичный адрес магазина из его же настроек, без хардкода.
+  const urlBase = absoluteUrlBase(settings);
   return {
     title: dict.catalog.title,
-    alternates: alternatesFor('/catalog', locale, enabledLocales),
+    alternates: alternatesFor('/catalog', locale, enabledLocales, urlBase),
   };
 }
 

@@ -11,6 +11,7 @@ import { listBlocksByProduct } from '@/lib/product-blocks';
 import {
   getActiveProductIdBySlug,
   getProductCategorySlugs,
+  getAttributeDictionary,
 } from '@/lib/storefront/queries';
 import { toProductDetailDto } from '@/lib/storefront/dto';
 import { localizeCtxFrom } from '@/lib/storefront/locale';
@@ -40,9 +41,12 @@ export async function GET(
       return jsonError('not_found', 'Товар не найден.', cors);
     }
 
-    const [categorySlugs, blocks] = await Promise.all([
+    // 🔴 №11: словарь переводов характеристик/значений — рядом с остальными
+    // связями карточки, одним параллельным запросом (справочник магазина мал).
+    const [categorySlugs, blocks, attributeDict] = await Promise.all([
       getProductCategorySlugs(id),
       listBlocksByProduct(id),
+      getAttributeDictionary(),
     ]);
     // «Новизна» — из эффективных настроек (env ⊕ БД), docs/11 §5.4.4.
     const settings = await getEffectiveSettings();
@@ -57,7 +61,14 @@ export async function GET(
     const storage = getStorage();
     const seoCtx = buildEntitySeoCtx(settings, (k) => storage.url(k), 'product');
 
-    const dto = toProductDetailDto(product, { effectiveIsNew, categorySlugs, seoCtx, loc, blocks });
+    const dto = toProductDetailDto(product, {
+      effectiveIsNew,
+      categorySlugs,
+      seoCtx,
+      loc,
+      blocks,
+      attributeDict,
+    });
     return jsonData(dto, {}, cors);
   });
 }

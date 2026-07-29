@@ -48,6 +48,14 @@ export interface PublicPageListItemDto {
   slug: string;
   title: string;
   meta: SeoMetaDto;
+  /**
+   * Показывать ли страницу в боковом меню разделов доп-страниц (0060). Это и
+   * есть ИСТОЧНИК пунктов боковика: витрина не знает названий страниц магазина
+   * и не должна их знать (мультитенантность) — она фильтрует по этому флагу.
+   */
+  showInNav: boolean;
+  /** Позиция в боковом меню; null = «не задан» → пункт уходит в конец списка. */
+  navOrder: number | null;
 }
 
 /**
@@ -197,5 +205,9 @@ export function toPublicPageListItemDto(
     slug: lp.slug,
     title: lp.title,
     meta: pageMeta(lp, seoCtx),
+    // Признак/позиция бокового меню — структурные поля, НЕ переводятся
+    // (переводится только подпись пункта, а она и есть локализованный title).
+    showInNav: Boolean(lp.showInNav),
+    navOrder: lp.navOrder ?? null,
   };
 }

@@ -108,9 +108,11 @@ describe('CheckoutForm — поле кода подарочного сертиф
   it('полное покрытие: онлайн-оплата не инициируется, покупатель уходит на success', () => {
     const at = src.indexOf('await createOrder(');
     const tail = src.slice(at);
-    // Ветка полного покрытия ДО initPaykeeperPayment.
+    // Ветка полного покрытия ДО инициации оплаты. Имя функции стало нейтральным
+    // (initPaykeeperPayment → initPayment: эквайера выбирает сервер, аудит major
+    // №1) — суть инварианта прежняя.
     const guard = tail.indexOf("paymentStatus === 'paid'");
-    const init = tail.indexOf('initPaykeeperPayment(');
+    const init = tail.indexOf('initPayment(');
     expect(guard).toBeGreaterThan(-1);
     expect(init).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(init);

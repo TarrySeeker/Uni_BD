@@ -20,6 +20,11 @@ export type GiftErrorCode =
   | 'duplicate_code'
   /** По этой позиции заказа сертификат уже выпущен (частичный UNIQUE 0054). */
   | 'duplicate_issue'
+  /**
+   * Заказ не проходит калитку ручного выпуска (не оплачен / отменён / возвращён /
+   * оплачен сертификатом при запрете политикой) — находка аудита №27.
+   */
+  | 'order_not_eligible'
   | 'validation';
 
 export class GiftCertificateError extends PublicActionError {

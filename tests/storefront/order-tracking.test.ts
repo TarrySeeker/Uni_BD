@@ -39,6 +39,10 @@ function makeOrder(over: Partial<Order> = {}): Order {
     deliveryTotal: '350.00',
     grandTotal: '3350.00',
     currency: 'RUB',
+    // Снимок валюты отображения (0059): заказ оформлен в базовой валюте → null.
+    displayCurrency: null,
+    displayRate: null,
+    displayTotal: null,
     paymentMethod: 'card',
     paymentStatus: 'paid',
     paidAt: new Date('2026-06-15T11:00:00.000Z'),

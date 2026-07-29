@@ -37,13 +37,24 @@ import { sql } from '@/lib/db/client';
 import { logger as appLogger, type Logger } from '@/lib/logger';
 
 import { autoIssueGiftsForPaidOrder, type AutoIssueReport } from './auto-issue';
-import { findOrdersPendingGiftIssue, type PendingGiftIssueOrder } from './repository';
+import { GIFT_EXPIRE_TASK } from './lifecycle';
+import {
+  findOrdersPendingGiftIssue,
+  markExpiredGiftCertificates,
+  type PendingGiftIssueOrder,
+} from './repository';
 
 /** Лимит заказов на один прогон (как у СДЭК create-pending). */
 export const GIFT_ISSUE_PENDING_LIMIT = 100;
 
 /** Стабильный ключ advisory-lock для сериализации прогонов. */
 export const GIFT_ISSUE_PENDING_LOCK_KEY = 'gift:issue-pending';
+
+/** Сколько сертификатов помечаем истёкшими за один тик (страховка от долгой блокировки). */
+export const GIFT_EXPIRE_LIMIT = 500;
+
+/** Ключ advisory-lock задачи истечения (своё пространство, не пересекается с выпуском). */
+export const GIFT_EXPIRE_LOCK_KEY = `gift:${GIFT_EXPIRE_TASK}`;
 
 /**
  * Результат попытки взять advisory-lock и выполнить критическую секцию.
@@ -160,6 +171,73 @@ export async function runIssuePending(
         issued: stats.issued,
         ordersIssued: stats.ordersIssued,
         failed: stats.failed,
+      });
+    }
+    return stats;
+  });
+
+  if (!locked.acquired) {
+    return { ok: true, scanned: 0, issued: 0, ordersIssued: 0, failed: 0, lockSkipped: true };
+  }
+  return locked.result;
+}
+
+// -----------------------------------------------------------------------------
+// Задача expire-outdated (минор аудита №3).
+// -----------------------------------------------------------------------------
+
+/** Инъецируемые зависимости задачи истечения. */
+export interface ExpireOutdatedDeps {
+  markExpired: (limit?: number) => Promise<number>;
+  withLock: WithLock;
+  logger: Logger;
+}
+
+/** Прод-зависимости задачи истечения. */
+export function productionExpireOutdatedDeps(): ExpireOutdatedDeps {
+  return {
+    markExpired: markExpiredGiftCertificates,
+    withLock: withAdvisoryLock,
+    logger: appLogger.child({ module: 'gift-cron' }),
+  };
+}
+
+/**
+ * expire-outdated: помечает истёкшие сертификаты статусом 'expired'.
+ *
+ * ЗАЧЕМ, если деньги и так защищены. Списание проверяет valid_until явно
+ * (redeemGiftTx, assertRedeemable), поэтому потратить истёкший код нельзя ни при
+ * каком статусе. Но админка показывала такой код «Активен» — оператор не понимал,
+ * почему покупателю отказывают, а бейдж и подпись 'expired' простаивали. Задача
+ * приводит ОТОБРАЖЕНИЕ в соответствие с уже действующим денежным правилом.
+ *
+ * Статистика той же формы, что у issue-pending: роут отдаёт её единообразно.
+ * Кодов и id в статистике нет намеренно (см. шапку модуля).
+ */
+export async function runExpireOutdated(
+  deps: ExpireOutdatedDeps = productionExpireOutdatedDeps(),
+): Promise<IssuePendingStats> {
+  const locked = await deps.withLock(GIFT_EXPIRE_LOCK_KEY, async () => {
+    const stats: IssuePendingStats = {
+      ok: true,
+      scanned: 0,
+      issued: 0,
+      ordersIssued: 0,
+      failed: 0,
+      lockSkipped: false,
+    };
+    try {
+      const marked = await deps.markExpired(GIFT_EXPIRE_LIMIT);
+      // Переиспользуем поля общей статистики: scanned — сколько строк тронуто.
+      stats.scanned = marked;
+      if (marked > 0) {
+        deps.logger.info('пометка истёкших сертификатов завершена', { expired: marked });
+      }
+    } catch (err) {
+      stats.ok = false;
+      stats.failed = 1;
+      deps.logger.error('пометка истёкших сертификатов сорвалась', {
+        error: err instanceof Error ? err.message : String(err),
       });
     }
     return stats;

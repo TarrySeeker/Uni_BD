@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/auth/session';
 import { can } from '@/lib/auth/rbac';
 import { listUsersWithRoles } from '@/lib/auth/admin-repository';
 import { formatDateTime } from '@/lib/admin/order-format';
+import { getShopTimeZone } from '@/lib/admin/timezone';
 import { isSingleUserModeEnabled } from '@/lib/config/settings';
 
 import { Forbidden } from '../_components/Forbidden';
@@ -22,6 +23,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function UsersPage() {
   const t = await getTranslations();
+  // Пояс магазина — один на всю админку (аудит major №26).
+  const timeZone = await getShopTimeZone();
   const statusLabel = (status: string) => {
     if (status === 'active') return t('common.states.active');
     if (status === 'disabled') return t('common.states.disabled');
@@ -90,7 +93,7 @@ export default async function UsersPage() {
                     {row.roles.length === 0 ? '—' : row.roles.map((r) => r.title).join(', ')}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2 text-gray-600">
-                    {formatDateTime(row.lastLoginAt)}
+                    {formatDateTime(row.lastLoginAt, timeZone)}
                   </td>
                   <td className="px-4 py-2 text-gray-600">{row.isOwner ? t('users.page.yes') : '—'}</td>
                   {canManage ? (

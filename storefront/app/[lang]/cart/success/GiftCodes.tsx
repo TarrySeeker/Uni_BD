@@ -14,9 +14,18 @@
  *  - none    — блок не рендерится вовсе;
  *  - pending — «оплата подтверждается, код появится автоматически» + опрос;
  *  - ready   — код(ы) моноширинным шрифтом, номинал, срок, кнопка «Скопировать».
+ *
+ * 🔴 СБОЙ ЗАПРОСА — ЧЕТВЁРТОЕ СОСТОЯНИЕ, А НЕ ПУСТОТА (находка аудита №12).
+ * Раньше fetchGiftCodes глушил и !res.ok, и исключение в один и тот же null, а
+ * ранний выход «нет payload → return null» стоял до обеих веток рендера. При
+ * первом же 429 (собственное ведро эндпоинта — 40 запросов/мин на IP) покупатель
+ * не видел НИЧЕГО: ни кода, ни объяснения, ни таймаута — блок бесследно исчезал,
+ * хотя деньги за сертификат уже уплачены. Теперь запрос возвращает размеченное
+ * объединение, а блок остаётся на экране и объясняет происходящее.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { formatPrice, type NumberFormatOpts } from '@/lib/format';
 
 /** Пауза между опросами (оплата подтверждается асинхронным вебхуком банка). */
 export const GIFT_CODES_POLL_INTERVAL_MS = 5000;
@@ -49,25 +58,44 @@ export interface GiftCodesStrings {
   giftCopy: string;
   giftCopied: string;
   giftWarning: string;
+  /** Сработало ведро rate-limit эндпоинта (429) — надо просто подождать. */
+  giftRateLimited: string;
+  /** Прочий сбой запроса (сеть/5xx) — код не потерян, попробуйте обновить. */
+  giftError: string;
 }
+
+/** Почему запрос не дал данных. Различаем, потому что советы покупателю разные. */
+export type GiftCodesFailure = 'rate_limited' | 'error';
+
+/**
+ * Результат обращения к эндпоинту — РАЗМЕЧЕННОЕ объединение.
+ * Прежний `Payload | null` не давал отличить «кодов нет» от «нас не пустили»,
+ * из-за чего 429 выглядел как отсутствие сертификата (находка №12).
+ */
+type FetchResult =
+  | { kind: 'ok'; payload: GiftCodesPayload }
+  | { kind: 'rate_limited' }
+  | { kind: 'error' };
 
 const API_BASE = (process.env.NEXT_PUBLIC_ADMIK_API_URL ?? '').replace(/\/$/, '');
 
-async function fetchGiftCodes(
-  number: string,
-  token: string,
-): Promise<GiftCodesPayload | null> {
+async function fetchGiftCodes(number: string, token: string): Promise<FetchResult> {
   try {
     const res = await fetch(
       `${API_BASE}/api/storefront/v1/orders/${encodeURIComponent(number)}/gift-codes` +
         `?token=${encodeURIComponent(token)}`,
       { headers: { Accept: 'application/json' }, cache: 'no-store' },
     );
-    if (!res.ok) return null;
+    // 429 — своё ведро эндпоинта (40/мин на IP). Это НЕ ошибка покупателя и не
+    // отсутствие кода: надо подождать, а не прятать блок.
+    if (res.status === 429) return { kind: 'rate_limited' };
+    if (!res.ok) return { kind: 'error' };
     const body = (await res.json()) as { data?: GiftCodesPayload };
-    return body?.data ?? null;
+    if (!body?.data) return { kind: 'error' };
+    return { kind: 'ok', payload: body.data };
   } catch {
-    return null;
+    // Сеть/парсинг — тоже сбой, а не «сертификата нет».
+    return { kind: 'error' };
   }
 }
 
@@ -101,10 +129,23 @@ const CODE_STYLE: React.CSSProperties = {
 };
 const PULSE_KEYFRAMES = '@keyframes sf-gift-pulse{0%,100%{opacity:.25}50%{opacity:1}}';
 
-function formatAmount(value: string, currency: string): string {
+/**
+ * 🔴 Аудит minor №9. Раньше здесь склеивалось `${n.toLocaleString('ru-RU')} ${currency}`:
+ * формат чисел был зашит русским, знаки после запятой не управлялись настройками, а
+ * рядом с валютой печатался КОД ('RUB'), а не символ магазина — три разных правила
+ * показа денег на одной витрине. Теперь номинал идёт через общий formatPrice, который
+ * знает и локаль формата, и знаки после запятой из настроек магазина.
+ */
+function formatAmount(
+  value: string,
+  currency: string,
+  fmt: NumberFormatOpts | undefined,
+  symbol: string | null,
+): string {
   const n = Number(value);
-  const amount = Number.isFinite(n) ? n.toLocaleString('ru-RU') : value;
-  return `${amount} ${currency}`;
+  // Нечисловой номинал (сервер прислал мусор) показываем как есть — не выдумываем.
+  if (!Number.isFinite(n)) return `${value} ${symbol ?? currency}`.trim();
+  return formatPrice(n, currency, symbol, fmt);
 }
 
 export default function GiftCodes({
@@ -112,13 +153,25 @@ export default function GiftCodes({
   token,
   strings,
   locale,
+  numberFormat,
+  currencySymbol = null,
 }: {
   number: string;
   token: string;
   strings: GiftCodesStrings;
   locale: string;
+  /**
+   * 🔴 №9 — формат чисел МАГАЗИНА (currency.locale/fractionDigits из настроек).
+   * Опционально: без него formatPrice отдаёт исторический вид (ru-RU, 0 знаков),
+   * поэтому старый вызов блока не ломается.
+   */
+  numberFormat?: NumberFormatOpts;
+  /** Символ валюты магазина (₽/€/$); null → показываем код валюты, как раньше. */
+  currencySymbol?: string | null;
 }) {
   const [payload, setPayload] = useState<GiftCodesPayload | null>(null);
+  /** Последний сбой запроса; null — сбоя нет (находка №12). */
+  const [failure, setFailure] = useState<GiftCodesFailure | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -132,12 +185,26 @@ export default function GiftCodes({
 
     async function tick(): Promise<void> {
       setBusy(true);
-      const data = await fetchGiftCodes(number, token);
+      const res = await fetchGiftCodes(number, token);
       if (cancelled) return;
       setBusy(false);
-      if (data) setPayload(data);
-      // Сетевой сбой трактуем как «ещё не готово» — но он тоже расходует попытки.
-      if (data && data.state !== 'pending') return;
+
+      if (res.kind === 'rate_limited') {
+        // Останавливаем опрос: продолжать долбить ведро значит никогда его не
+        // разгрузить. Покупателю объясняем и оставляем кнопку «Обновить».
+        setFailure('rate_limited');
+        return;
+      }
+      if (res.kind === 'error') {
+        // Разовый сбой не должен гасить уже показанный код: payload не трогаем,
+        // но ошибку показываем и продолжаем опрос до исчерпания попыток.
+        setFailure('error');
+      } else {
+        setFailure(null);
+        setPayload(res.payload);
+        if (res.payload.state !== 'pending') return;
+      }
+
       attempts += 1;
       if (attempts >= GIFT_CODES_POLL_MAX_ATTEMPTS) {
         setTimedOut(true);
@@ -147,6 +214,7 @@ export default function GiftCodes({
     }
 
     setTimedOut(false);
+    setFailure(null);
     void tick();
     return () => {
       cancelled = true;
@@ -160,10 +228,23 @@ export default function GiftCodes({
     });
   }, []);
 
-  // Состояние 3: сертификатов в заказе нет (или заказ отменён) — блока нет вовсе.
-  if (!payload || payload.state === 'none') return null;
+  /**
+   * Состояние 3: сертификатов в заказе нет (или заказ отменён) — блока нет вовсе.
+   *
+   * 🔴 Находка №12: проверка на СБОЙ обязана стоять ПЕРЕД этим выходом. Раньше
+   * ранний `return null` срабатывал и когда данных нет из-за ошибки запроса —
+   * покупатель, уплативший за сертификат, не видел ни кода, ни причины.
+   */
+  if (!failure && (!payload || payload.state === 'none')) return null;
 
-  if (payload.state === 'ready' && payload.codes.length > 0) {
+  /*
+    Код уже получен — показываем его, даже если ПОСЛЕДУЮЩИЙ опрос сорвался:
+    сертификат никуда не делся, а прятать выданный код из-за сетевой икоты
+    хуже, чем не показать сообщение об ошибке. Проверка `payload &&` здесь
+    обязательна: при сбое до первого успешного ответа payload ещё null, и
+    именно этот путь раньше уводил в ранний return (находка №12).
+  */
+  if (payload && payload.state === 'ready' && payload.codes.length > 0) {
     return (
       <div className="sf-success__gift" style={BLOCK_STYLE}>
         <h2 className="sf-success__gift-title" style={TITLE_STYLE}>
@@ -183,12 +264,12 @@ export default function GiftCodes({
             </button>
             <div className="sf-summary-row">
               <span>{strings.giftAmount}</span>
-              <span>{formatAmount(c.amount, c.currency)}</span>
+              <span>{formatAmount(c.amount, c.currency, numberFormat, currencySymbol)}</span>
             </div>
             {c.remaining !== c.amount ? (
               <div className="sf-summary-row">
                 <span>{strings.giftRemaining}</span>
-                <span>{formatAmount(c.remaining, c.currency)}</span>
+                <span>{formatAmount(c.remaining, c.currency, numberFormat, currencySymbol)}</span>
               </div>
             ) : null}
             <div className="sf-summary-row">
@@ -206,16 +287,30 @@ export default function GiftCodes({
     );
   }
 
-  // Состояние 1: сертификат куплен, код ещё не подтверждён.
+  /**
+   * Состояние 1: сертификат куплен, код ещё не подтверждён — ИЛИ запрос сорвался.
+   * Текст выбирается по приоритету: сбой > таймаут > обычное ожидание. Сбой
+   * приоритетнее, потому что он объясняет, почему опрос остановился.
+   */
+  const message =
+    failure === 'rate_limited'
+      ? strings.giftRateLimited
+      : failure === 'error'
+        ? strings.giftError
+        : timedOut
+          ? strings.giftTimeout
+          : strings.giftPending;
+  const stalled = failure !== null || timedOut;
+
   return (
     <div className="sf-success__gift" style={BLOCK_STYLE}>
       <style>{PULSE_KEYFRAMES}</style>
       <h2 className="sf-success__gift-title" style={TITLE_STYLE}>
         {strings.giftTitle}
       </h2>
-      <p className="sf-success__text" aria-live="polite">
-        {timedOut ? strings.giftTimeout : strings.giftPending}
-        {!timedOut ? (
+      <p className="sf-success__text" aria-live="polite" role={failure ? 'alert' : undefined}>
+        {message}
+        {!stalled ? (
           <span
             className="sf-success__gift-spinner"
             aria-hidden="true"

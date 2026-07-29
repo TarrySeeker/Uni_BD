@@ -39,7 +39,13 @@ export interface Dictionary {
     cart: string;
     contacts: string;
     forCustomers: string; // «Для покупателей»
+    forDesigners: string; // «Для дизайнеров» — вторая приёмная почта в низу меню
     phoneWhatsapp: string; // «Тел. / Whatsapp»
+    menuAria: string; // aria-label выезжающего меню («Меню сайта»)
+    openMenu: string; // aria-label бургера («Открыть меню»)
+    closeMenu: string; // aria-label крестика («Закрыть меню»)
+    // aria-шаблон кнопки раскрытия раздела: «Раскрыть раздел {name}» ({name} = имя категории)
+    expandSectionAria: string;
     langAria: string; // aria-шаблон с плейсхолдером {code}, напр. «Язык сайта: {code}»
     currencyAria: string; // aria-шаблон с плейсхолдером {code}
   };
@@ -55,10 +61,22 @@ export interface Dictionary {
     returns: string; // «Политика возвратов»
     offer: string; // «Оферта»
     userContract: string; // «Пользовательское соглашение»
+    // --- Форма подписки в подвале (эталон .footer-top__subscriptions) ---
+    // Дефолты локали: применяются, когда владелец не заполнил navigation.footerMeta.
+    subscribeTitle: string; // заголовок над полем ввода
+    subscribePlaceholder: string; // «Ваша почта»
+    subscribeSubmit: string; // «Отправить»
+    subscribeNote: string; // приписка о согласии на обработку перс. данных
+    subscribeSuccess: string; // «Спасибо за подписку!» (.fp-success__title)
+    subscribeError: string; // не удалось сохранить — попробуйте позже
+    subscribeInvalid: string; // введённый адрес не похож на почту
+    subscribeAria: string; // aria-label поля ввода (плейсхолдера мало для скринридера)
   };
   home: {
     newProducts: string; // «Новинки»
     ourStory: string; // «Наша история»
+    looksNext: string; // aria-label кнопки листания карусели «Образы»
+    looksTabsAria: string; // aria-label списка вкладок-категорий «Образы»
   };
   catalog: {
     title: string; // «Каталог»
@@ -118,12 +136,29 @@ export interface Dictionary {
     zoneLabel: string; // «Зона доставки»
     cityLabel: string; // «Город»
     cityPlaceholder: string; // «Начните вводить город»
+    /** №19: подсказка «город не найден» — сервис ОТВЕТИЛ, совпадений нет. */
+    cityLookupEmpty: string;
+    /** №19: справочник городов недоступен (сеть/сервис) — это НЕ «города нет». */
+    cityLookupFailed: string;
     addressLabel: string; // «Адрес доставки»
     addressPlaceholder: string; // «Улица, дом, квартира»
     pvzLabel: string; // «Пункт выдачи»
     pvzLoading: string; // «Загрузка пунктов выдачи…»
     pvzEmpty: string; // «В этом городе не найдено пунктов выдачи.»
+    /** №19: список ПВЗ не загрузился — про «нет пунктов» говорить нельзя. */
+    pvzLookupFailed: string;
     pvzSelect: string; // «— выберите пункт —»
+    /**
+     * №5: МЕТКА ТИПА пункта в списке. ПВЗ и постаматы приходят одним списком, и без
+     * метки покупатель не знает, что выбирает: в постамат (автоматическая ячейка)
+     * не выдают крупногабарит и там нет примерки.
+     */
+    pvzTypeOffice: string; // «Пункт выдачи»
+    pvzTypePostamat: string; // «Постамат»
+    /** №5: предупреждение об ограничениях постамата (показывается при его выборе). */
+    pvzPostamatHint: string;
+    /** №20: у магазина не настроен ни один способ доставки. */
+    deliveryNoMethods: string;
     // --- Промокод ---
     promo: string; // «Промокод»
     promoApplied: string; // «Применён:»
@@ -157,11 +192,53 @@ export interface Dictionary {
     deliveryFree: string; // «бесплатно»
     deliveryPending: string; // «уточняется»
     summaryTotal: string; // «Итого»
+    /**
+     * 🔴 ГЛАВНЫЙ РИСК МУЛЬТИВАЛЮТНОСТИ (ЭТАП 1). Покупатель ходит по каталогу с
+     * переключателем ₽/€ и видит цены в евро, а эквайринг у магазина РУБЛЁВЫЙ:
+     * списывается grand_total в БАЗОВОЙ валюте. Чекаут обязан сказать это прямо,
+     * иначе человек, пришедший из евро-режима, видит «внезапно другие» суммы и
+     * уходит платить, не понимая, сколько именно с него возьмут.
+     *
+     * Шаблон с ДВУМЯ суммами: {charged} — то, что реально спишут (в базовой
+     * валюте), {approx} — справочный эквивалент в валюте показа. Показывается
+     * ТОЛЬКО когда выбрана не базовая валюта; рублёвому покупателю (и магазину
+     * без доп.валют) не показывается вовсе.
+     */
+    paymentCurrencyNotice: string;
+    /**
+     * Хвост дисклеймера про КУРС: «по курсу 88,7602 ₽/€, справочно». Отдельным
+     * ключом, потому что курс осмыслен не всегда (валюта показа с испорченным
+     * курсом → основной текст остаётся правдивым и без этой фразы).
+     *
+     * ДАТЫ КУРСА ЗДЕСЬ НЕТ: публичный DTO настроек метку `rateUpdatedAt` наружу
+     * не отдаёт (внутренняя диагностика, guard tests/storefront/settings-dto),
+     * а подписывать курс временем рендера — врать. Точная дата действовавшего
+     * курса фиксируется сервером в снимке заказа (миграция 0059).
+     */
+    paymentCurrencyRate: string;
     // --- Статусы/кнопки ---
     recalculating: string; // «Пересчёт заказа…»
     notFulfillable: string; // «Некоторые товары недоступны в нужном количестве — измените корзину.»
     deliveryUnavailable: string; // «Не удалось рассчитать доставку — измените способ или адрес доставки.»
+    /**
+     * Аудит major №3: причина НЕАКТИВНОЙ кнопки оплаты, когда для выбранного
+     * способа доставки службой (курьер/ПВЗ) не указан город. Без города доставку
+     * нельзя ни посчитать, ни отгрузить, поэтому оформление блокируется — и
+     * покупатель должен видеть, ЧТО именно доввести, а не молчащую кнопку.
+     */
+    deliveryNeedsCity: string;
     unresolvableItems: string; // предупреждение о старых позициях корзины
+    /**
+     * №1: ПЕРЕЧЕНЬ неоформляемых позиций ({items}). Общее предупреждение выше не
+     * называет ни одной, и покупателю оставалось гадать, что именно удалять.
+     */
+    unresolvableItemsList: string;
+    /**
+     * №2: цена товара в каталоге изменилась после добавления в корзину. Суммы строк
+     * показываются СЕРВЕРНЫЕ (по ним и будет заказ), и расхождение с тем, что
+     * покупатель запомнил в корзине, обязано быть объяснено, а не выглядеть ошибкой.
+     */
+    priceChangedNotice: string;
     submit: string; // «Оплатить»
     /** Кнопка, когда платить нечего (сертификат покрыл заказ полностью). */
     submitGiftCovered: string; // «Оформить заказ»
@@ -219,6 +296,20 @@ export interface Dictionary {
      * банком (холд). Не «нельзя оплатить», а «повторять не нужно, деньги целы».
      */
     orderErrorPaymentInProgress: string;
+    /**
+     * Домен: total_mismatch — СЕРВЕР отказал, потому что показанный покупателю итог
+     * разошёлся с фактическим (аудит: находки №2/№9).
+     */
+    orderErrorTotalMismatch: string;
+    /**
+     * 🔴 КЛИЕНТСКАЯ сверка (вторая линия обороны, на случай старого сервера без
+     * total_mismatch): заказ создан, но его итог не равен показанному. Шаблон с
+     * ДВУМЯ плейсхолдерами — покупатель обязан увидеть ОБЕ суммы: {expected} —
+     * что было на экране, {actual} — что вышло по факту.
+     */
+    orderTotalChanged: string;
+    /** Что делать дальше при расхождении суммы (на оплату НЕ уводим автоматически). */
+    orderTotalChangedAction: string;
     orderErrorNetwork: string; // ApiError code 'network' (fetch не дошёл)
     orderErrorRateLimited: string; // ApiError code 'rate_limited' (429 от API)
     /**
@@ -289,6 +380,11 @@ export interface Dictionary {
     giftCopy: string; // «Скопировать»
     giftCopied: string; // «Скопировано»
     giftWarning: string; // «сохраните код — он равносилен деньгам»
+    // Сбой запроса кодов — четвёртое состояние блока (аудит, находка №12):
+    // раньше 429/ошибка молча ПРЯТАЛИ блок, и покупатель, уплативший за
+    // сертификат, не видел ни кода, ни причины.
+    giftRateLimited: string; // 429: слишком много запросов, подождите
+    giftError: string; // сеть/5xx: код не потерян, попробуйте обновить
   };
   /**
    * Страница заказа и блок «где моя посылка» (находка аудита №5). Покупателю
@@ -346,6 +442,19 @@ export interface Dictionary {
     productMetaTitle: string; // «Товар не найден»
     designerMetaTitle: string; // «Дизайнер не найден»
   };
+  /**
+   * Дополнительные CMS-страницы (about/доставка/оплата/оферта/…). Здесь ТОЛЬКО
+   * строки интерфейса; заголовки и содержимое самих страниц приходят из админки
+   * уже переведёнными (translations на cms_pages/cms_page_sections).
+   */
+  cms: {
+    /**
+     * Доступная подпись бокового меню разделов (`aria-label` у `.about__nav`).
+     * Видна скринридеру: без неё «навигация» в списке ориентиров безымянна и
+     * не отличима от меню шапки/подвала.
+     */
+    sectionsNavTitle: string; // «Разделы»
+  };
 }
 
 const ru: Dictionary = {
@@ -371,7 +480,12 @@ const ru: Dictionary = {
     cart: 'Корзина',
     contacts: 'Контакты',
     forCustomers: 'Для покупателей',
+    forDesigners: 'Для дизайнеров',
     phoneWhatsapp: 'Тел. / Whatsapp',
+    menuAria: 'Меню сайта',
+    openMenu: 'Открыть меню',
+    closeMenu: 'Закрыть меню',
+    expandSectionAria: 'Раскрыть раздел «{name}»',
     langAria: 'Язык сайта: {code}',
     currencyAria: 'Показывать цены в {code}',
   },
@@ -387,10 +501,21 @@ const ru: Dictionary = {
     returns: 'Политика возвратов',
     offer: 'Оферта',
     userContract: 'Пользовательское соглашение',
+    subscribeTitle: 'Подписка на рассылку',
+    subscribePlaceholder: 'Ваша почта',
+    subscribeSubmit: 'Отправить',
+    subscribeNote:
+      'Нажимая кнопку «Отправить» вы соглашаетесь на обработку персональных данных',
+    subscribeSuccess: 'Спасибо за подписку!',
+    subscribeError: 'Не удалось оформить подписку. Попробуйте позже.',
+    subscribeInvalid: 'Укажите корректный адрес почты.',
+    subscribeAria: 'Адрес почты для подписки на рассылку',
   },
   home: {
     newProducts: 'Новинки',
     ourStory: 'Наша история',
+    looksNext: 'Следующие образы',
+    looksTabsAria: 'Категории образов',
   },
   catalog: {
     title: 'Каталог',
@@ -448,12 +573,23 @@ const ru: Dictionary = {
     zoneLabel: 'Зона доставки',
     cityLabel: 'Город',
     cityPlaceholder: 'Начните вводить город',
+    cityLookupEmpty: 'Город не найден. Проверьте написание или введите крупный город рядом.',
+    cityLookupFailed:
+      'Не удалось загрузить список городов. Повторите попытку через минуту или выберите другой способ доставки.',
     addressLabel: 'Адрес доставки',
     addressPlaceholder: 'Улица, дом, квартира',
     pvzLabel: 'Пункт выдачи',
     pvzLoading: 'Загрузка пунктов выдачи…',
     pvzEmpty: 'В этом городе не найдено пунктов выдачи.',
+    pvzLookupFailed:
+      'Не удалось загрузить пункты выдачи. Повторите попытку через минуту или выберите доставку курьером.',
     pvzSelect: '— выберите пункт —',
+    pvzTypeOffice: 'Пункт выдачи',
+    pvzTypePostamat: 'Постамат',
+    pvzPostamatHint:
+      'Постамат — автоматическая ячейка: получение по коду без сотрудника, примерка невозможна, крупногабаритные заказы туда не принимают.',
+    deliveryNoMethods:
+      'Онлайн-оформление доставки временно недоступно. Свяжитесь с нами — оформим заказ вручную.',
     promo: 'Промокод',
     promoApplied: 'Применён:',
     promoNotApplied: 'не применён',
@@ -478,11 +614,18 @@ const ru: Dictionary = {
     deliveryFree: 'бесплатно',
     deliveryPending: 'уточняется',
     summaryTotal: 'Итого',
+    paymentCurrencyNotice:
+      'Оплата производится в валюте магазина — {base}. К списанию: {charged} (≈ {approx}).',
+    paymentCurrencyRate: 'Пересчёт по курсу {rate}, справочно.',
     recalculating: 'Пересчёт заказа…',
     notFulfillable: 'Некоторые товары недоступны в нужном количестве — измените корзину.',
     deliveryUnavailable: 'Не удалось рассчитать доставку — измените способ или адрес доставки.',
+    deliveryNeedsCity: 'Укажите город доставки — без него стоимость доставки не рассчитать.',
     unresolvableItems:
       'Некоторые товары добавлены в корзину в старой версии сайта и не могут быть оформлены. Пожалуйста, удалите их из корзины и добавьте заново со страницы товара.',
+    unresolvableItemsList: 'Это касается позиций: {items}.',
+    priceChangedNotice:
+      'Цена некоторых товаров изменилась после того, как вы добавили их в корзину. В заказе указаны актуальные цены — именно они и войдут в итог.',
     submit: 'Оплатить',
     submitGiftCovered: 'Оформить заказ',
     submitting: 'Переход к оплате…',
@@ -529,6 +672,12 @@ const ru: Dictionary = {
       'Не удалось начать оплату. Попробуйте ещё раз через минуту или свяжитесь с магазином.',
     orderErrorPaymentInProgress:
       'Оплата этого заказа уже обрабатывается: банк зарезервировал деньги. Платить второй раз не нужно — обновите страницу через несколько минут.',
+    orderErrorTotalMismatch:
+      'Сумма заказа изменилась, пока вы оформляли его: могли измениться цены, промокод или остаток сертификата. Заказ не создан, деньги не списаны. Вернитесь в корзину и проверьте актуальный итог.',
+    orderTotalChanged:
+      'Итог изменился: на экране было {expected}, фактическая сумма заказа — {actual}.',
+    orderTotalChangedAction:
+      'Мы не отправили вас на оплату, чтобы вы не заплатили сумму, которую не видели. Обновите страницу и проверьте заказ перед оплатой.',
     orderErrorNetwork:
       'Не удалось связаться с магазином. Проверьте соединение и попробуйте ещё раз.',
     orderErrorRateLimited: 'Слишком много попыток. Подождите немного и попробуйте снова.',
@@ -576,6 +725,10 @@ const ru: Dictionary = {
     giftCopy: 'Скопировать',
     giftCopied: 'Скопировано',
     giftWarning: 'Сохраните код — он равносилен деньгам. Не показывайте его посторонним.',
+    giftRateLimited:
+      'Слишком много обращений за кодом. Подождите минуту и нажмите «Обновить» — код никуда не пропал.',
+    giftError:
+      'Не удалось получить код прямо сейчас. Он сохранён за вашим заказом: нажмите «Обновить» или вернитесь на эту страницу позже.',
   },
   order: {
     title: 'Ваш заказ',
@@ -622,6 +775,9 @@ const ru: Dictionary = {
     productMetaTitle: 'Товар не найден',
     designerMetaTitle: 'Дизайнер не найден',
   },
+  cms: {
+    sectionsNavTitle: 'Разделы',
+  },
 };
 
 const en: Dictionary = {
@@ -647,7 +803,12 @@ const en: Dictionary = {
     cart: 'Cart',
     contacts: 'Contacts',
     forCustomers: 'For customers',
+    forDesigners: 'For designers',
     phoneWhatsapp: 'Phone / WhatsApp',
+    menuAria: 'Site menu',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
+    expandSectionAria: 'Expand section “{name}”',
     langAria: 'Site language: {code}',
     currencyAria: 'Show prices in {code}',
   },
@@ -663,10 +824,21 @@ const en: Dictionary = {
     returns: 'Returns policy',
     offer: 'Terms of sale',
     userContract: 'User agreement',
+    subscribeTitle: 'Newsletter',
+    subscribePlaceholder: 'Your email',
+    subscribeSubmit: 'Subscribe',
+    subscribeNote:
+      'By clicking “Subscribe” you consent to the processing of your personal data',
+    subscribeSuccess: 'Thank you for subscribing!',
+    subscribeError: 'We could not save your subscription. Please try again later.',
+    subscribeInvalid: 'Please enter a valid email address.',
+    subscribeAria: 'Email address for the newsletter',
   },
   home: {
     newProducts: 'New arrivals',
     ourStory: 'Our story',
+    looksNext: 'Next looks',
+    looksTabsAria: 'Look categories',
   },
   catalog: {
     title: 'Catalog',
@@ -724,12 +896,23 @@ const en: Dictionary = {
     zoneLabel: 'Delivery zone',
     cityLabel: 'City',
     cityPlaceholder: 'Start typing a city',
+    cityLookupEmpty: 'City not found. Check the spelling or enter a larger city nearby.',
+    cityLookupFailed:
+      'We could not load the city list. Please try again in a minute or choose another delivery option.',
     addressLabel: 'Delivery address',
     addressPlaceholder: 'Street, building, apartment',
     pvzLabel: 'Pickup point',
     pvzLoading: 'Loading pickup points…',
     pvzEmpty: 'No pickup points found in this city.',
+    pvzLookupFailed:
+      'We could not load the pickup points. Please try again in a minute or choose courier delivery.',
     pvzSelect: '— select a point —',
+    pvzTypeOffice: 'Pickup point',
+    pvzTypePostamat: 'Parcel locker',
+    pvzPostamatHint:
+      'A parcel locker is an automated box: you collect the parcel with a code, there is no staff member, no fitting is possible and oversized orders are not accepted.',
+    deliveryNoMethods:
+      'Online delivery booking is temporarily unavailable. Please contact us and we will place the order for you.',
     promo: 'Promo code',
     promoApplied: 'Applied:',
     promoNotApplied: 'not applied',
@@ -754,11 +937,19 @@ const en: Dictionary = {
     deliveryFree: 'free',
     deliveryPending: 'to be confirmed',
     summaryTotal: 'Total',
+    paymentCurrencyNotice:
+      'Payment is taken in the shop currency — {base}. You will be charged {charged} (≈ {approx}).',
+    paymentCurrencyRate: 'Converted at {rate}, for reference only.',
     recalculating: 'Recalculating order…',
     notFulfillable: 'Some items are not available in the requested quantity — please update your cart.',
     deliveryUnavailable: 'Could not calculate delivery — change the method or delivery address.',
+    deliveryNeedsCity:
+      'Please enter the delivery city — the shipping cost cannot be calculated without it.',
     unresolvableItems:
       'Some items were added to the cart in an older version of the site and cannot be ordered. Please remove them from the cart and add them again from the product page.',
+    unresolvableItemsList: 'This applies to: {items}.',
+    priceChangedNotice:
+      'The price of some items changed after you added them to your cart. The order shows the current prices — those are the ones included in the total.',
     submit: 'Pay',
     submitGiftCovered: 'Place order',
     submitting: 'Redirecting to payment…',
@@ -805,6 +996,12 @@ const en: Dictionary = {
       'Could not start the payment. Try again in a minute or contact the store.',
     orderErrorPaymentInProgress:
       'This order is already being paid: the bank is holding the funds. There is no need to pay twice — please refresh the page in a few minutes.',
+    orderErrorTotalMismatch:
+      'The order total changed while you were checking out: prices, the promo code or the certificate balance may have changed. The order was not created and you have not been charged. Please go back to your cart and check the current total.',
+    orderTotalChanged:
+      'The total changed: your screen showed {expected}, while the actual order total is {actual}.',
+    orderTotalChangedAction:
+      'We did not send you to payment, so that you never pay an amount you have not seen. Please refresh the page and review the order before paying.',
     orderErrorNetwork:
       'Could not reach the store. Please check your connection and try again.',
     orderErrorRateLimited: 'Too many attempts. Please wait a moment and try again.',
@@ -853,6 +1050,10 @@ const en: Dictionary = {
     giftCopy: 'Copy',
     giftCopied: 'Copied',
     giftWarning: 'Keep this code safe — it is equivalent to money. Do not share it.',
+    giftRateLimited:
+      'Too many requests for this code. Wait a minute and press “Refresh” — the code has not been lost.',
+    giftError:
+      'We could not retrieve the code right now. It stays attached to your order: press “Refresh” or come back to this page later.',
   },
   order: {
     title: 'Your order',
@@ -899,6 +1100,9 @@ const en: Dictionary = {
     productMetaTitle: 'Product not found',
     designerMetaTitle: 'Designer not found',
   },
+  cms: {
+    sectionsNavTitle: 'Sections',
+  },
 };
 
 const fr: Dictionary = {
@@ -924,7 +1128,12 @@ const fr: Dictionary = {
     cart: 'Panier',
     contacts: 'Contacts',
     forCustomers: 'Pour les clients',
+    forDesigners: 'Pour les créateurs',
     phoneWhatsapp: 'Tél. / WhatsApp',
+    menuAria: 'Menu du site',
+    openMenu: 'Ouvrir le menu',
+    closeMenu: 'Fermer le menu',
+    expandSectionAria: 'Déplier la rubrique « {name} »',
     langAria: 'Langue du site : {code}',
     currencyAria: 'Afficher les prix en {code}',
   },
@@ -940,10 +1149,21 @@ const fr: Dictionary = {
     returns: 'Politique de retour',
     offer: 'Conditions de vente',
     userContract: 'Conditions d’utilisation',
+    subscribeTitle: 'Newsletter',
+    subscribePlaceholder: 'Votre e-mail',
+    subscribeSubmit: 'S’abonner',
+    subscribeNote:
+      'En cliquant sur « S’abonner », vous acceptez le traitement de vos données personnelles',
+    subscribeSuccess: 'Merci pour votre abonnement !',
+    subscribeError: 'Impossible d’enregistrer votre abonnement. Réessayez plus tard.',
+    subscribeInvalid: 'Veuillez saisir une adresse e-mail valide.',
+    subscribeAria: 'Adresse e-mail pour la newsletter',
   },
   home: {
     newProducts: 'Nouveautés',
     ourStory: 'Notre histoire',
+    looksNext: 'Looks suivants',
+    looksTabsAria: 'Catégories de looks',
   },
   catalog: {
     title: 'Catalogue',
@@ -1001,12 +1221,24 @@ const fr: Dictionary = {
     zoneLabel: 'Zone de livraison',
     cityLabel: 'Ville',
     cityPlaceholder: 'Commencez à saisir une ville',
+    cityLookupEmpty:
+      'Ville introuvable. Vérifiez l’orthographe ou saisissez une grande ville proche.',
+    cityLookupFailed:
+      'Impossible de charger la liste des villes. Réessayez dans une minute ou choisissez un autre mode de livraison.',
     addressLabel: 'Adresse de livraison',
     addressPlaceholder: 'Rue, bâtiment, appartement',
     pvzLabel: 'Point de retrait',
     pvzLoading: 'Chargement des points de retrait…',
     pvzEmpty: 'Aucun point de retrait trouvé dans cette ville.',
+    pvzLookupFailed:
+      'Impossible de charger les points de retrait. Réessayez dans une minute ou choisissez la livraison par coursier.',
     pvzSelect: '— choisissez un point —',
+    pvzTypeOffice: 'Point relais',
+    pvzTypePostamat: 'Consigne automatique',
+    pvzPostamatHint:
+      'Une consigne automatique est un casier automatisé : le retrait se fait avec un code, sans personnel, l’essayage est impossible et les commandes volumineuses n’y sont pas acceptées.',
+    deliveryNoMethods:
+      'La commande de livraison en ligne est momentanément indisponible. Contactez-nous, nous enregistrerons la commande pour vous.',
     promo: 'Code promo',
     promoApplied: 'Appliqué :',
     promoNotApplied: 'non appliqué',
@@ -1032,11 +1264,19 @@ const fr: Dictionary = {
     deliveryFree: 'gratuite',
     deliveryPending: 'à confirmer',
     summaryTotal: 'Total',
+    paymentCurrencyNotice:
+      'Le paiement est prélevé dans la devise de la boutique — {base}. Vous serez débité de {charged} (≈ {approx}).',
+    paymentCurrencyRate: 'Conversion au taux de {rate}, à titre indicatif.',
     recalculating: 'Recalcul de la commande…',
     notFulfillable: 'Certains articles ne sont pas disponibles dans la quantité demandée — modifiez votre panier.',
     deliveryUnavailable: 'Impossible de calculer la livraison — changez le mode ou l’adresse de livraison.',
+    deliveryNeedsCity:
+      'Indiquez la ville de livraison — sans elle, les frais de livraison ne peuvent pas être calculés.',
     unresolvableItems:
       'Certains articles ont été ajoutés au panier dans une ancienne version du site et ne peuvent pas être commandés. Veuillez les retirer du panier et les ajouter à nouveau depuis la page produit.',
+    unresolvableItemsList: 'Cela concerne les articles suivants : {items}.',
+    priceChangedNotice:
+      'Le prix de certains articles a changé depuis que vous les avez ajoutés au panier. La commande affiche les prix actuels — ce sont eux qui entrent dans le total.',
     submit: 'Payer',
     submitGiftCovered: 'Valider la commande',
     submitting: 'Redirection vers le paiement…',
@@ -1083,6 +1323,12 @@ const fr: Dictionary = {
       'Impossible de lancer le paiement. Réessayez dans une minute ou contactez la boutique.',
     orderErrorPaymentInProgress:
       'Le paiement de cette commande est déjà en cours : la banque a réservé les fonds. Inutile de payer une seconde fois — actualisez la page dans quelques minutes.',
+    orderErrorTotalMismatch:
+      'Le montant de la commande a changé pendant votre commande : les prix, le code promo ou le solde du chèque-cadeau ont pu évoluer. La commande n’a pas été créée et aucun montant n’a été débité. Retournez au panier et vérifiez le total actuel.',
+    orderTotalChanged:
+      'Le total a changé : votre écran affichait {expected}, alors que le montant réel de la commande est {actual}.',
+    orderTotalChangedAction:
+      'Nous ne vous avons pas redirigé vers le paiement, afin que vous ne payiez jamais un montant que vous n’avez pas vu. Actualisez la page et vérifiez la commande avant de payer.',
     orderErrorNetwork:
       'Impossible de joindre la boutique. Vérifiez votre connexion et réessayez.',
     orderErrorRateLimited: 'Trop de tentatives. Patientez un instant puis réessayez.',
@@ -1134,6 +1380,10 @@ const fr: Dictionary = {
     giftCopy: 'Copier',
     giftCopied: 'Copié',
     giftWarning: 'Conservez ce code — il équivaut à de l’argent. Ne le partagez pas.',
+    giftRateLimited:
+      'Trop de demandes pour ce code. Patientez une minute puis appuyez sur « Actualiser » — le code n’est pas perdu.',
+    giftError:
+      'Impossible de récupérer le code pour le moment. Il reste rattaché à votre commande : appuyez sur « Actualiser » ou revenez sur cette page plus tard.',
   },
   order: {
     title: 'Votre commande',
@@ -1179,6 +1429,9 @@ const fr: Dictionary = {
     pageMetaTitle: 'Page introuvable',
     productMetaTitle: 'Produit introuvable',
     designerMetaTitle: 'Créateur introuvable',
+  },
+  cms: {
+    sectionsNavTitle: 'Rubriques',
   },
 };
 

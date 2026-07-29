@@ -11,6 +11,11 @@
  * Иначе работает дефолтный stub-провайдер (0.00) — поведение Этапа 3 сохранено,
  * а сборка/тесты при выключенном cdek не тянут его транзитивно.
  *
+ * 🔴 ИСКЛЮЧЕНИЕ (аудит major №3): комбинация «cdek включён + способ доставки
+ * требует тарификации + назначения НЕТ» — это НЕ stub 0.00. Считать нечем, и
+ * стоимость помечается НЕрассчитанной (resolved:false / бросок), см.
+ * canResolveDeliveryCost. Иначе «не смогли посчитать» выдавалось за «бесплатно».
+ *
  * ВЫБОР РЕШЕНИЯ (ленивый import vs реестр провайдеров): выбран ленивый
  * динамический import внутри адаптера. Он строго слабее реестра по связанности
  * (orders не знает о cdek на уровне типов и модульного графа), не требует точки
@@ -80,11 +85,13 @@ export interface DeliveryCostInput {
 
 /**
  * Источник расчёта (для прозрачности/аудита).
- *   • stub        — by-design 0.00 (самовывоз / cdek выключен / нет назначения);
+ *   • stub        — by-design 0.00 (самовывоз / cdek выключен). «Нет назначения»
+ *     сюда БОЛЬШЕ НЕ входит: при включённом cdek это нерассчитанность (№3);
  *   • zone        — зональная цена из настроек магазина (ТЗ_1, СДЭК не зовётся);
  *   • cdek/cdek_mock — успешный расчёт СДЭК (реальный/mock);
- *   • unavailable — расчёт БЫЛ нужен, но УПАЛ (только при softFail в quote;
- *     cost здесь НЕ доверять — витрина показывает «уточняется»).
+ *   • unavailable — расчёт БЫЛ нужен, но не состоялся: УПАЛ либо считать НЕЧЕМ
+ *     (нет города/индекса/ПВЗ). Только при softFail в quote; cost здесь НЕ
+ *     доверять — витрина показывает «уточняется».
  */
 export type DeliveryCostSource = 'stub' | 'zone' | 'cdek' | 'cdek_mock' | 'unavailable';
 
@@ -273,6 +280,43 @@ export function needsCdekProvider(args: {
   return args.hasDestination;
 }
 
+/**
+ * ЧИСТЫЙ предикат: МОЖНО ЛИ вообще получить авторитетную стоимость доставки.
+ *
+ * 🔴 КОРЕНЬ АУДИТ-НАХОДКИ major №3. Раньше ветка `!needsCdekProvider` целиком
+ * уходила в STUB_RESULT = { cost:'0.00', resolved:TRUE }, схлопывая в одно
+ * значение ДВА принципиально разных случая:
+ *   • «доставка бесплатна ПО ДИЗАЙНУ» — самовывоз, либо магазин без модуля СДЭК
+ *     (возит сам и стоимость не считает). Здесь 0.00 — настоящий, авторитетный
+ *     ответ, и resolved:true корректен;
+ *   • «расчёт БЫЛ НУЖЕН, но посчитать НЕЧЕМ» — СДЭК включён, способ доставки
+ *     требует тарификации, а назначения (город/индекс/ПВЗ) нет. Здесь 0.00 —
+ *     не цена, а отсутствие ответа. Помечая его resolved:true, система выдавала
+ *     «не смогли посчитать» за «посчитали, бесплатно»: анти-андерчардж-защита
+ *     (она смотрит ровно на resolved:false) молчала, заказ создавался с
+ *     delivery_total 0.00, магазин вёз бесплатно, а накладную СДЭК потом было не
+ *     создать (нет города) — заказ повисал.
+ *
+ * Точечной валидации города мало: любой путь, добравшийся до расчёта без
+ * назначения (другая витрина платформы, ручной заказ, интеграция), получал ту же
+ * бесплатную доставку. Поэтому «нерассчитанность» фиксируется ЗДЕСЬ, в самом
+ * расчёте, и дальше обрабатывается тем же механизмом, что и сбой СДЭК.
+ *
+ * false ⇒ авторитетной стоимости нет. true ⇒ 0.00/цена ниже — доверять можно.
+ */
+export function canResolveDeliveryCost(args: {
+  cdekEnabled: boolean;
+  deliveryType: DeliveryType;
+  hasDestination: boolean;
+}): boolean {
+  // Самовывоз бесплатен by design — назначение не нужно.
+  if (args.deliveryType === 'pickup') return true;
+  // Магазин без модуля СДЭК доставку не тарифицирует: 0.00 — его осознанный выбор.
+  if (!args.cdekEnabled) return true;
+  // СДЭК включён и должен посчитать — без назначения считать нечем.
+  return args.hasDestination;
+}
+
 /** deliveryType заказа → режим доставки СДЭК (для расчёта тарифа). */
 function toDeliveryMode(deliveryType: DeliveryType): 'pvz' | 'door' {
   return deliveryType === 'courier' ? 'door' : 'pvz';
@@ -297,10 +341,39 @@ export async function computeDeliveryCost(
     }
   }
 
+  const cdekEnabled = await isModuleEffectivelyEnabled('cdek');
+  const destinationKnown = hasDestination(input.destination);
+
+  // 🔴 АУДИТ major №3: расчёт НУЖЕН, но назначения нет — стоимость НЕИЗВЕСТНА.
+  // Раньше этот случай молча падал в stub 0.00 / resolved:true и выдавал
+  // «посчитать нечем» за «бесплатно» (см. canResolveDeliveryCost). Теперь он
+  // идёт по тому же пути, что и сбой СДЭК: quote (softFail) сигналит
+  // resolved:false → витрина показывает «уточняется» и не даёт оформить;
+  // createOrder БРОСАЕТ DeliveryCalculationError → заказ с бесплатной доставкой
+  // и без города физически не создать (anti-undercharge + защита от повисших
+  // заказов, которым не создать накладную).
+  if (!canResolveDeliveryCost({ cdekEnabled, deliveryType: input.deliveryType, hasDestination: destinationKnown })) {
+    if (options.softFail) {
+      return {
+        cost: '0.00',
+        resolved: false,
+        etaDays: null,
+        periodMin: null,
+        periodMax: null,
+        tariffCode: null,
+        source: 'unavailable',
+        provider: 'cdek',
+      };
+    }
+    throw new DeliveryCalculationError(
+      'Не удалось рассчитать стоимость доставки: не указан город получателя.',
+    );
+  }
+
   const useCdek = needsCdekProvider({
-    cdekEnabled: await isModuleEffectivelyEnabled('cdek'),
+    cdekEnabled,
     deliveryType: input.deliveryType,
-    hasDestination: hasDestination(input.destination),
+    hasDestination: destinationKnown,
   });
 
   if (!useCdek) {

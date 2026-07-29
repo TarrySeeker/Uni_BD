@@ -27,6 +27,11 @@ import {
   type OrderWithItems,
 } from './repository';
 import { canTransition, paymentStatusOnSettle, RESERVE_HELD_STATUSES } from './status';
+import {
+  orderStatusLabelKey,
+  paymentStatusLabelKey,
+  deliveryStatusLabelKey,
+} from './labels';
 import { isRussianPhone } from './phone';
 import { settleOrderClosureTx } from './refund-settle';
 import {
@@ -43,6 +48,21 @@ import { OrderError } from './errors';
 import type { Order, OrderItem, PromoCode } from './types';
 import { toKopecks } from '@/lib/payments/tbank';
 import { dispatchRefund } from '@/lib/payments/dispatch';
+
+/**
+ * ICU-параметры сообщения о КОНКУРЕНТНОЙ смене статуса (аудит minor №7).
+ *
+ * Раньше в текст подставлялся СЫРОЙ код статуса («переход из "awaiting_payment"»):
+ * оператор видел служебную строку вместо человеческой подписи, причём на языке
+ * автора кода, а не на своём. Отдаём КЛЮЧ подписи из общей карты lib/orders/labels
+ * (единый источник, G-15 — вторая карта здесь НЕ заводится); пайплайн Server Action
+ * развернёт ключ в язык оператора перед форматированием сообщения. Незнакомый код
+ * (например статус из будущей миграции) отдаём как есть — лучше код, чем пусто.
+ */
+function conflictParams(labelKey: string | null, code: string): { from: string } {
+  return { from: labelKey ?? code };
+}
+
 
 /**
  * Server Actions админки модуля orders (docs/07 §4.1).
@@ -309,7 +329,8 @@ async function applyOrderStatusTransition(args: {
     if (updated.length !== 1) {
       throw new OrderError(
         'conflict',
-        `Статус заказа изменился параллельно: переход из "${from}" более неактуален.`,
+        'errors.orders.conflictOrderStatus',
+        conflictParams(orderStatusLabelKey(from), from),
       );
     }
 
@@ -669,7 +690,8 @@ async function performRefund(args: {
     if (updated.length !== 1) {
       throw new OrderError(
         'conflict',
-        `Статус оплаты изменился параллельно: переход из "${fromPayment}" более неактуален.`,
+        'errors.orders.conflictPaymentStatus',
+        conflictParams(paymentStatusLabelKey(fromPayment), fromPayment),
       );
     }
     await tx`
@@ -841,7 +863,8 @@ export const setPaymentStatus = defineAction({
       if (updated.length !== 1) {
         throw new OrderError(
           'conflict',
-          `Статус оплаты изменился параллельно: переход из "${from}" более неактуален.`,
+          'errors.orders.conflictPaymentStatus',
+          conflictParams(paymentStatusLabelKey(from), from),
         );
       }
       await tx`
@@ -909,7 +932,8 @@ export const setDeliveryStatus = defineAction({
       if (updated.length !== 1) {
         throw new OrderError(
           'conflict',
-          `Статус доставки изменился параллельно: переход из "${from}" более неактуален.`,
+          'errors.orders.conflictDeliveryStatus',
+          conflictParams(deliveryStatusLabelKey(from), from),
         );
       }
       await tx`

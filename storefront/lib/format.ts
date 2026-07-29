@@ -13,6 +13,39 @@ const SYMBOLS: Record<string, string> = {
   USD: '$',
 };
 
+/**
+ * 🔴 Аудит minor №9 — ЛОКАЛЬ ФОРМАТА ЧИСЕЛ приходит из НАСТРОЕК МАГАЗИНА
+ * (`shop_settings.currency.locale`, публичное поле PublicSettingsDto.currency.locale),
+ * а не зашита в код. Раньше здесь стояло `Intl.NumberFormat('ru-RU', …)`, из-за чего
+ * магазин на любом другом рынке получал русскую группировку разрядов («7 500» вместо
+ * «7,500») независимо от своих настроек — прямое нарушение мультитенантности.
+ *
+ * Дефолт сохраняем прежним ('ru-RU'), чтобы магазин, у которого поле не заполнено,
+ * не изменил вид цен после выката (анти-регресс).
+ */
+export const DEFAULT_NUMBER_LOCALE = 'ru-RU';
+
+/**
+ * Строит Intl.NumberFormat, ПЕРЕЖИВАЯ мусор в настройках. `currency.locale` — это
+ * свободная строка из админки; невалидный BCP-47 тег («ru_RU», «не-локаль») роняет
+ * конструктор RangeError'ом, и вся страница с ценами упала бы белым экраном.
+ * Поэтому на ошибке молча деградируем к дефолтной локали.
+ */
+function numberFormat(
+  locale: string | null | undefined,
+  options: Intl.NumberFormatOptions,
+): Intl.NumberFormat {
+  const tag = typeof locale === 'string' && locale.trim() !== '' ? locale.trim() : undefined;
+  if (tag !== undefined) {
+    try {
+      return new Intl.NumberFormat(tag, options);
+    } catch {
+      /* невалидный тег из настроек — падаем на дефолт ниже */
+    }
+  }
+  return new Intl.NumberFormat(DEFAULT_NUMBER_LOCALE, options);
+}
+
 export function currencySymbol(code: string | undefined, explicit?: string | null): string {
   if (explicit) return explicit;
   if (code && SYMBOLS[code]) return SYMBOLS[code];
@@ -30,6 +63,12 @@ export interface DisplayCurrency {
   /** Единиц базовой валюты за 1 единицу этой (для базовой = 1). */
   rate: number;
   fractionDigits: number;
+  /**
+   * 🔴 №9 — локаль ФОРМАТА ЧИСЕЛ магазина (BCP-47, напр. 'ru-RU'/'en-US'/'de-DE') из
+   * настроек. Управляет группировкой разрядов и десятичным разделителем. Опционально:
+   * старые вызовы/настройки без поля получают DEFAULT_NUMBER_LOCALE — прежний вид.
+   */
+  locale?: string | null;
 }
 
 /**
@@ -52,7 +91,7 @@ export function formatDisplayPrice(
   // При защите от некорректного курса (rate<=0) деградируем к базовому показу:
   // целое число (0 знаков), но с символом выбранной валюты.
   const digits = rateValid && Number.isInteger(display.fractionDigits) ? display.fractionDigits : 0;
-  const formatted = new Intl.NumberFormat('ru-RU', {
+  const formatted = numberFormat(display.locale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(digits === 0 ? Math.round(converted) : converted);
@@ -60,20 +99,42 @@ export function formatDisplayPrice(
 }
 
 /**
+ * Формат чисел магазина для legacy-форматтера (№9). Оба поля опциональны: без них
+ * поведение ровно прежнее (ru-RU, 0 знаков) — анти-регресс для вызовов, которые
+ * настроек не видят.
+ */
+export interface NumberFormatOpts {
+  /** BCP-47 локаль формата из настроек (`currency.locale`). */
+  locale?: string | null;
+  /** Знаков после запятой из настроек (`currency.fractionDigits`). */
+  fractionDigits?: number | null;
+}
+
+/**
  * Легаси-форматтер (рубли по умолчанию). Оставлен для обратной совместимости:
  * серверные компоненты, которым не нужна мультивалюта, зовут formatPrice(price)
- * и получают рублёвый показ как раньше (fractionDigits 0). Символ/код опциональны.
+ * и получают прежний показ. Символ/код опциональны.
+ *
+ * 🔴 №9: четвёртым аргументом принимает ФОРМАТ МАГАЗИНА (локаль + знаки после
+ * запятой). Не передан → DEFAULT_NUMBER_LOCALE и 0 знаков, как было.
  */
 export function formatPrice(
   price: string | number | null | undefined,
   currencyCode = 'RUB',
   symbol?: string | null,
+  opts?: NumberFormatOpts,
 ): string {
   if (price == null) return '';
   const n = typeof price === 'number' ? price : Number(price);
   if (!Number.isFinite(n)) return '';
-  const formatted = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(
-    Math.round(n),
-  );
+  // Знаки после запятой: из настроек, если это целое в разумных пределах (схема
+  // ограничивает 0..4); иначе — исторический 0.
+  const raw = opts?.fractionDigits;
+  const digits =
+    typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw <= 4 ? raw : 0;
+  const formatted = numberFormat(opts?.locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(digits === 0 ? Math.round(n) : n);
   return `${formatted} ${currencySymbol(currencyCode, symbol)}`.trim();
 }

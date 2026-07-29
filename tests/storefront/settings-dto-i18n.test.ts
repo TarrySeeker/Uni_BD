@@ -36,7 +36,15 @@ function makeEffective(): EffectiveSettings {
         enabled: true,
         title: 'Образы',
         categories: [
-          { title: 'Весна', text: 'Лёгкие', imageKey: 'home/spring.webp' },
+          { id: 'spring', title: 'Весна', text: 'Лёгкие', imageKey: 'home/spring.webp' },
+        ],
+        items: [
+          {
+            categoryId: 'spring',
+            imageKey: 'home/look1.webp',
+            authorName: 'Анна',
+            authorAvatarKey: 'home/av1.webp',
+          },
         ],
       },
     },
@@ -48,6 +56,13 @@ function makeEffective(): EffectiveSettings {
       footer: [
         { title: 'Информация', links: [{ label: 'О нас', href: '/about' }] },
       ],
+      footerMeta: {
+        subscribeTitle: 'Рассылка магазина',
+        subscribeNote: 'Согласие на обработку персональных данных',
+        copyright: '2026 © Шёлк Магазин',
+        designedByLabel: 'Сделано в Студии',
+        designedByHref: 'https://studio.example',
+      },
     },
     branding: {
       shopName: 'Шёлк Магазин',
@@ -95,11 +110,23 @@ function enOverlay() {
       home: {
         hero: { title: 'Silk', subtitle: 'Scarves', ctaLabel: 'Shop now' },
         about: { title: 'About', paragraphs: ['First', 'Second'], values: ['Quality', 'Service'] },
-        looks: { title: 'Looks', categories: [{ title: 'Spring', text: 'Light' }] },
+        looks: {
+          title: 'Looks',
+          categories: [{ title: 'Spring', text: 'Light' }],
+          items: [{ authorName: 'Anna' }],
+        },
       },
       navigation: {
         header: [{ label: 'Catalog' }, { label: 'Delivery' }],
         footer: [{ title: 'Info', links: [{ label: 'About us' }] }],
+        // Тексты подвала переводимы; designedByHref в патч НЕ кладём — это адрес,
+        // а не текст (whitelist SETTINGS_TR_FIELDS.navigation.footerMeta).
+        footerMeta: {
+          subscribeTitle: 'Newsletter',
+          subscribeNote: 'By subscribing you consent to data processing',
+          copyright: '2026 © Silk Shop',
+          designedByLabel: 'Made by Studio',
+        },
       },
     },
   };
@@ -154,11 +181,20 @@ describe('storefront/settings-dto — локализация через content_
       'https://cdn/home/a2.webp',
     ]);
 
-    // looks.categories: title/text переведены по индексу, imageKey→URL цел.
+    // looks.categories: title/text переведены по индексу, id и imageKey→URL целы.
     expect(dto.home.looks.categories[0]).toEqual({
+      id: 'spring',
       title: 'Spring',
       text: 'Light',
       imageUrl: 'https://cdn/home/spring.webp',
+    });
+    // looks.items: имя автора переведено, categoryId и ключи фото/аватара целы
+    // (перевод не должен трогать связь карточка↔вкладка и адреса картинок).
+    expect(dto.home.looks.items[0]).toEqual({
+      categoryId: 'spring',
+      imageUrl: 'https://cdn/home/look1.webp',
+      authorName: 'Anna',
+      authorAvatarUrl: 'https://cdn/home/av1.webp',
     });
   });
 
@@ -174,6 +210,32 @@ describe('storefront/settings-dto — локализация через content_
     expect(dto.navigation.footer).toEqual([
       { title: 'Info', links: [{ label: 'About us', href: '/about' }] },
     ]);
+  });
+
+  it('тексты подвала переведены, адрес кредита НЕ тронут переводом', () => {
+    const eff = makeEffective();
+    eff.contentI18n = enOverlay();
+    const dto = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`, EN);
+
+    expect(dto.navigation.footerMeta).toEqual({
+      subscribeTitle: 'Newsletter',
+      subscribeNote: 'By subscribing you consent to data processing',
+      copyright: '2026 © Silk Shop',
+      designedByLabel: 'Made by Studio',
+      // Адрес остаётся базовым: перевод не должен уводить ссылку на другой сайт.
+      designedByHref: 'https://studio.example',
+    });
+  });
+
+  it('перевода подвала нет → базовый (русский) текст, а не пустота', () => {
+    const eff = makeEffective();
+    eff.contentI18n = enOverlay(); // только en
+    const dto = toPublicSettingsDto(eff, (k) => `https://cdn/${k}`, {
+      locale: 'fr',
+      defaultLocale: 'ru',
+    });
+    expect(dto.navigation.footerMeta.copyright).toBe('2026 © Шёлк Магазин');
+    expect(dto.navigation.footerMeta.designedByHref).toBe('https://studio.example');
   });
 
   it('перевод отсутствует для языка → база (fallback на defaultLocale)', () => {
