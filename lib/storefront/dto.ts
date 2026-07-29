@@ -187,10 +187,22 @@ export interface VariantDto {
   availableQty: number;
 }
 
+/**
+ * Ручные цены в валютах ОТОБРАЖЕНИЯ (products.display_prices, 0062):
+ * `{"EUR":"480.00"}`.
+ *
+ * 🔴 ТОЛЬКО ПОКАЗ ЦЕННИКА. `price` в базовой валюте остаётся источником истины:
+ * корзина, итог и оплата считаются ОТ НЕГО. Пустая карта (обычный случай и все
+ * одновалютные магазины) = витрина считает по курсу, как раньше.
+ */
+export type DisplayPricesDto = Record<string, string>;
+
 export interface ProductListItemDto {
   slug: string;
   name: string;
   price: string;
+  /** Ручные цены показа; пусто → считать по курсу. Не участвует в суммах. */
+  displayPrices: DisplayPricesDto;
   compareAtPrice: string | null;
   discountPct: number | null;
   onSale: boolean;
@@ -215,6 +227,15 @@ export interface ProductDetailDto {
   name: string;
   description: string;
   price: string;
+  /**
+   * Ручные цены показа товара (0062); пусто → считать по курсу.
+   *
+   * Задаются на уровне ТОВАРА и относятся к его базовой цене. У ВАРИАНТОВ
+   * своей карты нет намеренно: цена варианта выводится из base_price
+   * (priceOverride/priceDelta), и вторая независимая карта на вариант дала бы
+   * витрине два расходящихся ценника без выигрыша для владельца.
+   */
+  displayPrices: DisplayPricesDto;
   compareAtPrice: string | null;
   discountPct: number | null;
   onSale: boolean;
@@ -466,6 +487,7 @@ export function toProductListItemDto(
     slug: r.slug,
     name: r.name,
     price: r.basePrice,
+    displayPrices: r.displayPrices ?? {},
     compareAtPrice: r.compareAtPrice,
     discountPct: r.discountPct,
     onSale: r.onSale,
@@ -642,6 +664,7 @@ export function toProductDetailDto(
     name: p.name,
     description: p.description,
     price: p.basePrice,
+    displayPrices: p.displayPrices ?? {},
     compareAtPrice: p.compareAtPrice,
     discountPct: discountPercent(p.basePrice, p.compareAtPrice),
     onSale: isOnSale(p.basePrice, p.compareAtPrice),

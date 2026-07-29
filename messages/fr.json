@@ -61,6 +61,7 @@
     "giftCertificates": "Cartes cadeaux",
     "leads": "Demandes",
     "subscribers": "Abonnés",
+    "mail": "E-mails",
     "cdek": "Livraison",
     "cms": "Contenu",
     "news": "Actualités",
@@ -273,6 +274,11 @@
     "newsletter": {
       "subscriberNotFoundOrUnsubscribed": "Abonné introuvable ou déjà désabonné."
     },
+    "mail": {
+      "invalidId": "Identifiant d’e-mail invalide.",
+      "entryNotFound": "Enregistrement d’e-mail introuvable.",
+      "resendRequiresOrder": "Cet e-mail n’est pas lié à une commande : impossible de le renvoyer (le corps est reconstruit à partir de la commande)."
+    },
     "action": {
       "unauthorized": "Connexion requise.",
       "forbidden": "Autorisations insuffisantes (nécessite {permission}).",
@@ -345,6 +351,9 @@
       "statusHelp": "« Actif » — le produit est visible sur le site. « Brouillon » et « Archivé » — masqué.",
       "fields": {
         "price": "Prix",
+        "displayPrice": "Prix en {currency} (manuel)",
+        "displayPriceByRate": "au taux actuel : {price}",
+        "displayPriceHelp": "Laissez vide pour convertir automatiquement au taux actuel.",
         "status": "Statut",
         "sku": "Référence",
         "slug": "Adresse de la page sur le site",
@@ -388,6 +397,7 @@
         "archived": "Le produit a été retiré de la vente (archivé) — il n’est plus affiché sur le site."
       },
       "notes": {
+        "displayPriceDiverged": "Le prix manuel diffère du prix converti de {percent}% (au taux actuel : {price}). Le taux a changé — vérifiez le prix.",
         "noPrice": "Aucun prix défini — il s’affichera comme 0 sur la vitrine. Indiquez un prix.",
         "noStock": "0 en stock — la vitrine affiche « Rupture de stock » (le bouton d’achat est désactivé). Définissez le stock dans l’onglet « Variantes »."
       },
@@ -2304,6 +2314,42 @@
     "subscriberRowActions": {
       "confirmUnsubscribe": "Désabonner « {email} » de la newsletter ?",
       "unsubscribe": "Désabonner"
+    }
+  },
+  "mail": {
+    "page": {
+      "subtitle": "Journal des e-mails envoyés aux clients. Total : {total}.",
+      "truncationHint": "Les e-mails les plus récents sont affichés ; le journal complet est en base de données.",
+      "empty": "Aucun e-mail n’a encore été envoyé.",
+      "disabled": "L’e-mail de la boutique n’est pas configuré : aucun message n’est envoyé. Renseignez les variables SMTP dans le .env de l’instance (SMTP_HOST, MAIL_FROM et autres) puis redémarrez l’application.",
+      "enabled": "E-mail configuré : envoi depuis {from}.",
+      "columns": {
+        "date": "Date",
+        "recipient": "Destinataire",
+        "template": "E-mail",
+        "status": "Statut",
+        "attempts": "Tentatives"
+      }
+    },
+    "status": {
+      "pending": "Envoi en cours",
+      "sent": "Envoyé",
+      "failed": "Non envoyé",
+      "skipped": "Ignoré"
+    },
+    "template": {
+      "gift_certificate": "Code du chèque-cadeau",
+      "order_confirmation": "Confirmation de commande",
+      "cdek_accepted": "Livraison : accepté à l’entrepôt",
+      "cdek_in_transit": "Livraison : en transit",
+      "cdek_ready_for_pickup": "Livraison : prêt pour le retrait",
+      "cdek_courier_dispatched": "Livraison : remis au coursier",
+      "cdek_delivered": "Livraison : livré"
+    },
+    "rowActions": {
+      "resend": "Renvoyer",
+      "confirmResend": "Renvoyer cet e-mail à {recipient} ?",
+      "resent": "Envoyé"
     }
   },
   "permissions": {

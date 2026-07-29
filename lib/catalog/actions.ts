@@ -45,6 +45,7 @@ import {
   BrandUpdateSchema,
   BrandIdSchema,
   BrandLogoUploadSchema,
+  parseStoredDisplayPrices,
 } from './schemas';
 import {
   findOpenOrderNumbersForProduct,
@@ -355,6 +356,7 @@ export const createProduct = defineAction({
       const skuValue = data.sku || slug;
       const rows = await sql<{ id: string }[]>`
         INSERT INTO products (sku, slug, name, description, status, base_price,
+                              display_prices,
                               compare_at_price, is_featured, is_new, brand_id, designer_id,
                               colors,
                               seo_title, seo_description,
@@ -362,6 +364,7 @@ export const createProduct = defineAction({
         VALUES (
           ${skuValue}, ${slug}, ${data.name}, ${data.description ?? ''},
           ${data.status ?? 'draft'}, ${data.basePrice ?? '0'},
+          ${sql.json(data.displayPrices ?? {})}::jsonb,
           ${data.compareAtPrice ?? null}, ${data.isFeatured ?? false},
           ${data.isNew ?? null}, ${data.brandId ?? null}, ${data.designerId ?? null},
           ${sql.json(toJsonColors(data.colors ?? []))}::jsonb,
@@ -424,6 +427,13 @@ export const updateProduct = defineAction({
         description     = COALESCE(${data.description ?? null}, description),
         status          = COALESCE(${data.status ?? null}, status),
         base_price      = COALESCE(${data.basePrice ?? null}, base_price),
+        -- Семантика «не передали ≠ передали пустую» (как у compare_at_price, НЕ
+        -- COALESCE): {} — это осмысленная ОЧИСТКА всех ручных цен показа
+        -- (владелец стёр поля → снова считаем по курсу). Через COALESCE очистить
+        -- карту было бы невозможно: '{}'::jsonb не NULL.
+        display_prices  = CASE WHEN ${data.displayPrices !== undefined}
+                               THEN ${sql.json(data.displayPrices ?? {})}::jsonb
+                               ELSE display_prices END,
         compare_at_price = CASE WHEN ${data.compareAtPrice !== undefined}
                                 THEN ${data.compareAtPrice ?? null} ELSE compare_at_price END,
         is_featured     = COALESCE(${data.isFeatured ?? null}, is_featured),
@@ -618,6 +628,7 @@ export const duplicateProduct = defineAction({
         name: string;
         description: string | null;
         base_price: string | null;
+        display_prices: unknown;
         compare_at_price: string | null;
         is_featured: boolean | null;
         is_new: boolean | null;
@@ -632,7 +643,8 @@ export const duplicateProduct = defineAction({
         colors: unknown;
       }[]
     >`
-      SELECT id, sku, slug, name, description, base_price, compare_at_price,
+      SELECT id, sku, slug, name, description, base_price, display_prices,
+             compare_at_price,
              is_featured, is_new, brand_id, designer_id, seo_title, seo_description,
              weight_g, length_cm, width_cm, height_cm, colors
       FROM products WHERE id = ${data.id} LIMIT 1
@@ -659,6 +671,7 @@ export const duplicateProduct = defineAction({
       try {
         const ins = await sql<{ id: string }[]>`
           INSERT INTO products (sku, slug, name, description, status, base_price,
+                                display_prices,
                                 compare_at_price, is_featured, is_new, brand_id, designer_id,
                                 colors,
                                 seo_title, seo_description,
@@ -666,6 +679,8 @@ export const duplicateProduct = defineAction({
           VALUES (
             ${sku}, ${slug}, ${copyName}, ${src.description ?? ''},
             'draft', ${src.base_price ?? '0'},
+            -- Копия наследует ручные цены показа вместе с базовой ценой.
+            ${sql.json(parseStoredDisplayPrices(src.display_prices))}::jsonb,
             ${src.compare_at_price ?? null}, ${src.is_featured ?? false},
             ${src.is_new ?? null}, ${src.brand_id ?? null}, ${src.designer_id ?? null},
             ${sql.json(toJsonColors(parseStoredColors(src.colors)))}::jsonb,

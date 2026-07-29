@@ -122,6 +122,7 @@ describe('storefront/dto — бренды', () => {
 describe('storefront/dto — список товаров', () => {
   const row: ProductListRow = {
     id: 'p1',
+    displayPrices: {},
     sku: 'SKU1',
     slug: 'brake-pad',
     name: 'Brake pad',
@@ -247,6 +248,7 @@ describe('storefront/dto — карточка товара', () => {
   const inactiveVariant: ProductVariant = { ...variant, id: 'v2', isActive: false };
 
   const product: ProductDetail = {
+    displayPrices: {},
     id: 'p1', sku: 'SKU1', slug: 'coat', name: 'Coat', description: 'nice',
     status: 'active', basePrice: '1000.00', compareAtPrice: '1500.00',
     isFeatured: false, isNew: null, brandId: 'b1', designerId: null,

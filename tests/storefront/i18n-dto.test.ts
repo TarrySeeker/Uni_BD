@@ -46,6 +46,7 @@ const SEO: SeoCtx = {
 
 function product(over: Partial<ProductDetail> = {}): ProductDetail {
   return {
+    displayPrices: {},
     id: 'p1',
     sku: 'SKU1',
     slug: 'scarf',
@@ -169,6 +170,7 @@ describe('i18n storefront-DTO — товар (детальная карточк�
 describe('i18n storefront-DTO — список товаров', () => {
   function row(): ProductListRow {
     return {
+      displayPrices: {},
       id: 'p1',
       sku: 'SKU1',
       slug: 'scarf',

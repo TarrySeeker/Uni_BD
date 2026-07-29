@@ -50,7 +50,8 @@ export default async function ProductDetailPage({
     await Promise.all([
       getProductById(id),
       listBrands(),
-      listDesigners(),
+      // Алфавит: в форме товара дизайнера ищут глазами по списку (запрос заказчика).
+      listDesigners({ sort: 'name_asc' }),
       getCategoryTree(),
       listAttributes(),
       listAttributeValuesByAttribute(),
@@ -103,6 +104,7 @@ export default async function ProductDetailPage({
           masterColors={settings.catalog.masterColors}
           locales={localeConfig.locales}
           defaultLocale={localeConfig.defaultLocale}
+          displayCurrencies={settings.exchange.displayCurrencies}
         />
 
         <ProductBlocksEditor

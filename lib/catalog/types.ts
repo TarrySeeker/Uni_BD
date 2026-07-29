@@ -89,6 +89,12 @@ export interface CategoryTreeNode extends Category {
   children: CategoryTreeNode[];
 }
 
+/**
+ * Карта «код валюты отображения → сумма строкой» (products.display_prices, 0062).
+ * Пустой объект — оверрайдов нет. Валидируется displayPricesSchema.
+ */
+export type DisplayPrices = Record<string, string>;
+
 /** Товар (products). */
 export interface Product {
   id: string;
@@ -99,6 +105,14 @@ export interface Product {
   status: ProductStatus;
   /** NUMERIC(14,2) как строка — точность не теряется. */
   basePrice: string;
+  /**
+   * Ручные цены в валютах ОТОБРАЖЕНИЯ (0062): `{"EUR":"480.00"}`.
+   *
+   * 🔴 ТОЛЬКО ПОКАЗ ценника. Деньги (корзина/заказ/оплата) считаются от
+   * basePrice в базовой валюте. Пустая карта = считать по курсу (прежнее
+   * поведение). Суммы — рубли/евро, НЕ копейки.
+   */
+  displayPrices: DisplayPrices;
   /** Цена «было» для сравнения (docs/06 §3.1); null → нет акции. Скидка вычисляется. */
   compareAtPrice: string | null;
   /** Ручной флаг «Хит/Рекомендуемый» (docs/06 §3.2). */
@@ -305,6 +319,8 @@ export interface ProductListRow {
   name: string;
   status: ProductStatus;
   basePrice: string;
+  /** Ручные цены показа (0062); пусто → считать по курсу. Только показ, не деньги. */
+  displayPrices: DisplayPrices;
   /** Цена «было» (docs/06 §3.1); null → нет акции. */
   compareAtPrice: string | null;
   /** Процент скидки (вычислен из base_price/compare_at_price); null → не на распродаже. */

@@ -22,6 +22,7 @@ import {
   markStatusLogProcessed,
   findStatusLogByKey,
 } from '../repository';
+import { notifyDeliveryStatus } from '@/lib/mail/notifications';
 import { getOrderByNumber } from '@/lib/orders/repository';
 import { mapCdekStatus, displayName } from './status-map';
 import { advanceDeliveryStatus } from './delivery-status';
@@ -261,6 +262,29 @@ export class WebhookService {
     const next = mapCdekStatus(event.statusCode);
     if (next) {
       await advanceDeliveryStatus(orderId, next, `cdek-webhook:${event.statusCode}`);
+    }
+
+    // 3.5) ПИСЬМО ПОКУПАТЕЛЮ о смене статуса доставки.
+    //
+    // Шаблон выбирает карта STATUS_TO_CLIENT_TEMPLATE (status-map.ts), которая до
+    // этой волны была МЁРТВЫМ КОДОМ: она написана при портировании модуля СДЭК, но
+    // grep находил только объявление и тест — покупателю не уходило НИЧЕГО.
+    //
+    // Место вызова выбрано так: ПОСЛЕ применения перехода (иначе письмо обгоняло бы
+    // статус, который оно анонсирует) и ДО markStatusLogProcessed — пока событие не
+    // помечено обработанным, ретрай вебхука пройдёт весь путь заново и догонит
+    // письмо, не отправленное из-за упавшего релея.
+    //
+    // Технические статусы (CREATED и прочие без шаблона) письма не порождают —
+    // это решает сама карта. Уведомление не бросает по контракту, но try/catch
+    // здесь обязателен: вебхуку СДЭК нужно ответить 200, иначе он ретраит событие.
+    try {
+      await notifyDeliveryStatus(orderId, event.statusCode);
+    } catch (err) {
+      console.warn(
+        `[cdek] письмо о статусе доставки не отправлено (order=${orderId}, ` +
+          `status=${event.statusCode}): ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     // 4) Пометить лог обработанным (точка коммита идемпотентности).

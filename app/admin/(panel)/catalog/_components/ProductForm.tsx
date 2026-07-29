@@ -66,6 +66,55 @@ type ColorSlot = { masterId: string; name: string; hex: string };
 /** Пустой слот. */
 const EMPTY_COLOR_SLOT: ColorSlot = { masterId: '', name: '', hex: '' };
 
+/**
+ * Ввод ручных цен показа → карта для сервера. Пустые поля отбрасываем (это
+ * «оверрайда нет»), остальные нормализуем как деньги (RU-запятая → точка), чтобы
+ * сохранённое значение совпало с показанным после refresh (как у basePrice).
+ */
+function normalizeDisplayPrices(inputs: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [code, raw] of Object.entries(inputs)) {
+    const value = normalizeMoney(raw ?? '');
+    if (value !== '') out[code] = value;
+  }
+  return out;
+}
+
+/**
+ * Цена по курсу для подсказки-плейсхолдера: сколько получится, если ручную цену
+ * НЕ задавать. rate = единиц базовой валюты за 1 единицу валюты отображения.
+ * Некорректный курс/цена → null (подсказку не показываем).
+ */
+function rateBasedPrice(basePriceRub: string, rate: number, fractionDigits: number): string | null {
+  const base = Number(normalizeMoney(basePriceRub));
+  if (!Number.isFinite(base) || base <= 0) return null;
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  const digits = Number.isInteger(fractionDigits) && fractionDigits >= 0 && fractionDigits <= 4
+    ? fractionDigits
+    : 2;
+  return (base / rate).toFixed(digits);
+}
+
+/**
+ * Расхождение ручной цены с курсовой в долях (0.1 = 10 %); null — сравнивать не с
+ * чем (нет ручной цены или курсовая не считается).
+ *
+ * 🔴 ЗАЧЕМ (§9 плана): курс ЦБ уходит, а ручная цена остаётся на месте. Через
+ * несколько месяцев «480 €» может тихо разойтись с рублёвой ценой — товар
+ * незаметно подешевеет или подорожает для покупателя в валюте. Форма обязана
+ * показать это владельцу, а не молчать.
+ */
+function divergenceRatio(manual: string, byRate: string | null): number | null {
+  if (byRate === null) return null;
+  const m = Number(normalizeMoney(manual));
+  const r = Number(byRate);
+  if (!Number.isFinite(m) || m <= 0 || !Number.isFinite(r) || r <= 0) return null;
+  return Math.abs(m - r) / r;
+}
+
+/** Порог, с которого расхождение ручной цены с курсовой считается заметным. */
+const DIVERGENCE_THRESHOLD = 0.1;
+
 function flattenCategories(
   nodes: CategoryTreeNode[],
   depth = 0,
@@ -90,6 +139,7 @@ export function ProductForm({
   masterColors = DEFAULT_MASTER_COLORS as MasterColor[],
   locales,
   defaultLocale,
+  displayCurrencies = [],
 }: {
   /** null → режим создания. */
   product: ProductDetail | null;
@@ -108,6 +158,19 @@ export function ProductForm({
   locales: readonly string[];
   /** Язык по умолчанию (база = обычные колонки). */
   defaultLocale: string;
+  /**
+   * Доп.валюты ОТОБРАЖЕНИЯ магазина (shop_settings.exchange.displayCurrencies).
+   * Приходят со страницы — в форме нет ни одного зашитого кода валюты.
+   *
+   * 🔴 МУЛЬТИТЕНАНТНОСТЬ: пустой список (одновалютный магазин) → блок ручных цен
+   * НЕ рендерится вовсе, форма выглядит ровно как раньше.
+   */
+  displayCurrencies?: readonly {
+    code: string;
+    symbol: string;
+    rate: number;
+    fractionDigits: number;
+  }[];
 }) {
   const router = useRouter();
   const t = useTranslations();
@@ -138,6 +201,16 @@ export function ProductForm({
   const [description, setDescription] = useState(product?.description ?? '');
   const [status, setStatus] = useState<ProductStatus>(product?.status ?? 'draft');
   const [basePrice, setBasePrice] = useState(product?.basePrice ?? '0');
+  // Ручные «круглые» цены в валютах отображения (0062): код валюты → строка ввода.
+  // Пустая строка = «оверрайда нет, считать по курсу» (сервер отбросит такой ключ).
+  const [displayPriceInputs, setDisplayPriceInputs] = useState<Record<string, string>>(
+    () => {
+      const stored = (product?.displayPrices ?? {}) as Record<string, string>;
+      const init: Record<string, string> = {};
+      for (const c of displayCurrencies) init[c.code] = stored[c.code] ?? '';
+      return init;
+    },
+  );
   const [compareAtPrice, setCompareAtPrice] = useState(product?.compareAtPrice ?? '');
   const [brandId, setBrandId] = useState(product?.brandId ?? '');
   const [designerId, setDesignerId] = useState(product?.designerId ?? '');
@@ -236,6 +309,13 @@ export function ProductForm({
       // moneySchema нормализует тоже; здесь — чтобы сохранённое значение и его
       // показ после refresh совпадали.
       basePrice: normalizeMoney(basePrice) || '0',
+      // Ручные цены показа. Шлём ВСЕГДА, когда у магазина есть доп.валюты: форма
+      // содержит полное состояние карты, поэтому очищенное поле = снятие
+      // оверрайда (сервер отбрасывает пустые значения). Одновалютному магазину
+      // поле не отправляется вовсе — карта в БД остаётся нетронутой.
+      ...(displayCurrencies.length > 0
+        ? { displayPrices: normalizeDisplayPrices(displayPriceInputs) }
+        : {}),
       compareAtPrice: normalizeMoney(compareAtPrice) || null,
       isFeatured,
       isNew,
@@ -476,6 +556,57 @@ export function ProductForm({
               />
               {fieldErr('basePrice') ? <p className="mt-1 text-xs text-red-600">{fieldErr('basePrice')}</p> : null}
             </div>
+
+            {/*
+              РУЧНАЯ «КРУГЛАЯ» ЦЕНА в валютах отображения (0062). Поля рисуются
+              ДИНАМИЧЕСКИ по списку доп.валют магазина: одновалютный магазин не
+              увидит здесь ничего. Пусто = считать по курсу (плейсхолдер
+              показывает, сколько получится).
+            */}
+            {displayCurrencies.map((cur) => {
+              const byRate = rateBasedPrice(basePrice, cur.rate, cur.fractionDigits);
+              const manual = displayPriceInputs[cur.code] ?? '';
+              const ratio = divergenceRatio(manual, byRate);
+              const diverged = ratio !== null && ratio > DIVERGENCE_THRESHOLD;
+              return (
+                <div key={cur.code}>
+                  <label
+                    htmlFor={`p-display-price-${cur.code}`}
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    {t('catalog.product.fields.displayPrice', {
+                      currency: cur.symbol || cur.code,
+                    })}
+                  </label>
+                  <input
+                    id={`p-display-price-${cur.code}`}
+                    inputMode="decimal"
+                    value={manual}
+                    onChange={(e) =>
+                      setDisplayPriceInputs((prev) => ({ ...prev, [cur.code]: e.target.value }))
+                    }
+                    placeholder={
+                      byRate === null
+                        ? ''
+                        : t('catalog.product.fields.displayPriceByRate', { price: byRate })
+                    }
+                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  {diverged ? (
+                    <p className="mt-1 text-xs text-amber-700">
+                      {t('catalog.product.notes.displayPriceDiverged', {
+                        percent: Math.round((ratio ?? 0) * 100),
+                        price: byRate ?? '',
+                      })}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t('catalog.product.fields.displayPriceHelp')}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
 
             <div>
               <label htmlFor="p-status" className="block text-sm font-medium text-gray-700">

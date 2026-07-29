@@ -183,7 +183,7 @@ export default async function ProductPage({
                 {showCompare && (
                   <Price priceRub={product.compareAtPrice} className="sf-price-old" />
                 )}
-                <Price priceRub={product.price} />
+                <Price priceRub={product.price} displayPrices={product.displayPrices} />
               </div>
             </div>
 

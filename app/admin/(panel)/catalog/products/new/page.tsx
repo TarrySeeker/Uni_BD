@@ -30,7 +30,8 @@ export default async function NewProductPage() {
 
   const [brands, designers, categoryTree, attributes, settings, localeConfig] = await Promise.all([
     listBrands(),
-    listDesigners(),
+    // Алфавит: в форме товара дизайнера ищут глазами по списку (запрос заказчика).
+    listDesigners({ sort: 'name_asc' }),
     getCategoryTree(),
     listAttributes(),
     getEffectiveSettings(),
@@ -57,6 +58,7 @@ export default async function NewProductPage() {
           masterColors={settings.catalog.masterColors}
           locales={localeConfig.locales}
           defaultLocale={localeConfig.defaultLocale}
+          displayCurrencies={settings.exchange.displayCurrencies}
         />
       </div>
     </div>

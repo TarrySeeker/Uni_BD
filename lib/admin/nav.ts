@@ -64,6 +64,14 @@ export const NAV: NavItem[] = [
   { href: '/admin/leads', label: 'Заявки', labelKey: 'nav.leads', permission: 'orders.read' },
   // «Подписчики» — core: email-подписки из футера витрины; orders.read (G-12).
   { href: '/admin/subscribers', label: 'Подписчики', labelKey: 'nav.subscribers', permission: 'orders.read' },
+  // «Письма» — журнал отправок почты (кому, что, ушло ли, кнопка «переслать»).
+  // CORE, БЕЗ module, ОСОЗНАННО: письма порождают сразу несколько модулей —
+  // заказы (подтверждение), cdek (статусы доставки), сертификаты (коды на
+  // предъявителя). Спрятав раздел за один модуль, мы теряли бы журнал отправок
+  // при его выключении — вместе с доказательством, что код сертификата уходил.
+  // Право orders.read — как у «Заявок» и «Подписчиков»: это тот же операционный
+  // срез данных покупателя; пересылка требует orders.write.
+  { href: '/admin/mail', label: 'Письма', labelKey: 'nav.mail', permission: 'orders.read' },
   { href: '/admin/cdek', label: 'Доставка', labelKey: 'nav.cdek', permission: 'cdek.manage', module: 'cdek' },
   { href: '/admin/cms', label: 'Контент', labelKey: 'nav.cms', permission: 'cms.read', module: 'cms' },
   // «Новости» — тумблируемый модуль news; право news.read (docs/24 §3). Страница

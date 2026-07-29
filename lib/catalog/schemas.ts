@@ -14,6 +14,7 @@
 import { z } from 'zod';
 
 import { MAX_PRODUCT_COLORS, normalizeHex } from './colors';
+import { lookupCurrency } from '@/lib/exchange/catalog';
 import {
   ATTRIBUTE_TYPES,
   MEDIA_TYPES,
@@ -76,6 +77,73 @@ export const moneySchema = z.preprocess(
     'errors.catalog.priceInvalid',
   ),
 );
+
+/**
+ * Карта РУЧНЫХ цен в валютах ОТОБРАЖЕНИЯ (products.display_prices, 0062):
+ * `{"EUR": "480.00"}`.
+ *
+ * 🔴 ТОЛЬКО ПОКАЗ. base_price в базовой валюте остаётся единственным источником
+ * истины для денег (корзина/заказ/оплата). Пустая карта = «оверрайдов нет,
+ * считать по курсу» — прежнее поведение для всех магазинов.
+ *
+ * Правила очистки входа (важнее строгости — устойчивость: карта приходит из
+ * формы админки, где поля рисуются по списку доп.валют магазина):
+ *   * ключ приводится к ВЕРХНЕМУ регистру и обязан быть в справочнике валют
+ *     платформы (lib/exchange/catalog). НЕИЗВЕСТНЫЕ коды молча отбрасываются:
+ *     список валют магазина меняется, и старый мусор не должен ронять
+ *     сохранение товара целиком;
+ *   * ПУСТОЕ значение = «оверрайда нет» → ключ отбрасывается (владелец очистил
+ *     поле). Иначе пустая строка не прошла бы формат и заблокировала форму;
+ *   * оставшиеся суммы валидируются как СТРОГО ПОЛОЖИТЕЛЬНЫЕ деньги ≤ 2 знаков
+ *     (рубли/евро, НЕ копейки). Ноль запрещён: «бесплатно» задаётся базовой
+ *     ценой, а не оверрайдом показа.
+ */
+const positiveMoneyRe = /^\d{1,12}(?:\.\d{1,2})?$/;
+
+export const displayPricesSchema = z.preprocess(
+  (v) => {
+    if (v == null || typeof v !== 'object' || Array.isArray(v)) return v;
+    const out: Record<string, string> = {};
+    for (const [rawCode, rawValue] of Object.entries(v as Record<string, unknown>)) {
+      const code = String(rawCode).trim().toUpperCase();
+      if (lookupCurrency(code) === null) continue; // не из справочника — отбрасываем
+      if (typeof rawValue !== 'string') {
+        // не строка — пропускаем в валидацию как есть, чтобы ошибка была явной
+        out[code] = rawValue as unknown as string;
+        continue;
+      }
+      const value = normalizeMoney(rawValue);
+      if (value === '') continue; // очищенное поле — оверрайда нет
+      out[code] = value;
+    }
+    return out;
+  },
+  z.record(
+    z.string(),
+    z
+      .string()
+      .regex(positiveMoneyRe, 'errors.catalog.priceInvalid')
+      .refine((s) => Number(s) > 0, 'errors.catalog.priceInvalid'),
+  ),
+);
+
+/**
+ * Сырое значение products.display_prices (jsonb-объект или JSON-строка) →
+ * очищенная карта. Для путей, где данные приходят ИЗ БД, а не из формы:
+ * клонирование товара, ETL. Мусор → {} (считать по курсу).
+ */
+export function parseStoredDisplayPrices(v: unknown): Record<string, string> {
+  let raw: unknown = v;
+  if (typeof v === 'string') {
+    try {
+      raw = JSON.parse(v);
+    } catch {
+      return {};
+    }
+  }
+  const parsed = displayPricesSchema.safeParse(raw);
+  return parsed.success ? (parsed.data as Record<string, string>) : {};
+}
 
 /** Код характеристики (attributes.code): стабильный идентификатор. */
 export const attributeCodeSchema = z
@@ -221,6 +289,9 @@ export const ProductCreateSchema = z
     description: z.string().max(50000).optional().default(''),
     status: z.enum(PRODUCT_STATUSES).optional().default('draft'),
     basePrice: moneySchema.optional().default('0'),
+    // Ручные цены показа в доп.валютах (0062). Без .default({}) — чтобы отличать
+    // «не передали» от «передали пустую», как у colors.
+    displayPrices: displayPricesSchema.optional(),
     // Акционные/каталожные расширения (docs/06 §3.1–§3.3, ADR-009):
     compareAtPrice: moneySchema.nullish(),
     isFeatured: z.boolean().optional().default(false),
@@ -256,6 +327,8 @@ export const ProductUpdateSchema = z.object({
   description: z.string().max(50000).optional(),
   status: z.enum(PRODUCT_STATUSES).optional(),
   basePrice: moneySchema.optional(),
+  // Не передали → не трогаем карту в БД; передали {} → очистка всех оверрайдов.
+  displayPrices: displayPricesSchema.optional(),
   compareAtPrice: moneySchema.nullish(),
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().nullish(),

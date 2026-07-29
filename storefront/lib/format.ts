@@ -72,22 +72,69 @@ export interface DisplayCurrency {
 }
 
 /**
+ * Карта РУЧНЫХ цен показа товара: `{"EUR":"480.00"}` (products.display_prices).
+ * Приходит в DTO товара. Пусто/не задано → цена считается по курсу.
+ */
+export type DisplayPrices = Record<string, string>;
+
+/**
+ * Достаёт ручную цену для выбранной валюты.
+ *
+ * Правила (совпадают с серверной валидацией displayPricesSchema — витрина не
+ * доверяет данным вслепую, но и не падает от мусора):
+ *  - код валюты сравнивается БЕЗ учёта регистра;
+ *  - значение должно быть СТРОГО ПОЛОЖИТЕЛЬНЫМ конечным числом; пусто/мусор/
+ *    ноль/минус → оверрайда нет, считаем по курсу;
+ *  - к БАЗОВОЙ валюте (rate === 1) оверрайд НЕ применяется: это валюта денег,
+ *    и подмена ценника разошлась бы с суммой заказа и списанием.
+ */
+function lookupOverride(
+  display: DisplayCurrency,
+  prices: DisplayPrices | null | undefined,
+): number | null {
+  if (!prices || typeof prices !== 'object') return null;
+  // Базовая валюта — деньги, а не «отображение»: оверрайд к ней не применяем.
+  if (!(Number.isFinite(display.rate) && display.rate > 0) || display.rate === 1) return null;
+  const wanted = String(display.code ?? '').trim().toUpperCase();
+  if (wanted === '') return null;
+  for (const [code, raw] of Object.entries(prices)) {
+    if (String(code).trim().toUpperCase() !== wanted) continue;
+    if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+    const value = typeof raw === 'number' ? raw : Number(String(raw).trim().replace(',', '.'));
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return value;
+  }
+  return null;
+}
+
+/**
  * Форматирует РУБЛЁВУЮ цену для показа в выбранной валюте отображения.
  *  - базовая (₽, rate=1): округляем до целого (fractionDigits 0), «7 500 ₽»;
  *  - доп.валюта (€): делим на rate и показываем с fractionDigits знаками, «75,00 €».
  * Пустое/некорректное значение → пустая строка (как раньше). Отрицательный/нулевой
  * rate защищён (не делим на 0): трактуем как базовую (rate=1).
+ *
+ * 🔴 ЭТАП 3 — РУЧНАЯ «КРУГЛАЯ» ЦЕНА. Третий (необязательный) аргумент — карта
+ * ручных цен товара. Если для ВЫБРАННОЙ доп.валюты в ней есть корректная сумма,
+ * показываем РОВНО ЕЁ вместо деления на курс: премиальному бренду нужен ценник
+ * «480 €», а не «4783,12 €», и он не должен «плыть» вслед за курсом ЦБ.
+ *
+ * Это ТОЛЬКО показ ценника: сумма к оплате всегда считается от рублёвой цены
+ * (см. итог корзины и чекаут — туда карта не передаётся вовсе). Аргумент
+ * необязателен, поэтому все прежние вызовы сохраняют прежнее поведение.
  */
 export function formatDisplayPrice(
   priceRub: string | number | null | undefined,
   display: DisplayCurrency,
+  displayPrices?: DisplayPrices | null,
 ): string {
   if (priceRub == null) return '';
   const n = typeof priceRub === 'number' ? priceRub : Number(priceRub);
   if (!Number.isFinite(n)) return '';
   const rateValid = Number.isFinite(display.rate) && display.rate > 0;
   const rate = rateValid ? display.rate : 1;
-  const converted = n / rate;
+  const override = lookupOverride(display, displayPrices);
+  const converted = override ?? n / rate;
   // При защите от некорректного курса (rate<=0) деградируем к базовому показу:
   // целое число (0 знаков), но с символом выбранной валюты.
   const digits = rateValid && Number.isInteger(display.fractionDigits) ? display.fractionDigits : 0;

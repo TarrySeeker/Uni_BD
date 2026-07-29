@@ -19,6 +19,7 @@ import type {
   BrandRef,
   Category,
   CategoryTreeNode,
+  DisplayPrices,
   InventoryItem,
   Product,
   ProductAttribute,
@@ -51,6 +52,37 @@ function asJson(v: any): Record<string, unknown> {
   }
   return {};
 }
+/**
+ * Сырой jsonb products.display_prices (0062) → карта ручных цен показа.
+ *
+ * Принимает объект (postgres.js) или JSON-строку. Отбирает ТОЛЬКО пары
+ * «строковый код → непустая строка-сумма», код нормализует к верхнему регистру;
+ * мусор/не-объект/массив → {} (= «оверрайдов нет, считать по курсу»).
+ *
+ * 🔴 Защита на ЧТЕНИИ намеренно мягкая: карта могла быть записана прежней
+ * версией кода или правкой SQL напрямую. Испорченная запись не должна ронять
+ * выдачу каталога — она просто деградирует к пересчёту по курсу.
+ */
+function asDisplayPrices(v: any): DisplayPrices {
+  let obj: unknown = v;
+  if (typeof v === 'string') {
+    try {
+      obj = JSON.parse(v);
+    } catch {
+      return {};
+    }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const out: DisplayPrices = {};
+  for (const [code, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (typeof value !== 'string') continue;
+    const amount = value.trim();
+    if (amount === '') continue;
+    out[code.trim().toUpperCase()] = amount;
+  }
+  return out;
+}
+
 /**
  * Сырой jsonb products.colors (0050) → ProductColor[] (дисплейные свотчи carre
  * `.wv__colors`). Принимает массив-объект (postgres.js) или JSON-строку; отбирает
@@ -163,6 +195,7 @@ export function mapProduct(row: any): Product {
     description: row.description ?? '',
     status: row.status as ProductStatus,
     basePrice: String(row.base_price),
+    displayPrices: asDisplayPrices(row.display_prices),
     compareAtPrice:
       row.compare_at_price === null || row.compare_at_price === undefined
         ? null
@@ -512,6 +545,7 @@ export async function listProducts(
   const rows = await sql<Record<string, unknown>[]>`
     SELECT
       p.id, p.sku, p.slug, p.name, p.status, p.base_price, p.created_at,
+      p.display_prices,
       p.compare_at_price, p.is_featured, p.is_new, p.brand_id, p.translations,
       b.id AS b_id, b.slug AS b_slug, b.name AS b_name, b.logo_key AS b_logo_key,
       -- Остаток товара: строки вариантов всегда; строку уровня товара
@@ -563,6 +597,7 @@ export async function listProducts(
       name: r.name,
       status: r.status as ProductStatus,
       basePrice,
+      displayPrices: asDisplayPrices(r.display_prices),
       compareAtPrice,
       discountPct: discountPercent(basePrice, compareAtPrice),
       onSale: isOnSale(basePrice, compareAtPrice),
@@ -586,6 +621,7 @@ export async function getProductById(
 ): Promise<ProductDetail | null> {
   const prodRows = await sql<Record<string, unknown>[]>`
     SELECT p.id, p.sku, p.slug, p.name, p.description, p.status, p.base_price,
+           p.display_prices,
            p.compare_at_price, p.is_featured, p.is_new, p.brand_id, p.designer_id,
            p.attributes_cache, p.colors, p.seo_title, p.seo_description,
            p.og_title, p.og_description, p.og_image_key, p.canonical_url, p.noindex,

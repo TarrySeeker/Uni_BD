@@ -103,7 +103,7 @@ describe('storefront/dto — toProductBlockDto', () => {
 describe('storefront/dto — toProductDetailDto прокидывает блоки', () => {
   const product: ProductDetail = {
     id: 'p1', sku: 'SKU1', slug: 'scarf', name: 'Scarf', description: 'nice',
-    status: 'active', basePrice: '1000.00', compareAtPrice: null,
+    status: 'active', basePrice: '1000.00', displayPrices: {}, compareAtPrice: null,
     isFeatured: false, isNew: null, brandId: null, designerId: null,
     attributesCache: {}, colors: [], seoTitle: null, seoDescription: null,
     ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,

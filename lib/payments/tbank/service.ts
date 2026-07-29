@@ -23,6 +23,7 @@
 
 import type { Order, OrderItem } from '@/lib/orders/types';
 import { autoIssueGiftsForPaidOrder } from '@/lib/gift-certificates/auto-issue';
+import { notifyOrderPaid } from '@/lib/mail/notifications';
 import { getOrderByNumber } from '@/lib/orders/repository';
 import { TbankManager, getTbankManager } from './manager';
 import { TbankError } from './errors';
@@ -127,15 +128,20 @@ export function sanitizeNotification(
 // =============================================================================
 
 /**
- * ПОСТ-КОММИТНЫЙ автовыпуск подарочных сертификатов по оплаченному заказу (ТЗ п.11).
+ * ПОСТ-КОММИТНЫЕ ДЕЙСТВИЯ по оплаченному заказу: автовыпуск подарочных
+ * сертификатов (ТЗ п.11) и письма покупателю (подтверждение заказа + коды
+ * купленных сертификатов). Порядок ЗНАЧИМ: сначала выпуск, потом письмо —
+ * письмо собирает коды из БД, и до выпуска слать было бы нечего.
  *
  * ВЫЗЫВАТЬ СТРОГО ПОСЛЕ `await recordWebhookEvent`, то есть ПОСЛЕ КОММИТА. Внутри
  * той транзакции (лог события + переход в paid + пометка processed) любой throw
  * откатил бы САМ ФАКТ ОПЛАТЫ, а повторная доставка события была бы отсечена
  * уникальным ключом лога: деньги приняты, а заказ навсегда pending.
  *
- * По той же причине ошибка выпуска ГЛОТАЕТСЯ: ответ провайдеру обязан остаться
- * успешным, иначе банк начнёт ретраить событие. Невыпущенное подхватит крон-сверка.
+ * По той же причине ошибка ГЛОТАЕТСЯ: ответ провайдеру обязан остаться успешным,
+ * иначе банк начнёт ретраить событие. Невыпущенное подхватит крон-сверка
+ * (/api/cron/gift/issue-pending), неотправленное письмо — крон-досылка
+ * (/api/cron/mail/retry-failed).
  */
 async function autoIssueGiftsAfterCommit(
   orderId: string,
@@ -144,9 +150,14 @@ async function autoIssueGiftsAfterCommit(
   if (!(result.inserted && result.applied && result.paymentStatus === 'paid')) return;
   try {
     await autoIssueGiftsForPaidOrder(orderId);
+    // ПОЧТА — СТРОГО ПОСЛЕ ВЫПУСКА: письмо с кодом сертификата собирается из БД,
+    // и до выпуска слать было бы нечего. Само уведомление не бросает (см. шапку
+    // lib/mail/notifications.ts), но остаётся внутри общего try — сбой почты не
+    // смеет испортить ответ провайдеру, иначе банк начнёт ретраить вебхук.
+    await notifyOrderPaid(orderId);
   } catch (err) {
     console.warn(
-      `[tbank] автовыпуск подарочных сертификатов не удался (order=${orderId}): ` +
+      `[tbank] пост-оплатные действия (выпуск сертификатов / письмо) не удались (order=${orderId}): ` +
         `${err instanceof Error ? err.message : String(err)}`,
     );
   }

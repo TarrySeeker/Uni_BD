@@ -44,7 +44,7 @@ function productRow(colors: unknown): Record<string, unknown> {
 function productDetail(colors: ProductColor[]): ProductDetail {
   return {
     id: 'p1', sku: 'SKU1', slug: 'coat', name: 'Coat', description: '',
-    status: 'active', basePrice: '1000.00', compareAtPrice: null,
+    status: 'active', basePrice: '1000.00', displayPrices: {}, compareAtPrice: null,
     isFeatured: false, isNew: null, brandId: null, designerId: null,
     attributesCache: {}, colors,
     seoTitle: null, seoDescription: null, ogTitle: null, ogDescription: null,

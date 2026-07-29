@@ -38,7 +38,11 @@ export default function ProductCard({ product, locale = DEFAULT_LOCALE }: Props)
         <div className="work-item__name">{product.brand?.name ?? ' '}</div>
         <div className="work-item__description">{product.name}</div>
         <div className="work-item__price">
-          {product.inStock ? <Price priceRub={product.price} /> : ' '}
+          {product.inStock ? (
+            <Price priceRub={product.price} displayPrices={product.displayPrices} />
+          ) : (
+            ' '
+          )}
         </div>
         <FavoriteButton
           item={{

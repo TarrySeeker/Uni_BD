@@ -64,7 +64,9 @@ export default async function CatalogPage({
 
   const [{ rows, total }, designers, categoryTree] = await Promise.all([
     listProducts(filter),
-    listDesigners(),
+    // По умолчанию listDesigners отдаёт ручной порядок (ORDER BY sort) — он нужен витрине,
+    // где порядок задаёт владелец. В служебном фильтре искать по нему неудобно: нужен алфавит.
+    listDesigners({ sort: 'name_asc' }),
     getCategoryTree(),
   ]);
 

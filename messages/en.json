@@ -61,6 +61,7 @@
     "giftCertificates": "Gift certificates",
     "leads": "Leads",
     "subscribers": "Subscribers",
+    "mail": "Emails",
     "cdek": "Delivery",
     "cms": "Content",
     "news": "News",
@@ -273,6 +274,11 @@
     "newsletter": {
       "subscriberNotFoundOrUnsubscribed": "Subscriber not found or already unsubscribed."
     },
+    "mail": {
+      "invalidId": "Invalid email identifier.",
+      "entryNotFound": "Email record not found.",
+      "resendRequiresOrder": "This email is not linked to an order, so it cannot be resent (the body is rebuilt from the order)."
+    },
     "action": {
       "unauthorized": "Sign-in required.",
       "forbidden": "Insufficient permissions (requires {permission}).",
@@ -345,6 +351,9 @@
       "statusHelp": "«Active» — the product is visible on the site. «Draft» and «Archived» — hidden.",
       "fields": {
         "price": "Price",
+        "displayPrice": "Price in {currency} (manual)",
+        "displayPriceByRate": "at current rate: {price}",
+        "displayPriceHelp": "Leave empty to convert at the current rate automatically.",
         "status": "Status",
         "sku": "SKU",
         "slug": "Page URL on the site",
@@ -388,6 +397,7 @@
         "archived": "The product has been removed from sale (archived) — it is no longer shown on the site."
       },
       "notes": {
+        "displayPriceDiverged": "Manual price differs from the converted one by {percent}% (at current rate: {price}). The rate has moved — review the price.",
         "noPrice": "No price set — it will show as 0 on the storefront. Set a price.",
         "noStock": "0 in stock — the storefront shows «Out of stock» (the buy button is disabled). Set the stock on the «Variants» tab."
       },
@@ -2304,6 +2314,42 @@
     "subscriberRowActions": {
       "confirmUnsubscribe": "Unsubscribe «{email}» from the newsletter?",
       "unsubscribe": "Unsubscribe"
+    }
+  },
+  "mail": {
+    "page": {
+      "subtitle": "Log of emails sent to customers. Total: {total}.",
+      "truncationHint": "Showing the most recent emails; the full log lives in the database.",
+      "empty": "No emails have been sent yet.",
+      "disabled": "Store email is not configured: no messages are being sent. Set the SMTP variables in the instance .env (SMTP_HOST, MAIL_FROM and others) and restart the application.",
+      "enabled": "Email is configured: sending from {from}.",
+      "columns": {
+        "date": "Date",
+        "recipient": "Recipient",
+        "template": "Email",
+        "status": "Status",
+        "attempts": "Attempts"
+      }
+    },
+    "status": {
+      "pending": "Sending",
+      "sent": "Sent",
+      "failed": "Not sent",
+      "skipped": "Skipped"
+    },
+    "template": {
+      "gift_certificate": "Gift certificate code",
+      "order_confirmation": "Order confirmation",
+      "cdek_accepted": "Delivery: accepted at warehouse",
+      "cdek_in_transit": "Delivery: in transit",
+      "cdek_ready_for_pickup": "Delivery: ready for pickup",
+      "cdek_courier_dispatched": "Delivery: handed to courier",
+      "cdek_delivered": "Delivery: delivered"
+    },
+    "rowActions": {
+      "resend": "Send again",
+      "confirmResend": "Send this email again to {recipient}?",
+      "resent": "Sent"
     }
   },
   "permissions": {

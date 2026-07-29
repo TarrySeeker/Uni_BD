@@ -11,10 +11,20 @@ export interface BrandDto {
   logoUrl: string | null;
 }
 
+/**
+ * Ручные цены в валютах ОТОБРАЖЕНИЯ: `{"EUR":"480.00"}` (products.display_prices).
+ *
+ * 🔴 ТОЛЬКО ПОКАЗ ЦЕННИКА. Сумма к оплате всегда считается от `price` в базовой
+ * валюте. Пусто/не задано → цена пересчитывается по курсу, как раньше.
+ */
+export type DisplayPricesDto = Record<string, string>;
+
 export interface ProductListItemDto {
   slug: string;
   name: string;
   price: string;
+  /** Ручные цены показа; опционально — старый API их не отдаёт (анти-регресс). */
+  displayPrices?: DisplayPricesDto;
   compareAtPrice: string | null;
   discountPct: number | null;
   onSale: boolean;
@@ -116,6 +126,8 @@ export interface ProductDetailDto {
   name: string;
   description: string;
   price: string;
+  /** Ручные цены показа; опционально — старый API их не отдаёт (анти-регресс). */
+  displayPrices?: DisplayPricesDto;
   compareAtPrice: string | null;
   discountPct: number | null;
   onSale: boolean;
