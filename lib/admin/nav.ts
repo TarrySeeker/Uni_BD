@@ -54,6 +54,12 @@ export const NAV: NavItem[] = [
   { href: '/admin/users', label: 'Пользователи', permission: 'users.read' },
   { href: '/admin/roles', label: 'Роли', permission: 'roles.manage' },
   { href: '/admin/audit', label: 'Аудит', permission: 'audit.read' },
+  // «Готовность» — core (без module): диагностика конфигурации инстанса. Право
+  // settings.manage — тот, кто настраивает магазин, и должен видеть, чего не
+  // хватает. Отдельный пункт, а не блок дашборда: блокеры вроде пустых ключей
+  // интеграции месяцами оставались незамеченными именно потому, что о них нигде
+  // не было сказано прямо.
+  { href: '/admin/readiness', label: 'Готовность', permission: 'settings.manage' },
   // «Настройки» — core (без module): не прячется за флагом, которым сам управляет
   // (self-lock guard, docs/11 §5.4.5). Виден при наличии settings.manage.
   { href: '/admin/settings', label: 'Настройки', permission: 'settings.manage' },

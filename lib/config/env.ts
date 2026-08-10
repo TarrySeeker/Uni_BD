@@ -73,6 +73,28 @@ const envSchema = z.object({
   S3_PUBLIC_URL: optionalUrl,
 
   // Набор включённых модулей (csv). Парсится в modules.ts.
+  // ---------------------------------------------------------------------------
+  // ПОЧТА (SMTP). Все переменные опциональны: модуль ИНЕРТЕН, пока не заданы
+  // SMTP_HOST и MAIL_FROM — письма не уходят, только пишется предупреждение в
+  // лог, вызывающий код не падает.
+  //
+  // ⚠️ Инертность удобна в разработке и опасна на бою: магазин выглядит рабочим,
+  // а письма молча не доходят. Поэтому настроенность почты проверяется в разделе
+  // «Готовность магазина».
+  // ---------------------------------------------------------------------------
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  // Неявный TLS (порт 465). Для 587 обычно false — там STARTTLS.
+  SMTP_SECURE: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+  // Адрес отправителя и отображаемое имя. Без MAIL_FROM модуль инертен.
+  MAIL_FROM: z.string().optional(),
+  MAIL_FROM_NAME: z.string().optional(),
+
   ADMIK_MODULES: z.string().optional(),
 
   // Брендинг магазина.
