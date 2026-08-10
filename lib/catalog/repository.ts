@@ -334,6 +334,15 @@ export interface ProductListFilter {
   isNew?: boolean;
   /** Подборка «Со скидкой» — только товары с compare_at_price > base_price. */
   onSale?: boolean;
+  /**
+   * Выборка по конкретному списку товаров.
+   *
+   * Нужна избранному: список хранится идентификаторами, а карточки для него
+   * собираются обычным путём каталога — с ценами, скидками и признаком наличия.
+   * Пустой массив трактуется как «ничего не найдено», а не как «фильтр не задан»:
+   * иначе покупатель с пустым избранным увидел бы весь каталог.
+   */
+  ids?: string[];
   page: number;
   pageSize: number;
   /**
@@ -417,6 +426,10 @@ export async function listProducts(
             SELECT 1 FROM product_categories pc
             WHERE pc.product_id = p.id AND pc.category_id = ANY(${categoryIds ?? []}::uuid[])
           ))
+      -- Выборка по списку (избранное). Признак «фильтр задан» вычисляется в JS,
+      -- а не через длину массива в SQL: пустой список означает «ничего не
+      -- найдено», и покупатель с пустым избранным не должен увидеть весь каталог.
+      AND (${f.ids === undefined}::boolean OR p.id = ANY(${f.ids ?? []}::uuid[]))
   `;
 
   const orderBy =

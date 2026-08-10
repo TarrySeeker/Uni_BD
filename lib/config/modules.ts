@@ -8,7 +8,7 @@
  * Пример: ADMIK_MODULES=catalog,orders,cdek
  */
 
-export type ModuleName = 'catalog' | 'orders' | 'cdek' | 'cms' | 'payments';
+export type ModuleName = 'catalog' | 'orders' | 'cdek' | 'cms' | 'payments' | 'account';
 
 /** Все известные платформе модули. */
 export const ALL_MODULES: readonly ModuleName[] = [
@@ -17,6 +17,14 @@ export const ALL_MODULES: readonly ModuleName[] = [
   'cdek',
   'cms',
   'payments',
+  // Личный кабинет покупателя. Существует только в ветке LK — в ветке freeLK
+  // этого кода нет вовсе, поэтому выключать его там нечего.
+  //
+  // Модулем, а не «всегда включён»: кабинет — это хранение персональных данных,
+  // паролей и сессий покупателей. Магазину, которому он не нужен, его наличие
+  // добавляет только риск, и такой магазин должен уметь его отключить, не
+  // выкладывая пустые страницы входа.
+  'account',
 ] as const;
 
 function isModuleName(value: string): value is ModuleName {

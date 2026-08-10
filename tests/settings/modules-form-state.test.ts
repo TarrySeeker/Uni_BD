@@ -68,6 +68,7 @@ describe('settings/modules-form-state — buildModuleOverridesPayload', () => {
       cdek: 'inherit',
       cms: 'inherit',
       payments: 'inherit',
+      account: 'inherit',
     };
     expect(buildModuleOverridesPayload(state)).toEqual({ catalog: true, orders: false });
   });
@@ -103,6 +104,7 @@ describe('settings/modules-form-state — modulesBeingTurnedOff', () => {
       cdek: 'on',
       cms: 'inherit',
       payments: 'off',
+      account: 'inherit',
     };
     const labels = modulesBeingTurnedOff(state);
     expect(labels).toContain('Каталог');

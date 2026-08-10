@@ -50,11 +50,12 @@ const TEST_LIKE_SQL_PATTERN = '%test%';
 export async function collectReadinessInput(): Promise<ReadinessInput> {
   const env = getEnv();
 
-  const [cdekOn, paymentsOn, catalogOn, ordersOn] = await Promise.all([
+  const [cdekOn, paymentsOn, catalogOn, ordersOn, accountOn] = await Promise.all([
     isModuleEffectivelyEnabled('cdek').catch(() => false),
     isModuleEffectivelyEnabled('payments').catch(() => false),
     isModuleEffectivelyEnabled('catalog').catch(() => false),
     isModuleEffectivelyEnabled('orders').catch(() => false),
+    isModuleEffectivelyEnabled('account').catch(() => false),
   ]);
 
   // Настройки читаем мягко: при недоступности БД экран всё равно должен
@@ -131,6 +132,7 @@ export async function collectReadinessInput(): Promise<ReadinessInput> {
       payments: paymentsOn,
       catalog: catalogOn,
       orders: ordersOn,
+      account: accountOn,
     },
     integrations: {
       cdekMock: isCdekMock(),

@@ -27,7 +27,7 @@ import {
 /** Идеальный магазин: всё настроено, данные заполнены. */
 function healthyInput(): ReadinessInput {
   return {
-    modules: { cdek: true, payments: true, catalog: true, orders: true },
+    modules: { cdek: true, payments: true, catalog: true, orders: true, account: true },
     integrations: {
       cdekMock: false,
       cdekCronSecretSet: true,
@@ -110,29 +110,39 @@ describe('admin/readiness — интеграции', () => {
 });
 
 /**
- * Почта. Её отсутствие — предупреждение, а не блокер: магазин без писем
- * работает, просто уведомления о заказах приходится рассылать вручную.
- *
- * (В сборке с личным кабинетом этот же пункт становится блокером — там без
- * почты нельзя ни подтвердить адрес, ни восстановить пароль.)
+ * Почта. Её отсутствие значит разное в зависимости от того, есть ли на сайте
+ * личный кабинет: без кабинета это неудобство, с кабинетом — тупик, из которого
+ * покупатель не может выбраться сам.
  */
 describe('admin/readiness — отправка писем', () => {
-  it('почта не настроена → предупреждение, вердикт не blocked', () => {
+  it('почта не настроена, кабинет ВКЛЮЧЁН → БЛОКЕР', () => {
     const input = healthyInput();
     input.integrations.mailConfigured = false;
+    const r = buildReadinessReport(input);
+
+    const item = r.items.find((i) => i.id === 'mail');
+    expect(item?.level).toBe('blocker');
+    // Текст обязан называть последствия для покупателя, а не «SMTP не задан».
+    expect(item?.detail).toMatch(/пароль/i);
+    expect(item?.detail).toMatch(/подтвердить адрес/i);
+  });
+
+  it('почта не настроена, кабинет ВЫКЛЮЧЕН → только предупреждение', () => {
+    const input = healthyInput();
+    input.integrations.mailConfigured = false;
+    input.modules.account = false;
     const r = buildReadinessReport(input);
 
     expect(r.items.find((i) => i.id === 'mail')?.level).toBe('warning');
     expect(r.status).not.toBe('blocked');
   });
 
-  it('текст называет последствие, а не «SMTP не задан»', () => {
+  it('подсказка предлагает и выключить кабинет — это законный выход', () => {
     const input = healthyInput();
     input.integrations.mailConfigured = false;
-    const item = buildReadinessReport(input).items.find((i) => i.id === 'mail');
+    const r = buildReadinessReport(input);
 
-    expect(item?.detail).toMatch(/письма не отправляются|вручную/i);
-    expect(item?.action.length).toBeGreaterThan(0);
+    expect(r.items.find((i) => i.id === 'mail')?.action).toMatch(/выключите модуль/i);
   });
 
   it('почта настроена → пункт в порядке', () => {
