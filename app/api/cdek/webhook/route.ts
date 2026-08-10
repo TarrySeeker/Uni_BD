@@ -4,6 +4,7 @@ import { getCdekConfig, isCdekMock } from '@/lib/cdek/config';
 import { verifyWebhookIp, WebhookService } from '@/lib/cdek/services/webhook';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { logger } from '@/lib/logger';
+import { extractWebhookIp } from '@/lib/server/request-ip';
 import { safeEqual } from '@/lib/storefront/order-dto';
 
 /** Структурный логгер webhook СДЭК (наблюдаемость, Этап 6 §6.3). */
@@ -49,14 +50,10 @@ export const dynamic = 'force-dynamic';
  * бы whitelist. Возвращаемый ip также сохраняется в cdek_status_log.ip (аудит).
  */
 function extractIp(req: NextRequest, trustProxy: boolean): string {
-  if (!trustProxy) return '';
-  const fwd = req.headers.get('x-forwarded-for');
-  if (fwd) {
-    const first = fwd.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  const real = req.headers.get('x-real-ip')?.trim();
-  return real ?? '';
+  // Делегируем в ЕДИНСТВЕННУЮ реализацию: своя копия здесь уже разошлась с общей
+  // (доверяла подделываемому X-Forwarded-For первым и не проверяла формат), из-за
+  // чего IP-whitelist обходился заголовком, а в журнал попадал чужой адрес.
+  return extractWebhookIp(req.headers, trustProxy);
 }
 
 /** Результат аутентификации запроса вебхука. */

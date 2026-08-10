@@ -41,6 +41,9 @@ import {
   verifyWebhookIp,
   parseEvent,
   WebhookService,
+  ensureWebhookSubscription,
+  maskWebhookUrl,
+  CDEK_WEBHOOK_PATH,
 } from '@/lib/cdek/services/webhook';
 import { CdekManager } from '@/lib/cdek/manager';
 import { getCdekConfig } from '@/lib/cdek/config';
@@ -218,5 +221,283 @@ describe('cdek/webhook — handleWebhookEvent идемпотентность', (
     const r = await svc.handleWebhookEvent(payload);
     expect(r.processed).toBe(true);
     expect(advanceDeliveryStatusMock).toHaveBeenCalledWith('ord-9', 'delivered', expect.any(String));
+  });
+});
+
+// =============================================================================
+// ensureWebhookSubscription — регистрация подписки в СДЭК (POST /v2/webhooks).
+//
+// Боевой гэп: без подписки вебхуки не приходят вообще. Функция идемпотентна:
+// GET /v2/webhooks → сравнение с целевым URL → POST недостающих; подписки с
+// нашим path и устаревшим доменом пересоздаются (DELETE+POST); ЧУЖИЕ url не
+// трогаются. mock-режим → no-op.
+// =============================================================================
+describe('cdek/webhook — ensureWebhookSubscription', () => {
+  /** Конфиг боевого контура с секретом вебхука. */
+  const liveCfg = getCdekConfig({
+    NODE_ENV: 'test',
+    CDEK_ACCOUNT: 'acc',
+    CDEK_SECRET: 'sec',
+    CDEK_BASE_URL: 'https://api.edu.cdek.ru',
+    CDEK_WEBHOOK_SECRET: 'whsec',
+  });
+  const tokenCache = { getToken: vi.fn(async () => 'tok'), invalidate: vi.fn(async () => {}) };
+  const BASE = 'https://shop.example.com';
+  const TARGET = `${BASE}${CDEK_WEBHOOK_PATH}?key=whsec`;
+
+  function jsonResponse(data: unknown, status = 200): Response {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('mock-режим → no-op с mock:true (сеть не трогается)', async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: mockCfg, fetchImpl }),
+      resolveBaseUrl: async () => BASE,
+    });
+    expect(report.mock).toBe(true);
+    expect(report.created).toEqual([]);
+    expect(report.errors).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('нет публичного URL приложения → errors без сетевых вызовов', async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => null,
+    });
+    expect(report.errors.length).toBeGreaterThan(0);
+    expect(report.created).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('нет ни секрета, ни IP-whitelist → errors (роут отвечал бы 401 и СДЭК отключил бы подписку)', async () => {
+    const cfgNoAuth = getCdekConfig({
+      NODE_ENV: 'test',
+      CDEK_ACCOUNT: 'acc',
+      CDEK_SECRET: 'sec',
+      CDEK_BASE_URL: 'https://api.edu.cdek.ru',
+    });
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: cfgNoAuth, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+    expect(report.errors.length).toBeGreaterThan(0);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('подписок нет → POST /v2/webhooks с {type: ORDER_STATUS, url: base+path?key=…} → created', async () => {
+    const calls: { url: string; method: string; body: unknown }[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url);
+      const method = init?.method ?? 'GET';
+      calls.push({ url: u, method, body: init?.body ? JSON.parse(String(init.body)) : null });
+      if (method === 'GET') return jsonResponse([]);
+      return jsonResponse({ entity: { uuid: 'sub-1' }, requests: [{ state: 'SUCCESSFUL' }] });
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+
+    expect(report.errors).toEqual([]);
+    expect(report.created).toHaveLength(1);
+    expect(report.created[0]!.type).toBe('ORDER_STATUS');
+    expect(report.created[0]!.uuid).toBe('sub-1');
+    const post = calls.find((c) => c.method === 'POST');
+    expect(post).toBeDefined();
+    expect(post!.body).toEqual({ type: 'ORDER_STATUS', url: TARGET });
+    // Секрет не светится в отчёте (маскирование для UI/аудита).
+    expect(JSON.stringify(report)).not.toContain('whsec');
+  });
+
+  it('подписка с нашим URL уже есть → kept, POST/DELETE не вызываются (идемпотентность)', async () => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') {
+        return jsonResponse([{ uuid: 'sub-keep', type: 'ORDER_STATUS', url: TARGET }]);
+      }
+      throw new Error(`неожиданный ${method}`);
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+
+    expect(report.kept).toHaveLength(1);
+    expect(report.kept[0]!.uuid).toBe('sub-keep');
+    expect(report.created).toEqual([]);
+    expect(report.deleted).toEqual([]);
+    expect(report.errors).toEqual([]);
+  });
+
+  it('наш path на УСТАРЕВШЕМ домене → DELETE старой + POST новой (пересоздание)', async () => {
+    const methods: string[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      methods.push(`${method} ${String(url)}`);
+      if (method === 'GET') {
+        return jsonResponse([
+          { uuid: 'sub-old', type: 'ORDER_STATUS', url: `https://old-domain.example${CDEK_WEBHOOK_PATH}?key=whsec` },
+        ]);
+      }
+      if (method === 'DELETE') return jsonResponse({});
+      return jsonResponse({ entity: { uuid: 'sub-new' }, requests: [] });
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+
+    expect(report.deleted).toHaveLength(1);
+    expect(report.deleted[0]!.uuid).toBe('sub-old');
+    expect(report.created).toHaveLength(1);
+    expect(methods.some((m) => m.startsWith('DELETE ') && m.includes('/v2/webhooks/sub-old'))).toBe(true);
+  });
+
+  it('ЧУЖАЯ подписка (другой path) НЕ удаляется — мультитенантная осторожность', async () => {
+    const methods: string[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      methods.push(method);
+      if (method === 'GET') {
+        return jsonResponse([
+          { uuid: 'sub-foreign', type: 'ORDER_STATUS', url: 'https://other-system.example/hooks/cdek' },
+        ]);
+      }
+      if (method === 'DELETE') throw new Error('чужую подписку удалять нельзя');
+      return jsonResponse({ entity: { uuid: 'sub-ours' }, requests: [] });
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+
+    expect(report.deleted).toEqual([]);
+    expect(report.created).toHaveLength(1);
+    expect(report.errors).toEqual([]);
+    expect(methods).not.toContain('DELETE');
+  });
+
+  it('эквивалентный URL с другим порядком query-параметров → kept (нормализация сравнения)', async () => {
+    // СДЭК может вернуть URL в нормализованном виде — «наша» подписка не должна
+    // пересоздаваться на каждом запуске.
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') {
+        return jsonResponse([
+          { uuid: 'sub-eq', type: 'ORDER_STATUS', url: `${BASE}${CDEK_WEBHOOK_PATH}/?key=whsec` },
+        ]);
+      }
+      throw new Error(`неожиданный ${method}`);
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+    expect(report.kept).toHaveLength(1);
+    expect(report.deleted).toEqual([]);
+    expect(report.created).toEqual([]);
+  });
+
+  it('POST вернул requests[].state INVALID с errors[] → errors в отчёте, created пуст', async () => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return jsonResponse([]);
+      return jsonResponse({
+        requests: [
+          { state: 'INVALID', errors: [{ code: 'v2_webhook_type_incorrect', message: 'bad type' }] },
+        ],
+      });
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+    expect(report.created).toEqual([]);
+    expect(report.errors.length).toBeGreaterThan(0);
+    expect(report.errors.join(' ')).toContain('v2_webhook_type_incorrect');
+  });
+
+  it('секрет из URL в сообщении ошибки СДЭК маскируется в report.errors (аудит #4)', async () => {
+    // СДЭК на POST /v2/webhooks отражает присланный url (с ?key=<секрет>) в тексте
+    // ошибки валидации. report.errors пишется в audit_log и показывается оператору —
+    // секрет утекать не должен.
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return jsonResponse([]);
+      return jsonResponse({
+        requests: [
+          {
+            state: 'INVALID',
+            errors: [{ code: 'v2_webhook_url_incorrect', message: `bad url: ${TARGET}` }],
+          },
+        ],
+      });
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+    expect(report.errors.length).toBeGreaterThan(0);
+    const joined = report.errors.join(' ');
+    expect(joined).not.toContain('whsec'); // секрет НЕ утёк
+    expect(joined).toContain('key=***'); // замаскирован
+  });
+
+  it('GET /v2/webhooks упал (HTTP 500 после ретраев) → errors, POST не пробуем', async () => {
+    let postCalled = false;
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return jsonResponse({ errors: [{ code: 'boom', message: 'x' }] }, 500);
+      postCalled = true;
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: liveCfg, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+    expect(report.errors.length).toBeGreaterThan(0);
+    expect(postCalled).toBe(false);
+  });
+
+  it('без секрета, но с IP-whitelist → подписка создаётся на URL без ?key=', async () => {
+    const cfgIpOnly = getCdekConfig({
+      NODE_ENV: 'test',
+      CDEK_ACCOUNT: 'acc',
+      CDEK_SECRET: 'sec',
+      CDEK_BASE_URL: 'https://api.edu.cdek.ru',
+      CDEK_WEBHOOK_IPS: '203.0.113.0/24',
+      CDEK_WEBHOOK_TRUST_PROXY: 'true',
+    });
+    let postedUrl: string | null = null;
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return jsonResponse([]);
+      postedUrl = (JSON.parse(String(init?.body)) as { url: string }).url;
+      return jsonResponse({ entity: { uuid: 'sub-ip' }, requests: [] });
+    }) as unknown as typeof fetch;
+
+    const report = await ensureWebhookSubscription({
+      manager: new CdekManager({ config: cfgIpOnly, fetchImpl, tokenCache }),
+      resolveBaseUrl: async () => BASE,
+    });
+    expect(report.created).toHaveLength(1);
+    expect(postedUrl).toBe(`${BASE}${CDEK_WEBHOOK_PATH}`);
   });
 });

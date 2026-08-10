@@ -19,7 +19,7 @@
  * mock-данные живут отдельным слоем lib/payments/tbank/mock/*.
  */
 
-import { getTbankConfig, type TbankConfig } from './config';
+import { getTbankConfig, resolveTbankMock, type TbankConfig } from './config';
 import { TbankClient, type ITbankClient } from './client';
 import { TbankError } from './errors';
 import * as mock from './mock';
@@ -49,9 +49,16 @@ export class TbankManager {
     this.fetchImpl = opts.fetchImpl;
   }
 
-  /** true при пустых TBANK_TERMINAL_KEY/TBANK_PASSWORD (mock-режим, docs/15 §2.1). */
+  /**
+   * true при пустых TBANK_TERMINAL_KEY/TBANK_PASSWORD (mock-режим, docs/15 §2.1).
+   *
+   * Считается ЧЕРЕЗ resolveTbankMock, а не собственной формулой: именно этот
+   * геттер спрашивает боевой путь оплаты, и пока он вычислял признак сам,
+   * fail-closed-защита в isTbankMock() на нём не срабатывала вовсе. В production
+   * без ключей бросает (см. TBANK_MOCK_IN_PRODUCTION_ERROR).
+   */
   get isMock(): boolean {
-    return !this.config.terminalKey || !this.config.password;
+    return resolveTbankMock(this.config);
   }
 
   /**

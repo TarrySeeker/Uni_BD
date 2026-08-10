@@ -36,6 +36,25 @@
 		Referrer-Policy "strict-origin-when-cross-origin"
 		# Убираем заголовок, раскрывающий сервер
 		-Server
+		# Content-Security-Policy — ВТОРОЙ рубеж против XSS (аудит 2026-07-30).
+		#
+		# Зачем: 29.07 в плитках категорий нашли stored XSS — адрес картинки
+		# подставлялся в разметку без экранирования. Дыру закрыли на входе и на
+		# выводе, но CSP не было вовсе: сработай такая инъекция ещё где-то, у
+		# браузера не осталось бы ни одного рубежа. Экранирование — защита №1,
+		# CSP — страховка на случай, когда №1 где-то забыли.
+		#
+		# Состав политики продиктован тем, что реально нужно витрине:
+		#   script-src  'unsafe-inline' — в colors.html есть inline-<script>,
+		#               а в разметке 15 инлайновых обработчиков/стилей; убрать их
+		#               значит переписывать витрину, это отдельная задача;
+		#   style-src   инлайновые style="" + шрифты Google;
+		#   img-src     data: (SVG-плейсхолдеры генерируются в JS) + https:
+		#               (медиа отдаёт поддомен admin.);
+		#   connect-src API админки — витрина ходит на другой поддомен;
+		#   frame-ancestors 'none' — дублирует X-Frame-Options современным способом;
+		#   object-src  'none' — <object>/<embed> витрине не нужны никогда.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://admin.{$SHOP_DOMAIN} https://{$SHOP_DOMAIN}; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
 	}
 }
 
@@ -61,7 +80,15 @@ www.{$SHOP_DOMAIN} {
 {$SHOP_DOMAIN} {
 	import security_headers
 	import json_log
-	reverse_proxy storefront:3000
+	reverse_proxy storefront:3000 {
+		# SECURITY: перезаписываем X-Real-IP адресом реального соединения.
+		# Клиент подделать его не может, в отличие от левого сегмента
+		# X-Forwarded-For (прокси лишь дописывает свой адрес справа, присланное
+		# сохраняет). Приложение доверяет именно X-Real-IP —
+		# см. lib/server/request-ip.ts. От этого зависят ключ лимита попыток
+		# входа и достоверность IP в журнале аудита.
+		header_up X-Real-IP {http.request.remote.host}
+	}
 }
 
 # -----------------------------------------------------------------------------
@@ -86,7 +113,12 @@ www.{$SHOP_DOMAIN} {
 
 	# Всё остальное (админка /admin, API /api/*) — в приложение Admik.
 	handle {
-		reverse_proxy app:3000
+		reverse_proxy app:3000 {
+			# SECURITY: доверенный X-Real-IP (обоснование — у витрины выше).
+			# Здесь это особенно важно: через этот хост идут вход в админку и
+			# публичный API, где IP служит ключом ограничения частоты запросов.
+			header_up X-Real-IP {http.request.remote.host}
+		}
 	}
 }
 
@@ -97,5 +129,9 @@ www.{$SHOP_DOMAIN} {
 # -----------------------------------------------------------------------------
 :80 {
 	import security_headers
-	reverse_proxy storefront:3000
+	reverse_proxy storefront:3000 {
+		# SECURITY: тот же доверенный X-Real-IP, что и на доменных блоках —
+		# иначе локальный/IP-доступ остался бы лазейкой с подделываемым адресом.
+		header_up X-Real-IP {http.request.remote.host}
+	}
 }

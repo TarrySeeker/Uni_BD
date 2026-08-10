@@ -4,6 +4,7 @@ import { getTbankConfig } from '@/lib/payments/tbank/config';
 import { PaymentService } from '@/lib/payments/tbank/service';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { logger } from '@/lib/logger';
+import { extractWebhookIp } from '@/lib/server/request-ip';
 
 /** Структурный логгер webhook Т-Банк (docs/15 §7, порт cdek.webhook). */
 const log = logger.child({ module: 'tbank.webhook' });
@@ -55,14 +56,10 @@ function ok(): NextResponse {
  * первичная защита webhook — проверка Token в теле (см. JSDoc роута).
  */
 function extractIp(req: NextRequest, trustProxy: boolean): string {
-  if (!trustProxy) return '';
-  const fwd = req.headers.get('x-forwarded-for');
-  if (fwd) {
-    const first = fwd.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  const real = req.headers.get('x-real-ip')?.trim();
-  return real ?? '';
+  // Делегируем в ЕДИНСТВЕННУЮ реализацию (см. lib/server/request-ip.ts):
+  // локальная копия доверяла подделываемому X-Forwarded-For первым и не
+  // проверяла формат — этим обходился IP-whitelist платёжного вебхука.
+  return extractWebhookIp(req.headers, trustProxy);
 }
 
 /** Проверка IP по whitelist (CIDR/точные). Пустой whitelist → пропуск (главная защита — Token). */

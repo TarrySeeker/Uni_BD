@@ -8,6 +8,7 @@ import { formatDateTime } from '@/lib/admin/order-format';
 import { Forbidden } from '../_components/Forbidden';
 import { PageHeader } from '../_components/PageHeader';
 import { guardCdek } from './_components/guard';
+import { WebhookSubscriptionCard } from './_components/WebhookSubscriptionCard';
 
 /**
  * Раздел «Доставка (СДЭК)» админки — сводка отправлений по всем заказам.
@@ -151,6 +152,8 @@ export default async function CdekPage({
           </div>
         }
       />
+
+      <WebhookSubscriptionCard isMock={isCdekMock()} />
 
       <form method="get" className="mt-4 flex gap-2">
         <input

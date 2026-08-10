@@ -34,7 +34,27 @@ export interface TbankConfig {
   webhookTrustProxy: boolean;
 
   redirectDueMin: number;
+
+  /**
+   * Разрешён ли mock-режим. Вне production — всегда; в production — только при
+   * явном `TBANK_ALLOW_MOCK=true` (легальный демо-стенд).
+   *
+   * Признак едет В КОНФИГЕ, а не читается из `process.env` по месту: иначе
+   * любой потребитель мог бы принять решение самостоятельно и обойти защиту,
+   * а инжектированный в тестах конфиг вёл бы себя не так, как боевой.
+   */
+  mockAllowed: boolean;
 }
+
+/**
+ * Текст ошибки fail-closed. Вынесен, чтобы совпадал во всех местах проверки:
+ * его читает администратор на проде, и он обязан объяснять и причину, и починку.
+ */
+export const TBANK_MOCK_IN_PRODUCTION_ERROR =
+  'Платёжный модуль в production без боевых ключей ' +
+  '(TBANK_TERMINAL_KEY/TBANK_PASSWORD): mock-режим в проде запрещён — иначе ' +
+  'заказы помечаются «оплаченными» без реального списания. Задайте боевые ключи ' +
+  'ИЛИ явно разрешите демо-режим флагом TBANK_ALLOW_MOCK=true.';
 
 /** Парсит csv строк (IP/CIDR) → массив без пустых (порт parseCsvStrings СДЭК). */
 export function parseCsvStrings(raw: string | undefined): string[] {
@@ -53,10 +73,31 @@ function nonEmpty(v: string | undefined): string | null {
  * MOCK-режим (ключевая функция модуля): true, если не заданы боевые ключи
  * TBANK_TERMINAL_KEY/TBANK_PASSWORD. Принимает опциональный source для юнит-тестов
  * без мутации process.env (порт isCdekMock).
+ *
+ * FAIL-CLOSED в production: в mock оплата не ходит в банк, а фоновая доводка
+ * платежей помечает заказ `paid`. Потерянный (или не проброшенный в контейнер)
+ * TBANK_PASSWORD на боевом сервере молча превращал магазин в раздачу товара.
+ * Поэтому прод без ключей БРОСАЕТ, если демо не разрешён явным TBANK_ALLOW_MOCK.
  */
 export function isTbankMock(source?: Record<string, string | undefined>): boolean {
-  const env = getEnv(source ?? process.env);
-  return !nonEmpty(env.TBANK_TERMINAL_KEY) || !nonEmpty(env.TBANK_PASSWORD);
+  return resolveTbankMock(getTbankConfig(source));
+}
+
+/**
+ * ЕДИНСТВЕННОЕ место, где решается «mock или банк» (fail-closed).
+ *
+ * Почему единственное: боевой путь оплаты спрашивает `TbankManager.isMock`, а не
+ * `isTbankMock()`. Пока эти ветки считали признак каждая по-своему, защита,
+ * поставленная в одной из них, на боевом пути просто не срабатывала. Теперь обе
+ * приходят сюда — это тот класс дефекта, где «поправили в одной функции» не
+ * значит «поправили».
+ */
+export function resolveTbankMock(config: TbankConfig): boolean {
+  const mock = !config.terminalKey || !config.password;
+  if (mock && !config.mockAllowed) {
+    throw new Error(TBANK_MOCK_IN_PRODUCTION_ERROR);
+  }
+  return mock;
 }
 
 /**
@@ -84,5 +125,9 @@ export function getTbankConfig(source?: Record<string, string | undefined>): Tba
     webhookTrustProxy: env.TBANK_WEBHOOK_TRUST_PROXY,
 
     redirectDueMin: env.TBANK_REDIRECT_DUE_MIN,
+
+    // Вне production mock свободен (иначе онбординг без боевых ключей
+    // невозможен); в production — только явным opt-in.
+    mockAllowed: env.NODE_ENV !== 'production' || env.TBANK_ALLOW_MOCK,
   };
 }

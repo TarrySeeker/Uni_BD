@@ -245,21 +245,47 @@ export class CdekClient implements ICdekClient {
   }
 }
 
-/** Достаёт structured errors[] из тела ответа СДЭК (поле `errors`). */
-function extractCdekErrors(decoded: unknown): CdekApiError[] {
-  if (
-    decoded &&
-    typeof decoded === 'object' &&
-    'errors' in decoded &&
-    Array.isArray((decoded as { errors: unknown }).errors)
-  ) {
-    const raw = (decoded as { errors: unknown[] }).errors;
-    return raw
-      .filter((e): e is Record<string, unknown> => !!e && typeof e === 'object')
-      .map((e) => ({
-        code: typeof e.code === 'string' ? e.code : 'unknown',
-        message: typeof e.message === 'string' ? e.message : '',
-      }));
+/** Складывает элементы одного errors[]-массива в аккумулятор, отсеивая дубли. */
+function collectErrors(arr: unknown, acc: CdekApiError[], seen: Set<string>): void {
+  if (!Array.isArray(arr)) return;
+  for (const e of arr) {
+    if (!e || typeof e !== 'object') continue;
+    const rec = e as Record<string, unknown>;
+    const code = typeof rec.code === 'string' ? rec.code : 'unknown';
+    const message = typeof rec.message === 'string' ? rec.message : '';
+    const key = `${code} ${message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    acc.push({ code, message });
   }
-  return [];
+}
+
+/**
+ * Достаёт structured errors[] из тела ответа СДЭК — из КОРНЯ и из `requests[]`.
+ *
+ * Почему двух мест мало не бывает: СДЭК на асинхронных методах отвечает
+ * HTTP 200, а сам отказ кладёт в `requests[].state = INVALID` + `requests[].errors[]`
+ * (так ведёт себя POST /v2/webhooks). Читая только корневой `errors`, вызывающий
+ * принимал отказ за успех — на живом контуре это выглядело как «подписка создана»
+ * при фактически несозданной подписке. Дубли (одна ошибка в корне и в requests)
+ * схлопываются по паре code+message.
+ *
+ * Экспортируется: проверить HTTP-статус недостаточно, вызывающему нужно самому
+ * заглянуть в тело ответа.
+ */
+export function extractCdekErrors(decoded: unknown): CdekApiError[] {
+  const acc: CdekApiError[] = [];
+  const seen = new Set<string>();
+  if (decoded && typeof decoded === 'object') {
+    const rec = decoded as Record<string, unknown>;
+    collectErrors(rec.errors, acc, seen);
+    if (Array.isArray(rec.requests)) {
+      for (const req of rec.requests) {
+        if (req && typeof req === 'object') {
+          collectErrors((req as Record<string, unknown>).errors, acc, seen);
+        }
+      }
+    }
+  }
+  return acc;
 }
