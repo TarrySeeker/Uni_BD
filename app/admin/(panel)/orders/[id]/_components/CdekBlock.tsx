@@ -85,7 +85,7 @@ export function CdekBlock({
   async function run(
     label: string,
     fn: () => Promise<ActionResult<unknown>>,
-    opts: { confirm?: string; openUrl?: boolean } = {},
+    opts: { confirm?: string; openUrl?: boolean; kind?: 'waybill' | 'barcode' } = {},
   ) {
     if (opts.confirm && !window.confirm(opts.confirm)) return;
     setPending(true);
@@ -107,7 +107,20 @@ export function CdekBlock({
           url,
         });
         if (outcome.open && url) {
-          window.open(url, '_blank', 'noopener');
+          /**
+           * 🔴 Открываем НЕ прямой URL СДЭК, а свой прокси-роут.
+           * PDF по ссылке api.cdek.ru требует `Authorization: Bearer <token>`;
+           * переход по ней из вкладки идёт БЕЗ заголовка → СДЭК отвечает 401, и
+           * оператор видит пустую страницу вместо накладной (боевая проверка
+           * carre 2026-08-29: без токена 401, с токеном — PDF 91 КБ).
+           * Роут /api/cdek/label/<orderId> сам ходит в СДЭК с токеном под
+           * правом cdek.manage и отдаёт PDF в браузер.
+           */
+          window.open(
+            `/api/cdek/label/${orderId}?kind=${opts.kind ?? 'waybill'}`,
+            '_blank',
+            'noopener',
+          );
         }
         setSuccess(outcome.message);
       } else {
@@ -235,7 +248,7 @@ export function CdekBlock({
                     run(
                       'Печать накладной',
                       () => getCdekLabelAction({ orderId, kind: 'waybill' }),
-                      { openUrl: true },
+                      { openUrl: true, kind: 'waybill' },
                     )
                   }
                   className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
@@ -249,7 +262,7 @@ export function CdekBlock({
                     run(
                       'Печать ШК',
                       () => getCdekLabelAction({ orderId, kind: 'barcode' }),
-                      { openUrl: true },
+                      { openUrl: true, kind: 'barcode' },
                     )
                   }
                   className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"

@@ -18,8 +18,30 @@ import { getShipmentByOrderId, updateShipmentByOrderId } from '../repository';
 export type PrintFormat = 'A4' | 'A5' | 'A6';
 
 interface PrintEntityRaw {
-  entity?: { uuid?: string };
+  /**
+   * 🔴 URL готового PDF СДЭК отдаёт ВНУТРИ entity, а не на верхнем уровне
+   * (проверено живым вызовом 2026-08-29):
+   *   { "entity": { "uuid": "...", "url": "https://api.cdek.ru/v2/print/orders/<uuid>.pdf",
+   *                 "statuses": [ ... {"code":"READY"} ] }, "requests": [...] }
+   * Раньше здесь читалось только `raw.url` (поле верхнего уровня, которого в
+   * ответе НЕТ) → опрос всегда возвращал null, и печать ВСЕГДА падала с
+   * «PDF печати ещё не готов», даже когда СДЭК уже отдал статус READY.
+   */
+  entity?: { uuid?: string; url?: string; statuses?: Array<{ code?: string }> };
+  /** Верхний уровень — на случай иного формата ответа (обратная совместимость). */
   url?: string;
+}
+
+/**
+ * Достаёт URL готового PDF из ответа СДЭК: сначала `entity.url` (реальный
+ * формат), затем `url` верхнего уровня — на случай иного формата ответа.
+ */
+function extractPrintUrl(raw: PrintEntityRaw | null | undefined): string | null {
+  const fromEntity = raw?.entity?.url;
+  if (typeof fromEntity === 'string' && fromEntity.length > 0) return fromEntity;
+  const fromTop = raw?.url;
+  if (typeof fromTop === 'string' && fromTop.length > 0) return fromTop;
+  return null;
 }
 
 /** Пауза между опросами URL печати (мс). */
@@ -49,7 +71,7 @@ export class PrintService {
       'GET',
       `/v2/print/orders/${printUuid}`,
     );
-    return typeof raw?.url === 'string' ? raw.url : null;
+    return extractPrintUrl(raw);
   }
 
   /** Запрос задачи на ШК (POST /v2/print/barcodes) → printUuid. */
@@ -68,7 +90,7 @@ export class PrintService {
       'GET',
       `/v2/print/barcodes/${printUuid}`,
     );
-    return typeof raw?.url === 'string' ? raw.url : null;
+    return extractPrintUrl(raw);
   }
 
   /** Опрос URL с короткой ре-попыткой (URL готов не мгновенно). */
