@@ -5,7 +5,8 @@
  *   POST|GET /api/cron/payments/<task>?key=<CRON_SECRET>
  *   либо заголовок X-Cron-Secret: <CRON_SECRET>
  *
- * <task> ∈ { reconcile-pending } — сверка статуса оплаты по «зависшим» tbank-заказам.
+ * <task> ∈ { reconcile-pending, ozon-reconcile-pending } — сверка статуса оплаты
+ * по «зависшим» заказам (Т-Банк и Ozon соответственно).
  *
  * Защита (как /api/cron/cdek):
  *   • cron-секрет не задан → 503 (роут выключен, не работаем открытым);
@@ -21,17 +22,22 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getCdekConfig } from '@/lib/cdek/config';
 import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { runReconcilePending } from '@/lib/payments/tbank/cron';
+import { runOzonReconcilePending } from '@/lib/payments/ozon/cron';
 import { extractCronSecret, cronSecretMatches } from '@/lib/cron/secret';
 
 export const dynamic = 'force-dynamic';
 
-const TASKS = ['reconcile-pending'] as const;
+const TASKS = ['reconcile-pending', 'ozon-reconcile-pending'] as const;
 type CronTask = (typeof TASKS)[number];
 
 async function dispatch(task: CronTask): Promise<unknown> {
   switch (task) {
     case 'reconcile-pending':
       return runReconcilePending();
+    // Сверка платежей Ozon: доводит статус заказов, по которым уведомление
+    // банка не дошло (иначе оплаченный заказ навсегда остался бы в pending).
+    case 'ozon-reconcile-pending':
+      return runOzonReconcilePending();
   }
 }
 
