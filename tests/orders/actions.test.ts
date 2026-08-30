@@ -1284,23 +1284,57 @@ describe('refundOrder: шлюзовой возврат Т-Банка', () => {
     expect(writeAuditSpy).not.toHaveBeenCalled();
   });
 
-  it('COD/manual (provider!=tbank): refundPayment вернул skipped → переход всё равно идёт', async () => {
-    refundPaymentMock.mockResolvedValueOnce({
-      ok: true,
-      status: null,
-      isMock: true,
-      skipped: true,
-      reason: 'no_gateway',
-    });
+  /**
+   * 🔴 РЕГРЕСС БОЕВОГО КЛАССА: возврат для заказа, оплаченного НЕ Т-Банком.
+   *
+   * Раньше `lib/orders/actions` импортировал Т-Банк напрямую, и его
+   * `refundPayment` первым делом сверял `paymentProvider !== 'tbank'` → молча
+   * отвечал «возврат не требуется» ПРИ РЕАЛЬНО СПИСАННЫХ ДЕНЬГАХ. То есть у
+   * магазина на любом другом эквайринге кнопка возврата в админке не работала,
+   * не сообщая об этом ни оператору, ни в аудит.
+   *
+   * Теперь провайдер выбирается по `orders.payment_provider`, поэтому заказ,
+   * оплаченный другим банком, уходит СВОЕМУ эквайеру.
+   */
+  it('заказ оплачен другим эквайером: возврат идёт ЕГО провайдером, а не Т-Банком', async () => {
+    H.state.getOrderByIdQueue = [
+      orderDetail({
+        status: 'paid',
+        paymentStatus: 'paid',
+        paymentProvider: 'ozon',
+        paymentRef: 'ozon-pay-1',
+        grandTotal: '700.00',
+      }),
+      orderDetail({ status: 'refunded', paymentStatus: 'refunded', paymentProvider: 'ozon' }),
+    ];
+    const res = await refundOrder({ id: UUID });
+    expect(res.ok, JSON.stringify(res)).toBe(true);
+    // Т-Банк к чужому заказу НЕ ПРИКАСАЕТСЯ (мок стоит именно на нём).
+    expect(refundPaymentMock).not.toHaveBeenCalled();
+    // Внутренний сетл отработал: резерв освобождён, заказ возвращён.
+    expect(releaseReservationMock).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Заказ БЕЗ шлюза (наличные / оплата по счёту, `payment_provider = null`).
+   *
+   * После перехода на реестр провайдеров шлюз здесь не дёргается ВООБЩЕ:
+   * getProviderForOrder(null) возвращает null, и возврат сразу считается
+   * пропущенным. Раньше вызывался Т-Банк, который сам отвечал skipped —
+   * лишний вызов чужого эквайера при отмене «наличного» заказа.
+   *
+   * Суть проверки прежняя и главная: отмена такого заказа НЕ БЛОКИРУЕТСЯ, а
+   * внутренний сетл отрабатывает (резерв paid→refunded освобождён).
+   */
+  it('заказ без шлюза (provider=null): эквайер не дёргается, переход всё равно идёт', async () => {
     H.state.getOrderByIdQueue = [
       orderDetail({ status: 'paid', paymentStatus: 'pending', paymentProvider: null, grandTotal: '500.00' }),
       orderDetail({ status: 'refunded', paymentStatus: 'pending', paymentProvider: null }),
     ];
     const res = await refundOrder({ id: UUID });
     expect(res.ok).toBe(true);
-    expect(refundPaymentMock).toHaveBeenCalledTimes(1);
-    const arg = refundPaymentMock.mock.calls[0]![0] as Record<string, unknown>;
-    expect(arg.paymentProvider).toBeNull();
+    // Шлюза у заказа нет — обращаться к эквайеру незачем.
+    expect(refundPaymentMock).not.toHaveBeenCalled();
     // Внутренний сетл всё равно отработал: резерв paid→refunded освобождён.
     expect(releaseReservationMock).toHaveBeenCalledTimes(1);
   });

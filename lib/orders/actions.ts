@@ -29,7 +29,8 @@ import { canTransition, paymentStatusOnSettle } from './status';
 import { settleRefundEffectsTx } from './refund-settle';
 import { OrderError } from './errors';
 import type { Order, OrderItem, PromoCode } from './types';
-import { PaymentService, toKopecks } from '@/lib/payments/tbank';
+import { toKopecks } from '@/lib/payments/tbank';
+import { getProviderForOrder } from '@/lib/payments/registry';
 
 /**
  * Server Actions админки модуля orders (docs/07 §4.1).
@@ -428,14 +429,27 @@ export const refundOrder = defineAction({
     // сетла нет). Суммы — СЕРВЕРНЫЕ (копейки из grand_total, anti-tamper). Для
     // COD/manual (provider!=='tbank') вернёт skipped, и внутренний сетл всё равно
     // отработает.
-    const refundRes = await new PaymentService().refundPayment({
-      orderId: cur.order.id,
-      orderNumber: cur.order.number,
-      paymentStatus: cur.order.paymentStatus,
-      paymentProvider: cur.order.paymentProvider ?? null,
-      paymentRef: cur.order.paymentRef,
-      amountKop: toKopecks(cur.order.grandTotal),
-    });
+    /**
+     * 🔴 Возврат идёт ТЕМ провайдером, который ПРИНЯЛ платёж
+     * (`orders.payment_provider`), а не активным эквайером магазина: эквайера
+     * могли сменить уже после оплаты. Раньше здесь был жёстко зашит Т-Банк,
+     * поэтому у магазина на другом эквайринге возврат молча отвечал «не
+     * требуется» при реально списанных деньгах.
+     *
+     * Заказ без провайдера (наличные/оплата по счёту) — возвращать через шлюз
+     * нечего: `skipped`, внутренний сетл ниже отработает как прежде.
+     */
+    const provider = getProviderForOrder(cur.order.paymentProvider ?? null);
+    const refundRes = provider
+      ? await provider.refundPayment({
+          orderId: cur.order.id,
+          orderNumber: cur.order.number,
+          paymentStatus: cur.order.paymentStatus,
+          paymentProvider: cur.order.paymentProvider ?? null,
+          paymentRef: cur.order.paymentRef,
+          amountKop: toKopecks(cur.order.grandTotal),
+        })
+      : { ok: true, skipped: true, status: null, isMock: false, reason: 'no_gateway' };
 
     // Деньги НЕ вернулись (шлюз отказал) → НЕ помечаем заказ refunded (не врём про
     // возврат): переход не выполняется, оператор повторит позже.
