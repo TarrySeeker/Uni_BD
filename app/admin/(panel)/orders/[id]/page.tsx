@@ -34,6 +34,7 @@ import {
   type CdekShipmentView,
   type CdekStatusLogView,
 } from './_components/CdekBlock';
+import { describeSnapshot } from '@/lib/personalization/schemas';
 
 /**
  * Карточка заказа админки (docs/07 §5, Пакет 3.E).
@@ -211,6 +212,11 @@ export default async function OrderDetailPage({
                 <tbody className="divide-y divide-gray-100">
                   {items.map((item) => {
                     const attrs = Object.entries(item.attributesSnapshot);
+                    // Персонализация читается ИЗ СНИМКА заказа, а не из карточки
+                    // товара: подписи и словарь вариантов сняты вместе со
+                    // значениями, поэтому строка остаётся читаемой и после
+                    // правки или удаления товара (0034, ADR-010).
+                    const personalization = describeSnapshot(item.personalization);
                     return (
                       <tr key={item.id}>
                         <td className="px-4 py-2">
@@ -226,6 +232,22 @@ export default async function OrderDetailPage({
                             <div className="text-xs text-gray-400">
                               {attrs.map(([k, v]) => `${k}: ${String(v)}`).join(', ')}
                             </div>
+                          ) : null}
+                          {/*
+                            Что нанести — это содержание работы, а не примечание:
+                            по этим строкам заказ уходит в производство. Поэтому
+                            обычный текст рядом с названием, а не мелкий серый
+                            хвост, как у характеристик.
+                          */}
+                          {personalization.length > 0 ? (
+                            <dl className="mt-2 space-y-0.5 border-l-2 border-gray-300 pl-3 text-sm">
+                              {personalization.map((row) => (
+                                <div key={row.label} className="flex gap-2">
+                                  <dt className="text-gray-500">{row.label}:</dt>
+                                  <dd className="font-medium text-gray-900">{row.value}</dd>
+                                </div>
+                              ))}
+                            </dl>
                           ) : null}
                         </td>
                         <td className="px-4 py-2 text-gray-600">

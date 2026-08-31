@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { isOnlinePaymentMethod, ONLINE_PAYMENT_METHODS } from '@/lib/orders/repository';
-import type { CreateOrderInput } from '@/lib/orders/schemas';
+import type { ManualOrderInput } from '@/lib/orders/schemas';
 
 /**
  * Баг #33 (аудит тупиков): онлайн-оплата (card/sbp = инициация Т-Банк) при
@@ -68,7 +68,7 @@ describe('orders/repository — cdek_pay НЕ блокируется выклю�
   });
 });
 
-const ONLINE_INPUT: CreateOrderInput = {
+const ONLINE_INPUT: ManualOrderInput = {
   items: [{ variantId: '11111111-1111-4111-8111-111111111111', qty: 1 }],
   customer: { name: 'Иван', email: 'ivan@example.com', phone: '+79990000000' },
   delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },

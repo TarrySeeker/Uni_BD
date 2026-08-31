@@ -46,25 +46,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
 # -----------------------------------------------------------------------------
-# Этап sharp — нативный libvips под ЦЕЛЕВУЮ платформу (musl/x64) для рантайма
-# -----------------------------------------------------------------------------
-# Зачем: standalone-трассировка Next.js (nft) приносит нативный .node sharp, но НЕ
-# тянет dlopen-загружаемый libvips (@img/sharp-libvips-linuxmusl-x64@1.3.0 с
-# libvips-cpp.so.8.18.3) — в рантайме обработка изображений падает
-# ERR_DLOPEN_FAILED, из-за чего весь модуль lib/storage/image (и экшены каталога)
-# не загружается. Externalize sharp при этом РАБОТАЕТ (хеш-внешний резолвится в
-# пакет); не хватает только .so. Ставим sharp чисто под платформу, чтобы получить
-# КОРРЕКТНЫЙ libvips, и подкладываем его на путь загрузчика (LD_LIBRARY_PATH).
-# Версию берём из package.json приложения (синхронно, без хардкода).
-FROM node:20-alpine AS sharp
-WORKDIR /sharp
-COPY package.json /tmp/app-package.json
-RUN SHARP_VER=$(node -p "require('/tmp/app-package.json').dependencies.sharp") \
- && npm init -y >/dev/null 2>&1 \
- && npm install --no-audit --no-fund --include=optional \
-      --os=linux --libc=musl --cpu=x64 "sharp@${SHARP_VER}"
-
-# -----------------------------------------------------------------------------
 # Этап runner — финальный минимальный образ
 # -----------------------------------------------------------------------------
 FROM node:20-alpine AS runner
@@ -102,11 +83,23 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 # 'postgres' в node_modules надёжно (даже как serverExternalPackages) — копируем
 # реальные файлы пакета из pnpm-стора (postgres.js zero-deps). Версия — из лок-файла.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.pnpm/postgres@*/node_modules/postgres ./node_modules/postgres
-# Нативный libvips для sharp (см. стадию `sharp`): кладём lib/ пакета
-# @img/sharp-libvips-linuxmusl-x64 (содержит libvips-cpp.so.8.18.3) и добавляем его
-# в LD_LIBRARY_PATH, чтобы dlopen из sharp .node нашёл библиотеку. Это закрывает
-# ERR_DLOPEN_FAILED без вмешательства в externalize/символические ссылки standalone.
-COPY --from=sharp --chown=nextjs:nodejs /sharp/node_modules/@img/sharp-libvips-linuxmusl-x64/lib /app/sharp-libvips/lib
+# Нативный libvips для sharp: кладём lib/ пакета @img/sharp-libvips-linuxmusl-x64
+# и добавляем его в LD_LIBRARY_PATH, чтобы dlopen из sharp .node нашёл библиотеку.
+# Это закрывает ERR_DLOPEN_FAILED без вмешательства в externalize/символические
+# ссылки standalone.
+#
+# ⚠️ Берём библиотеку ИЗ СТАДИИ `deps` — из той же установки pnpm, которая дала
+# нативный .node. Раньше здесь была отдельная стадия `sharp` с `npm install
+# sharp@<диапазон из package.json>`: она резолвила libvips НЕЗАВИСИМО от
+# лок-файла и в какой-то момент принесла `libvips-cpp.so.8.18.6`, тогда как
+# `@img/sharp-linuxmusl-x64@0.35.1` из лока ищет `8.18.3`. Образ собирался
+# зелёным, а в рантайме падал ERR_DLOPEN_FAILED: не открывались настройки
+# магазина и экшены каталога. Дефект «прилетал» сам, от свежего релиза libvips.
+#
+# Шаблон `@*` намеренно захватывает ВСЕ установленные версии musl-libvips: в
+# дереве их бывает несколько (разные sharp у разных зависимостей), имена .so у
+# них различаются, и слияние каталогов даёт загрузчику сразу все варианты.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.pnpm/@img+sharp-libvips-linuxmusl-x64@*/node_modules/@img/sharp-libvips-linuxmusl-x64/lib /app/sharp-libvips/lib
 ENV LD_LIBRARY_PATH=/app/sharp-libvips/lib
 # Скрипты развёртывания и SQL-миграции/seed — НЕ входят в standalone-трассировку
 # Next.js, поэтому копируются явно (нужны init-shop.sh внутри контейнера app).

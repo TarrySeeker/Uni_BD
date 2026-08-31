@@ -129,6 +129,7 @@ function makeItem(over: Partial<OrderItem> = {}): OrderItem {
     nameSnapshot: 'Чехол',
     skuSnapshot: 'SKU1',
     attributesSnapshot: {},
+    personalization: {},
     unitPrice: '500.00',
     compareAtSnapshot: null,
     quantity: 2,

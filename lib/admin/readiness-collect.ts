@@ -18,6 +18,27 @@ import { getEffectiveSettings, isModuleEffectivelyEnabled } from '@/lib/config/s
 import { isCdekMock } from '@/lib/cdek/config';
 import { isTbankMock } from '@/lib/payments/tbank/config';
 
+/**
+ * Признак «оплата эмулируется» для раздела готовности.
+ *
+ * `isTbankMock()` в production НАМЕРЕННО бросает, когда ключи терминала пусты:
+ * fail-closed на боевом пути оплаты правилен — иначе заказ пометится
+ * оплаченным без списания. Но здесь это привело к тому, что раздел
+ * «Готовность магазина» падал с 500 ровно на той конфигурации, о которой был
+ * обязан предупредить: владелец видел белый экран вместо строки «ключи не
+ * заданы» и не понимал, что чинить.
+ *
+ * Диагностика не имеет права падать от того, что диагностирует. Исключение
+ * здесь означает ровно одно — боевых ключей нет, то есть оплата эмулируется.
+ */
+function paymentsMockSafe(): boolean {
+  try {
+    return isTbankMock();
+  } catch {
+    return true;
+  }
+}
+
 import type { ReadinessInput } from './readiness';
 
 /** Безопасный COUNT: любая ошибка → null («не смогли посчитать»), не 0. */
@@ -135,7 +156,7 @@ export async function collectReadinessInput(): Promise<ReadinessInput> {
     integrations: {
       cdekMock: isCdekMock(),
       cdekCronSecretSet: Boolean(env.CDEK_CRON_SECRET && env.CDEK_CRON_SECRET.length > 0),
-      paymentsMock: isTbankMock(),
+      paymentsMock: paymentsMockSafe(),
       storageConfigured: Boolean(env.S3_ENDPOINT && env.S3_BUCKET),
       // Тот же минимум, что и в самом почтовом модуле: без адреса отправителя
       // письмо не примет ни один сервер, поэтому половина настройки не считается.

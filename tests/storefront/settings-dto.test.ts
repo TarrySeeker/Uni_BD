@@ -57,6 +57,25 @@ function makeEffective(): EffectiveSettings {
   };
 }
 
+describe('storefront/settings-dto — доступность онлайн-оплаты', () => {
+  /*
+   * Витрина не должна предлагать способ оплаты, которого магазин не умеет.
+   * Признак считает сервер: модуль включён И ключи терминала заданы. Пока
+   * ключей нет, оплата на стороне админки эмулируется, и показывать
+   * покупателю кнопку «оплатить картой» значит вести его в тупик.
+   */
+  it('по умолчанию онлайн-оплата недоступна', () => {
+    expect(toPublicSettingsDto(makeEffective()).payments.onlineAvailable).toBe(false);
+  });
+
+  it('доступна, когда сервер сообщил о готовности', () => {
+    const dto = toPublicSettingsDto(makeEffective(), (k) => k, {
+      onlinePaymentAvailable: true,
+    });
+    expect(dto.payments.onlineAvailable).toBe(true);
+  });
+});
+
 describe('storefront/settings-dto — toPublicSettingsDto', () => {
   it('НЕ содержит bankDetails', () => {
     const dto = toPublicSettingsDto(makeEffective());

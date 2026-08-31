@@ -29,6 +29,7 @@ import type {
 } from './types';
 import type { CategoryEdge } from './tree';
 import { discountPercent, isOnSale, resolveIsNew } from './pricing';
+import { parseSpec } from '@/lib/personalization/schemas';
 
 // =============================================================================
 // Чистые мапперы row→domain (тестируемы без БД).
@@ -121,6 +122,7 @@ export function mapProduct(row: any): Product {
         : Boolean(row.is_new),
     brandId: row.brand_id ?? null,
     attributesCache: asJson(row.attributes_cache),
+    personalization: parseSpec(row.personalization),
     seoTitle: row.seo_title ?? null,
     seoDescription: row.seo_description ?? null,
     ...mapSeoFields(row),
@@ -431,6 +433,7 @@ export async function listProducts(
   const rows = await sql<Record<string, unknown>[]>`
     SELECT
       p.id, p.sku, p.slug, p.name, p.status, p.base_price, p.created_at,
+      p.personalization,
       p.compare_at_price, p.is_featured, p.is_new, p.brand_id,
       b.id AS b_id, b.slug AS b_slug, b.name AS b_name, b.logo_key AS b_logo_key,
       -- Остаток товара: строки вариантов всегда; строку уровня товара
@@ -505,7 +508,7 @@ export async function getProductById(
   const prodRows = await sql<Record<string, unknown>[]>`
     SELECT p.id, p.sku, p.slug, p.name, p.description, p.status, p.base_price,
            p.compare_at_price, p.is_featured, p.is_new, p.brand_id,
-           p.attributes_cache, p.seo_title, p.seo_description,
+           p.attributes_cache, p.personalization, p.seo_title, p.seo_description,
            p.og_title, p.og_description, p.og_image_key, p.canonical_url, p.noindex,
            p.weight_g, p.length_cm, p.width_cm, p.height_cm,
            p.created_at, p.updated_at,

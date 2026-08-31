@@ -329,7 +329,7 @@ export const createProduct = defineAction({
       const rows = await sql<{ id: string }[]>`
         INSERT INTO products (sku, slug, name, description, status, base_price,
                               compare_at_price, is_featured, is_new, brand_id,
-                              seo_title, seo_description,
+                              seo_title, seo_description, personalization,
                               weight_g, length_cm, width_cm, height_cm)
         VALUES (
           ${skuValue}, ${slug}, ${data.name}, ${data.description ?? ''},
@@ -337,6 +337,7 @@ export const createProduct = defineAction({
           ${data.compareAtPrice ?? null}, ${data.isFeatured ?? false},
           ${data.isNew ?? null}, ${data.brandId ?? null},
           ${data.seoTitle ?? null}, ${data.seoDescription ?? null},
+          ${data.personalization ? sql.json(data.personalization as never) : null},
           ${data.weightG ?? null}, ${data.lengthCm ?? null},
           ${data.widthCm ?? null}, ${data.heightCm ?? null}
         )
@@ -391,6 +392,11 @@ export const updateProduct = defineAction({
                                THEN ${data.isNew ?? null} ELSE is_new END,
         brand_id        = CASE WHEN ${data.brandId !== undefined}
                                THEN ${data.brandId ?? null} ELSE brand_id END,
+        -- CASE, а не COALESCE: null здесь — осмысленное значение «персонализацию
+        -- убрали», и COALESCE молча сохранил бы старое описание.
+        personalization = CASE WHEN ${data.personalization !== undefined}
+                               THEN ${data.personalization ? sql.json(data.personalization as never) : null}
+                               ELSE personalization END,
         seo_title       = COALESCE(${data.seoTitle ?? null}, seo_title),
         seo_description = COALESCE(${data.seoDescription ?? null}, seo_description),
         og_title        = CASE WHEN ${data.ogTitle !== undefined}

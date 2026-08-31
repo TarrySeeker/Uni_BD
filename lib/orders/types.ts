@@ -203,6 +203,12 @@ export interface OrderItem {
   nameSnapshot: string;
   skuSnapshot: string;
   attributesSnapshot: Record<string, unknown>;
+  /**
+   * Снимок персонализации (0034): `{ spec, values }` — описание полей и то, что
+   * вписал покупатель. Пустой объект — позиция без персонализации. Читается
+   * через describeSnapshot: подписи берутся из снимка, а не из каталога.
+   */
+  personalization: Record<string, unknown>;
   /** Эффективная цена за единицу (что платят). */
   unitPrice: string;
   /** «Было» на момент покупки (для чека/возврата); null → без акции. */

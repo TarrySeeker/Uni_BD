@@ -42,7 +42,12 @@ import {
   type DeliveryCostLine,
 } from './delivery-cost';
 import type { DeliveryType, Order, OrderItem, PaymentMethod, PromoCode } from './types';
-import type { CartQuoteInput, CreateOrderInput } from './schemas';
+import type { CartQuoteInput, CreateOrderInput, ManualOrderInput } from './schemas';
+import {
+  buildSnapshot,
+  validateValues,
+  type PersonalizationSnapshot,
+} from '@/lib/personalization/schemas';
 
 // Сентинель для COALESCE(variant_id, ...) в inventory_unit_uniq (0010).
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
@@ -165,6 +170,7 @@ export function mapOrderItem(row: Record<string, unknown>): OrderItem {
     nameSnapshot: String(row.name_snapshot),
     skuSnapshot: String(row.sku_snapshot),
     attributesSnapshot: asJson(row.attributes_snapshot),
+    personalization: asJson(row.personalization),
     unitPrice: String(row.unit_price),
     compareAtSnapshot: strOrNull(row.compare_at_snapshot),
     quantity: Number(row.quantity),
@@ -352,11 +358,26 @@ export interface ResolvedLine extends PricedLine {
   lengthCm: number | null;
   widthCm: number | null;
   heightCm: number | null;
+  /**
+   * Самодостаточный снимок персонализации (0034): описание полей + значения.
+   * Пустой объект — позиция без персонализации.
+   */
+  personalization: PersonalizationSnapshot | Record<string, never>;
 }
 
 export type LineResolution =
   | { ok: true; line: ResolvedLine }
-  | { ok: false; reason: 'product_not_found' | 'variant_not_found' | 'inactive' };
+  | {
+      ok: false;
+      reason: 'product_not_found' | 'variant_not_found' | 'inactive' | 'invalid_personalization';
+      /**
+       * Готовый текст отказа. Есть только у invalid_personalization: остальные
+       * причины — коды из общего словаря cart-messages, а здесь сообщение
+       * зависит от описания полей конкретного товара («Поле «Надпись»: не
+       * длиннее 20 знаков») и словарём не выражается.
+       */
+      message?: string;
+    };
 
 /**
  * Резолв веса/габаритов позиции по приоритету вариант→товар (0018, docs/08 §3.2).
@@ -395,6 +416,8 @@ export async function resolveCartLine(input: {
   productId?: string;
   variantId?: string;
   qty: number;
+  /** Сырые значения персонализации от витрины; проверяются здесь, по описанию из БД. */
+  personalization?: Record<string, unknown>;
 }): Promise<LineResolution> {
   // Загружаем товар: либо напрямую по productId, либо найдя владельца варианта.
   let product: ProductDetail | null = null;
@@ -449,6 +472,14 @@ export async function resolveCartLine(input: {
   // фиксирует снимок для СДЭК, из тела запроса они НЕ берутся.
   const dims = resolveLineDims(product, variant);
 
+  // Персонализация: описание берём ИЗ КАТАЛОГА, значения — из запроса. Обратный
+  // порядок («описание тоже из запроса») позволил бы покупателю объявить себе
+  // любые поля — тот же anti-tamper, что у цены (ADR-010).
+  const personalization = validateValues(product.personalization, input.personalization ?? {});
+  if (!personalization.ok) {
+    return { ok: false, reason: 'invalid_personalization', message: personalization.message };
+  }
+
   return {
     ok: true,
     line: {
@@ -466,6 +497,7 @@ export async function resolveCartLine(input: {
       attributesSnapshot: variant?.attributesCache ?? product.attributesCache ?? {},
       available,
       inStock: available >= input.qty,
+      personalization: buildSnapshot(product.personalization, personalization.values),
       ...dims,
     },
   };
@@ -563,7 +595,18 @@ export interface QuoteCartResult {
   /** Проблемные позиции (не найдены/неактивны/нет остатка). */
   issues: Array<{
     index: number;
-    code: 'product_not_found' | 'variant_not_found' | 'inactive' | 'out_of_stock';
+    code:
+      | 'product_not_found'
+      | 'variant_not_found'
+      | 'inactive'
+      | 'out_of_stock'
+      | 'invalid_personalization';
+    /**
+     * Точный текст отказа, когда код его не выражает (персонализация: сообщение
+     * зависит от описания полей товара). Витрина показывает его вместо
+     * словарного, чтобы покупатель понял, какое поле чинить.
+     */
+    message?: string;
   }>;
   /** Результат валидации промокода (если код передан). */
   promo: PromoValidationResult | null;
@@ -611,7 +654,7 @@ export async function quoteCart(
   for (let i = 0; i < input.items.length; i++) {
     const res = await resolveCartLine(input.items[i]!);
     if (!res.ok) {
-      issues.push({ index: i, code: res.reason });
+      issues.push({ index: i, code: res.reason, ...(res.message ? { message: res.message } : {}) });
       continue;
     }
     const key = unitKey(res.line.productId, res.line.variantId);
@@ -852,7 +895,16 @@ export type CreateOrderResult =
  *  3) идемпотентность по idempotency_key (повтор → существующий заказ).
  */
 export async function createOrder(
-  input: CreateOrderInput,
+  /**
+   * Тип — `ManualOrderInput`, а НЕ `CreateOrderInput`, хотя вызывают отсюда и
+   * витрину, и ручной заказ админки. Разница ровно в согласиях (152-ФЗ): у
+   * витрины они есть, у заказа со слов покупателя по телефону их нет и быть не
+   * может. Репозиторий согласий не пишет вовсе — этим занимается роут витрины,
+   * потому что согласие относится к КАНАЛУ, а не к заказу. `CreateOrderInput`
+   * структурно совместим с этим типом (он его расширяет), поэтому вызов с
+   * витрины проходит без приведения.
+   */
+  input: ManualOrderInput,
   ctx: CreateOrderContext = {},
 ): Promise<CreateOrderResult> {
   // Баг #33 (аудит тупиков): онлайн-метод оплаты (card/sbp — инициация Т-Банк) при
@@ -898,8 +950,15 @@ export async function createOrder(
     const res = await resolveCartLine(item);
     if (!res.ok) {
       // Понятный покупателю текст вместо сырого кода (`out_of_stock` и т.п.) —
-      // единый словарь cart-messages (общий корень разбора дефектов).
-      return { ok: false, code: 'invalid_item', message: cartLineIssueMessage(res.reason) };
+      // единый словарь cart-messages (общий корень разбора дефектов). У отказа
+      // по персонализации текст уже готов и зависит от полей товара — словарь
+      // его не заменит, иначе покупатель увидит «Позиция недоступна» вместо
+      // «Поле «Надпись»: не длиннее 20 знаков» и не поймёт, что чинить.
+      return {
+        ok: false,
+        code: 'invalid_item',
+        message: res.message ?? cartLineIssueMessage(res.reason),
+      };
     }
     resolved.push(res.line);
   }
@@ -1087,12 +1146,13 @@ export async function createOrder(
           INSERT INTO order_items (
             order_id, product_id, variant_id, name_snapshot, sku_snapshot,
             attributes_snapshot, unit_price, compare_at_snapshot, quantity, line_total, is_gift,
-            weight_g, length_cm, width_cm, height_cm
+            weight_g, length_cm, width_cm, height_cm, personalization
           ) VALUES (
             ${orderId}, ${l.productId}, ${l.variantId}, ${l.name}, ${l.sku},
             ${tx.json(l.attributesSnapshot as Record<string, never>)}, ${l.unitPrice}, ${l.compareAt},
             ${l.qty}, ${lineTotal}, false,
-            ${l.weightG}, ${l.lengthCm}, ${l.widthCm}, ${l.heightCm}
+            ${l.weightG}, ${l.lengthCm}, ${l.widthCm}, ${l.heightCm},
+            ${tx.json(l.personalization as Record<string, never>)}
           )
         `;
       }
@@ -1117,6 +1177,9 @@ export async function createOrder(
             order_id, product_id, variant_id, name_snapshot, sku_snapshot,
             attributes_snapshot, unit_price, compare_at_snapshot, quantity, line_total, is_gift,
             weight_g, length_cm, width_cm, height_cm
+            -- personalization не указываем: подарок выбирает магазин, а не
+            -- покупатель, заполнять его надписью некому. Колонка возьмёт свой
+            -- DEFAULT '{}' — тот же смысл «персонализации нет».
           ) VALUES (
             ${orderId}, ${giftLine.productId}, ${giftLine.variantId}, ${giftLine.name}, ${giftLine.sku},
             ${tx.json(giftLine.attributesSnapshot as Record<string, never>)}, ${fromMinor(0)},

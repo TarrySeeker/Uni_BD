@@ -46,6 +46,9 @@ async function loadRoute() {
   vi.resetModules();
   vi.doMock('@/lib/config/settings', () => ({
     getEffectiveSettings: vi.fn(async () => fakeEffective()),
+    // Роут спрашивает состояние модуля, чтобы решить, доступна ли онлайн-оплата
+    // (её признак уходит витрине). Мок обязан отдавать и этот экспорт.
+    isModuleEffectivelyEnabled: vi.fn(async () => false),
   }));
   return import('@/app/api/storefront/v1/settings/route');
 }

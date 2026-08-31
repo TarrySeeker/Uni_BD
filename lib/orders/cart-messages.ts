@@ -17,13 +17,18 @@ export type CartLineIssueCode =
   | 'product_not_found'
   | 'variant_not_found'
   | 'inactive'
-  | 'out_of_stock';
+  | 'out_of_stock'
+  | 'invalid_personalization';
 
 const MESSAGES: Record<CartLineIssueCode, string> = {
   product_not_found: 'Товар больше недоступен',
   variant_not_found: 'Выбранный вариант товара недоступен',
   inactive: 'Товар больше не продаётся',
   out_of_stock: 'Недостаточно товара на складе',
+  // Запасной текст: у отказа по персонализации обычно есть СВОЙ, точный
+  // («Поле «Надпись»: не длиннее 20 знаков»), собранный по описанию полей
+  // товара. Словарный вариант нужен там, где точный текст не доехал.
+  invalid_personalization: 'Проверьте, что вы указали для нанесения',
 };
 
 /**

@@ -64,3 +64,16 @@ minio-data
 
 # Агентские настройки Claude
 .claude
+
+# pnpm-workspace.yaml — НЕ копируем в образ.
+#
+# В корне репозитория он содержит только `allowBuilds` с незаполненными
+# значениями-заглушками («set this to true or false») и не содержит `packages`.
+# Образ ставит зависимости через pnpm 9.15.9 (пин в Dockerfile под node:20),
+# который поля `allowBuilds` не знает вовсе, а workspace-файл без `packages`
+# считает ошибкой: `pnpm build` падает с «packages field missing or empty».
+# Локальная сборка этого не показывает — там подхватывается workspace уровнем
+# выше. Скрипты сборки зависимостей (sharp) в pnpm 9 выполняются без отдельного
+# разрешения, поэтому исключение файла ничего не ломает; sharp проверяется
+# отдельно — scripts/sharp-selfcheck.mjs в deploy.sh.
+pnpm-workspace.yaml

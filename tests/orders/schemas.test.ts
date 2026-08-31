@@ -132,10 +132,30 @@ describe('orders/schemas — CreateOrderSchema (POST /orders)', () => {
     customer: { name: 'Иван', email: 'ivan@example.com', phone: '+79990000000' },
     delivery: { type: 'courier', city: 'Москва', address: 'ул. 1' },
     paymentMethod: 'cod',
+    // Заказ с витрины несёт согласия 152-ФЗ (см. CreateOrderSchema).
+    consent: { pd: true, offer: true },
   };
 
   it('принимает валидный заказ', () => {
     expect(CreateOrderSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('без согласий заказ с витрины НЕ принимается (152-ФЗ)', () => {
+    const { consent, ...withoutConsent } = base;
+    void consent;
+    expect(CreateOrderSchema.safeParse(withoutConsent).success).toBe(false);
+  });
+
+  it('снятая галочка ПДн отклоняется сервером, а не только браузером', () => {
+    expect(
+      CreateOrderSchema.safeParse({ ...base, consent: { pd: false, offer: true } }).success,
+    ).toBe(false);
+  });
+
+  it('ручной заказ админки согласий НЕ требует: их некому поставить по телефону', () => {
+    const { consent, ...withoutConsent } = base;
+    void consent;
+    expect(ManualOrderSchema.safeParse(withoutConsent).success).toBe(true);
   });
 
   it('отклоняет невалидный email покупателя', () => {
@@ -417,6 +437,7 @@ describe('orders/schemas — курьер требует адрес при со�
     items: [{ variantId: UUID, qty: 1 }],
     customer: { name: 'Иван', email: 'ivan@example.com', phone: '+79990000000' },
     paymentMethod: 'cod' as const,
+    consent: { pd: true, offer: true },
   };
 
   it('CreateOrderSchema: курьер БЕЗ адреса → отклоняется', () => {

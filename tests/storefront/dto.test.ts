@@ -249,7 +249,7 @@ describe('storefront/dto — карточка товара', () => {
     id: 'p1', sku: 'SKU1', slug: 'coat', name: 'Coat', description: 'nice',
     status: 'active', basePrice: '1000.00', compareAtPrice: '1500.00',
     isFeatured: false, isNew: null, brandId: 'b1',
-    attributesCache: { color: 'white' }, seoTitle: null, seoDescription: null,
+    attributesCache: { color: 'white' }, personalization: null, seoTitle: null, seoDescription: null,
     ogTitle: null, ogDescription: null, ogImageKey: null, canonicalUrl: null, noindex: false,
     weightG: null, lengthCm: null, widthCm: null, heightCm: null,
     createdAt: D, updatedAt: D,
@@ -295,6 +295,31 @@ describe('storefront/dto — карточка товара', () => {
     // Прочие внутренние поля карточки по-прежнему не утекают.
     expect(dto).not.toHaveProperty('status');
     expect(dto).not.toHaveProperty('attributesCache');
+  });
+
+  it('отдаёт описание персонализации: по нему витрина рисует конструктор', () => {
+    const spec = {
+      fields: [
+        { key: 'text', type: 'text' as const, label: 'Надпись', maxLength: 20, required: true },
+      ],
+    };
+    const dto = toProductDetailDto(
+      { ...product, personalization: { fields: [{ ...spec.fields[0]! }] } },
+      { effectiveIsNew: false, categorySlugs: [], seoCtx: TEST_SEO_CTX },
+    );
+    const field = dto.personalization?.fields[0];
+    expect(field?.label).toBe('Надпись');
+    expect(field?.type === 'text' && field.maxLength).toBe(20);
+  });
+
+  it('у обычного товара персонализация — null, а не пустой объект', () => {
+    // Пустой объект витрина отрисовала бы как конструктор без полей.
+    const dto = toProductDetailDto(product, {
+      effectiveIsNew: false,
+      categorySlugs: [],
+      seoCtx: TEST_SEO_CTX,
+    });
+    expect(dto.personalization).toBeNull();
   });
 
   it('отдаёт только активные варианты, у варианта inStock и без сырого id остатка', () => {
