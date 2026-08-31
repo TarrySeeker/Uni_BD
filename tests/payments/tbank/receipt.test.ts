@@ -56,6 +56,7 @@ function item(extra: Partial<OrderItem> = {}): OrderItem {
     nameSnapshot: 'Товар',
     skuSnapshot: 'SKU-1',
     attributesSnapshot: {},
+    personalization: {},
     unitPrice: '500.00',
     compareAtSnapshot: null,
     quantity: 3,

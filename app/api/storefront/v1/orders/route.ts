@@ -20,9 +20,12 @@ import {
 } from '@/lib/storefront/response';
 import { STOREFRONT_WRITE_METHODS } from '@/lib/storefront/cors';
 import { CreateOrderSchema } from '@/lib/orders/schemas';
-import { createOrder } from '@/lib/orders/repository';
+import { createOrder, getOrderById } from '@/lib/orders/repository';
+import { sendOrderConfirmation } from '@/lib/orders/notify';
 import { toOrderCreatedDto, assertOrderTokenConfigured } from '@/lib/storefront/order-dto';
 import { normalizeClientIp } from '@/lib/server/request-ip';
+import { recordConsentSafe } from '@/lib/consent/repository';
+import { consentEntries } from '@/lib/consent/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,7 +92,34 @@ export async function POST(req: Request): Promise<Response> {
         return jsonError('unprocessable', result.message, cors);
       }
 
+      // Согласия (152-ФЗ) пишет РОУТ, а не репозиторий: согласие относится к
+      // каналу (витрина), а не к заказу — ручной заказ админки идёт через тот
+      // же createOrder и согласий не несёт.
+      //
+      // ⚠️ Идемпотентный повтор согласия НЕ пишет: ретраи сети и двойные клики
+      // иначе набивают журнал дублями одного волеизъявления.
+      if (!result.reused) {
+        await recordConsentSafe({
+          purposes: consentEntries(parsed.data.consent),
+          source: 'order',
+          sourceRef: result.order.number,
+          subject: parsed.data.customer.email,
+          ip: clientIp(req),
+          userAgent: req.headers.get('user-agent'),
+        });
+      }
+
       const dto = toOrderCreatedDto(result.order);
+
+      // Письмо о заказе — только на новый заказ. Повтор по ключу
+      // идемпотентности письма не шлёт: сеть могла оборваться после создания,
+      // и второе «ваш заказ принят» на один заказ выглядит как второй заказ.
+      if (!result.reused) {
+        const full = await getOrderById(result.order.id);
+        if (full) {
+          await sendOrderConfirmation(result.order, full.items, dto.accessToken);
+        }
+      }
       // Повтор с тем же idempotency-ключом → 200 (заказ существует), иначе 201.
       return jsonData(dto, {}, cors, { status: result.reused ? 200 : 201 });
     },

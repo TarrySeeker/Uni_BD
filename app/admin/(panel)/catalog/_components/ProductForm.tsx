@@ -12,6 +12,11 @@ import { PRODUCT_STATUSES, type ProductStatus } from '@/lib/catalog/types';
 import { normalizeMoney } from '@/lib/catalog/schemas';
 import { isPubliclyVisible } from '@/lib/catalog/visibility';
 import type { ActionResult } from '@/lib/server/action';
+import {
+  buildSpecFromDraft,
+  draftFromSpec,
+  type FieldDraft,
+} from '@/lib/personalization/draft';
 
 import {
   createProductAction,
@@ -21,6 +26,7 @@ import {
 } from './form-actions';
 import { errorMessage, fieldError } from './action-result';
 import { VariantsSection } from './VariantsSection';
+import { PersonalizationSection } from './PersonalizationSection';
 import { AttributesSection } from './AttributesSection';
 import { MediaSection } from './MediaSection';
 import { InventorySection } from './InventorySection';
@@ -32,14 +38,14 @@ import {
 
 /**
  * Форма товара (docs/05 §5.3, П4.2). Секции-вкладки:
- * Основное / Варианты / Характеристики / Медиа / SEO.
+ * Основное / Варианты / Персонализация / Характеристики / Медиа / SEO.
  *
  * «Основное» доступно и при создании, и при редактировании; прочие секции —
  * только для существующего товара (нужен id). Сабмит — Server Action
  * createProduct/updateProduct; ошибки валидации берутся из fieldErrors.
  */
 
-type Section = 'main' | 'variants' | 'attributes' | 'media' | 'seo';
+type Section = 'main' | 'variants' | 'personalization' | 'attributes' | 'media' | 'seo';
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
   draft: 'Черновик — скрыт с сайта',
@@ -119,6 +125,15 @@ export function ProductForm({
     noindex: product?.noindex ?? false,
   });
 
+  // Персонализация (0034): описание полей, которые заполняет покупатель.
+  const [personalizationOn, setPersonalizationOn] = useState(
+    product?.personalization != null,
+  );
+  const [personalizationFields, setPersonalizationFields] = useState<FieldDraft[]>(
+    draftFromSpec(product?.personalization ?? null),
+  );
+  const [personalizationError, setPersonalizationError] = useState<string | null>(null);
+
   const initialCategoryIds = product?.categories.map((c) => c.categoryId) ?? [];
   const [categoryIds, setCategoryIds] = useState<string[]>(initialCategoryIds);
   const [primaryCategoryId, setPrimaryCategoryId] = useState<string>(
@@ -137,6 +152,19 @@ export function ProductForm({
     setPending(true);
     setError(null);
     setSuccess(null);
+    setPersonalizationError(null);
+
+    // Описание персонализации собирается ДО отправки: неполное поле обязано
+    // остановить сохранение и сказать, что дозаполнить, а не пропасть молча
+    // (docs/32 §3). Пользователя при этом перебрасываем на нужную вкладку —
+    // иначе он видит отказ, но не видит, где чинить.
+    const personalization = buildSpecFromDraft(personalizationOn, personalizationFields);
+    if (!personalization.ok) {
+      setPersonalizationError(personalization.message);
+      setSection('personalization');
+      setPending(false);
+      return;
+    }
 
     const isNew = isNewMode === 'auto' ? null : isNewMode === 'yes';
     // Пустая строка → null (дефолт магазина); иначе целое (Zod проверит ≥ 0).
@@ -171,6 +199,7 @@ export function ProductForm({
       lengthCm: strToNum(lengthCm),
       widthCm: strToNum(widthCm),
       heightCm: strToNum(heightCm),
+      personalization: personalization.spec,
     };
 
     // Расширенные SEO/OG-поля принимает только Update-схема (docs/11 §5.3.3).
@@ -280,6 +309,9 @@ export function ProductForm({
   const tabs: Array<{ key: Section; label: string; editOnly?: boolean }> = [
     { key: 'main', label: 'Основное' },
     { key: 'variants', label: 'Варианты', editOnly: true },
+    // Персонализация доступна и при создании: это часть описания товара
+    // (что покупатель заполняет), а не связанная сущность, которой нужен id.
+    { key: 'personalization', label: 'Персонализация' },
     { key: 'attributes', label: 'Характеристики', editOnly: true },
     { key: 'media', label: 'Медиа', editOnly: true },
     { key: 'seo', label: 'SEO' },
@@ -647,6 +679,15 @@ export function ProductForm({
         {section === 'variants' && isEdit ? (
           <VariantsSection product={product!} />
         ) : null}
+        {section === 'personalization' ? (
+          <PersonalizationSection
+            enabled={personalizationOn}
+            fields={personalizationFields}
+            onEnabledChange={setPersonalizationOn}
+            onFieldsChange={setPersonalizationFields}
+            error={personalizationError}
+          />
+        ) : null}
         {section === 'attributes' && isEdit ? (
           <AttributesSection
             product={product!}
@@ -657,7 +698,7 @@ export function ProductForm({
         {section === 'media' && isEdit ? <MediaSection product={product!} /> : null}
       </div>
 
-      {section === 'main' || section === 'seo' ? (
+      {section === 'main' || section === 'seo' || section === 'personalization' ? (
         <div className="mt-6 flex items-center gap-3 border-t border-gray-200 pt-4">
           <button
             type="button"

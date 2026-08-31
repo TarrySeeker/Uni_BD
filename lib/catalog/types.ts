@@ -12,6 +12,8 @@
 // -----------------------------------------------------------------------------
 
 /** Жизненный цикл товара (products.status). */
+import type { PersonalizationSpec } from '@/lib/personalization/schemas';
+
 export type ProductStatus = 'draft' | 'active' | 'archived';
 export const PRODUCT_STATUSES: readonly ProductStatus[] = [
   'draft',
@@ -94,6 +96,12 @@ export interface Product {
   ogImageKey: string | null;
   canonicalUrl: string | null;
   noindex: boolean;
+  /**
+   * Описание полей персонализации, которые заполняет покупатель (0034).
+   * null — товар не персонализируется (обычная позиция). Разбирается через
+   * parseSpec: битое значение не роняет карточку, а читается как «нет».
+   */
+  personalization: PersonalizationSpec | null;
   /** Вес товара в граммах для расчёта/создания доставки СДЭК (0018); null → дефолт магазина. */
   weightG: number | null;
   /** Габариты товара в см (0018); null → дефолт магазина (CDEK_DEFAULT_*). */

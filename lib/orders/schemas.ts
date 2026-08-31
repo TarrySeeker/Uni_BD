@@ -26,6 +26,7 @@ import {
   PROMO_TARGET_TYPES,
 } from './types';
 import type { PromoApplyScope, PromoTargetType } from './types';
+import { ConsentInputSchema } from '@/lib/consent/schemas';
 
 // -----------------------------------------------------------------------------
 // Переиспользуемые примитивы.
@@ -108,6 +109,14 @@ export const cartLineSchema = z
     variantId: uuidSchema.optional(),
     productId: uuidSchema.optional(),
     qty: quantitySchema,
+    /**
+     * Персонализация позиции (0034): что покупатель просит нанести. Здесь она
+     * принимается как СЫРОЙ объект и НЕ проверяется по содержанию — проверить
+     * её можно только по описанию полей из карточки товара, а товар на этом
+     * шаге ещё не прочитан. Валидация — в resolveCartLine, по описанию ИЗ БД
+     * (anti-tamper, ADR-010): присланное витриной описание не имеет силы.
+     */
+    personalization: z.record(z.string(), z.unknown()).optional(),
   })
   .refine((v) => Boolean(v.variantId) || Boolean(v.productId), {
     message: 'Нужен variantId или productId.',
@@ -174,10 +183,22 @@ function refineCourierAddress(
   }
 }
 
-export const CreateOrderSchema = z.object(createOrderShape).superRefine(refineCourierAddress);
+/**
+ * Заказ с витрины = общая форма ПЛЮС согласия покупателя (152-ФЗ).
+ *
+ * ⚠️ `consent` намеренно НЕ входит в `createOrderShape`. По этому же shape
+ * строится `ManualOrderSchema` — заказ, который менеджер заводит в админке со
+ * слов покупателя по телефону. Там галочек нет и быть не может: согласие —
+ * свойство КАНАЛА (витрины), а не заказа. Положив его в общий shape, мы
+ * сделали бы ручной заказ невозможным.
+ */
+export const CreateOrderSchema = z
+  .object({ ...createOrderShape, consent: ConsentInputSchema })
+  .superRefine(refineCourierAddress);
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 
 /** Ручное создание заказа в админке (source='admin'): та же форма + признак. */
+/** Ручной заказ админки: тот же shape БЕЗ согласий (см. комментарий выше). */
 export const ManualOrderSchema = z
   .object({ ...createOrderShape, source: z.literal('admin').optional() })
   .superRefine(refineCourierAddress);

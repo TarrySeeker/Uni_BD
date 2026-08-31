@@ -11,6 +11,25 @@
 import { runStorefront, jsonData, jsonError, handlePreflight } from '@/lib/storefront/response';
 import { STOREFRONT_WRITE_METHODS } from '@/lib/storefront/cors';
 import { LeadInputSchema } from '@/lib/leads/schemas';
+import { PdConsentSchema } from '@/lib/consent/schemas';
+import { recordConsentSafe } from '@/lib/consent/repository';
+import { normalizeClientIp } from '@/lib/server/request-ip';
+import { z } from 'zod';
+
+/**
+ * Форма обратной связи собирает имя и контакт — это персональные данные, и у
+ * их обработки должно быть основание (152-ФЗ). Проверять только чекаут
+ * недостаточно: на бою форма обратной связи собирала контакты вообще без
+ * согласия (docs/32 §8-bis).
+ *
+ * Согласие добавлено НА УРОВНЕ РОУТА, а не в LeadInputSchema: сама схема
+ * описывает заявку как сущность и переиспользуется внутренними путями, где
+ * галочек нет.
+ */
+const StorefrontLeadSchema = z.object({
+  ...LeadInputSchema.shape,
+  consent: PdConsentSchema,
+});
 import { insertLead } from '@/lib/leads/repository';
 import { logger } from '@/lib/logger';
 
@@ -26,7 +45,7 @@ export async function POST(req: Request): Promise<Response> {
       } catch {
         body = null;
       }
-      const parsed = LeadInputSchema.safeParse(body);
+      const parsed = StorefrontLeadSchema.safeParse(body);
       if (!parsed.success) {
         return jsonError('unprocessable', 'Проверьте поля формы.', cors);
       }
@@ -36,6 +55,17 @@ export async function POST(req: Request): Promise<Response> {
           contact: parsed.data.contact,
           message: parsed.data.message,
           source: 'contact_form',
+        });
+        await recordConsentSafe({
+          purposes: ['pd'],
+          source: 'lead',
+          sourceRef: id,
+          subject: parsed.data.contact,
+          ip: normalizeClientIp(
+            req.headers.get('x-forwarded-for'),
+            req.headers.get('x-real-ip'),
+          ),
+          userAgent: req.headers.get('user-agent'),
         });
         return jsonData({ id }, {}, cors);
       } catch (err) {

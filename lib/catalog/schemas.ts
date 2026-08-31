@@ -25,6 +25,7 @@ import {
   canonicalUrlSchema,
   noindexSchema,
 } from '@/lib/seo/schemas';
+import { PersonalizationSpecSchema } from '@/lib/personalization/schemas';
 
 // -----------------------------------------------------------------------------
 // Переиспользуемые примитивы.
@@ -178,6 +179,12 @@ export const ProductCreateSchema = z
     primaryCategoryId: uuidSchema.nullish(),
     seoTitle,
     seoDescription,
+    /**
+     * Описание полей персонализации (0034). null — товар не персонализируется.
+     * Валидируется той же схемой, что и чтение из БД: форма и рантайм не должны
+     * расходиться в том, что считается корректным описанием.
+     */
+    personalization: PersonalizationSpecSchema.nullish(),
     ...dimensionFields,
   })
   .refine(
@@ -207,6 +214,12 @@ export const ProductUpdateSchema = z.object({
   primaryCategoryId: uuidSchema.nullish(),
   seoTitle,
   seoDescription,
+  /**
+   * Описание полей персонализации (0034). null — товар не персонализируется.
+   * Валидируется той же схемой, что и чтение из БД: форма и рантайм не должны
+   * расходиться в том, что считается корректным описанием.
+   */
+  personalization: PersonalizationSpecSchema.nullish(),
   ...seoEntityFields,
   ...dimensionFields,
 })

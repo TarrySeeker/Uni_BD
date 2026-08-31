@@ -87,6 +87,7 @@ function makeItem(over: Partial<OrderItem> = {}): OrderItem {
     nameSnapshot: 'Чехол — Чёрный',
     skuSnapshot: 'CASE-BLK',
     attributesSnapshot: { color: 'black' },
+    personalization: {},
     unitPrice: '1500.00',
     compareAtSnapshot: '2000.00',
     quantity: 2,
@@ -458,6 +459,7 @@ describe('schemas — парсинг/валидация тела (anti-tamper: �
       delivery: { type: 'courier', city: 'Москва', address: 'ул. Ленина, 1' },
       paymentMethod: 'cod',
       idempotencyKey: 'idem-1',
+      consent: { pd: true, offer: true },
     });
     expect(ok.success).toBe(true);
   });

@@ -31,6 +31,7 @@ import type {
   ProductVariant,
 } from '@/lib/catalog/types';
 import { MAIN_WAREHOUSE } from '@/lib/catalog/types';
+import type { PersonalizationSpec } from '@/lib/personalization/schemas';
 
 // ---------------------------------------------------------------------------
 // Типы публичных DTO.
@@ -144,6 +145,16 @@ export interface ProductDetailDto {
   brand: BrandDto | null;
   categories: string[];
   attributes: Record<string, unknown>;
+  /**
+   * Описание полей персонализации (0034) — по нему витрина рисует конструктор:
+   * какие поля показать, как их подписать, сколько строк и знаков разрешено.
+   * null — товар не персонализируется.
+   *
+   * Отдаётся ИМЕННО описание, а не право решать: значения всё равно проверит
+   * сервер по этой же записи из БД. Витрина, нарисовавшая лишнее поле или
+   * ослабившая предел, получит отказ на создании заказа (anti-tamper, ADR-010).
+   */
+  personalization: PersonalizationSpec | null;
   variants: VariantDto[];
   media: MediaDto[];
   inStock: boolean;
@@ -436,6 +447,7 @@ export function toProductDetailDto(
     brand: toBrandDto(product.brand, opts.seoCtx.publicUrl),
     categories: opts.categorySlugs,
     attributes: product.attributesCache ?? {},
+    personalization: product.personalization ?? null,
     variants: product.variants
       .filter((v) => v.isActive)
       .map((v) => toVariantDto(v, product)),

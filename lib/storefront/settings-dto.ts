@@ -18,6 +18,7 @@
  */
 
 import type { EffectiveSettings } from '@/lib/config/settings';
+import { CONSENT_TEXTS, CONSENT_VERSION } from '@/lib/consent/schemas';
 
 /** Публичная социальная ссылка. */
 export interface PublicSocialDto {
@@ -115,6 +116,26 @@ export interface PublicSettingsDto {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
   };
+  /**
+   * Тексты согласий (152-ФЗ) и их редакция.
+   *
+   * Витрина ОБЯЗАНА подписывать галочки этими строками, а не своей копией в
+   * вёрстке: в журнал согласий сервер пишет именно их. Разойдись копии — в
+   * журнале окажется один текст, а покупатель увидит другой, и доказательная
+   * ценность записи обнулится.
+   */
+  consent: {
+    version: string;
+    texts: Record<string, string>;
+  };
+  /**
+   * Что магазин реально умеет принимать. Витрина показывает способ оплаты
+   * только когда он работает: модуль включён И ключи терминала заданы. Иначе
+   * покупатель уходил бы в оплату, которая на стороне админки эмулируется.
+   */
+  payments: {
+    onlineAvailable: boolean;
+  };
 }
 
 /**
@@ -125,6 +146,12 @@ export interface PublicSettingsDto {
 export function toPublicSettingsDto(
   eff: EffectiveSettings,
   publicUrl: PublicUrlResolver = (k) => k,
+  /**
+   * Готовность приёма оплаты считает вызывающий роут: здесь нет ни доступа к
+   * env, ни к состоянию модулей, а функция должна оставаться чистой и
+   * проверяемой без окружения.
+   */
+  opts: { onlinePaymentAvailable?: boolean } = {},
 ): PublicSettingsDto {
   return {
     branding: {
@@ -175,6 +202,13 @@ export function toPublicSettingsDto(
       defaultDescription: eff.seo.default_description ?? null,
       twitterSite: eff.seo.twitter_site ?? null,
       // default_og_image_key (ключ S3), robots_extra, noindex_site — НЕ наружу.
+    },
+    consent: {
+      version: CONSENT_VERSION,
+      texts: { ...CONSENT_TEXTS },
+    },
+    payments: {
+      onlineAvailable: opts.onlinePaymentAvailable ?? false,
     },
     // home публичен; изображения отдаём как URL (ключи S3 наружу не раскрываем).
     home: {
