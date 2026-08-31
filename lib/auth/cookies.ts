@@ -20,8 +20,21 @@ import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from '@/lib/auth/session';
  *   * maxAge/expires  — срок жизни = окно сессии (expires_at).
  */
 
-/** Secure-флаг включается только в проде (в dev — http://localhost). */
+/**
+ * Secure-флаг включается в проде (в dev — http://localhost).
+ *
+ * Исключение — установка без TLS. Пока у магазина нет домена, админка стоит
+ * на голом IP по HTTP: сертификат Let's Encrypt на IP не выдаёт. Браузер не
+ * возвращает Secure-cookie по http, поэтому сессия терялась на первом же
+ * переходе — вход проходил, а следующая страница снова просила логин.
+ *
+ * COOKIE_INSECURE=1 снимает флаг ЯВНО и только на такой случай. Это
+ * осознанное ослабление: по HTTP cookie идёт открыто, и её можно перехватить
+ * в сети между браузером и сервером. Как только появится домен и TLS —
+ * убрать переменную, флаг вернётся сам.
+ */
 function isSecure(): boolean {
+  if (process.env.COOKIE_INSECURE === '1') return false;
   return process.env.NODE_ENV === 'production';
 }
 
