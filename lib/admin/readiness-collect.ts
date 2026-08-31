@@ -135,7 +135,19 @@ export async function collectReadinessInput(): Promise<ReadinessInput> {
     integrations: {
       cdekMock: isCdekMock(),
       cdekCronSecretSet: Boolean(env.CDEK_CRON_SECRET && env.CDEK_CRON_SECRET.length > 0),
-      paymentsMock: isTbankMock(),
+      /*
+        Мок-режим кассы спрашиваем ТОЛЬКО у включённого модуля платежей.
+
+        isTbankMock() в проде без боевых ключей не возвращает значение, а
+        БРОСАЕТ — и это правильно: молчаливый мок пометил бы заказы
+        «оплаченными» без списания. Но вызов стоял безусловно, поэтому у
+        магазина без эквайринга (payments выключен в ADMIK_MODULES) весь
+        экран «Готовность» падал с 500 — притом что ниже готовность и так
+        не спрашивает про ключи выключенного модуля.
+
+        Выключенный модуль в мок-режиме не бывает: показываем false.
+      */
+      paymentsMock: paymentsOn ? isTbankMock() : false,
       storageConfigured: Boolean(env.S3_ENDPOINT && env.S3_BUCKET),
       // Тот же минимум, что и в самом почтовом модуле: без адреса отправителя
       // письмо не примет ни один сервер, поэтому половина настройки не считается.
