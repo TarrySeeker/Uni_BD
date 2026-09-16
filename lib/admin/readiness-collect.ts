@@ -16,7 +16,7 @@ import { sql } from '@/lib/db/client';
 import { getEnv } from '@/lib/config/env';
 import { getEffectiveSettings, isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { isCdekMock } from '@/lib/cdek/config';
-import { isTbankMock } from '@/lib/payments/tbank/config';
+import { getPaymentProvider } from '@/lib/payments/registry';
 
 import type { ReadinessInput } from './readiness';
 
@@ -28,6 +28,32 @@ async function safeCount(run: () => Promise<{ n: string }[]>): Promise<number | 
     return Number.isFinite(n) ? n : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Работает ли касса в mock-режиме (боевые ключи не заданы).
+ *
+ * 🔴 ПОЧЕМУ ЧЕРЕЗ РЕЕСТР, А НЕ `isTbankMock()`. Раньше здесь стоял прямой вызов
+ * Т-Банка — признак mock спрашивался у него ВСЕГДА, независимо от
+ * `PAYMENTS_PROVIDER`. У магазина на Озоне или АТОЛе «Готовность» показывала
+ * статус ЧУЖОГО эквайера: заполненные ключи АТОЛа при пустых Т-Банка давали
+ * ложный блокер, а обратная ситуация — ложное «всё хорошо» при неработающей
+ * оплате. Это ровно тот класс ошибки, ради которого реестр и появился (см.
+ * lib/payments/types.ts): провайдер обязан выбираться в ОДНОМ месте.
+ *
+ * 🔴 ПОЧЕМУ try/catch. `isConfigured()` Т-Банка в проде без боевых ключей не
+ * возвращает значение, а БРОСАЕТ (fail-closed в resolveTbankMock) — и это
+ * правильно: молчаливый мок пометил бы заказы «оплаченными» без списания. Но
+ * экран диагностики обязан ОТКРЫВАТЬСЯ именно тогда, когда магазин сломан.
+ * Поэтому исключение здесь трактуем как «да, mock»: ключей нет — значит касса
+ * ненастоящая, и владелец увидит предупреждение вместо страницы с 500.
+ */
+function resolvePaymentsMock(): boolean {
+  try {
+    return !getPaymentProvider().isConfigured();
+  } catch {
+    return true;
   }
 }
 
@@ -136,18 +162,17 @@ export async function collectReadinessInput(): Promise<ReadinessInput> {
       cdekMock: isCdekMock(),
       cdekCronSecretSet: Boolean(env.CDEK_CRON_SECRET && env.CDEK_CRON_SECRET.length > 0),
       /*
-        Мок-режим кассы спрашиваем ТОЛЬКО у включённого модуля платежей.
+        Мок-режим кассы спрашиваем ТОЛЬКО у включённого модуля платежей —
+        у АКТИВНОГО провайдера магазина (см. resolvePaymentsMock выше).
 
-        isTbankMock() в проде без боевых ключей не возвращает значение, а
-        БРОСАЕТ — и это правильно: молчаливый мок пометил бы заказы
-        «оплаченными» без списания. Но вызов стоял безусловно, поэтому у
-        магазина без эквайринга (payments выключен в ADMIK_MODULES) весь
-        экран «Готовность» падал с 500 — притом что ниже готовность и так
-        не спрашивает про ключи выключенного модуля.
+        Гард `paymentsOn` сохранён намеренно: у магазина без эквайринга
+        (payments выключен в ADMIK_MODULES) безусловный вызов однажды ронял
+        весь экран «Готовность» с 500 — притом что ниже готовность и так не
+        спрашивает про ключи выключенного модуля.
 
         Выключенный модуль в мок-режиме не бывает: показываем false.
       */
-      paymentsMock: paymentsOn ? isTbankMock() : false,
+      paymentsMock: paymentsOn ? resolvePaymentsMock() : false,
       storageConfigured: Boolean(env.S3_ENDPOINT && env.S3_BUCKET),
       // Тот же минимум, что и в самом почтовом модуле: без адреса отправителя
       // письмо не примет ни один сервер, поэтому половина настройки не считается.
