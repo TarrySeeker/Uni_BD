@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listMigrations } from '@/lib/db/migrate';
+import { expectVersionsStrictlyIncreasing } from '@/tests/db/migration-numbering';
 
 /**
  * Тесты пакета 5.C-1 (docs/11 §5.1.6) — миграции 0022_cms_pages / 0023_cms_page_sections.
  *
- * (а) ЮНИТ (без БД, всегда): файлы существуют, сплошная нумерация от 0001,
+ * (а) ЮНИТ (без БД, всегда): файлы существуют, нумерация строго возрастает,
  *     CREATE TABLE/INDEX IF NOT EXISTS, GRANT TO admik_app, запись в
  *     schema_migrations ON CONFLICT, CHECK размера content идемпотентно (DO-блок).
  * (б) ИНТЕГРАЦИЯ (skipIf без DATABASE_URL): двойной накат, таблицы на месте.
@@ -182,15 +183,18 @@ describe('db/migrations — 0023_cms_page_sections (юнит)', () => {
   });
 });
 
-describe('db/migrations — сплошная нумерация (юнит)', () => {
-  it('0022 и 0023 идут без пропусков от 0001', async () => {
+describe('db/migrations — порядок нумерации (юнит)', () => {
+  // Раньше здесь требовалась сплошная нумерация от 0001. Требование снято:
+  // миграции личного кабинета (0034…0037) существуют только в ветке LK, поэтому
+  // в freeLK разрыв 0033 → 0038 законен и постоянен. Накат идёт sort по именам
+  // файлов, ему достаточно строгой монотонности и формата NNNN.
+  it('0021..0023 на месте, версии строго возрастают', async () => {
     const all = await listMigrations();
     const versions = all.map((m) => m.version);
     expect(versions).toContain('0021');
     expect(versions).toContain('0022');
     expect(versions).toContain('0023');
-    const expected = versions.map((_, i) => String(i + 1).padStart(4, '0'));
-    expect(versions).toEqual(expected);
+    expectVersionsStrictlyIncreasing(versions);
   });
 });
 

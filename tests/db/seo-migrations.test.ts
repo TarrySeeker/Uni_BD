@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listMigrations } from '@/lib/db/migrate';
+import { expectVersionsStrictlyIncreasing } from '@/tests/db/migration-numbering';
 
 /**
  * Тесты пакета 5.S-1 (docs/11 §5.3.6) — миграция 0021_seo_entity_fields.
@@ -59,13 +60,17 @@ describe('db/migrations — 0021_seo_entity_fields (юнит)', () => {
     expect(sqlText.toUpperCase()).toContain('ON CONFLICT DO NOTHING');
   });
 
-  it('нумерация: 0021 идёт после 0020 без пропуска', async () => {
+  it('нумерация: 0021 идёт сразу после 0020, версии строго возрастают', async () => {
     const all = await listMigrations();
     const versions = all.map((m) => m.version);
     expect(versions).toContain('0020');
     expect(versions).toContain('0021');
-    const expected = versions.map((_, i) => String(i + 1).padStart(4, '0'));
-    expect(versions).toEqual(expected);
+    // Соседство 0020/0021 проверяем точечно по индексам, а сплошную нумерацию всего
+    // списка — нет: миграции личного кабинета (0034…0037) есть только в ветке LK,
+    // поэтому в freeLK разрыв 0033 → 0038 законен. Накату (sort по именам) хватает
+    // монотонности и формата NNNN.
+    expect(versions.indexOf('0021')).toBe(versions.indexOf('0020') + 1);
+    expectVersionsStrictlyIncreasing(versions);
   });
 });
 

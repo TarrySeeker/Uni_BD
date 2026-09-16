@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listMigrations, parseMigrationName } from '@/lib/db/migrate';
+import { expectVersionsStrictlyIncreasing } from '@/tests/db/migration-numbering';
 
 /**
  * Тесты пакета A Этапа 4 — миграции СДЭК 0017/0018 (docs/08 §3).
@@ -8,7 +9,7 @@ import { listMigrations, parseMigrationName } from '@/lib/db/migrate';
  * (а) ЮНИТ — читают .sql с диска (без БД), проходят ВСЕГДА:
  *     наличие 0017/0018, идемпотентность (IF NOT EXISTS), запись в
  *     schema_migrations, GRANT для admik_app (0017), UNIQUE-идемпотентность
- *     cdek_status_log, FK через DO-блок, сплошная нумерация 0001..0018.
+ *     cdek_status_log, FK через DO-блок, монотонность нумерации.
  * (б) ИНТЕГРАЦИЯ (skipIf без DATABASE_URL) — двойной накат всех миграций,
  *     создание таблиц СДЭК, идемпотентная вставка в cdek_status_log (повтор → 1 ряд),
  *     добавление габаритов в products/product_variants.
@@ -41,11 +42,13 @@ describe('db/migrations — СДЭК 0017/0018 (юнит)', () => {
     expect(byVersion['0018']).toBe('product_weight_dims');
   });
 
-  it('нумерация без пропусков 0001..0018 сплошняком, 0018 завершает диапазон СДЭК', async () => {
+  it('нумерация строго возрастает, 0018 завершает диапазон СДЭК', async () => {
     const all = await listMigrations();
     const versions = all.map((m) => m.version);
-    const expected = versions.map((_, i) => String(i + 1).padStart(4, '0'));
-    expect(versions).toEqual(expected);
+    // Сплошную нумерацию не проверяем: миграции личного кабинета (0034…0037)
+    // живут только в ветке LK, значит разрыв 0033 → 0038 в freeLK — норма.
+    // Накату (sort по именам) важны лишь монотонность и формат NNNN.
+    expectVersionsStrictlyIncreasing(versions);
     for (const v of CDEK_VERSIONS) {
       expect(versions).toContain(v);
     }

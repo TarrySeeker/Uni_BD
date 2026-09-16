@@ -1,13 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listMigrations, parseMigrationName } from '@/lib/db/migrate';
+import { expectVersionsStrictlyIncreasing } from '@/tests/db/migration-numbering';
 
 /**
  * Тесты пакета П1 Этапа 2 — миграции каталога 0005…0010 (docs/05 §2).
  *
  * (а) ЮНИТ — читают .sql-файлы с диска (без БД), проходят ВСЕГДА:
  *     наличие файлов 0005..0010, идемпотентность (IF NOT EXISTS на всех CREATE),
- *     запись в schema_migrations, GRANT для admik_app, сплошная нумерация.
+ *     запись в schema_migrations, GRANT для admik_app, монотонность нумерации.
  * (б) ИНТЕГРАЦИЯ (skipIf без DATABASE_URL) — двойной накат всех миграций,
  *     создание ключевых таблиц каталога, работа FK (RESTRICT/CASCADE).
  */
@@ -56,14 +57,14 @@ describe('db/migrations — каталог 0005..0010 (юнит)', () => {
     expect(byVersion['0010']).toBe('catalog_inventory');
   });
 
-  it('нумерация без пропусков и продолжает Этап 1 (0001..0010 сплошняком)', async () => {
+  it('нумерация строго возрастает, диапазон каталога на месте', async () => {
     const all = await listMigrations();
     const versions = all.map((m) => m.version);
-    // Версии уникальны и идут сплошной возрастающей последовательностью.
-    const expected = versions
-      .slice()
-      .map((_, i) => String(i + 1).padStart(4, '0'));
-    expect(versions).toEqual(expected);
+    // Версии уникальны, в формате NNNN и строго возрастают. Сплошной
+    // последовательности НЕ требуем: миграции личного кабинета (0034…0037) есть
+    // только в ветке LK, поэтому в freeLK разрыв 0033 → 0038 законен и постоянен,
+    // а накат сортирует файлы по имени — пропуск номера ему безразличен.
+    expectVersionsStrictlyIncreasing(versions);
     // В частности, присутствует весь диапазон каталога.
     for (const v of CATALOG_VERSIONS) {
       expect(versions).toContain(v);

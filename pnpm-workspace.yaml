@@ -1,4 +1,26 @@
+# Admik — один пакет в корне, вложенных рабочих пространств нет.
+#
+# ЗАЧЕМ ЭТОТ ФАЙЛ ВООБЩЕ. Он нужен pnpm 9 (версия закреплена в Dockerfile:
+# corepack prepare pnpm@9.15.9) — тот считает файл описанием рабочего
+# пространства и ТРЕБУЕТ поле `packages`. Без него сборка образа падала на
+# `pnpm build` с «ERROR packages field missing or empty»: этап deps копирует
+# только package.json (и установка проходила), а этап build делает `COPY . .` —
+# и сломанный файл попадал внутрь уже перед самой сборкой.
+packages:
+  - '.'
+
+# Разрешения на выполнение install-скриптов зависимостей (pnpm 10+).
+#
+# ⚠ Значения ниже были плейсхолдером «set this to true or false» — это
+# НЕВЫПОЛНЕННЫЙ вопрос pnpm, а не настройка: с ним нативные скрипты молча
+# пропускаются, и sharp остаётся без бинарника libvips.
+#
+# sharp: true — он собирает/распаковывает нативный libvips. Рантайм-бинарник
+# всё равно ставится отдельной стадией `sharp` в Dockerfile под musl/x64 с
+# ТОЧНОЙ версией (диапазон `^` в обход lock уже ломал каталог 500-й ошибкой:
+# ERR_DLOPEN_FAILED, libvips не той версии, контейнер при этом healthy).
+# esbuild и unrs-resolver: true — оба распаковывают свой платформенный бинарник.
 allowBuilds:
-  esbuild: set this to true or false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

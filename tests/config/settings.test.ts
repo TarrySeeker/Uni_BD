@@ -12,6 +12,7 @@ import { getEnv } from '@/lib/config/env';
 import { getEnabledModules, ALL_MODULES } from '@/lib/config/modules';
 import { toMinor, fromMinor } from '@/lib/orders/money';
 import { listMigrations } from '@/lib/db/migrate';
+import { expectVersionsStrictlyIncreasing } from '@/tests/db/migration-numbering';
 
 /**
  * Тесты пакета 5.D-1 (docs/11 §5.4.6, §8) — фундамент DB-driven настроек.
@@ -316,11 +317,13 @@ describe('db/migrations — настройки 0019/0020 (юнит, файлы �
     expect(byVersion['0020']).toBe('shop_settings_seed');
   });
 
-  it('нумерация сплошная, продолжает 0018 без пропусков', async () => {
+  // Ждём не сплошную нумерацию, а порядок: миграции личного кабинета (0034…0037)
+  // живут только в ветке LK, поэтому в freeLK разрыв 0033 → 0038 законен и постоянен.
+  // Накат идёт sort по именам файлов — ему хватает монотонности и формата NNNN.
+  it('нумерация строго возрастает, 0019/0020 на месте (разрыв ветки LK допустим)', async () => {
     const all = await listMigrations();
     const versions = all.map((m) => m.version);
-    const expected = versions.map((_, i) => String(i + 1).padStart(4, '0'));
-    expect(versions).toEqual(expected);
+    expectVersionsStrictlyIncreasing(versions);
     expect(versions).toContain('0019');
     expect(versions).toContain('0020');
   });

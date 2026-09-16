@@ -1,13 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { listMigrations, parseMigrationName } from '@/lib/db/migrate';
+import { expectVersionsStrictlyIncreasing } from '@/tests/db/migration-numbering';
 
 /**
  * Тесты пакета 3.A Этапа 3 — миграции заказов 0012…0016 (docs/07 §2).
  *
  * (а) ЮНИТ — читают .sql-файлы с диска (без БД), проходят ВСЕГДА:
  *     наличие 0012..0016, идемпотентность (IF NOT EXISTS на всех CREATE),
- *     запись в schema_migrations, GRANT для admik_app, сплошная нумерация 0001..0016.
+ *     запись в schema_migrations, GRANT для admik_app, монотонность нумерации.
  * (б) ИНТЕГРАЦИЯ (skipIf без DATABASE_URL) — двойной накат ВСЕХ миграций,
  *     создание ключевых таблиц заказов, работа FK.
  */
@@ -45,13 +46,13 @@ describe('db/migrations — заказы 0012..0016 (юнит)', () => {
     expect(byVersion['0016']).toBe('order_number_counter');
   });
 
-  it('нумерация без пропусков и продолжает каталог (0001..0016 сплошняком)', async () => {
+  it('нумерация строго возрастает, диапазон заказов на месте', async () => {
     const all = await listMigrations();
     const versions = all.map((m) => m.version);
-    const expected = versions
-      .slice()
-      .map((_, i) => String(i + 1).padStart(4, '0'));
-    expect(versions).toEqual(expected);
+    // Сплошной нумерации не ждём: миграции личного кабинета (0034…0037) лежат
+    // только в ветке LK, поэтому в freeLK разрыв 0033 → 0038 законен и постоянен.
+    // Накат сортирует файлы по имени — важны монотонность и формат NNNN, не счётчик.
+    expectVersionsStrictlyIncreasing(versions);
     for (const v of ORDER_VERSIONS) {
       expect(versions).toContain(v);
     }
