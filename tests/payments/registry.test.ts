@@ -5,7 +5,11 @@
  * без сети, БД и боевых ключей.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+import type { Order } from '@/lib/orders/types';
+import { AtolProviderAdapter } from '@/lib/payments/registry/adapters';
+import type { AtolPaymentService } from '@/lib/payments/atol/service';
 
 import {
   resolvePaymentProviderCode,
@@ -19,6 +23,11 @@ describe('payments/registry — выбор эквайера магазина', (
   it('явный PAYMENTS_PROVIDER имеет приоритет', () => {
     expect(resolvePaymentProviderCode({ PAYMENTS_PROVIDER: 'ozon' })).toBe('ozon');
     expect(resolvePaymentProviderCode({ PAYMENTS_PROVIDER: 'tbank' })).toBe('tbank');
+    expect(resolvePaymentProviderCode({ PAYMENTS_PROVIDER: 'atol' })).toBe('atol');
+  });
+
+  it('регистр и пробелы не важны и для atol', () => {
+    expect(resolvePaymentProviderCode({ PAYMENTS_PROVIDER: ' AtoL  ' })).toBe('atol');
   });
 
   it('регистр и пробелы в значении не важны', () => {
@@ -64,5 +73,125 @@ describe('payments/registry — выбор эквайера магазина', (
     expect(getProviderForOrder(null)).toBeNull();
     expect(getProviderForOrder('')).toBeNull();
     expect(getProviderForOrder('manual')).toBeNull();
+  });
+
+  /** Новый эквайер обязан быть виден реестру, иначе он мёртвый код. */
+  it('atol зарегистрирован и создаётся', () => {
+    expect(knownPaymentProviders()).toContain('atol');
+    expect(createPaymentProvider('atol')?.code).toBe('atol');
+    expect(getProviderForOrder('atol')?.code).toBe('atol');
+  });
+});
+
+/**
+ * Адаптер АТОЛа. Сервис подставляем через DI (дефолтный параметр конструктора) —
+ * ни сети, ни боевых ключей.
+ *
+ * 🔴 Главное, что проверяем: refundPayment на «нечего возвращать» отдаёт
+ * skipped, а НЕ бросает. Иначе админка не смогла бы отменить заказ, оплаченный
+ * наличными или чужим эквайером, — контракт из lib/payments/types.ts.
+ */
+describe('payments/registry — AtolProviderAdapter', () => {
+  const REFUND_INPUT = {
+    orderId: 'order-uuid-1',
+    orderNumber: '2026-000123',
+    paymentStatus: 'paid',
+    paymentProvider: 'atol',
+    paymentRef: 'ATOL-1',
+    amountKop: 150000,
+  };
+
+  /** Минимальный дубль сервиса: только то, чем пользуется адаптер. */
+  function fakeService(over: Record<string, unknown> = {}) {
+    return {
+      isMock: false,
+      initPayment: vi.fn(),
+      handleCallback: vi.fn(),
+      reconcile: vi.fn(),
+      refund: vi.fn(() => Promise.resolve()),
+      ...over,
+    } as unknown as AtolPaymentService;
+  }
+
+  it('isConfigured = не mock (источник правды — сам сервис)', () => {
+    expect(new AtolProviderAdapter(fakeService({ isMock: false })).isConfigured()).toBe(true);
+    expect(new AtolProviderAdapter(fakeService({ isMock: true })).isConfigured()).toBe(false);
+  });
+
+  it('чужой провайдер заказа → skipped no_gateway, шлюз не дёргается', async () => {
+    const svc = fakeService();
+    const r = await new AtolProviderAdapter(svc).refundPayment({
+      ...REFUND_INPUT,
+      paymentProvider: 'tbank',
+    });
+    expect(r).toMatchObject({ ok: true, skipped: true, reason: 'no_gateway' });
+    expect((svc as unknown as { refund: ReturnType<typeof vi.fn> }).refund).not.toHaveBeenCalled();
+  });
+
+  it('заказ без paymentRef (наличные/по счёту) → skipped, а не исключение', async () => {
+    const svc = fakeService();
+    const r = await new AtolProviderAdapter(svc).refundPayment({
+      ...REFUND_INPUT,
+      paymentProvider: null,
+      paymentRef: null,
+    });
+    expect(r).toMatchObject({ ok: true, skipped: true, reason: 'no_gateway' });
+    expect((svc as unknown as { refund: ReturnType<typeof vi.fn> }).refund).not.toHaveBeenCalled();
+  });
+
+  it('деньги не захвачены → skipped not_captured', async () => {
+    const svc = fakeService();
+    for (const paymentStatus of ['pending', 'failed', 'refunded']) {
+      const r = await new AtolProviderAdapter(svc).refundPayment({ ...REFUND_INPUT, paymentStatus });
+      expect(r).toMatchObject({ ok: true, skipped: true, reason: 'not_captured' });
+    }
+    expect((svc as unknown as { refund: ReturnType<typeof vi.fn> }).refund).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 🔴 У АТОЛа отмена и возврат — одна ручка с суммой, поэтому, в отличие от
+   * Озона, возврат настоящий: сумма ОБЯЗАНА доехать до сервиса, иначе частичный
+   * возврат молча превратится в полный.
+   */
+  it('paid/authorized → возврат вызывается С СУММОЙ', async () => {
+    for (const paymentStatus of ['paid', 'authorized']) {
+      const svc = fakeService();
+      const r = await new AtolProviderAdapter(svc).refundPayment({ ...REFUND_INPUT, paymentStatus });
+      expect(r.ok).toBe(true);
+      expect(r.skipped).toBeUndefined();
+      expect((svc as unknown as { refund: ReturnType<typeof vi.fn> }).refund).toHaveBeenCalledWith({
+        paymentRef: 'ATOL-1',
+        amountKop: 150000,
+      });
+    }
+  });
+
+  it('частичный возврат передаёт именно свою сумму', async () => {
+    const svc = fakeService();
+    await new AtolProviderAdapter(svc).refundPayment({ ...REFUND_INPUT, amountKop: 50000 });
+    expect((svc as unknown as { refund: ReturnType<typeof vi.fn> }).refund).toHaveBeenCalledWith({
+      paymentRef: 'ATOL-1',
+      amountKop: 50000,
+    });
+  });
+
+  /** Отказ ШЛЮЗА — это ok:false с причиной: деньги остались у эквайера. */
+  it('шлюз отказал → ok:false с причиной, без выброса исключения', async () => {
+    const svc = fakeService({ refund: vi.fn(() => Promise.reject(new Error('PAYMENT_NOT_FOUND'))) });
+    const r = await new AtolProviderAdapter(svc).refundPayment(REFUND_INPUT);
+    expect(r.ok).toBe(false);
+    expect(r.skipped).toBeUndefined();
+    expect(r.reason).toBe('PAYMENT_NOT_FOUND');
+  });
+
+  it('reconcile пробрасывается в сервис', async () => {
+    const svc = fakeService({
+      reconcile: vi.fn(() => Promise.resolve({ status: '1', applied: true })),
+    });
+    const order = { id: 'order-uuid-1' } as unknown as Order;
+    await expect(new AtolProviderAdapter(svc).reconcile(order)).resolves.toEqual({
+      status: '1',
+      applied: true,
+    });
   });
 });

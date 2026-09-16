@@ -17,7 +17,7 @@
 
 import { logger } from '@/lib/logger';
 import type { PaymentProvider, PaymentProviderCode } from '@/lib/payments/types';
-import { TbankProviderAdapter, OzonProviderAdapter } from './adapters';
+import { TbankProviderAdapter, OzonProviderAdapter, AtolProviderAdapter } from './adapters';
 
 const log = logger.child({ module: 'payments.registry' });
 
@@ -25,6 +25,7 @@ const log = logger.child({ module: 'payments.registry' });
 const FACTORIES: Record<string, () => PaymentProvider> = {
   tbank: () => new TbankProviderAdapter(),
   ozon: () => new OzonProviderAdapter(),
+  atol: () => new AtolProviderAdapter(),
 };
 
 /** Провайдер по умолчанию — поведение платформы до появления реестра. */
