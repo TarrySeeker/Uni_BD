@@ -20,6 +20,14 @@ function fakeEffective(): EffectiveSettings {
     access: { singleUserMode: false },
     // Платформенный дефолт size_charts: сеток нет (таблица размеров не рисуется).
     sizeCharts: { charts: [] },
+    // Платформенные дефолты режима оформления: оплата включена (иначе появление
+    // настройки молча выключило бы приём денег), упаковка выключена.
+    checkout: {
+      onlinePaymentEnabled: true,
+      paymentDisabledNotice: null,
+      giftWrapEnabled: false,
+      giftWrapLabel: null,
+    },
     home: HOME_DEFAULTS,
     navigation: { header: [], footer: [] },
     branding: {
@@ -48,6 +56,10 @@ async function loadRoute() {
   vi.resetModules();
   vi.doMock('@/lib/config/settings', () => ({
     getEffectiveSettings: vi.fn(async () => fakeEffective()),
+    // Роут спрашивает модуль payments, чтобы не обещать витрине оплату,
+    // которую оформление заказа отклонит. В этих тестах модуль считаем
+    // включённым: проверяется core-always-on и изоляция DTO, а не оплата.
+    isModuleEffectivelyEnabled: vi.fn(async () => true),
   }));
   return import('@/app/api/storefront/v1/settings/route');
 }

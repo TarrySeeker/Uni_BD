@@ -57,6 +57,26 @@ export interface PublicHomeDto {
   };
 }
 
+/**
+ * Публичная размерная сетка. Набор колонок ПРОИЗВОЛЕН (задаётся в админке),
+ * строка — плоский словарь columnKey → значение ячейки. `genders` — значения
+ * атрибута товара `gender`, к которым применима сетка; пустой массив = «всегда».
+ */
+export interface PublicSizeChartDto {
+  id: string;
+  title: string;
+  note?: string;
+  genders: string[];
+  columns: { key: string; label: string }[];
+  rows: Record<string, string>[];
+}
+
+/** Публичный блок размерных сеток: сетки + общая сноска под таблицей. */
+export interface PublicSizeChartsDto {
+  charts: PublicSizeChartDto[];
+  footnote?: string;
+}
+
 /** Публичный DTO настроек магазина (наружу витрине). */
 export interface PublicSettingsDto {
   branding: {
@@ -101,6 +121,16 @@ export interface PublicSettingsDto {
     /** Порог бесплатной доставки — в КОПЕЙКАХ (0 = выключено). */
     freeDeliveryThreshold: number;
   };
+  /**
+   * Режим оформления заказа — публичный: витрина по нему решает, показывать
+   * оплату или заглушку-заявку, и рисовать ли пункт подарочной упаковки.
+   */
+  checkout: {
+    onlinePaymentEnabled: boolean;
+    paymentDisabledNotice: string | null;
+    giftWrapEnabled: boolean;
+    giftWrapLabel: string | null;
+  };
   seo: {
     siteName: string | null;
     siteUrl: string | null;
@@ -115,6 +145,11 @@ export interface PublicSettingsDto {
     header: { label: string; href: string }[];
     footer: { title: string; links: { label: string; href: string }[] }[];
   };
+  /**
+   * Размерные сетки магазина — публичные (показываются на карточке товара).
+   * Пустой charts = сеток нет, витрина не рисует блок «Размерная сетка».
+   */
+  sizeCharts: PublicSizeChartsDto;
 }
 
 /**
@@ -125,7 +160,16 @@ export interface PublicSettingsDto {
 export function toPublicSettingsDto(
   eff: EffectiveSettings,
   publicUrl: PublicUrlResolver = (k) => k,
+  // Реально ли включён модуль `payments` (эквайринг). Онлайн-оплата возможна
+  // ТОЛЬКО когда И бизнес-тумблер checkout.onlinePaymentEnabled, И модуль
+  // payments включены. Иначе createOrder отклонит онлайн-заказ (payments_disabled),
+  // а витрина, доверяя одному тумблеру, увела бы покупателя в тупик. Дефолт true —
+  // не менять контракт для вызовов/тестов, которым модульный статус не важен.
+  paymentsModuleEnabled = true,
 ): PublicSettingsDto {
+  const onlinePaymentEffective =
+    eff.checkout.onlinePaymentEnabled && paymentsModuleEnabled;
+
   return {
     branding: {
       shopName: eff.branding.shopName,
@@ -168,6 +212,12 @@ export function toPublicSettingsDto(
     delivery: {
       freeDeliveryThreshold: eff.delivery.freeDeliveryThreshold,
     },
+    checkout: {
+      onlinePaymentEnabled: onlinePaymentEffective,
+      paymentDisabledNotice: eff.checkout.paymentDisabledNotice,
+      giftWrapEnabled: eff.checkout.giftWrapEnabled,
+      giftWrapLabel: eff.checkout.giftWrapLabel,
+    },
     seo: {
       siteName: eff.seo.site_name ?? null,
       siteUrl: eff.seo.site_url ?? null,
@@ -205,6 +255,17 @@ export function toPublicSettingsDto(
         title: c.title,
         links: c.links.map((l) => ({ label: l.label, href: l.href })),
       })),
+    },
+    sizeCharts: {
+      charts: eff.sizeCharts.charts.map((c) => ({
+        id: c.id,
+        title: c.title,
+        ...(c.note ? { note: c.note } : {}),
+        genders: [...c.genders],
+        columns: c.columns.map((col) => ({ key: col.key, label: col.label })),
+        rows: c.rows.map((r) => ({ ...r })),
+      })),
+      ...(eff.sizeCharts.footnote ? { footnote: eff.sizeCharts.footnote } : {}),
     },
   };
 }

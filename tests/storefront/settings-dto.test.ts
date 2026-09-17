@@ -18,6 +18,14 @@ function makeEffective(): EffectiveSettings {
     access: { singleUserMode: false },
     // Платформенный дефолт size_charts: сеток нет (таблица размеров не рисуется).
     sizeCharts: { charts: [] },
+    // Платформенные дефолты режима оформления: оплата включена (иначе появление
+    // настройки молча выключило бы приём денег), упаковка выключена.
+    checkout: {
+      onlinePaymentEnabled: true,
+      paymentDisabledNotice: null,
+      giftWrapEnabled: false,
+      giftWrapLabel: null,
+    },
     branding: {
       shopName: 'Gang Auto',
       logoUrl: 'https://cdn/logo.png',
@@ -105,5 +113,64 @@ describe('storefront/settings-dto — toPublicSettingsDto', () => {
     expect(dto.contacts.phone).toBeNull();
     expect(dto.contacts.socials).toEqual([]);
     expect(dto.legalEntity.name).toBeNull();
+  });
+});
+
+/**
+ * Режим оформления заказа в публичном DTO.
+ *
+ * 🔴 ГЛАВНОЕ СВОЙСТВО: онлайн-оплата показывается витрине ТОЛЬКО когда
+ * совпало ДВА условия — бизнес-тумблер владельца И включённый модуль
+ * payments. Каждое по отдельности недостаточно:
+ *   • тумблер включён, модуль выключен → витрина нарисует кнопку оплаты, а
+ *     createOrder отклонит заказ с payments_disabled. Покупатель увидит
+ *     ошибку на последнем шаге — худший момент из возможных;
+ *   • модуль включён, тумблер выключен → владелец сознательно не берёт
+ *     деньги на сайте (эквайринг не подключён, документы не готовы), и
+ *     показывать оплату нельзя.
+ */
+describe('settings DTO — checkout: оплата только при тумблере И модуле', () => {
+  const eff = () => ({
+    ...makeEffective(),
+    checkout: {
+      onlinePaymentEnabled: true,
+      paymentDisabledNotice: 'Оплата при получении',
+      giftWrapEnabled: true,
+      giftWrapLabel: 'Подарочная упаковка',
+    },
+  });
+
+  it('тумблер включён + модуль включён → оплата доступна', () => {
+    const dto = toPublicSettingsDto(eff(), (k) => k, true);
+    expect(dto.checkout.onlinePaymentEnabled).toBe(true);
+  });
+
+  it('🔴 тумблер включён, но модуль payments ВЫКЛЮЧЕН → оплата НЕ доступна', () => {
+    const dto = toPublicSettingsDto(eff(), (k) => k, false);
+    expect(dto.checkout.onlinePaymentEnabled).toBe(false);
+  });
+
+  it('🔴 тумблер выключен → оплата не доступна даже при включённом модуле', () => {
+    const src = eff();
+    src.checkout.onlinePaymentEnabled = false;
+    const dto = toPublicSettingsDto(src, (k) => k, true);
+    expect(dto.checkout.onlinePaymentEnabled).toBe(false);
+  });
+
+  it('текст-заглушка и подарочная упаковка проходят наружу как есть', () => {
+    const dto = toPublicSettingsDto(eff(), (k) => k, false);
+    expect(dto.checkout.paymentDisabledNotice).toBe('Оплата при получении');
+    expect(dto.checkout.giftWrapEnabled).toBe(true);
+    expect(dto.checkout.giftWrapLabel).toBe('Подарочная упаковка');
+  });
+
+  /**
+   * Обратная совместимость: параметр не передан → считаем модуль включённым,
+   * то есть поведение до появления флага. Иначе все существующие вызовы
+   * молча погасили бы оплату.
+   */
+  it('параметр модуля не передан → прежнее поведение (оплата по тумблеру)', () => {
+    const dto = toPublicSettingsDto(eff(), (k) => k);
+    expect(dto.checkout.onlinePaymentEnabled).toBe(true);
   });
 });

@@ -8,7 +8,7 @@
  */
 
 import { runStorefront, jsonData, handlePreflight } from '@/lib/storefront/response';
-import { getEffectiveSettings } from '@/lib/config/settings';
+import { getEffectiveSettings, isModuleEffectivelyEnabled } from '@/lib/config/settings';
 import { toPublicSettingsDto } from '@/lib/storefront/settings-dto';
 import { getStorage } from '@/lib/storage';
 
@@ -22,7 +22,17 @@ export async function GET(req: Request): Promise<Response> {
       // Изображения главной (home.*) отдаём как публичные URL: ключи S3 наружу
       // не раскрываем (инвариант, зеркально каталог-медиа/CMS).
       const storage = getStorage();
-      return jsonData(toPublicSettingsDto(eff, (k) => storage.url(k)), {}, cors);
+      // 🔴 Онлайн-оплата честна для витрины ТОЛЬКО с учётом модуля payments:
+      // бизнес-тумблер checkout.onlinePaymentEnabled сам по себе ничего не
+      // значит, если модуль выключен — createOrder отклонит заказ с
+      // payments_disabled. Отдаём наружу ЭФФЕКТИВНЫЙ флаг, иначе витрина
+      // покажет кнопку оплаты, а оформление упадёт.
+      const paymentsModuleEnabled = await isModuleEffectivelyEnabled('payments');
+      return jsonData(
+        toPublicSettingsDto(eff, (k) => storage.url(k), paymentsModuleEnabled),
+        {},
+        cors,
+      );
     },
     { module: null },
   );

@@ -33,6 +33,7 @@ import {
   type NavigationSettings,
   type AccessSettings,
   type SizeChartsSettings,
+  type CheckoutSettings,
 } from '@/lib/settings/schemas';
 import { HOME_DEFAULTS, type HomeContent } from '@/lib/config/home-defaults';
 import { toMinor } from '@/lib/orders/money';
@@ -124,6 +125,21 @@ export interface EffectiveSettings {
    * ни одна сетка не зашита в код). Набор колонок произвольный, задаётся из админки.
    */
   sizeCharts: SizeChartsSettings;
+  /**
+   * Режим оформления заказа. Тумблер онлайн-оплаты — БИЗНЕС-решение владельца
+   * (эквайринг не подключён, документы не готовы), а не признак технической
+   * поломки: магазин продолжает принимать заказы как заявки.
+   *
+   * 🔴 Дефолт онлайн-оплаты — ВКЛЮЧЕНО. Иначе появление настройки молча
+   * выключило бы приём денег у магазинов, где оплата уже работает.
+   * Подарочная упаковка по умолчанию выключена: такой услуги может не быть.
+   */
+  checkout: {
+    onlinePaymentEnabled: boolean;
+    paymentDisabledNotice: string | null;
+    giftWrapEnabled: boolean;
+    giftWrapLabel: string | null;
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -250,6 +266,8 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
   // size_charts — мягкий парс: кривая строка БД → дефолт «сеток нет» (charts: []).
   const sizeCharts: SizeChartsSettings =
     parseSettingValue('size_charts', rows.get('size_charts')) ?? { charts: [] };
+  // checkout — мягкий парс: кривая строка БД → {} → платформенные дефолты ниже.
+  const checkout: CheckoutSettings = parseSettingValue('checkout', rows.get('checkout')) ?? {};
   // module_overrides — мягкий парс (.strip): кривая строка БД → {} (нет оверрайда).
   const moduleOverrides: ModuleOverrides =
     parseSettingValue('module_overrides', rows.get('module_overrides')) ?? {};
@@ -318,6 +336,14 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
     sizeCharts: {
       charts: sizeCharts.charts ?? [],
       ...(sizeCharts.footnote ? { footnote: sizeCharts.footnote } : {}),
+    },
+    checkout: {
+      // ?? true — см. комментарий к типу: молчаливое выключение приёма денег
+      // у магазина, где оплата уже работает, недопустимо.
+      onlinePaymentEnabled: checkout.onlinePaymentEnabled ?? true,
+      paymentDisabledNotice: checkout.paymentDisabledNotice ?? null,
+      giftWrapEnabled: checkout.giftWrapEnabled ?? false,
+      giftWrapLabel: checkout.giftWrapLabel ?? null,
     },
   };
 }

@@ -220,6 +220,21 @@ export interface DeliveryInput {
   cost: MoneyString;
   /** Порог бесплатной доставки (SHOP_FREE_DELIVERY_THRESHOLD); 0 = выключено. */
   freeThreshold: number;
+  /**
+   * Право на бесплатную доставку ПО ПОРОГУ. Магазин может ограничить акцию
+   * географией (типичное решение: бесплатно по России, СНГ и зарубеж — платно),
+   * и тогда сюда приезжает уже вычисленный признак.
+   *
+   * 🔴 `undefined`/`true` → порог действует, КАК РАНЬШЕ. Поле опционально
+   * именно поэтому: «признак не передан» (страна неизвестна, старый заказ,
+   * самовывоз) не должно означать «бесплатной доставки нет». Иначе появление
+   * поля молча отняло бы бесплатную доставку у всех работающих магазинов.
+   *
+   * `false` → порог НЕ применяется, покупатель платит реальную стоимость.
+   * Промокод на бесплатную доставку действует независимо: это явная акция
+   * магазина, и выданный покупателю промокод обязан срабатывать.
+   */
+  freeEligible?: boolean;
 }
 
 /** Полный вход расчёта итога. */
@@ -591,8 +606,13 @@ export function resolveDelivery(
   const baseCostMinor = toMinor(delivery.cost);
 
   // Порог: 0 (или отрицательный) = выключено → никогда не «бесплатно по порогу».
+  // freeEligible === false (например доставка не по РФ) → порог не применяется
+  // вовсе: покупатель платит реальную стоимость. Сравнение именно с `false`,
+  // чтобы «признак не передан» сохраняло прежнее поведение (см. тип).
   const thresholdMinor =
-    delivery.freeThreshold > 0 ? toMinor(delivery.freeThreshold) : Number.POSITIVE_INFINITY;
+    delivery.freeEligible !== false && delivery.freeThreshold > 0
+      ? toMinor(delivery.freeThreshold)
+      : Number.POSITIVE_INFINITY;
   const freeThresholdMet =
     Number.isFinite(thresholdMinor) && netItemsMinor >= thresholdMinor;
 

@@ -86,6 +86,16 @@ export const deliverySelectionSchema = z
      * сервер из каталога, тариф — из whitelist (anti-tamper, ADR-010).
      */
     cityCode: z.number().int().positive().optional(),
+    /**
+     * Страна доставки. Нужна для географических правил доставки — например
+     * «бесплатно по порогу только по РФ» (см. freeEligible в lib/orders/pricing).
+     *
+     * В БД НЕ сохраняется: это параметр расчёта, а не реквизит заказа. Из тела
+     * доверяем — это не цена: итог всё равно считает сервер из каталога
+     * (anti-tamper, ADR-010), а страна может лишь СДЕЛАТЬ доставку платной,
+     * но никогда — бесплатной (неизвестная страна = прежнее поведение).
+     */
+    country: z.string().trim().max(100).optional(),
     address: z.string().trim().max(500).optional(),
     pvzCode: z.string().trim().max(64).optional(),
   })

@@ -124,6 +124,17 @@ const innField = z
 /** Денежная величина в копейках (целое, ≥ 0). */
 const minorMoney = z.number().int().min(0);
 
+/**
+ * Текст настроек, где ПУСТАЯ строка значит «не задано» (владелец очистил поле),
+ * а не «показать пустоту». `.transform` схлопывает '' и пробелы в undefined,
+ * чтобы потребитель мягко деградировал на свой дефолт.
+ */
+const optionalText = z
+  .string()
+  .trim()
+  .transform((v) => (v.length > 0 ? v : undefined))
+  .optional();
+
 // -----------------------------------------------------------------------------
 // Схемы значений по ключам (§5.4.1). Все объекты — `partial`/опциональные поля,
 // т.к. строка БД хранит ТОЛЬКО оверрайды; отсутствующее поле → env-дефолт.
@@ -379,6 +390,31 @@ export const accessSchema = z
 // Реестр ключ → схема. Единственный источник правды о наборе ключей настроек.
 // -----------------------------------------------------------------------------
 
+/**
+ * checkout — режим оформления заказа (мультитенантно, без правки кода витрины).
+ *
+ *  • onlinePaymentEnabled — есть ли у магазина работающий эквайринг. При false
+ *    витрина НЕ инициирует платёж: заказ оформляется как ЗАЯВКА, покупателю
+ *    показывается paymentDisabledNotice. Дефолт (поле не задано) — ВКЛЮЧЕНО,
+ *    чтобы настройка не меняла поведение магазинов, где оплата уже работает.
+ *  • giftWrapEnabled/giftWrapLabel — пункт «подарочная упаковка» в корзине.
+ *    Дефолт — ВЫКЛЮЧЕНО: у магазина может не быть такой услуги.
+ *
+ * 🔴 Тумблер онлайн-оплаты — это БИЗНЕС-решение владельца, а не признак
+ * технической готовности. Он существует именно для состояния «эквайринг ещё
+ * не подключён / документы не готовы»: магазин продолжает принимать заказы,
+ * но деньги на сайте не берёт. Без него единственным способом «выключить
+ * оплату» остаётся сломать конфигурацию, а это выглядит как авария.
+ */
+export const checkoutSettingsSchema = z
+  .object({
+    onlinePaymentEnabled: z.boolean().optional(),
+    paymentDisabledNotice: optionalText,
+    giftWrapEnabled: z.boolean().optional(),
+    giftWrapLabel: optionalText,
+  })
+  .strip();
+
 /** Максимум колонок в сетке — он же потолок числа ячеек в одной строке. */
 const MAX_SIZE_CHART_COLUMNS = 24;
 
@@ -499,6 +535,7 @@ export const SETTING_KEYS = [
   'navigation',
   'access',
   'size_charts',
+  'checkout',
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -519,6 +556,7 @@ export const SETTING_SCHEMAS = {
   navigation: navigationSchema,
   access: accessSchema,
   size_charts: sizeChartsSchema,
+  checkout: checkoutSettingsSchema,
 } as const satisfies Record<SettingKey, z.ZodTypeAny>;
 
 // Типы значений по ключам (выводятся из схем).
@@ -540,6 +578,8 @@ export type SizeChartsSettings = z.infer<typeof sizeChartsSchema>;
 export type SizeChart = SizeChartsSettings['charts'][number];
 /** Колонка размерной сетки (произвольная, задаётся из админки). */
 export type SizeChartColumn = z.infer<typeof sizeChartColumnSchema>;
+/** Режим оформления заказа (тумблер онлайн-оплаты, подарочная упаковка). */
+export type CheckoutSettings = z.infer<typeof checkoutSettingsSchema>;
 
 /**
  * Безопасный парс значения по ключу. Возвращает провалидированный частичный
