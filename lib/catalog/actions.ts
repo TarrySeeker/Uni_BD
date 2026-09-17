@@ -26,6 +26,7 @@ import {
   AttributeCreateSchema,
   AttributeUpdateSchema,
   AttributeValueSchema,
+  AttributeValueUpdateSchema,
   AttributeValueDeleteSchema,
   SetProductAttributesSchema,
   MediaUploadSchema,
@@ -924,8 +925,11 @@ export const addAttributeValue = defineAction({
   handler: async (data, _ctx) => {
     await assertCatalogEnabled();
     const rows = await sql<{ id: string }[]>`
-      INSERT INTO attribute_values (attribute_id, value, slug, sort)
-      VALUES (${data.attributeId}, ${data.value}, ${data.slug ?? null}, ${data.sort ?? 0})
+      INSERT INTO attribute_values (attribute_id, value, slug, sort, color_hex)
+      VALUES (
+        ${data.attributeId}, ${data.value}, ${data.slug ?? null},
+        ${data.sort ?? 0}, ${data.colorHex ?? null}
+      )
       RETURNING id
     `;
     return {
@@ -935,7 +939,55 @@ export const addAttributeValue = defineAction({
         action: 'catalog.attribute_value.create',
         entityType: 'attribute_value',
         entityId: rows[0]!.id,
-        after: { attributeId: data.attributeId, value: data.value },
+        after: {
+          attributeId: data.attributeId,
+          value: data.value,
+          colorHex: data.colorHex ?? null,
+        },
+      },
+    };
+  },
+});
+
+/**
+ * Правка значения словаря — в первую очередь HEX справочника «Цвет» (0043):
+ * значения обычно уже заведены, и требовать удалить-создать заново ради hex
+ * нельзя (FK ON DELETE RESTRICT не даст удалить используемое значение).
+ *
+ * colorHex различает undefined («не трогать») и null («очистить») — как
+ * priceOverride в updateVariant. Через COALESCE это невыразимо, поэтому CASE.
+ */
+export const updateAttributeValue = defineAction({
+  permission: 'catalog.write',
+  input: AttributeValueUpdateSchema,
+  handler: async (data, _ctx) => {
+    await assertCatalogEnabled();
+    const before = await sql<Record<string, unknown>[]>`
+      SELECT * FROM attribute_values WHERE id = ${data.id} LIMIT 1
+    `;
+    if (!before[0]) {
+      throw new CatalogError('not_found', 'Значение характеристики не найдено.');
+    }
+    const after = await sql<Record<string, unknown>[]>`
+      UPDATE attribute_values SET
+        value     = COALESCE(${data.value ?? null}, value),
+        slug      = CASE WHEN ${data.slug !== undefined}
+                         THEN ${data.slug ?? null} ELSE slug END,
+        sort      = COALESCE(${data.sort ?? null}, sort),
+        color_hex = CASE WHEN ${data.colorHex !== undefined}
+                         THEN ${data.colorHex ?? null} ELSE color_hex END
+      WHERE id = ${data.id}
+      RETURNING *
+    `;
+    return {
+      result: { id: data.id },
+      revalidate: [ATTRIBUTES_PATH],
+      audit: {
+        action: 'catalog.attribute_value.update',
+        entityType: 'attribute_value',
+        entityId: data.id,
+        before: before[0],
+        after: after[0],
       },
     };
   },

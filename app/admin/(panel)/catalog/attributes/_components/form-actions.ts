@@ -4,6 +4,7 @@ import {
   createAttribute,
   updateAttribute,
   addAttributeValue,
+  updateAttributeValue,
   deleteAttributeValue,
 } from '@/lib/catalog/actions';
 import type { ActionResult } from '@/lib/server/action';
@@ -34,6 +35,12 @@ export async function addAttributeValueAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   return addAttributeValue(input);
+}
+
+export async function updateAttributeValueAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  return updateAttributeValue(input);
 }
 
 export async function deleteAttributeValueAction(

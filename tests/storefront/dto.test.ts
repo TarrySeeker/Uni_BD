@@ -9,6 +9,7 @@ import {
   computeInStock,
   computeAvailableQty,
   effectiveVariantPrice,
+  collectProductColors,
 } from '@/lib/storefront/dto';
 import type {
   Brand,
@@ -313,6 +314,41 @@ describe('storefront/dto — карточка товара', () => {
     expect(v).not.toHaveProperty('productId');
   });
 
+  // Цвет варианта (0043): цвет живёт в вариантном EAV, а `name` варианта
+  // остаётся своей меткой («M») — цвет в имя не подмешивается.
+  it('цвет варианта и сводка colors собираются ТОЛЬКО по активным вариантам', () => {
+    const colored: ProductDetail = {
+      ...product,
+      variants: [
+        { ...variant, color: 'Белый', colorHex: '#FFFFFF' },
+        // Второй размер того же цвета — в сводке цветов схлопнется в один.
+        { ...variant, id: 'v3', sku: 'V3', name: 'L', color: 'Белый', colorHex: '#FFFFFF' },
+        // Неактивный: его цвет выбрать было бы некуда (варианта нет в DTO).
+        { ...inactiveVariant, color: 'Синий', colorHex: '#0000FF' },
+      ],
+    };
+    const dto = toProductDetailDto(colored, {
+      effectiveIsNew: false,
+      categorySlugs: [],
+      seoCtx: TEST_SEO_CTX,
+    });
+    expect(dto.colors).toEqual([{ value: 'Белый', hex: '#FFFFFF' }]);
+    expect(dto.variants[0]!.color).toBe('Белый');
+    expect(dto.variants[0]!.colorHex).toBe('#FFFFFF');
+    expect(dto.variants[0]!.name).toBe('M');
+  });
+
+  it('цвета не заведены → colors пуст, поля варианта null (витрина не рисует селектор)', () => {
+    const dto = toProductDetailDto(product, {
+      effectiveIsNew: false,
+      categorySlugs: [],
+      seoCtx: TEST_SEO_CTX,
+    });
+    expect(dto.colors).toEqual([]);
+    expect(dto.variants[0]!.color).toBeNull();
+    expect(dto.variants[0]!.colorHex).toBeNull();
+  });
+
   // Регресс (Prevki «Халат, остаток 50, но нет в наличии» + «не выбрать размер»):
   // товар БЕЗ вариантов с остатком на УРОВНЕ ТОВАРА (variant_id = null) должен
   // отдавать id (для заказа по productId), inStock=true и пустой список вариантов.
@@ -454,5 +490,56 @@ describe('computeAvailableQty — доступное к заказу колич�
     // Строгий === спрятал бы остаток; citext-семантика — «Main» === «main».
     expect(computeAvailableQty(mixed, undefined, 'main')).toBe(4);
     expect(computeInStock(mixed, undefined, 'main')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Цвета товара (attribute_values.color_hex, миграция 0043).
+//
+// Витрина рисует свотч по hex из DTO. Значит здесь граница: наружу уходит либо
+// валидный '#RRGGBB', либо null — но НИКОГДА сырая строка из БД, даже если
+// CHECK там почему-то обошли (восстановление из старого дампа, ручной SQL).
+// ---------------------------------------------------------------------------
+describe('collectProductColors', () => {
+  const v = (color: string | null, colorHex: string | null = null) => ({ color, colorHex });
+
+  it('схлопывает повторы цвета (один цвет на нескольких размерах)', () => {
+    expect(collectProductColors([v('Белый'), v('Белый'), v('Чёрный')])).toEqual([
+      { value: 'Белый', hex: null },
+      { value: 'Чёрный', hex: null },
+    ]);
+  });
+
+  it('порядок — первое появление, написание — первое встреченное', () => {
+    expect(collectProductColors([v('Серый'), v('серый'), v('СЕРЫЙ')])).toEqual([
+      { value: 'Серый', hex: null },
+    ]);
+  });
+
+  it('ё и е — один цвет (справочник ведёт человек)', () => {
+    expect(collectProductColors([v('Чёрный'), v('Черный')])).toHaveLength(1);
+  });
+
+  it('hex берётся с ПЕРВОГО варианта, где он задан (порядок не теряет цвет)', () => {
+    expect(collectProductColors([v('Белый'), v('Белый', '#FFFFFF')])).toEqual([
+      { value: 'Белый', hex: '#FFFFFF' },
+    ]);
+  });
+
+  it('невалидный hex из БД наружу не уходит — null вместо мусора', () => {
+    expect(collectProductColors([v('Белый', 'white')])).toEqual([
+      { value: 'Белый', hex: null },
+    ]);
+    expect(collectProductColors([v('Белый', '#FFF')])).toEqual([
+      { value: 'Белый', hex: null },
+    ]);
+  });
+
+  it('варианты без цвета пропускаются, пустая строка цветом не считается', () => {
+    expect(collectProductColors([v(null), v('  '), v('Белый')])).toEqual([
+      { value: 'Белый', hex: null },
+    ]);
+    expect(collectProductColors([])).toEqual([]);
+    expect(collectProductColors([{}])).toEqual([]);
   });
 });

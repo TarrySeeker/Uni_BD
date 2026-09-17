@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { isColorAttribute } from '@/lib/catalog/color';
 import { listAttributes, listAttributeValues } from '@/lib/catalog/repository';
 
 import { Forbidden } from '../../../_components/Forbidden';
@@ -56,10 +57,15 @@ export default async function AttributeDetailPage({
         <AttributeForm attribute={attribute} />
       </div>
 
+      {/* isColor: справочник «Цвет» распознаётся по имени/коду (lib/catalog/color.ts),
+          а НЕ по флагу is_variant — в реальных данных его никто не проставляет.
+          От этого зависит только показ колонки HEX, поэтому ошибка распознавания
+          ничего не ломает: колонка просто не появится. */}
       <AttributeValues
         attributeId={attribute.id}
         values={values}
         editable={attribute.type === 'select'}
+        isColor={isColorAttribute(attribute)}
       />
     </div>
   );

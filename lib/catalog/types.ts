@@ -158,6 +158,15 @@ export interface ProductVariant {
   isActive: boolean;
   sort: number;
   attributesCache: Record<string, unknown>;
+  /**
+   * Значение цвета варианта («Белый») из вариантного EAV (product_attributes с
+   * variant_id → attribute_values.value). null — цвет у варианта не заведён.
+   * Опционально в типе: точечные SELECT без цветового джойна и старые фикстуры
+   * варианта остаются валидными.
+   */
+  color?: string | null;
+  /** HEX цвета варианта ('#RRGGBB') из attribute_values.color_hex; null — не задан. */
+  colorHex?: string | null;
   /** Вес варианта в граммах (0018); null → берётся от товара → дефолт магазина. */
   weightG: number | null;
   /** Габариты варианта в см (0018); null → берётся от товара → дефолт магазина. */
@@ -190,6 +199,13 @@ export interface AttributeValue {
   value: string;
   slug: string | null;
   sort: number;
+  /**
+   * HEX-код '#RRGGBB' для значений справочника «Цвет» (attribute_values.color_hex,
+   * миграция 0043); null — не задан, витрина отрисует значение текстом.
+   * Хранится в словаре, а НЕ в attributes_cache: форма кеша
+   * Record<string, string | string[]> объект {value,hex} не выдержала бы.
+   */
+  colorHex: string | null;
 }
 
 /** Привязка характеристики к товару/варианту (product_attributes). */

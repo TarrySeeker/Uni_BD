@@ -5,11 +5,13 @@ import {
   buildAttributeCreatePayload,
   buildAttributeUpdatePayload,
   buildAttributeValuePayload,
+  buildAttributeValueUpdatePayload,
 } from '@/app/admin/(panel)/catalog/attributes/_components/payload';
 import {
   AttributeCreateSchema,
   AttributeUpdateSchema,
   AttributeValueSchema,
+  AttributeValueUpdateSchema,
 } from '@/lib/catalog/schemas';
 import { defineAction, type ActionDeps } from '@/lib/server/action';
 import type { AuthUser } from '@/lib/auth/rbac';
@@ -261,5 +263,78 @@ describe('характеристики через defineAction — guard catalog
     const res = await action({ code: 'color', name: 'Цвет' });
     expect(res.ok).toBe(true);
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HEX справочника «Цвет» (0043): форма нормализует бытовой ввод, схема судит.
+//
+// ПОЧЕМУ ЭТО РАЗДЕЛЕНИЕ ТЕСТИРУЕТСЯ: человек набирает `FFFFFF` и `#fff`, а
+// CHECK в БД и Zod принимают строго '#RRGGBB'. Если нормализации нет, редактор
+// получает ошибку формата на совершенно разумном вводе; если нормализация
+// «дочинивает» мусор — в БД уедет неверный цвет. Граница ровно здесь.
+// ---------------------------------------------------------------------------
+describe('buildAttributeValuePayload: colorHex', () => {
+  it('#RRGGBB проходит как есть (в верхнем регистре) и валиден по схеме', () => {
+    const payload = buildAttributeValuePayload(UUID, { value: 'Белый', colorHex: '#ffffff' });
+    expect(payload.colorHex).toBe('#FFFFFF');
+    expect(AttributeValueSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('бытовой ввод без решётки и сокращённый #RGB нормализуются', () => {
+    expect(buildAttributeValuePayload(UUID, { value: 'X', colorHex: 'ff00aa' }).colorHex).toBe('#FF00AA');
+    expect(buildAttributeValuePayload(UUID, { value: 'X', colorHex: '#f0a' }).colorHex).toBe('#FF00AA');
+    expect(buildAttributeValuePayload(UUID, { value: 'X', colorHex: ' FFF ' }).colorHex).toBe('#FFFFFF');
+  });
+
+  it('поле не показано (не цветной справочник) → colorHex не передаётся вовсе', () => {
+    const payload = buildAttributeValuePayload(UUID, { value: 'M' });
+    expect(payload.colorHex).toBeUndefined();
+    expect(AttributeValueSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('пустое поле HEX → undefined: значение без свотча валидно', () => {
+    const payload = buildAttributeValuePayload(UUID, { value: 'Белый', colorHex: '   ' });
+    expect(payload.colorHex).toBeUndefined();
+    expect(AttributeValueSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('нераспознанный ввод НЕ «дочиняется» — отдаётся схеме и отклоняется ею', () => {
+    const payload = buildAttributeValuePayload(UUID, { value: 'X', colorHex: 'красный' });
+    expect(payload.colorHex).toBe('красный');
+    expect(AttributeValueSchema.safeParse(payload).success).toBe(false);
+  });
+});
+
+describe('buildAttributeValueUpdatePayload', () => {
+  it('правка только hex: остальные поля undefined (сервер их не трогает)', () => {
+    const payload = buildAttributeValueUpdatePayload(UUID, { colorHex: '#123abc' });
+    expect(payload).toMatchObject({ id: UUID, colorHex: '#123ABC' });
+    expect(payload.value).toBeUndefined();
+    expect(payload.sort).toBeUndefined();
+    expect(AttributeValueUpdateSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('пустая строка HEX → null: это ОСОЗНАННАЯ очистка, а не «не трогать»', () => {
+    const payload = buildAttributeValueUpdatePayload(UUID, { colorHex: '' });
+    expect(payload.colorHex).toBeNull();
+    const res = AttributeValueUpdateSchema.safeParse(payload);
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.colorHex).toBeNull();
+    }
+  });
+
+  it('мусорный hex доходит до схемы и отклоняется (валидация не только в UI)', () => {
+    const payload = buildAttributeValueUpdatePayload(UUID, { colorHex: '#12345' });
+    expect(AttributeValueUpdateSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('невалидный id отклоняется схемой', () => {
+    expect(
+      AttributeValueUpdateSchema.safeParse(
+        buildAttributeValueUpdatePayload('nope', { colorHex: '#FFFFFF' }),
+      ).success,
+    ).toBe(false);
   });
 });

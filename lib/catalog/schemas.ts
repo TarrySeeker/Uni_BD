@@ -361,13 +361,45 @@ export const AttributeUpdateSchema = z.object({
 });
 export type AttributeUpdateInput = z.infer<typeof AttributeUpdateSchema>;
 
+/**
+ * HEX-код цвета значения справочника (attribute_values.color_hex, миграция
+ * 0043). Зеркало CHECK-ограничения attribute_values_color_hex_chk: формат
+ * '#RRGGBB' в любом регистре. null — цвет без hex (витрина отрисует текстом).
+ *
+ * ПОЧЕМУ ВАЛИДАЦИЯ ЗДЕСЬ, А НЕ ТОЛЬКО В UI: CHECK в БД отвергнет мусор жёстко,
+ * но исключением уровня драйвера — редактор увидел бы «внутреннюю ошибку»
+ * вместо внятной подсказки про формат. Zod даёт человекочитаемый fieldError.
+ */
+const colorHexSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9A-Fa-f]{6}$/, 'формат HEX: #RRGGBB, например #FFFFFF');
+
 export const AttributeValueSchema = z.object({
   attributeId: uuidSchema,
   value: z.string().trim().min(1).max(255),
   slug: slugSchema.nullish(),
   sort: z.number().int().min(0).optional().default(0),
+  colorHex: colorHexSchema.nullish(),
 });
 export type AttributeValueInput = z.infer<typeof AttributeValueSchema>;
+
+/**
+ * Правка существующего значения словаря. Отдельная схема от AttributeValueSchema:
+ * там attributeId обязателен (значение создаётся В справочнике), здесь меняются
+ * только поля самого значения. `colorHex: null` — осознанная очистка hex,
+ * `colorHex: undefined` — «не трогать» (различие важно для хендлера).
+ */
+export const AttributeValueUpdateSchema = z.object({
+  id: uuidSchema,
+  value: z.string().trim().min(1).max(255).optional(),
+  slug: slugSchema.nullish(),
+  sort: z.number().int().min(0).optional(),
+  colorHex: colorHexSchema.nullish(),
+});
+export type AttributeValueUpdateInput = z.infer<
+  typeof AttributeValueUpdateSchema
+>;
 
 /** Удаление значения из словаря характеристики (по id). */
 export const AttributeValueDeleteSchema = z.object({ id: uuidSchema });

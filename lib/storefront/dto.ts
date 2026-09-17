@@ -18,6 +18,7 @@
  */
 
 import { discountPercent, isOnSale, effectiveCompareAt } from '@/lib/catalog/pricing';
+import { normalizeColorHex } from '@/lib/catalog/color';
 import { buildSeoMeta, type SeoCtx } from '@/lib/seo/meta';
 import type {
   Brand,
@@ -98,6 +99,14 @@ export interface VariantDto {
   onSale: boolean;
   /** Публичные атрибуты варианта (denormalized cache — без внутренних id). */
   attributes: Record<string, unknown>;
+  /**
+   * Значение цвета варианта («Белый») из вариантного EAV; null — цвет у
+   * варианта не заведён. `name` варианта при этом остаётся своей меткой и цвет
+   * в него НЕ подмешивается — иначе разъезжаются подпись и селектор цвета.
+   */
+  color?: string | null;
+  /** HEX цвета варианта ('#RRGGBB', attribute_values.color_hex); null — не задан. */
+  colorHex?: string | null;
   /** В наличии (inventory > 0). */
   inStock: boolean;
   /**
@@ -124,6 +133,12 @@ export interface ProductListItemDto {
   availableQty: number;
 }
 
+/** Цвет товара для селектора на карточке: значение + опциональный HEX-свотч. */
+export interface ColorOptionDto {
+  value: string;
+  hex?: string | null;
+}
+
 export interface ProductDetailDto {
   /**
    * Публичный id товара. Нужен витрине, чтобы заказать товар БЕЗ вариантов
@@ -145,6 +160,13 @@ export interface ProductDetailDto {
   categories: string[];
   attributes: Record<string, unknown>;
   variants: VariantDto[];
+  /**
+   * УНИКАЛЬНЫЕ цвета товара в порядке появления у активных вариантов; пустой
+   * массив = цвета не заведены (витрина не рисует селектор цвета). Собирается
+   * из вариантных значений, а не из attributes_cache товара: цвет — свойство
+   * ВАРИАНТА, одна строка на весь товар набор цветов не описывает.
+   */
+  colors: ColorOptionDto[];
   media: MediaDto[];
   inStock: boolean;
   /**
@@ -375,6 +397,62 @@ export function effectiveVariantPrice(
   return (base + delta).toFixed(2);
 }
 
+/** Пустая/пробельная строка цвета = «не задан» → null (никаких '' наружу). */
+function normalizeColorValue(value: string | null | undefined): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+/**
+ * Ключ схлопывания одинаковых цветов: trim + нижний регистр + ё→е.
+ *
+ * ПОЧЕМУ НОРМАЛИЗАЦИЯ ВООБЩЕ: справочник цвета ведёт живой контентщик, и
+ * «Серый»/«серый»/«Сёрый» — для него один цвет. Без схлопывания API отдал бы
+ * три опции селектора на один и тот же свотч.
+ *
+ * ⚠️ Витрина, если делает свой свотч-компонент, ОБЯЗАНА нормализовать так же:
+ * это два независимых приложения, и расхождение (бэкенд отдал два цвета,
+ * витрина схлопнула в один) typecheck не поймает.
+ */
+function colorDedupeKey(value: string): string {
+  return value.toLowerCase().replace(/ё/g, 'е');
+}
+
+/**
+ * УНИКАЛЬНЫЕ цвета набора вариантов в порядке появления (чистая функция).
+ *
+ * Дубли схлопываются по значению (один цвет обычно заведён на несколько
+ * размеров). HEX берётся с ПЕРВОГО варианта, где он задан: часть вариантов
+ * может быть заведена без hex, и терять его из-за порядка нельзя.
+ */
+export function collectProductColors(
+  variants: readonly { color?: string | null; colorHex?: string | null }[],
+): ColorOptionDto[] {
+  const order: string[] = [];
+  const byKey = new Map<string, ColorOptionDto>();
+  for (const v of variants) {
+    const value = normalizeColorValue(v.color);
+    if (value === null) {
+      continue;
+    }
+    const key = colorDedupeKey(value);
+    let entry = byKey.get(key);
+    if (entry === undefined) {
+      // Показываем ПЕРВОЕ написание как есть — справочник ведёт живой человек,
+      // и «Серый» читается лучше, чем схлопнутый в нижний регистр ключ.
+      entry = { value, hex: null };
+      byKey.set(key, entry);
+      order.push(key);
+    }
+    if (entry.hex === null) {
+      entry.hex = normalizeColorHex(v.colorHex);
+    }
+  }
+  return order.map((key) => {
+    const entry = byKey.get(key)!;
+    return { value: entry.value, hex: entry.hex };
+  });
+}
+
 /** Вариант → публичный DTO (цена/скидка/inStock). */
 export function toVariantDto(
   variant: ProductVariant,
@@ -395,6 +473,11 @@ export function toVariantDto(
     discountPct: discountPercent(price, compareAtStr),
     onSale: isOnSale(price, compareAtStr),
     attributes: variant.attributesCache ?? {},
+    color: normalizeColorValue(variant.color),
+    // HEX нормализуем на границе: наружу отдаём только валидный '#RRGGBB'
+    // (витрина подставляет его в inline-стиль свотча, мусор туда попасть не
+    // должен даже если в БД он как-то оказался).
+    colorHex: normalizeColorHex(variant.colorHex),
     inStock: computeInStock(product.inventory, variant.id, MAIN_WAREHOUSE),
     availableQty: computeAvailableQty(product.inventory, variant.id, MAIN_WAREHOUSE),
   };
@@ -416,7 +499,8 @@ export function toProductDetailDto(
   // не заказуем (заказ идёт по variantId) и завышал бы наличие — тот же инвариант,
   // что в listProducts (волна 14). Без вариантов остаток на уровне товара —
   // единственный и заказуется по productId.
-  const hasActiveVariants = product.variants.some((v) => v.isActive);
+  const activeVariants = product.variants.filter((v) => v.isActive);
+  const hasActiveVariants = activeVariants.length > 0;
   const orderableInventory = hasActiveVariants
     ? product.inventory.filter((i) => (i.variantId ?? null) !== null)
     : product.inventory;
@@ -436,9 +520,10 @@ export function toProductDetailDto(
     brand: toBrandDto(product.brand, opts.seoCtx.publicUrl),
     categories: opts.categorySlugs,
     attributes: product.attributesCache ?? {},
-    variants: product.variants
-      .filter((v) => v.isActive)
-      .map((v) => toVariantDto(v, product)),
+    variants: activeVariants.map((v) => toVariantDto(v, product)),
+    // Цвета — только по АКТИВНЫМ вариантам: неактивных нет в `variants`, и
+    // выбрать такой цвет было бы некуда (селектор без варианта).
+    colors: collectProductColors(activeVariants),
     media: product.media.map(toMediaDto),
     inStock: computeInStock(orderableInventory, undefined, MAIN_WAREHOUSE),
     // Уровень товара (для товара без вариантов — заказ по productId).

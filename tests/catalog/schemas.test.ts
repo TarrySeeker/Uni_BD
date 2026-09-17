@@ -11,6 +11,8 @@ import {
   VariantCreateSchema,
   VariantReorderSchema,
   AttributeCreateSchema,
+  AttributeValueSchema,
+  AttributeValueUpdateSchema,
   AttributeValueDeleteSchema,
   ProductAttributeItemSchema,
   StockSetSchema,
@@ -358,6 +360,62 @@ describe('VariantReorderSchema (C12)', () => {
   });
   it('без productId отклонён', () => {
     expect(VariantReorderSchema.safeParse({ order: [UUID2] }).success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HEX справочника «Цвет» (attribute_values.color_hex, миграция 0043).
+//
+// ЗАЧЕМ ЭТИ ТЕСТЫ: CHECK attribute_values_color_hex_chk отвергнет мусор в БД
+// жёстко — исключением драйвера, которое пайплайн покажет как 'internal'.
+// Значит серверная валидация формата ОБЯЗАНА стоять до БД, и её зеркальность
+// CHECK'у нужно держать тестом, а не памятью.
+// ---------------------------------------------------------------------------
+describe('colorHex в схемах значений справочника (0043)', () => {
+  const base = { attributeId: UUID, value: 'Белый' };
+
+  it('валидный #RRGGBB принимается в любом регистре', () => {
+    expect(AttributeValueSchema.safeParse({ ...base, colorHex: '#FFFFFF' }).success).toBe(true);
+    expect(AttributeValueSchema.safeParse({ ...base, colorHex: '#ff00aa' }).success).toBe(true);
+  });
+
+  it('hex необязателен: отсутствие и null — валидны (значение без свотча)', () => {
+    expect(AttributeValueSchema.safeParse(base).success).toBe(true);
+    expect(AttributeValueSchema.safeParse({ ...base, colorHex: null }).success).toBe(true);
+  });
+
+  it('формат вне #RRGGBB отклоняется ДО БД (не отдаём CHECK ронять запрос)', () => {
+    for (const bad of ['FFFFFF', '#FFF', '#GGGGGG', '#FFFFFFF', 'red', '#12345', '']) {
+      expect(
+        AttributeValueSchema.safeParse({ ...base, colorHex: bad }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('сообщение об ошибке говорит человеку про формат, а не про regexp', () => {
+    const res = AttributeValueSchema.safeParse({ ...base, colorHex: 'red' });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error.issues[0]!.message).toContain('#RRGGBB');
+    }
+  });
+
+  it('AttributeValueUpdateSchema: null — очистка hex, undefined — «не трогать»', () => {
+    const cleared = AttributeValueUpdateSchema.safeParse({ id: UUID, colorHex: null });
+    expect(cleared.success).toBe(true);
+    if (cleared.success) {
+      expect(cleared.data.colorHex).toBeNull();
+    }
+    const untouched = AttributeValueUpdateSchema.safeParse({ id: UUID });
+    expect(untouched.success).toBe(true);
+    if (untouched.success) {
+      expect(untouched.data.colorHex).toBeUndefined();
+    }
+  });
+
+  it('AttributeValueUpdateSchema: мусорный hex отклонён, id обязателен', () => {
+    expect(AttributeValueUpdateSchema.safeParse({ id: UUID, colorHex: 'FFF' }).success).toBe(false);
+    expect(AttributeValueUpdateSchema.safeParse({ colorHex: '#FFFFFF' }).success).toBe(false);
   });
 });
 
