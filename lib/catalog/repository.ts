@@ -199,6 +199,27 @@ export function mapVariant(row: any): ProductVariant {
   };
 }
 
+/**
+ * Уникальные метки размеров в порядке появления (чистая функция).
+ *
+ * ЗАЧЕМ: variant.name — метка РАЗМЕРА («42 / XS»), а при матрице «цвет × размер»
+ * несколько вариантов делят одно имя. Фасет размеров каталога сравнивает метки
+ * точной строкой, поэтому дубли обязаны схлопываться. Пустые метки отбрасываем.
+ */
+export function uniqueSizes(values: readonly (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const v = typeof raw === 'string' ? raw.trim() : '';
+    if (v === '' || seen.has(v)) {
+      continue;
+    }
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
 export function mapAttribute(row: any): Attribute {
   return {
     id: row.id,
@@ -465,7 +486,21 @@ export async function listProducts(
                OR NOT EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id))), 0) AS available_stock,
       (SELECT m.url FROM product_media m
         WHERE m.product_id = p.id AND m.is_primary
-        LIMIT 1) AS primary_media_url
+        LIMIT 1) AS primary_media_url,
+      -- Фасеты сетки каталога: атрибуты товара (цвет/пол) из презентационного
+      -- кеша + метки размеров из имён активных вариантов.
+      p.attributes_cache,
+      -- УНИКАЛЬНЫЕ метки размеров: при матрице «цвет × размер» имена вариантов
+      -- ПОВТОРЯЮТСЯ (2 цвета × 4 размера = 8 вариантов, 4 метки), и фасет
+      -- размеров каталога (точное сравнение строк) получал бы дубли. Схлопываем
+      -- по имени, порядок держим по МИНИМАЛЬНОМУ sort метки (array_agg(DISTINCT …
+      -- ORDER BY v.sort) в Postgres невозможен: с DISTINCT сортировать можно
+      -- только по агрегируемому выражению).
+      COALESCE((SELECT array_agg(s.name ORDER BY s.sort, s.name)
+        FROM (SELECT v.name AS name, min(v.sort) AS sort
+              FROM product_variants v
+              WHERE v.product_id = p.id AND v.is_active AND v.name <> ''
+              GROUP BY v.name) s), '{}') AS variant_sizes
     FROM products p
     LEFT JOIN brands b ON b.id = p.brand_id
     ${where}
@@ -505,6 +540,15 @@ export async function listProducts(
       totalStock: Number(r.total_stock ?? 0),
       availableStock: Number(r.available_stock ?? 0),
       primaryMediaUrl: r.primary_media_url ?? null,
+      attributesCache:
+        r.attributes_cache && typeof r.attributes_cache === 'object'
+          ? (r.attributes_cache as Record<string, unknown>)
+          : {},
+      // Второй рубеж дедупа (SQL уже схлопнул): фасет каталога сравнивает метки
+      // строкой, дубль размера ломает фильтр сетки.
+      sizes: uniqueSizes(
+        Array.isArray(r.variant_sizes) ? (r.variant_sizes as string[]) : [],
+      ),
       createdAt,
     };
   });

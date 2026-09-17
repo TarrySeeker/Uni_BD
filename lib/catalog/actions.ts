@@ -23,6 +23,7 @@ import {
   VariantUpdateSchema,
   VariantIdSchema,
   VariantReorderSchema,
+  VariantMatrixSchema,
   AttributeCreateSchema,
   AttributeUpdateSchema,
   AttributeValueSchema,
@@ -47,6 +48,12 @@ import {
   rebuildVariantAttributesCache,
 } from './cache';
 import { slugify, slugifyOrFallback, uniquifySlug } from './slug';
+import {
+  COLOR_ATTRIBUTE_CODE_PATTERNS,
+  COLOR_ATTRIBUTE_NAMES,
+  isColorAttribute,
+} from './color';
+import { planVariantMatrix, type ExistingMatrixVariant } from './variant-matrix';
 
 /**
  * Server Actions каталога (docs/05 §4).
@@ -848,6 +855,329 @@ export const reorderVariant = defineAction({
   },
 });
 
+/**
+ * Находит id справочника «Цвет» среди характеристик по имени/коду.
+ *
+ * ПОЧЕМУ НЕ ПО attributes.is_variant: флаг существует в схеме, но в UI никогда
+ * не проставлялся, поэтому в реальных данных он почти всегда false — фильтр по
+ * нему просто не нашёл бы справочник. Признаки распознавания — единый список
+ * lib/catalog/color.ts, тот же, что параметризует запросы репозитория.
+ */
+async function findColorAttributeId(): Promise<string | null> {
+  const rows = await sql<{ id: string }[]>`
+    SELECT id FROM attributes
+    WHERE lower(name) = ANY(${COLOR_ATTRIBUTE_NAMES})
+       OR lower(code) LIKE ANY(${COLOR_ATTRIBUTE_CODE_PATTERNS})
+    ORDER BY sort, name
+    LIMIT 1
+  `;
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * Определяет справочник «Цвет» для матрицы.
+ *
+ * ЯВНЫЙ id ОТ КЛИЕНТА ПРОВЕРЯЕТСЯ, А НЕ ПРИНИМАЕТСЯ НА ВЕРУ: схема допускает
+ * любой uuid характеристики, а действие пишет с этим attribute_id вариантный
+ * EAV и по нему же читает текущие цвета вариантов. Подставив id словаря
+ * «Размер», клиент получил бы «цвета» из чужого словаря — витрина (LATERAL-джойн
+ * репозитория ищет цвет по имени/коду справочника) показала бы одно, а админка
+ * не показала бы ничего. Признак «этот справочник — цвет» один на весь проект:
+ * lib/catalog/color.ts (то же условие в SQL репозитория).
+ */
+async function resolveColorAttributeId(
+  explicitId: string | null | undefined,
+): Promise<string | null> {
+  if (!explicitId) {
+    return findColorAttributeId();
+  }
+  const rows = await sql<{ id: string; code: string; name: string }[]>`
+    SELECT id, code::text AS code, name FROM attributes
+    WHERE id = ${explicitId}::uuid
+    LIMIT 1
+  `;
+  const attr = rows[0];
+  if (!attr || !isColorAttribute({ code: attr.code, name: attr.name })) {
+    throw new CatalogError(
+      'validation',
+      'Указанная характеристика не является справочником «Цвет».',
+    );
+  }
+  return attr.id;
+}
+
+/**
+ * Добирает подписи выбранных цветов ИЗ СПРАВОЧНИКА и заодно проверяет их
+ * принадлежность ему.
+ *
+ * ЗАЧЕМ: FK product_attributes.value_id → attribute_values несоставной, он не
+ * знает, из какого словаря значение. Без этой проверки редактор (или просто
+ * устаревшая вкладка админки) мог прислать valueId из словаря «Размер», и в
+ * цветовом EAV появилась бы строка, которую витрина отдала бы как ЦВЕТ «42»,
+ * а админка нарисовала бы прочерком. Чинилось бы только руками в SQL.
+ *
+ * Возвращает подписи, которыми дальше пользуются ТОЛЬКО серверные потребители:
+ * основа артикула и запись аудита. Клиентских подписей у действия нет.
+ */
+async function loadColorValues(
+  valueIds: readonly string[],
+  colorAttributeId: string,
+): Promise<Map<string, string>> {
+  const ids = Array.from(new Set(valueIds));
+  const map = new Map<string, string>();
+  if (ids.length === 0) {
+    return map;
+  }
+  const rows = await sql<{ id: string; value: string }[]>`
+    SELECT id, value FROM attribute_values
+    WHERE id = ANY(${ids}::uuid[]) AND attribute_id = ${colorAttributeId}::uuid
+  `;
+  for (const r of rows) {
+    map.set(String(r.id), String(r.value));
+  }
+  if (map.size !== ids.length) {
+    const missing = ids.length - map.size;
+    throw new CatalogError(
+      'validation',
+      `Выбранные цвета (${missing} шт.) не найдены в справочнике «Цвет». Обновите страницу и повторите выбор.`,
+    );
+  }
+  return map;
+}
+
+/**
+ * Максимум попыток подобрать свободный sku варианта.
+ *
+ * Потолок щедрый, потому что sku уникален ГЛОБАЛЬНО по всей БД, а пара
+ * «Белый × 42» повторяется по всему каталогу: с базой вида только «цвет-размер»
+ * и десятком попыток девятый такой товар матрицу применить бы уже не смог.
+ * База включает slug товара (см. skuPrefix), а с MATRIX_SKU_PLAIN_ATTEMPTS
+ * кандидаты получают случайный хвост, поэтому потолок — лишь страховка от
+ * бесконечного цикла.
+ */
+const MATRIX_SKU_ATTEMPTS = 24;
+
+/** Сколько первых кандидатов sku нумеруются по-человечески (-2, -3, ...). */
+const MATRIX_SKU_PLAIN_ATTEMPTS = 3;
+
+/** Сколько значений каждой оси попадает в запись аудита (см. ниже). */
+const MATRIX_AUDIT_SAMPLE = 10;
+
+/**
+ * Кандидат артикула для попытки `attempt`. Первые попытки — читаемые
+ * «-2»/«-3», дальше случайный хвост: последовательная нумерация в общем
+ * пространстве артикулов быстро упирается в занятые значения.
+ */
+function matrixSkuCandidate(base: string, attempt: number): string {
+  if (attempt < MATRIX_SKU_PLAIN_ATTEMPTS) {
+    return uniquifySlug(base, attempt);
+  }
+  return `${base}-${crypto.randomUUID().replace(/-/g, '').slice(0, 6)}`;
+}
+
+/**
+ * Матрица «цвет × размер» одной операцией.
+ *
+ * ЗАЧЕМ ОТДЕЛЬНЫЙ BATCH-ACTION, А НЕ ЦИКЛ createVariant НА КЛИЕНТЕ: createVariant
+ * делает свой INSERT + INSERT в inventory вне общей транзакции и на каждый вызов
+ * пишет запись аудита и ревалидацию. Матрица 4×5 превратилась бы в 20 круговых
+ * вызовов, 20 записей аудита и 20 ревалидаций, причём падение на середине
+ * оставило бы товар с половиной матрицы. Здесь — одна транзакция, один аудит,
+ * одна ревалидация.
+ *
+ * РАСКЛАДКА — в чистом модуле variant-matrix (покрыт юнит-тестом): здесь только
+ * ввод-вывод. Инварианты раскладки: name варианта = метка РАЗМЕРА (цвет живёт
+ * в вариантном EAV), варианты вне матрицы только гасятся и только по явному
+ * флагу, удалений нет вообще (order_items хранят снимок варианта).
+ *
+ * SKU: product_variants.sku уникален ГЛОБАЛЬНО по всей БД, а не в рамках товара.
+ * Поэтому база артикула — slug ТОВАРА + «цвет-размер»: пара «Белый × 42» сама по
+ * себе повторяется по всему каталогу и упиралась бы в занятые значения уже на
+ * девятом товаре. Артикул подбирается ретраем кандидатов через INSERT ...
+ * ON CONFLICT DO NOTHING RETURNING id — пустой RETURNING означает «занят, берём
+ * следующий». Ловить исключение уникальности здесь нельзя: внутри транзакции
+ * упавший statement отравляет её целиком (пришлось бы городить savepoint).
+ * Ячейка, которой артикул так и не подобрался, ПРОПУСКАЕТСЯ и отдаётся в
+ * result.skipped: ронять транзакцию (а с ней десятки уже созданных вариантов)
+ * из-за одной ячейки — несоразмерно.
+ *
+ * ЦВЕТА ПРИХОДЯТ ID-АМИ: подписи и принадлежность справочнику добираются
+ * сервером до транзакции (loadColorValues) — см. VariantMatrixSchema.
+ *
+ * ХАРАКТЕРИСТИКИ УРОВНЯ ТОВАРА НЕ ТРОГАЮТСЯ: setProductAttributes намеренно НЕ
+ * вызывается — он всегда сносит привязки с variant_id IS NULL, и вызов с одними
+ * вариантными items молча стёр бы все характеристики товара. Здесь пишутся
+ * только вариантные привязки создаваемых вариантов.
+ */
+export const applyVariantMatrix = defineAction({
+  permission: 'catalog.write',
+  input: VariantMatrixSchema,
+  handler: async (data, _ctx) => {
+    await assertCatalogEnabled();
+
+    // Товар нужен до записи: его slug — префикс артикулов (уникальность sku
+    // глобальная), а заодно это внятный not_found вместо нарушения FK.
+    const productRows = await sql<{ slug: string }[]>`
+      SELECT slug FROM products WHERE id = ${data.productId} LIMIT 1
+    `;
+    if (!productRows[0]) {
+      throw new CatalogError('not_found', 'Товар не найден.');
+    }
+    const skuPrefix = slugify(String(productRows[0].slug)) || 'variant';
+
+    const colorAttributeId = await resolveColorAttributeId(
+      data.colorAttributeId,
+    );
+    if (data.colors.length > 0 && !colorAttributeId) {
+      throw new CatalogError(
+        'validation',
+        'Справочник «Цвет» не найден. Заведите характеристику «Цвет» типа «Список значений» и её значения.',
+      );
+    }
+
+    // Подписи цветов — из справочника, а не от клиента. Заодно отсекаются
+    // valueId чужих словарей: их не вернёт фильтр по attribute_id.
+    const colorValues = colorAttributeId
+      ? await loadColorValues(data.colors, colorAttributeId)
+      : new Map<string, string>();
+    const colors = data.colors.map((valueId) => ({
+      valueId,
+      value: colorValues.get(valueId) ?? '',
+    }));
+
+    // Существующие варианты + их текущий цвет одним запросом. attribute_id =
+    // NULL при отсутствии справочника даёт color_value_id = NULL для всех строк,
+    // поэтому форма запроса одна на оба случая.
+    const rows = await sql<Record<string, unknown>[]>`
+      SELECT v.id, v.name, v.is_active, v.sort, pa.value_id AS color_value_id
+      FROM product_variants v
+      LEFT JOIN product_attributes pa
+        ON pa.variant_id = v.id AND pa.attribute_id = ${colorAttributeId}::uuid
+      WHERE v.product_id = ${data.productId}
+      ORDER BY v.sort, v.name
+    `;
+    const existing: ExistingMatrixVariant[] = rows.map((r) => ({
+      id: String(r.id),
+      name: String(r.name ?? ''),
+      colorValueId: r.color_value_id == null ? null : String(r.color_value_id),
+      isActive: r.is_active === true,
+    }));
+    const nextSort = existing.length
+      ? Math.max(...rows.map((r) => Number(r.sort) || 0)) + 1
+      : 0;
+
+    const plan = planVariantMatrix({
+      colors,
+      sizes: data.sizes,
+      existing,
+      deactivateMissing: data.deactivateMissing,
+      nextSort,
+    });
+
+    const createdIds: string[] = [];
+    const coloredIds: string[] = [];
+    /** Ячейки, которым не нашлось свободного артикула (см. докстринг). */
+    const skipped: string[] = [];
+
+    await sql.begin(async (tx: TransactionSql) => {
+      for (const item of plan.create) {
+        const skuBase = `${skuPrefix}-${item.skuBase}`;
+        let variantId: string | null = null;
+        for (let attempt = 0; attempt < MATRIX_SKU_ATTEMPTS; attempt++) {
+          const sku = matrixSkuCandidate(skuBase, attempt);
+          const inserted = await tx<{ id: string }[]>`
+            INSERT INTO product_variants (product_id, sku, name, is_active, sort)
+            VALUES (${data.productId}, ${sku}, ${item.name}, ${true}, ${item.sort})
+            ON CONFLICT DO NOTHING
+            RETURNING id
+          `;
+          if (inserted[0]) {
+            variantId = inserted[0].id;
+            break;
+          }
+        }
+        if (!variantId) {
+          // Пропускаем ЯЧЕЙКУ, а не всю матрицу: throw здесь откатил бы и все
+          // успешно созданные варианты. Счётчик уходит в результат и аудит.
+          skipped.push(item.name);
+          continue;
+        }
+        createdIds.push(variantId);
+
+        // Остаток варианта инициализируем нулём (§4.4) — как в createVariant.
+        await tx`
+          INSERT INTO inventory (product_id, variant_id, warehouse_code, quantity)
+          VALUES (${data.productId}, ${variantId}, 'main', 0)
+          ON CONFLICT DO NOTHING
+        `;
+
+        if (item.colorValueId && colorAttributeId) {
+          await tx`
+            INSERT INTO product_attributes
+              (product_id, variant_id, attribute_id, value_id)
+            VALUES (${data.productId}, ${variantId}, ${colorAttributeId}, ${item.colorValueId})
+            ON CONFLICT DO NOTHING
+          `;
+          coloredIds.push(variantId);
+        }
+      }
+
+      if (plan.activate.length > 0) {
+        await tx`
+          UPDATE product_variants SET is_active = true, updated_at = now()
+          WHERE product_id = ${data.productId} AND id = ANY(${plan.activate}::uuid[])
+        `;
+      }
+      if (plan.deactivate.length > 0) {
+        await tx`
+          UPDATE product_variants SET is_active = false, updated_at = now()
+          WHERE product_id = ${data.productId} AND id = ANY(${plan.deactivate}::uuid[])
+        `;
+      }
+    });
+
+    // Презентационный кеш вариантов (ADR-007) — только для тех, кому проставили
+    // цвет; вне транзакции, как и в setProductAttributes.
+    if (coloredIds.length > 0) {
+      await rebuildVariantAttributesCache(data.productId, coloredIds);
+    }
+
+    return {
+      result: {
+        productId: data.productId,
+        created: createdIds.length,
+        activated: plan.activate.length,
+        deactivated: plan.deactivate.length,
+        /** Ячейки без свободного артикула — редактор должен об этом узнать. */
+        skipped: skipped.length,
+      },
+      revalidate: [productPath(data.productId)],
+      audit: {
+        action: 'catalog.variant.matrix.apply',
+        entityType: 'product',
+        entityId: data.productId,
+        // Осями матрицы аудит не грузим: потолок MATRIX_MAX_CELLS ограничивает
+        // ПРОИЗВЕДЕНИЕ, а не длины осей — 64 цвета × 3 размера валидный вход и
+        // ≈33 КБ строк в одной записи. Пишем счётчики + выборку начала осей,
+        // этого хватает, чтобы понять, что применяли.
+        after: {
+          colors: colors.slice(0, MATRIX_AUDIT_SAMPLE).map((c) => c.value),
+          colorsTotal: colors.length,
+          sizes: data.sizes.slice(0, MATRIX_AUDIT_SAMPLE),
+          sizesTotal: data.sizes.length,
+          created: createdIds.length,
+          activated: plan.activate.length,
+          deactivated: plan.deactivate.length,
+          skipped: skipped.length,
+          // Какие именно ячейки пропущены — иначе разбираться пришлось бы
+          // сравниванием матрицы с таблицей вариантов вручную.
+          skippedSample: skipped.slice(0, MATRIX_AUDIT_SAMPLE),
+        },
+      },
+    };
+  },
+});
+
 // =============================================================================
 // ХАРАКТЕРИСТИКИ (§4.5).
 // =============================================================================
@@ -1037,14 +1367,6 @@ export const setProductAttributes = defineAction({
   input: SetProductAttributesSchema,
   handler: async (data, _ctx) => {
     await assertCatalogEnabled();
-    // Полная замена привязок уровня товара (variant_id IS NULL) и переданных вариантов.
-    // Уровень товара чистим всегда; привязки переданных вариантов — тоже, иначе
-    // INSERT ... ON CONFLICT DO NOTHING (uniq включает value_id) НЕ перезапишет
-    // прежнее select-значение варианта (Красный→Синий дал бы два значения).
-    await sql`
-      DELETE FROM product_attributes
-      WHERE product_id = ${data.productId} AND variant_id IS NULL
-    `;
     const variantIds = Array.from(
       new Set(
         data.items
@@ -1052,24 +1374,42 @@ export const setProductAttributes = defineAction({
           .filter((v): v is string => Boolean(v)),
       ),
     );
-    if (variantIds.length > 0) {
-      await sql`
+    // ОДНА ТРАНЗАКЦИЯ на замену (образец — applyVariantMatrix): DELETE и серия
+    // INSERT раньше шли каждый в своей автокоммит-транзакции, и обрыв процесса
+    // между ними оставлял товар БЕЗ характеристик, а варианты — без цвета. До
+    // матрицы «цвет × размер» товар с сотнями привязок был экзотикой — окно
+    // между DELETE и последним INSERT было коротким; с матрицей это норма (цвет
+    // каждой ячейки — отдельная строка EAV), и окно выросло настолько, что
+    // полусобранный товар стал реальным исходом: витрина показывала бы карточку
+    // без цветов, а форма админки — пустые характеристики.
+    await sql.begin(async (tx: TransactionSql) => {
+      // Полная замена привязок уровня товара (variant_id IS NULL) и переданных
+      // вариантов. Уровень товара чистим всегда; привязки переданных вариантов —
+      // тоже, иначе INSERT ... ON CONFLICT DO NOTHING (uniq включает value_id) НЕ
+      // перезапишет прежнее select-значение варианта (Красный→Синий дал бы два).
+      await tx`
         DELETE FROM product_attributes
-        WHERE product_id = ${data.productId}
-          AND variant_id = ANY(${variantIds}::uuid[])
+        WHERE product_id = ${data.productId} AND variant_id IS NULL
       `;
-    }
-    for (const item of data.items) {
-      await sql`
-        INSERT INTO product_attributes
-          (product_id, variant_id, attribute_id, value_id, value_text)
-        VALUES (
-          ${data.productId}, ${item.variantId ?? null}, ${item.attributeId},
-          ${item.valueId ?? null}, ${item.valueText ?? null}
-        )
-        ON CONFLICT DO NOTHING
-      `;
-    }
+      if (variantIds.length > 0) {
+        await tx`
+          DELETE FROM product_attributes
+          WHERE product_id = ${data.productId}
+            AND variant_id = ANY(${variantIds}::uuid[])
+        `;
+      }
+      for (const item of data.items) {
+        await tx`
+          INSERT INTO product_attributes
+            (product_id, variant_id, attribute_id, value_id, value_text)
+          VALUES (
+            ${data.productId}, ${item.variantId ?? null}, ${item.attributeId},
+            ${item.valueId ?? null}, ${item.valueText ?? null}
+          )
+          ON CONFLICT DO NOTHING
+        `;
+      }
+    });
     // Пересбор презентационного кеша (ADR-007, cache.ts): уровень товара —
     // всегда; уровень вариантов — для переданных вариантов (C10-1: иначе
     // product_variants.attributes_cache остаётся стейл/пустым на витрине).

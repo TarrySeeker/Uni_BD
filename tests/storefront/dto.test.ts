@@ -136,6 +136,8 @@ describe('storefront/dto — список товаров', () => {
     totalStock: 3,
     availableStock: 3,
     primaryMediaUrl: 'https://cdn/img.jpg',
+    attributesCache: { color: 'Белый', gender: 'Мужской' },
+    sizes: ['48', '50'],
     createdAt: D,
   };
 

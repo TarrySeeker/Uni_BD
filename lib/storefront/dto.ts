@@ -85,6 +85,13 @@ export interface MediaDto {
   type: string;
   alt: string;
   isPrimary: boolean;
+  /**
+   * Вариант, к которому привязано фото (product_media.variant_id); null — общее
+   * фото товара. Нужен витрине, чтобы показывать снимки ВЫБРАННОГО цвета:
+   * без этого поля галерея не отличает белый костюм от графитового.
+   * Публичен только идентификатор связи — storage_key/mime/размеры приватны.
+   */
+  variantId: string | null;
 }
 
 export interface VariantDto {
@@ -131,6 +138,17 @@ export interface ProductListItemDto {
   inStock: boolean;
   /** Доступное к заказу количество (≥0) — для ограничения корзины (см. VariantDto.availableQty). */
   availableQty: number;
+  /**
+   * Фасеты сетки каталога: фильтр по полу/цвету/размеру прямо в списке.
+   * gender/color — из attributes_cache ТОВАРА (одна строка на товар), sizes —
+   * уникальные метки активных вариантов. Цвет здесь — не замена ProductDetailDto
+   * .colors: в списке нужна одна строка для фильтра, а не набор свотчей.
+   * Отсутствие атрибута — пустая строка, а не undefined: фильтр витрины
+   * сравнивает строками и на undefined упал бы в «нет данных».
+   */
+  gender: string;
+  color: string;
+  sizes: string[];
 }
 
 /** Цвет товара для селектора на карточке: значение + опциональный HEX-свотч. */
@@ -310,7 +328,26 @@ export function toProductListItemDto(
     // Семантика совпадает с computeInStock карточки/детали.
     inStock: row.availableStock > 0,
     availableQty: Math.max(0, row.availableStock),
+    // Фасеты сетки каталога: пол/цвет из attributes_cache, размеры из вариантов.
+    gender: attrStr(row.attributesCache, ['gender', 'пол']),
+    color: attrStr(row.attributesCache, ['color', 'цвет']),
+    sizes: row.sizes,
   };
+}
+
+/**
+ * Читает строковый атрибут по одному из ключей.
+ *
+ * Ключей несколько, потому что код характеристики задаёт контентщик магазина
+ * (платформа мультитенантна): 'color' и 'цвет' — один и тот же фасет. Пустая
+ * строка вместо undefined — см. ProductListItemDto.gender.
+ */
+function attrStr(attrs: Record<string, unknown>, keys: string[]): string {
+  for (const k of keys) {
+    const v = attrs?.[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return '';
 }
 
 /** Медиа → публичный DTO (без storage_key/размеров/байт). */
@@ -320,6 +357,7 @@ export function toMediaDto(media: ProductMedia): MediaDto {
     type: media.type,
     alt: media.alt,
     isPrimary: media.isPrimary,
+    variantId: media.variantId ?? null,
   };
 }
 
