@@ -53,6 +53,7 @@ export default async function SettingsPage() {
     { id: 'modules', title: 'Модули' },
     { id: 'navigation', title: 'Навигация (меню и футер)' },
     { id: 'access', title: 'Доступ' },
+    { id: 'size-charts', title: 'Размерные сетки' },
     { id: 'seo', title: 'SEO и поиск' },
   ];
 
@@ -136,6 +137,20 @@ export default async function SettingsPage() {
           <Section id="access" title="Доступ">
             <AccessForm singleUserMode={eff.access.singleUserMode} />
             <ResetRow keys={[{ key: 'access', label: 'Сбросить режим доступа' }]} />
+          </Section>
+
+          <Section id="size-charts" title="Размерные сетки">
+            <p className="text-sm text-gray-600">
+              Таблицы размеров на карточке товара: произвольные колонки и строки,
+              привязка сетки к полу товара, общая сноска — в отдельном разделе.
+            </p>
+            <a
+              href="/admin/settings/size-charts"
+              className="mt-3 inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            >
+              Открыть размерные сетки →
+            </a>
+            <ResetRow keys={[{ key: 'size_charts', label: 'Сбросить размерные сетки' }]} />
           </Section>
 
           <Section id="seo" title="SEO и поиск">

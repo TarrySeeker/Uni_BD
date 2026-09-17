@@ -41,6 +41,7 @@ import {
   homeSchema,
   navigationSchema,
   accessSchema,
+  sizeChartsSchema,
   SETTING_KEYS,
 } from '@/lib/settings/schemas';
 import {
@@ -129,6 +130,9 @@ export const NavigationInputSchema = z.object({ navigation: navigationSchema });
 
 /** access на ВХОДЕ действия (B9): флаги доступа уровня магазина (singleUserMode). */
 export const AccessInputSchema = z.object({ access: accessSchema });
+
+/** size_charts на ВХОДЕ действия: размерные сетки магазина целиком (replace). */
+export const SizeChartsInputSchema = z.object({ sizeCharts: sizeChartsSchema });
 
 /**
  * Вход загрузки изображения настроек: kind (logo|favicon|og) + байты файла.
@@ -485,6 +489,36 @@ export function createSettingsActions(deps: SettingsActionDeps) {
   });
 
   /**
+   * Сохранение размерных сеток (ключ size_charts). Значение сохраняется ЦЕЛИКОМ
+   * (replace, а не merge): порядок сеток/колонок/строк задаёт админ.
+   *
+   * invalidateCache() ОБЯЗАТЕЛЕН: без него memo-кэш эффективных настроек продолжает
+   * отдавать старое значение до рестарта приложения («сохранил — витрина не видит»).
+   */
+  const updateSizeChartsAction = defineAction({
+    permission: 'settings.manage',
+    input: SizeChartsInputSchema,
+    deps: actionDeps,
+    handler: async (data, ctx: ActionCtx) => {
+      const before = await deps.getSetting('size_charts');
+      const row = await deps.upsertSetting('size_charts', data.sizeCharts, ctx.user.id);
+      deps.invalidateCache();
+      return {
+        result: { key: 'size_charts' as const },
+        // Сетки видны на карточках товара → инвалидируем витрину и форму настроек.
+        revalidate: [SETTINGS_PATH, ...STOREFRONT_PATHS],
+        audit: {
+          action: 'settings.size_charts.update',
+          entityType: 'shop_settings',
+          entityId: 'size_charts',
+          before: before?.value,
+          after: row.value,
+        },
+      };
+    },
+  });
+
+  /**
    * Загрузка изображения настроек (логотип/фавикон/og). Переиспользует пайплайн
    * медиа: validateUpload (magic-bytes) → generatePreviews (webp) → storage.put.
    * logo/favicon → URL в branding (logoUrl/faviconUrl); og → КЛЮЧ S3 в
@@ -655,6 +689,7 @@ export function createSettingsActions(deps: SettingsActionDeps) {
     updateHomeAction,
     updateNavigationAction,
     updateAccessSettings,
+    updateSizeChartsAction,
     uploadSettingsImageAction,
     uploadStoreImageAction,
     resetSetting,

@@ -18,6 +18,8 @@ function fakeEffective(): EffectiveSettings {
   return {
     modules: { overrides: {} },
     access: { singleUserMode: false },
+    // Платформенный дефолт size_charts: сеток нет (таблица размеров не рисуется).
+    sizeCharts: { charts: [] },
     home: HOME_DEFAULTS,
     navigation: { header: [], footer: [] },
     branding: {

@@ -18,6 +18,7 @@ import {
   updateHomeAction as _updateHome,
   updateNavigationAction as _updateNavigation,
   updateAccessSettings as _updateAccess,
+  updateSizeChartsAction as _updateSizeCharts,
   uploadSettingsImageAction as _uploadSettingsImage,
   uploadStoreImageAction as _uploadStoreImage,
   resetSetting as _resetSetting,
@@ -50,6 +51,11 @@ export async function updateNavigationContentAction(input: unknown): Promise<Act
 }
 export async function updateAccessAction(input: unknown): Promise<ActionResult<unknown>> {
   return _updateAccess(input);
+}
+export async function updateSizeChartsSettingAction(
+  input: unknown,
+): Promise<ActionResult<unknown>> {
+  return _updateSizeCharts(input);
 }
 export async function uploadSettingsImageAction(
   formData: FormData,

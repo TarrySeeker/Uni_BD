@@ -32,6 +32,7 @@ import {
   type HomeSettings,
   type NavigationSettings,
   type AccessSettings,
+  type SizeChartsSettings,
 } from '@/lib/settings/schemas';
 import { HOME_DEFAULTS, type HomeContent } from '@/lib/config/home-defaults';
 import { toMinor } from '@/lib/orders/money';
@@ -117,6 +118,12 @@ export interface EffectiveSettings {
   access: {
     singleUserMode: boolean;
   };
+  /**
+   * Размерные сетки магазина. Платформенный дефолт — ПУСТОЙ массив: без явной
+   * настройки таблица размеров на витрине просто не показывается (мультитенантность —
+   * ни одна сетка не зашита в код). Набор колонок произвольный, задаётся из админки.
+   */
+  sizeCharts: SizeChartsSettings;
 }
 
 // -----------------------------------------------------------------------------
@@ -240,6 +247,9 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
   const navigation: NavigationSettings =
     parseSettingValue('navigation', rows.get('navigation')) ?? {};
   const access: AccessSettings = parseSettingValue('access', rows.get('access')) ?? {};
+  // size_charts — мягкий парс: кривая строка БД → дефолт «сеток нет» (charts: []).
+  const sizeCharts: SizeChartsSettings =
+    parseSettingValue('size_charts', rows.get('size_charts')) ?? { charts: [] };
   // module_overrides — мягкий парс (.strip): кривая строка БД → {} (нет оверрайда).
   const moduleOverrides: ModuleOverrides =
     parseSettingValue('module_overrides', rows.get('module_overrides')) ?? {};
@@ -304,6 +314,10 @@ export function mergeSettings(env: Env, dbRows: SettingRow[]): EffectiveSettings
       // Дефолт OFF: отсутствие/пустой объект access → однопользовательский режим
       // выключен (другие магазины не затронуты без явного включения).
       singleUserMode: access.singleUserMode ?? false,
+    },
+    sizeCharts: {
+      charts: sizeCharts.charts ?? [],
+      ...(sizeCharts.footnote ? { footnote: sizeCharts.footnote } : {}),
     },
   };
 }

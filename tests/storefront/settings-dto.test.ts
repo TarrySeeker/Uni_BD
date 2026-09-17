@@ -16,6 +16,8 @@ function makeEffective(): EffectiveSettings {
     home: HOME_DEFAULTS,
     navigation: { header: [], footer: [] },
     access: { singleUserMode: false },
+    // Платформенный дефолт size_charts: сеток нет (таблица размеров не рисуется).
+    sizeCharts: { charts: [] },
     branding: {
       shopName: 'Gang Auto',
       logoUrl: 'https://cdn/logo.png',

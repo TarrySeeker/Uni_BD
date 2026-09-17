@@ -379,6 +379,110 @@ export const accessSchema = z
 // Реестр ключ → схема. Единственный источник правды о наборе ключей настроек.
 // -----------------------------------------------------------------------------
 
+/** Максимум колонок в сетке — он же потолок числа ячеек в одной строке. */
+const MAX_SIZE_CHART_COLUMNS = 24;
+
+/**
+ * size_charts — размерные сетки магазина (таблица «Размерная сетка» на карточке
+ * товара). Мультитенантный контракт: набор сеток и НАБОР КОЛОНОК произвольны и
+ * задаются из админки, в коде НИЧЕГО не зашито. Платформенный дефолт — ПУСТОЙ
+ * массив сеток (charts: []), никаких данных конкретного магазина.
+ *
+ * Структура значения:
+ *   charts[]  — сетки в порядке показа;
+ *     id      — slug, уникален в массиве (проверяется refine ниже);
+ *     genders — значения атрибута товара `gender`, к которым применима сетка;
+ *               ПУСТОЙ массив = «применима всегда»;
+ *     columns[] — произвольные колонки (key/label), key — идентификатор ячейки;
+ *     rows[]  — плоские словари columnKey → строковое значение ячейки.
+ *   footnote  — общая сноска под таблицей (опционально).
+ *
+ * Выбор сетки по gender — чистая функция на стороне потребителя (см. контракт
+ * selectSizeCharts): если НИ ОДНА сетка не подошла (пол пустой/unisex/неизвестен),
+ * показываются ВСЕ сетки — молча подставлять одну (женскую) нельзя.
+ *
+ * Все строки ограничены по длине, массивы — по размеру: кривой/раздутый JSONB не
+ * должен ломать рендер витрины. `.strip()` — анти-tamper, как у прочих ключей.
+ */
+const sizeChartColumnSchema = z
+  .object({
+    key: z.string().trim().min(1).max(64),
+    label: z.string().trim().min(1).max(120),
+  })
+  .strip();
+
+/**
+ * Строка таблицы: плоский словарь columnKey → значение ячейки (строка).
+ * Zod 4 требует у z.record ОБА аргумента (keyType, valueType); режим по умолчанию
+ * 'strict' — ключи, не проходящие keyType, дают ошибку (не молча проходят).
+ */
+const sizeChartRowSchema = z.record(
+  z.string().min(1).max(64),
+  z.string().trim().max(120),
+);
+
+const sizeChartSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    title: z.string().trim().min(1).max(160),
+    note: z.string().trim().min(1).max(240).optional(),
+    // Пустой массив = сетка применима всегда (дефолт при отсутствии поля).
+    genders: z.array(z.string().trim().min(1).max(64)).max(32).default([]),
+    columns: z.array(sizeChartColumnSchema).min(1).max(MAX_SIZE_CHART_COLUMNS),
+    rows: z.array(sizeChartRowSchema).max(200).default([]),
+  })
+  .strip()
+  .superRefine((chart, ctx) => {
+    // Ключи колонок уникальны В ПРЕДЕЛАХ сетки: они же React-key в таблице и
+    // они же ключи ячеек, поэтому дубль схлопывает две колонки в одну ячейку.
+    const seen = new Set<string>();
+    for (const [i, col] of chart.columns.entries()) {
+      if (seen.has(col.key)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Ключ колонки «${col.key}» повторяется — ключи должны различаться внутри сетки`,
+          path: ['columns', i, 'key'],
+        });
+      }
+      seen.add(col.key);
+    }
+
+    // Ячейка без колонки не рендерится (таблица идёт по columns), но занимает
+    // место в jsonb, в ответе витрины и в audit_log. Без этой проверки z.record
+    // не ограничивает ЧИСЛО ключей, и лимиты charts/rows не дают реальной границы.
+    for (const [i, row] of chart.rows.entries()) {
+      const keys = Object.keys(row);
+      if (keys.length > MAX_SIZE_CHART_COLUMNS) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `В строке ${keys.length} ячеек — больше допустимых ${MAX_SIZE_CHART_COLUMNS}`,
+          path: ['rows', i],
+        });
+        continue;
+      }
+      for (const key of keys) {
+        if (!seen.has(key)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Ячейка «${key}» не соответствует ни одной колонке сетки`,
+            path: ['rows', i, key],
+          });
+        }
+      }
+    }
+  });
+
+export const sizeChartsSchema = z
+  .object({
+    charts: z.array(sizeChartSchema).max(24).default([]),
+    footnote: z.string().trim().max(500).optional(),
+  })
+  .strip()
+  .refine(
+    (v) => new Set(v.charts.map((c) => c.id)).size === v.charts.length,
+    { message: 'Идентификаторы размерных сеток (id) должны быть уникальными', path: ['charts'] },
+  );
+
 /** Стабильные ключи логических разделов настроек (PK shop_settings.setting_key). */
 export const SETTING_KEYS = [
   'branding',
@@ -394,6 +498,7 @@ export const SETTING_KEYS = [
   'home',
   'navigation',
   'access',
+  'size_charts',
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -413,6 +518,7 @@ export const SETTING_SCHEMAS = {
   home: homeSchema,
   navigation: navigationSchema,
   access: accessSchema,
+  size_charts: sizeChartsSchema,
 } as const satisfies Record<SettingKey, z.ZodTypeAny>;
 
 // Типы значений по ключам (выводятся из схем).
@@ -429,6 +535,11 @@ export type SeoSettings = z.infer<typeof seoSettingsSchema>;
 export type HomeSettings = z.infer<typeof homeSchema>;
 export type NavigationSettings = z.infer<typeof navigationSchema>;
 export type AccessSettings = z.infer<typeof accessSchema>;
+export type SizeChartsSettings = z.infer<typeof sizeChartsSchema>;
+/** Одна размерная сетка (элемент SizeChartsSettings['charts']). */
+export type SizeChart = SizeChartsSettings['charts'][number];
+/** Колонка размерной сетки (произвольная, задаётся из админки). */
+export type SizeChartColumn = z.infer<typeof sizeChartColumnSchema>;
 
 /**
  * Безопасный парс значения по ключу. Возвращает провалидированный частичный
