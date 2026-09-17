@@ -135,6 +135,7 @@ export function mapOrder(row: Record<string, unknown>): Order {
     deliveryType: row.delivery_type as Order['deliveryType'],
     deliveryStatus: row.delivery_status as Order['deliveryStatus'],
     deliveryCity: strOrNull(row.delivery_city),
+    deliveryCityCode: numOrNull(row.delivery_city_code),
     deliveryAddress: strOrNull(row.delivery_address),
     deliveryPvzCode: strOrNull(row.delivery_pvz_code),
     deliveryCost: strOrNull(row.delivery_cost),
@@ -496,6 +497,24 @@ export async function resolveGiftLine(promo: PromoCode): Promise<ResolvedLine | 
 // =============================================================================
 
 /**
+ * Право на бесплатную доставку по порогу — только РФ (типичное решение
+ * владельца: по России бесплатно от суммы, СНГ и зарубеж — платно).
+ *
+ * 🔴 Страна НЕ задана (старые клиенты, самовывоз, витрина её не присылает) →
+ * `true`, то есть прежнее поведение: порог действует как раньше. Иначе
+ * появление правила молча отняло бы бесплатную доставку у всех существующих
+ * заказов и у магазинов, которым география не важна.
+ *
+ * Сравнение регистро- и пробело-независимое, покрывает «Россия»,
+ * «Российская Федерация», «RU», «Russia».
+ */
+function isRussianDelivery(country: string | null | undefined): boolean {
+  const c = (country ?? '').trim().toLowerCase();
+  if (!c) return true; // страна неизвестна → не ужесточаем (прежнее поведение)
+  return /(росси|russia|\bru\b|российск)/.test(c);
+}
+
+/**
  * Стоимость доставки через адаптер (развязка orders↔cdek). При выключенном
  * модуле cdek / самовывозе / отсутствии назначения → '0.00' (поведение Этапа 3
  * сохранено). При включённом cdek + назначении → расчёт СДЭК (mock без сети).
@@ -680,6 +699,8 @@ export async function quoteCart(
     delivery: {
       cost: delivery.cost,
       freeThreshold,
+      // Бесплатно по порогу — только РФ; СНГ/зарубеж платят реальную цену.
+      freeEligible: isRussianDelivery(input.delivery?.country),
     },
     scopeTargets,
   });
@@ -965,6 +986,8 @@ export async function createOrder(
     delivery: {
       cost: deliveryCost,
       freeThreshold,
+      // Бесплатно по порогу — только РФ; СНГ/зарубеж платят реальную цену.
+      freeEligible: isRussianDelivery(input.delivery.country),
     },
     scopeTargets,
   });
@@ -1063,6 +1086,7 @@ export async function createOrder(
         INSERT INTO orders (
           number, status, items_total, discount_total, delivery_total, grand_total,
           currency, payment_method, payment_status, delivery_type, delivery_city,
+          delivery_city_code,
           delivery_address, delivery_pvz_code, delivery_cost, promo_code_id, promo_code,
           customer_name, customer_email, customer_phone, comment, idempotency_key,
           source, ip
@@ -1070,6 +1094,9 @@ export async function createOrder(
           ${number}, 'new', ${quote.itemsTotal}, ${quote.discount}, ${quote.deliveryCost},
           ${quote.grandTotal}, ${env.SHOP_CURRENCY}, ${input.paymentMethod}, 'pending',
           ${input.delivery.type}, ${input.delivery.city ?? null},
+          -- Код города СДЭК из автокомплита витрины: без него накладная курьерки
+          -- уходит без надёжной идентификации получателя (см. deliveryCityCode).
+          ${input.delivery.cityCode ?? null},
           ${input.delivery.address ?? null}, ${input.delivery.pvzCode ?? null},
           ${quote.deliveryCost}, ${promoRow?.id ?? null}, ${appliedPromo?.code ?? null},
           ${input.customer.name}, ${input.customer.email}, ${input.customer.phone},

@@ -162,6 +162,14 @@ export interface Order {
   deliveryType: DeliveryType;
   deliveryStatus: DeliveryStatus;
   deliveryCity: string | null;
+  /**
+   * Числовой код города СДЭК получателя (из автокомплита /cities витрины).
+   * null → код неизвестен, идентификация города падает на строковое
+   * deliveryCity. Нужен для to_location курьерки: по документации СДЭК тариф
+   * «до двери» требует address + идентификацию города (code|city|postal_code),
+   * и числовой код надёжнее названия (тёзки городов, опечатки, регионы).
+   */
+  deliveryCityCode: number | null;
   deliveryAddress: string | null;
   deliveryPvzCode: string | null;
   /** Расчётная стоимость доставки (СДЭК/заглушка); null → не рассчитана. */

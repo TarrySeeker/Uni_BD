@@ -48,6 +48,13 @@ export interface CdekConfig {
 
   cronSecret: string | null;
   createEnabled: boolean;
+  /**
+   * Создавать накладную СДЭК сразу при оформлении заказа, БЕЗ ожидания оплаты
+   * (магазины без онлайн-кассы: «нажал Оформить» = подтверждение заказа).
+   * Дефолт false — штатно накладная только после оплаты. Когда у магазина
+   * появится касса — выключить, и вернётся гейт по оплате.
+   */
+  createOnOrder: boolean;
 }
 
 /**
@@ -145,6 +152,7 @@ export function getCdekConfig(source?: Record<string, string | undefined>): Cdek
 
     cronSecret: nonEmpty(env.CDEK_CRON_SECRET),
     createEnabled: env.CDEK_CREATE_ENABLED,
+    createOnOrder: env.CDEK_CREATE_ON_ORDER,
   };
 }
 

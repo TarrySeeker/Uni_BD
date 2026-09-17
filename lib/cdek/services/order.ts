@@ -115,7 +115,8 @@ export interface CdekOrderPayload {
   shipment_point?: string;
   from_location?: { code: number };
   delivery_point?: string;
-  to_location?: { code?: number; postal_code?: string; address?: string };
+  /** Тарифы «до двери»: адрес + идентификация города (code|city|postal_code). */
+  to_location?: { code?: number; city?: string; postal_code?: string; address?: string };
   recipient: {
     name: string;
     phones: Array<{ number: string }>;
@@ -243,9 +244,17 @@ export function buildPayload(
       );
     }
   } else {
-    // door: адрес получателя (код города у заказа — это название, не числовой код
-    // СДЭК; адрес — основное поле для курьерской доставки).
+    // door (боевой аудит СДЭК 2026-07-09, фикс 4): to_location = адрес + идентификация
+    // города. По документации apidoc.cdek.ru тариф «до двери» опознаёт город по
+    // code | city | postal_code, и числовой code надёжнее названия: у городов бывают
+    // тёзки в разных регионах, а опечатка в строке уводит груз не туда. Поэтому
+    // сначала пробрасываем delivery_city_code (заполняется из автокомплита /cities),
+    // а строковое city оставляем как фоллбэк для старых заказов, где кода ещё нет.
+    const cityCode = order.deliveryCityCode ?? undefined;
+    const cityName = order.deliveryCity ?? undefined;
     payload.to_location = {
+      ...(cityCode !== undefined ? { code: cityCode } : {}),
+      ...(cityName !== undefined ? { city: cityName } : {}),
       ...(order.deliveryAddress ? { address: order.deliveryAddress } : {}),
     };
   }
@@ -286,17 +295,51 @@ export function shipmentBlockMessage(reason: ShipmentBlockReason): string {
   }
 }
 
-/** Можно ли создавать отправление для заказа (оплачен и не самовывоз). */
+/**
+ * Можно ли создавать отправление для заказа (не самовывоз; оплачен ЛИБО включён
+ * режим «накладная при заказе» для магазина без кассы — opts.createOnOrder).
+ */
 export function canCreateShipment(
   order: Order,
+  opts: { createOnOrder?: boolean } = {},
 ): { ok: boolean; reason?: ShipmentBlockReason } {
   if (order.deliveryType === 'pickup') {
     return { ok: false, reason: 'pickup' };
   }
-  if (!isOrderPaidForShipment(order)) {
+  // Гейт оплаты снимается ТОЛЬКО если магазин работает без кассы (createOnOrder):
+  // тогда оформление заказа и есть подтверждение, накладная формируется сразу.
+  // При выключенном флаге (дефолт) поведение прежнее — защита от отправки
+  // неоплаченного заказа.
+  if (!opts.createOnOrder && !isOrderPaidForShipment(order)) {
     return { ok: false, reason: 'not_paid' };
   }
   return { ok: true };
+}
+
+/**
+ * Нужно ли регистрировать накладную СДЭК СРАЗУ при оформлении заказа (режим
+ * «магазин без онлайн-кассы», CDEK_CREATE_ON_ORDER). Чистое решение для горячего
+ * пути POST /orders — тестируется без сети и БД. Условия (все обязательны):
+ *   • НЕ повторный idempotency-заказ (reused уже обрабатывался ранее — иначе
+ *     ретрай витрины дёргал бы СДЭК по второму разу);
+ *   • включён режим createOnOrder;
+ *   • доставка НЕ самовывоз (по самовывозу накладной нет в принципе);
+ *   • модуль cdek эффективно включён — единый рубильник (боевой аудит СДЭК
+ *     2026-07-09, находка #6: авто-создание обходило module toggle и ходило в
+ *     СДЭК даже при выключенном модуле).
+ */
+export function wantsCdekShipmentOnOrder(args: {
+  reused: boolean;
+  createOnOrder: boolean;
+  deliveryType: string;
+  cdekModuleEnabled: boolean;
+}): boolean {
+  return (
+    !args.reused &&
+    args.createOnOrder &&
+    args.deliveryType !== 'pickup' &&
+    args.cdekModuleEnabled
+  );
 }
 
 // -----------------------------------------------------------------------------
@@ -415,7 +458,9 @@ export class OrderService {
     }
     const { order, items } = loaded;
 
-    const precond = canCreateShipment(order);
+    const precond = canCreateShipment(order, {
+      createOnOrder: this.manager.config.createOnOrder,
+    });
     if (!precond.ok) {
       throw new CdekError(
         'cdek_precondition_failed',

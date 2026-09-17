@@ -5,8 +5,12 @@
  * атомарный резерв, выдача номера, снимок позиций, учёт промокода.
  *
  * Headers: Idempotency-Key (рекоменд.) — повтор не дублирует заказ.
- * Body: { items[], customer:{name,email,phone}, delivery:{type,city,address?,pvzCode?},
+ * Body: { items[], customer:{name,email,phone},
+ *         delivery:{type,city?,cityCode?,address?,pvzCode?},
  *         paymentMethod, promoCode?, comment?, idempotencyKey? }
+ * delivery.cityCode — числовой код города СДЭК (опц., из автокомплита /cities);
+ * персистится в orders.delivery_city_code и используется для to_location
+ * курьерки при регистрации накладной (боевой аудит СДЭК 2026-07-09, фикс 4).
  * Ответ: { number, status, paymentStatus, grandTotal, currency, accessToken }.
  * Ошибки: нет остатка → 409; невалидная позиция/промокод → 422.
  */
@@ -23,6 +27,9 @@ import { CreateOrderSchema } from '@/lib/orders/schemas';
 import { createOrder } from '@/lib/orders/repository';
 import { toOrderCreatedDto, assertOrderTokenConfigured } from '@/lib/storefront/order-dto';
 import { normalizeClientIp } from '@/lib/server/request-ip';
+import { getCdekConfig } from '@/lib/cdek/config';
+import { OrderService, wantsCdekShipmentOnOrder } from '@/lib/cdek/services/order';
+import { isModuleEffectivelyEnabled } from '@/lib/config/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +94,36 @@ export async function POST(req: Request): Promise<Response> {
           return jsonError('conflict', result.message, cors);
         }
         return jsonError('unprocessable', result.message, cors);
+      }
+
+      // Накладная ПРИ ЗАКАЗЕ (магазин без онлайн-кассы): при CDEK_CREATE_ON_ORDER
+      // регистрируем отправление СДЭК сразу после оформления. Best-effort — сбой
+      // НЕ валит ответ заказа (покупатель не виноват в недоступности СДЭК, а
+      // недосозданное подхватит cron/оператор в админке). Самовывоз исключён.
+      // Идемпотентно: повторный вызов упрётся в advisory-lock и существующее
+      // отправление внутри OrderService.createShipment.
+      // Повторный idempotency-заказ (reused) уже обрабатывался — не дёргаем СДЭК.
+      // Модуль cdek читаем из БД ТОЛЬКО если дешёвые условия прошли (короткое
+      // замыкание: иначе лишний запрос настроек на КАЖДОМ заказе даже у магазинов
+      // с выключенным режимом; боевой аудит СДЭК 2026-07-09, находка #6).
+      const cdekCfg = getCdekConfig();
+      const cdekModuleEnabled =
+        !result.reused && cdekCfg.createOnOrder && result.order.deliveryType !== 'pickup'
+          ? await isModuleEffectivelyEnabled('cdek')
+          : false;
+      if (
+        wantsCdekShipmentOnOrder({
+          reused: result.reused,
+          createOnOrder: cdekCfg.createOnOrder,
+          deliveryType: result.order.deliveryType,
+          cdekModuleEnabled,
+        })
+      ) {
+        try {
+          await new OrderService().createShipment(result.order.id);
+        } catch {
+          // Заказ оформлён; накладную довыполнит cron/ручное создание в админке.
+        }
       }
 
       const dto = toOrderCreatedDto(result.order);

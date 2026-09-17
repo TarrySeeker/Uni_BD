@@ -105,6 +105,7 @@ function makeOrder(over: Partial<Order> = {}): Order {
     deliveryType: 'pvz',
     deliveryStatus: 'pending',
     deliveryCity: 'Москва',
+    deliveryCityCode: null,
     deliveryAddress: null,
     deliveryPvzCode: 'MSK1',
     deliveryCost: '0.00',
